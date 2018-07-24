@@ -34,7 +34,7 @@ def read_mama(filename):
                                                     # Update 20171024: Started changing everything to lower bin edge,
                                                     # but started to hesitate. For now I'm inclined to keep it as
                                                     # center-bin everywhere. 
-    return matrix, cal, y_array, x_array # Returning y first as this is axis 0 in matrix language
+    return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
 
 def write_mama(matrix, filename, Egamma_range, Ex_range, comment=""):
     import time
@@ -160,199 +160,201 @@ def shift_and_smooth2D(array, E_array, FWHM, p, shift, smoothing=True):
 
 
 # === Unfolding -- convert the following into a function when it's done ===
-
-
-
-fname_data_raw = 'alfna28si.m'
-fname_resp = 'resp.dat'
-fname_resp_mat = 'response-si28-20171112.m'
-
-
-
-# Import raw mama matrix
-data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
-# data_raw, cal, Ex_array, Eg_array = read_mama('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
-
-# Plot raw matrix:
-f, ((ax_raw, ax_fold), (ax_unfold, ax_unfold_smooth)) = plt.subplots(2,2)
-ax_raw.set_title("raw")
-ax_fold.set_title("folded")
-ax_unfold.set_title("unfolded")
-ax_unfold_smooth.set_title("Compton subtracted")
-cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm())
-f.colorbar(cbar_raw, ax=ax_raw)
-
-# Import response matrix
-R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
-
-# Check that response matrix matches data, at least in terms of calibration:
-eps = 1e-3
-if not (np.abs(cal["a0x"]-cal_R["a0x"])<eps and np.abs(cal["a1x"]-cal_R["a1x"])<eps and np.abs(cal["a2x"]-cal_R["a2x"])<eps):
-    raise Exception("Calibration mismatch between data and response matrices")
-
-
-
-
-# = Step 1: Run iterative unfolding =
-
-
-# Set limits for excitation and gamma energy bins to be considered for unfolding
-Ex_low = 0
-Ex_high = 12000 # keV
-# Use index 0 of array as lower limit instead of energy because it can be negative!
-iEx_low, iEx_high = 0, i_from_E(Ex_high, Ex_array)
-Eg_low = 0
-Eg_high = 12000 # keV
-iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
-Nit = 10 #27
-
-# Make masking array to cut away noise below Eg=Ex+dEg diagonal
-dEg = 1000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
-# Define cut   x1    y1    x2    y2
-cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
-              i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
-# cut_points = [ 72,   5,  1050,  257]
-def line(x, points):
-    a = (points[3]-points[1])/float(points[2]-points[0])
-    b = points[1] - a*points[0]
-    print("a = {}, b = {}".format(a,b))
-    return a*x + b
-# i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
-# j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
-j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
-mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
-
-
-
-rawmat = (data_raw*mask)[iEx_low:iEx_high,iEg_low:iEg_high] 
-
-mask_cut = mask[iEx_low:iEx_high,iEg_low:iEg_high]
-Ndof = mask_cut.sum()
-
-unfoldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
-foldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
-chisquares = np.zeros(Nit)
-R = R[iEg_low:iEg_high,iEg_low:iEg_high]
-
-# Run folding iterations:
-for iteration in range(Nit):
-    if iteration == 0:
-        unfoldmat = rawmat
-    else:
-        unfoldmat = unfoldmat + (rawmat - foldmat)
-    foldmat = np.dot(R.T, unfoldmat.T).T # Have to do some transposing to get the axis orderings right for matrix product
-    foldmat = mask_cut*foldmat # Apply mask for every iteration to suppress stuff below diag
-    # 20171110: Tried transposing R. Was it that simple? Immediately looks good.
-    #           Or at least much better. There is still something wrong giving negative counts left of peaks.
-    #           Seems to come from unfolding and not from compton subtraction
-
-    # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
-    chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() / Ndof
-    print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
-
-
-# Remove negative counts and trim:
-unfoldmat[unfoldmat<=0] = 0
-unfoldmat = mask_cut*unfoldmat
-
-# Plot:
-cbar_fold = ax_fold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], foldmat, norm=LogNorm(vmin=1))
-f.colorbar(cbar_fold, ax=ax_fold)
-
-
-
-# = Step 2: Compton subtraction =
-
-# We also need the resp.dat file for this.
-# TODO: Consider writing a function that makes the response matrix (R) from this file
-# (or other input), so we don't have to keep track of redundant info.
-resp = []
-with open(fname_resp) as f:
-    # Read line by line as there is crazyness in the file format
-    lines = f.readlines()
-    for i in range(4,len(lines)):
-        try:
-            row = np.array(lines[i].split(), dtype="double")
-            resp.append(row)
-        except:
-            break
-
-
-resp = np.array(resp)
-# Name the columns for ease of reading
-FWHM = resp[:,1]
-eff = resp[:,2]
-pf = resp[:,3]
-pc = resp[:,4]
-ps = resp[:,5]
-pd = resp[:,6]
-pa = resp[:,7]
-
-# We follow the notation of Guttormsen et al (NIM 1996) in what follows.
-# u0 is the unfolded spectrum from above, r is the raw spectrum, 
-# w = us + ud + ua is the folding contributions from everything except Compton,
-# i.e. us = single escape, ua = double escape, ua = annihilation (511).
-# v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
-# c is the estimated Compton spectrum.
-
-# Plot compton subtraction spectra for debugging:
-# f_compt, ax_compt = plt.subplots(1,1)
-
-# TODO consider parallelizing this loop? Or can it be simply vectorized?
-# Allocate array to store properly unfolded spectrum:
-unfolded = np.zeros(unfoldmat.shape)
-# Select a single channel for testing:
-i_Ex_testing = 300
-for i_Ex in range(i_Ex_testing,i_Ex_testing+1):
-# for i_Ex in range(0,50):
-# for i_Ex in range(iEx_low,iEx_high):
-    if i_Ex%5==0:
-        print("Unfolding, i_Ex =", i_Ex, flush=True)
-    r = rawmat[i_Ex,:]
-    u0 = unfoldmat[i_Ex,:]
-    uf = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
-    us = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
-    ud = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
-    ua = shift_and_smooth2D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-    w = us + ud + ua
-    v = uf + w
-    c = r - v
-
-    # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-    c_s = shift_and_smooth2D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)
-
-    # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-    u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat
-
-    unfolded[i_Ex,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
-    # print(unfolded[i_Ex,:], flush=True)
-
-    # # Diagnostic plotting:
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], r, label="r")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], u0, label="u0")
-    # # ax_compt.plot(Eg_array[iEg_low:iEg_high], uf, label="uf")
-    # # ax_compt.plot(Eg_array[iEg_low:iEg_high], us, label="us")
-    # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ud, label="ud")
-    # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ua, label="ua")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], w, label="w")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], v, label="v")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], c, label="c")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], c_s, label="c_s")
-    # ax_compt.plot(Eg_array[iEg_low:iEg_high], u, label="u")
-    # ax_compt.legend()
-
-
-
-# Plot unfolded and Compton subtracted matrices:
-cbar_unfold = ax_unfold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfoldmat, norm=LogNorm(vmin=1))
-# f.colorbar(cbar_unfold, ax=ax_unfold)
-cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfolded, norm=LogNorm(vmin=1))
-# f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
-
-
-# Save compton subtracted matrix
-write_mama(unfolded, 'unfolded-28Si.m', Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], comment="Unfolded using unfold.py by JEM, during development of pyma, Summer 2018")
-
-plt.show()
+    
+    
+if __name__=="__main__":
+    fname_data_raw = 'alfna28si.m'
+    fname_resp = 'resp.dat'
+    fname_resp_mat = 'response-si28-20171112.m'
+    
+    
+    
+    # Import raw mama matrix
+    data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
+    # data_raw, cal, Ex_array, Eg_array = read_mama('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
+    
+    # Plot raw matrix:
+    f, ((ax_raw, ax_fold), (ax_unfold, ax_unfold_smooth)) = plt.subplots(2,2)
+    ax_raw.set_title("raw")
+    ax_fold.set_title("folded")
+    ax_unfold.set_title("unfolded")
+    ax_unfold_smooth.set_title("Compton subtracted")
+    cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm())
+    f.colorbar(cbar_raw, ax=ax_raw)
+    
+    # Import response matrix
+    R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
+    
+    # Check that response matrix matches data, at least in terms of calibration:
+    eps = 1e-3
+    if not (np.abs(cal["a0x"]-cal_R["a0x"])<eps and np.abs(cal["a1x"]-cal_R["a1x"])<eps and np.abs(cal["a2x"]-cal_R["a2x"])<eps):
+        raise Exception("Calibration mismatch between data and response matrices")
+    
+    
+    
+    
+    # = Step 1: Run iterative unfolding =
+    
+    
+    # Set limits for excitation and gamma energy bins to be considered for unfolding
+    Ex_low = 0
+    Ex_high = 12000 # keV
+    # Use index 0 of array as lower limit instead of energy because it can be negative!
+    iEx_low, iEx_high = 0, i_from_E(Ex_high, Ex_array)
+    Eg_low = 0
+    Eg_high = 12000 # keV
+    iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
+    Nit = 10 #27
+    
+    # Make masking array to cut away noise below Eg=Ex+dEg diagonal
+    dEg = 1000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
+    # Define cut   x1    y1    x2    y2
+    cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
+                  i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
+    # cut_points = [ 72,   5,  1050,  257]
+    def line(x, points):
+        a = (points[3]-points[1])/float(points[2]-points[0])
+        b = points[1] - a*points[0]
+        print("a = {}, b = {}".format(a,b))
+        return a*x + b
+    # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
+    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
+    i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
+    mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+    
+    
+    
+    rawmat = (data_raw*mask)[iEx_low:iEx_high,iEg_low:iEg_high] 
+    
+    mask_cut = mask[iEx_low:iEx_high,iEg_low:iEg_high]
+    Ndof = mask_cut.sum()
+    
+    unfoldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
+    foldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
+    chisquares = np.zeros(Nit)
+    R = R[iEg_low:iEg_high,iEg_low:iEg_high]
+    
+    # Run folding iterations:
+    for iteration in range(Nit):
+        if iteration == 0:
+            unfoldmat = rawmat
+        else:
+            unfoldmat = unfoldmat + (rawmat - foldmat)
+        foldmat = np.dot(R.T, unfoldmat.T).T # Have to do some transposing to get the axis orderings right for matrix product
+        foldmat = mask_cut*foldmat # Apply mask for every iteration to suppress stuff below diag
+        # 20171110: Tried transposing R. Was it that simple? Immediately looks good.
+        #           Or at least much better. There is still something wrong giving negative counts left of peaks.
+        #           Seems to come from unfolding and not from compton subtraction
+    
+        # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
+        chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() / Ndof
+        print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
+    
+    
+    # Remove negative counts and trim:
+    unfoldmat[unfoldmat<=0] = 0
+    unfoldmat = mask_cut*unfoldmat
+    
+    # Plot:
+    cbar_fold = ax_fold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], foldmat, norm=LogNorm(vmin=1))
+    f.colorbar(cbar_fold, ax=ax_fold)
+    
+    
+    
+    # = Step 2: Compton subtraction =
+    
+    # We also need the resp.dat file for this.
+    # TODO: Consider writing a function that makes the response matrix (R) from this file
+    # (or other input), so we don't have to keep track of redundant info.
+    resp = []
+    with open(fname_resp) as f:
+        # Read line by line as there is crazyness in the file format
+        lines = f.readlines()
+        for i in range(4,len(lines)):
+            try:
+                row = np.array(lines[i].split(), dtype="double")
+                resp.append(row)
+            except:
+                break
+    
+    
+    resp = np.array(resp)
+    # Name the columns for ease of reading
+    FWHM = resp[:,1]
+    eff = resp[:,2]
+    pf = resp[:,3]
+    pc = resp[:,4]
+    ps = resp[:,5]
+    pd = resp[:,6]
+    pa = resp[:,7]
+    
+    # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
+    # u0 is the unfolded spectrum from above, r is the raw spectrum, 
+    # w = us + ud + ua is the folding contributions from everything except Compton,
+    # i.e. us = single escape, ua = double escape, ua = annihilation (511).
+    # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
+    # c is the estimated Compton spectrum.
+    
+    # Plot compton subtraction spectra for debugging:
+    # f_compt, ax_compt = plt.subplots(1,1)
+    
+    # TODO consider parallelizing this loop? Or can it be simply vectorized?
+    # Allocate array to store properly unfolded spectrum:
+    unfolded = np.zeros(unfoldmat.shape)
+    # Select a single channel for testing:
+    i_Ex_testing = 300
+    for i_Ex in range(i_Ex_testing,i_Ex_testing+1):
+    # for i_Ex in range(0,50):
+    # for i_Ex in range(iEx_low,iEx_high):
+        if i_Ex%5==0:
+            print("Unfolding, i_Ex =", i_Ex, flush=True)
+        r = rawmat[i_Ex,:]
+        u0 = unfoldmat[i_Ex,:]
+        uf = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
+        us = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
+        ud = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
+        ua = shift_and_smooth2D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+        w = us + ud + ua
+        v = uf + w
+        c = r - v
+    
+        # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+        c_s = shift_and_smooth2D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)
+    
+        # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+        u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat
+    
+        unfolded[i_Ex,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+        # print(unfolded[i_Ex,:], flush=True)
+    
+        # # Diagnostic plotting:
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], r, label="r")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], u0, label="u0")
+        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], uf, label="uf")
+        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], us, label="us")
+        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ud, label="ud")
+        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ua, label="ua")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], w, label="w")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], v, label="v")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], c, label="c")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], c_s, label="c_s")
+        # ax_compt.plot(Eg_array[iEg_low:iEg_high], u, label="u")
+        # ax_compt.legend()
+    
+    
+    # Trim result:
+    unfolded = mask_cut*unfolded
+    
+    # Plot unfolded and Compton subtracted matrices:
+    cbar_unfold = ax_unfold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfoldmat, norm=LogNorm(vmin=1))
+    # f.colorbar(cbar_unfold, ax=ax_unfold)
+    cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfolded, norm=LogNorm(vmin=1))
+    # f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
+    
+    
+    # Save compton subtracted matrix
+    write_mama(unfolded, 'unfolded-28Si.m', Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
+    
+    plt.show()
