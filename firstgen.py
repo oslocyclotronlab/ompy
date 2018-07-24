@@ -12,7 +12,14 @@ from unfold import *
 
 # === Utility functions ===
 
-def first_generation_spectrum_test2(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_max, dE_gamma, N_iterations=1):
+def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_max, dE_gamma, N_iterations=1):
+	"""
+	Function implementing the first generation method from Guttormsen et al. (NIM 1987)
+	The code is heavily influenced by the original implementation by Magne in MAMA.
+	Mainly written autumn 2016 at MSU
+	"""
+
+
 	Ny = len(matrix[:,0])
 	Nx = len(matrix[0,:])
 	# Extract / calculate calibration coefficients
@@ -317,8 +324,11 @@ if __name__=="__main__":
 	Ex_max = 7500 # keV - maximum excitation energy
 	dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
 	N_Exbins = 100
-	firstgen, diff, Eg_array_fg, Ex_array_fg = first_generation_spectrum_test2(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
+	firstgen, diff, Eg_array_fg, Ex_array_fg = first_generation_spectrum(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
 
+
+
+write_mama()
 
 
 # Diagnostic plots:
