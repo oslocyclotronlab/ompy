@@ -181,6 +181,12 @@ if __name__=="__main__":
     ax_unfold_smooth.set_title("Compton subtracted")
     cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm())
     f.colorbar(cbar_raw, ax=ax_raw)
+
+
+
+    # Rebin 
+
+
     
     # Import response matrix
     R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
