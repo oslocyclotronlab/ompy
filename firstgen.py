@@ -321,20 +321,19 @@ if __name__=="__main__":
 	fname_unf = "unfolded-28Si.m"
 	unfolded, cal_unf, Ex_array_unf, Eg_array_unf = read_mama(fname_unf)
 
-	Ex_max = 7500 # keV - maximum excitation energy
+	Ex_max = 12000 # keV - maximum excitation energy
 	dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
-	N_Exbins = 100
+	N_Exbins = 300
 	firstgen, diff, Eg_array_fg, Ex_array_fg = first_generation_spectrum(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
 
 
 
-write_mama()
-
-
-# Diagnostic plots:
-fig, (ax_unf, ax_fg) = plt.subplots(2,1)
-ax_unf.pcolormesh(Eg_array_unf, Ex_array_unf, unfolded, norm=LogNorm(vmin=1), cmap="jet")
-ax_fg.pcolormesh(Eg_array_fg, Ex_array_fg, firstgen, norm=LogNorm(vmin=1), cmap="jet")
-
-
-plt.show()
+	write_mama(firstgen, 'firstgen-28Si.m', Eg_array_fg, Ex_array_fg, comment="Made using firstgen.py by JEM, during development of pyma, summer 2018")	
+	
+	# Diagnostic plots:
+	fig, (ax_unf, ax_fg) = plt.subplots(2,1)
+	ax_unf.pcolormesh(Eg_array_unf, Ex_array_unf, unfolded, norm=LogNorm(vmin=1), cmap="jet")
+	ax_fg.pcolormesh(Eg_array_fg, Ex_array_fg, firstgen, norm=LogNorm(vmin=1), cmap="jet")
+	
+	
+	plt.show()

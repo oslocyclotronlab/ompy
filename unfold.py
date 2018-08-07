@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from scipy.stats import norm
 import psutil
+import time
 
 
 
@@ -37,7 +38,7 @@ def read_mama(filename):
                                                     # center-bin everywhere. 
     return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
 
-def write_mama(matrix, filename, Egamma_range, Ex_range, comment=""):
+def write_mama(matrix, filename, y_array, x_array, comment=""):
     import time
     outfile = open(filename, 'w')
 
@@ -58,7 +59,7 @@ def write_mama(matrix, filename, Egamma_range, Ex_range, comment=""):
     header_string +='!EXPERIMENT= pyma \n'
     header_string +='!COMMENT={:s} \n'.format(comment)
     header_string +='!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
-    header_string +='!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(Egamma_range[0], (Egamma_range[1]-Egamma_range[0]), Ex_range[0], (Ex_range[1]-Ex_range[0]))
+    header_string +='!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(x_array[0], (x_array[1]-x_array[0]), y_array[0], (y_array[1]-y_array[0]))
     header_string +='!PRECISION=16 \n'
     header_string +='!DIMENSION=2,0:%4d,0:%4d \n' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
     header_string +='!CHANNEL=(0:%4d,0:%4d) ' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
@@ -128,6 +129,10 @@ def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
 
     
     N_initial = array.shape[rebin_axis] # Initial number of counts along rebin axis
+
+    # TODO: Loop this part over chunks of the Ex axis to avoid running out of memory.
+    # Just take the loop from main program in here. Have some test on the dimensionality 
+    # to judge whether chunking is necessary?
 
     # Repeat each bin of array Nfinal times and scale to preserve counts
     array_rebinned = array.repeat(N_final, axis=rebin_axis)/N_final
@@ -248,8 +253,9 @@ if __name__=="__main__":
     fname_resp_mat = 'response-si28-20171112.m'
     
     
-    # == Step 0: Import data and response matrix ==
+    # = Step 0: Import data and response matrix =
     
+    time_readfiles_start = time.process_time()
     # Import raw mama matrix
     data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
     # data_raw, cal, Ex_array, Eg_array = read_mama('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
@@ -258,31 +264,48 @@ if __name__=="__main__":
     print("Lowest Eg value =", Eg_array[0], flush=True)
     print("Lowest Ex value =", Ex_array[0], flush=True)
    
-    # Rebin it:
-    N_rebin = int(N_Eg/2)
-    # Take it in Ex portions to avoid memory problems
-    data_raw_rebinned = np.zeros((N_Ex, N_rebin))
-    N_Ex_portions = 10
-    N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-    for i in range(N_Ex_portions):
-        data_raw_rebinned[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array_rebinned = rebin_and_shift(data_raw[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array, N_rebin, rebin_axis=1)
-
-
 
     # Import response matrix
     R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
 
-    # Rebin response matrix by interpolating:
-    from scipy.interpolate import RectBivariateSpline
-    f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
-    R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
+
+    time_readfiles_end = time.process_time()
+    time_rebin_start = time.process_time()
 
 
-    # Rename everything:    
-    data_raw = data_raw_rebinned
-    R = R_rebinned    
-    Eg_array = Eg_array_rebinned
+    # Rebin data -- take it in Ex portions to avoid memory problems:
+    N_rebin = int(N_Eg/4)
 
+    if N_rebin != N_Eg:
+        # Allocate matrix to store finished result, filled in chunks:
+        data_raw_rebinned = np.zeros((N_Ex, N_rebin)) 
+    
+        N_Ex_portions = 1 # How many portions to chunk, initially try just 1
+        mem_avail = psutil.virtual_memory()[1]
+        mem_need = 8 * N_Ex/N_Ex_portions * N_Eg * N_rebin
+        print("Rebinning: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        while mem_need > mem_avail: # Empirical limit from my Thinkpad, corresponds to 100 % system memory load (i.e. I'm not sure what the number from psutil really means.)
+            # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+            N_Ex_portions += 1 # Double number of portions 
+            mem_need = 8 * N_Ex/N_Ex_portions * N_Eg * N_rebin
+            print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        N_Ex_portions = 10
+        N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+        for i in range(N_Ex_portions):
+            data_raw_rebinned[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array_rebinned = rebin_and_shift(data_raw[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array, N_rebin, rebin_axis=1)
+    
+        # Rebin response matrix by interpolating:
+        from scipy.interpolate import RectBivariateSpline
+        f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
+        R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
+    
+    
+        # Rename everything:    
+        data_raw = data_raw_rebinned
+        R = R_rebinned    
+        Eg_array = Eg_array_rebinned
+
+    time_rebin_end = time.process_time()
 
 
     # Plot raw matrix:
@@ -291,7 +314,7 @@ if __name__=="__main__":
     ax_fold.set_title("folded")
     ax_unfold.set_title("unfolded")
     ax_unfold_smooth.set_title("Compton subtracted")
-    cbar_raw = ax_raw.pcolormesh(Eg_array_rebinned, Ex_array, data_raw, norm=LogNorm(vmin=1))
+    cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm(vmin=1))
     f.colorbar(cbar_raw, ax=ax_raw)
     
 
@@ -310,6 +333,7 @@ if __name__=="__main__":
     
     
     # = Step 1: Run iterative unfolding =
+    time_unfolding_start = time.process_time()
     
     
     # Set limits for excitation and gamma energy bins to be considered for unfolding
@@ -372,17 +396,19 @@ if __name__=="__main__":
     cbar_fold = ax_fold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], foldmat, norm=LogNorm(vmin=1))
     f.colorbar(cbar_fold, ax=ax_fold)
     
+    time_unfolding_end = time.process_time()
     
     
     # = Step 2: Compton subtraction =
+    time_compton_start = time.process_time()
     
     # We also need the resp.dat file for this.
     # TODO: Consider writing a function that makes the response matrix (R) from this file
     # (or other input), so we don't have to keep track of redundant info.
     resp = []
-    with open(fname_resp) as f:
+    with open(fname_resp) as file:
         # Read line by line as there is crazyness in the file format
-        lines = f.readlines()
+        lines = file.readlines()
         for i in range(4,len(lines)):
             try:
                 row = np.array(lines[i].split(), dtype="double")
@@ -409,75 +435,89 @@ if __name__=="__main__":
     # c is the estimated Compton spectrum.
     
     # Plot compton subtraction spectra for debugging:
-    f_compt, ax_compt = plt.subplots(1,1)
+    # f_compt, ax_compt = plt.subplots(1,1)
     
-    # TODO consider parallelizing this loop? Or can it be simply vectorized?
-    # Allocate array to store properly unfolded spectrum:
-    unfolded = np.zeros(unfoldmat.shape)
-    # Select a single channel for testing:
-    i_Ex_testing = range(0,iEx_high)
 
 
     # Check that there is enough memory:
+
+    # Split this operation into Ex chunks to not exceed memory:
+    # Allocate matrix to fill with result:
+    unfolded = np.zeros(unfoldmat.shape)
+
+    N_Ex_portions = 1 # How many portions to chunk, initially try just 1
     mem_avail = psutil.virtual_memory()[1]
-    mem_need = 8 * len(i_Ex_testing) * unfoldmat.shape[1] * unfoldmat.shape[1]
-    print("mem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail)
-    if mem_need > 0.48*mem_avail: # Empirical limit from my Thinkpad, corresponds to 100 % system memory load
-        raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+    mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
+    print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+    while mem_need > mem_avail: 
+        # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+        N_Ex_portions += 1 # Double number of portions 
+        mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
+    print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+
+    N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+    for i in range(N_Ex_portions):
+        u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        
+        uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
+        print("uf smoothed, integral =", uf.sum())
+        uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=False)
+        print("uf unsmoothed, integral =", uf_unsm.sum())
+        us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
+        ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
+        ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+        w = us + ud + ua
+        v = uf + w
+        c = r - v    
+        # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+        c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)    
+        # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+        u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
+        unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
 
 
-
-    u0 = unfoldmat[i_Ex_testing,:]
-    print("u0.shape =", u0.shape, flush=True)
-    r = rawmat[i_Ex_testing,:]
-    # pf = np.ones(u0.shape[1]) # Test
-    uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
-    print("uf smoothed, integral =", uf.sum())
-    uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=False)
-    print("uf unsmoothed, integral =", uf_unsm.sum())
-    us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
-    ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
-    ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-    w = us + ud + ua
-    v = uf + w
-    c = r - v    
-    # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-    c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)    
-    # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-    u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
-    unfolded = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
-    # print(unfolded[i_Ex,:], flush=True)    
     # Diagnostic plotting:
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], r[0,:], label="r")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], u0[0,:], label="u0")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], uf[0,:], label="uf")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], uf_unsm[0,:], label="uf unsmoothed")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], us[0,:], label="us")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], ud[0,:], label="ud")
-    ax_compt.plot(Eg_array[iEg_low:iEg_high], ua[0,:], label="ua")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], u0[0,:], label="u0")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], uf[0,:], label="uf")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], uf_unsm[0,:], label="uf unsmoothed")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], us[0,:], label="us")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], ud[0,:], label="ud")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], ua[0,:], label="ua")
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], w[0,:], label="w")
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], v[0,:], label="v")
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], c[0,:], label="c")
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], c_s[0,:], label="c_s")
     # ax_compt.plot(Eg_array[iEg_low:iEg_high], u[0,:], label="u")
-    ax_compt.legend()
-    
-    
+    # ax_compt.legend()
+        
+        
     # Trim result:
-    unfolded = mask_cut[i_Ex_testing,:]*unfolded
+    unfolded = mask_cut*unfolded
+
+
+    time_compton_end = time.process_time()
     
     # Plot unfolded and Compton subtracted matrices:
     cbar_unfold = ax_unfold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfoldmat, norm=LogNorm(vmin=1))
-    # f.colorbar(cbar_unfold, ax=ax_unfold)
-    cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[i_Ex_testing], unfolded, norm=LogNorm(vmin=1))
-    # f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
+    f.colorbar(cbar_unfold, ax=ax_unfold)
+    cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfolded, norm=LogNorm(vmin=1))
+    f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
+
+
     
     # Save compton subtracted matrix
-    write_mama(unfolded, 'unfolded-28Si.m', Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
+    write_mama(unfolded, 'unfolded-28Si.m', Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high], comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
     
     # f_1d, ax_1d = plt.subplots(1,1)
     # for i in range(len(i_Ex_testing)):
     #     i_Ex = i_Ex_testing[i]
     #     ax_1d.plot(Eg_array[iEg_low:iEg_high], unfolded[i,:], label="i_Ex={:d}".format(i_Ex))
+
+
+    # Print timing results:
+    print("Time elapsed: \nFile import = {:f} s \nRebinning = {:f} s \nUnfolding = {:f} s \nCompton subtraction = {:f} s".format(time_readfiles_end-time_readfiles_start, time_rebin_end-time_rebin_start, time_unfolding_end-time_unfolding_start, time_compton_end-time_compton_start), flush=True)
+
     
     plt.show()
