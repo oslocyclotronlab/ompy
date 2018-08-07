@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from scipy.stats import norm
+import psutil
 
 
 
@@ -94,9 +95,64 @@ def i_from_E(E, E_array):
 
 
 
+def line(x, points):
+    a = (points[3]-points[1])/float(points[2]-points[0])
+    b = points[1] - a*points[0]
+    # print("a = {}, b = {}".format(a,b))
+    return a*x + b
 
-def shift_and_smooth2D(array, E_array, FWHM, p, shift, smoothing=True):
-    # Takes an array of counts, shifts it (downward only!) with energy 'shift'
+
+def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
+    # Function to rebin an M-dimensional array either to larger or smaller binsize.
+    # Written by J{\o}rgen E. Midtb{\o}, University of Oslo, j.e.midtbo@fys.uio.no, github.com/jorgenem
+    # Latest change made 20161029.
+
+    # Rebinning is done with simple proportionality. E.g. for down-scaling rebinning (N_final < N_initial): 
+    # if a bin in the original spacing ends up between two bins in the reduced spacing, 
+    # then the counts of that bin are split proportionally between adjacent bins in the 
+    # rebinned array. 
+    # Upward binning (N_final > N_initial) is done in the same way, dividing the content of bins
+    # equally among adjacent bins.
+
+    # Technically it's done by repeating each element of array N_final times and dividing by N_final to 
+    # preserve total number of counts, then reshaping the array from M dimensions to M+1 before summing 
+    # along the new dimension of length N_initial, resulting in an array of the desired dimensionality.
+
+    # This version (called rebin_and_shift rather than just rebin) takes in also the energy range array (lower bin edge)
+    # corresponding to the counts array, in order to be able to change the calibration. What it does is transform the
+    # coordinates such that the starting value of the rebinned axis is zero energy. This is done by shifting all
+    # bins, so we are discarding some of the eventual counts in the highest energy bins. However, there is usually a margin.
+
+    if isinstance(array, tuple): # Check if input array is actually a tuple, which may happen if rebin_and_shift() is called several times nested for different axes.
+        array = array[0]
+
+    
+    N_initial = array.shape[rebin_axis] # Initial number of counts along rebin axis
+
+    # Repeat each bin of array Nfinal times and scale to preserve counts
+    array_rebinned = array.repeat(N_final, axis=rebin_axis)/N_final
+
+    if E_range[0] < 0 or E_range[1] < E_range[0]:
+        raise Exception("Error in function rebin_and_shift(): Negative zero energy is not supported. (But it should be relatively easy to implement.)")
+    else:
+        # Calculate number of extra slices in Nf*Ni sized array required to get down to zero energy
+        n_extra = int(np.ceil(N_final * (E_range[0]/(E_range[1]-E_range[0]))))
+        # Append this matrix of zero counts in front of the array
+        indices_append = np.array(array_rebinned.shape)
+        indices_append[rebin_axis] = n_extra
+        array_rebinned = np.append(np.zeros(indices_append), array_rebinned, axis=rebin_axis)
+        array_rebinned = np.split(array_rebinned, [0, N_initial*N_final], axis=rebin_axis)[1]
+        indices = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
+        array_rebinned = array_rebinned.reshape(indices).sum(axis=(rebin_axis+1)) 
+        E_range_shifted_and_scaled = np.linspace(0, E_range[-1]-E_range[0], N_final)
+    return array_rebinned, E_range_shifted_and_scaled
+
+
+
+
+def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
+    # Updated 201807: Trying to vectorize so all Ex bins are handled simultaneously.
+    # Takes a 2D array of counts, shifts it (downward only!) with energy 'shift'
     # and smooths it with a gaussian of specified 'FWHM'.
     # This version is vectorized to shift, smooth and scale all points
     # of 'array' individually, and then sum together and return.
@@ -105,8 +161,9 @@ def shift_and_smooth2D(array, E_array, FWHM, p, shift, smoothing=True):
     p = np.append(0, p) 
     FWHM = np.append(0, FWHM)
 
-    a1 = (E_array[1]-E_array[0]) # bin width
-    N = len(array)
+    a1_Eg = (Eg_array[1]-Eg_array[0]) # bin width
+    N_Ex, N_Eg = array.shape
+
     # Shift is the same for all energies 
     if shift == "annihilation":
         # For the annihilation peak, all channels should be mapped on E = 511 keV. Of course, gamma channels below 511 keV,
@@ -115,37 +172,57 @@ def shift_and_smooth2D(array, E_array, FWHM, p, shift, smoothing=True):
         # original array to i(511). 
         i_shift = 0 
     else:
-        i_shift = i_from_E(shift, E_array) - i_from_E(0, E_array) # The number of indices to shift by
-    # print("Shifting by energy", shift, ", giving", i_shift, "as index")
-    # indices = (np.linspace(0,len(array)-1,len(array)).astype(int)+i_shift) # Index array for shifted array
-    # indices = np.trim_zeros(np.where(indices < len(array), indices, 0), trim='b') # Make sure nothing wraps around and comes down from the top
-    indices_original = np.linspace(i_shift, len(array)-1, len(array)-i_shift).astype(int) # Index array for original array, truncated to shifted array length
-    if shift == "annihilation": # If this is the annihilation peak then all counts should end up with their centroid at E = 511 keV
-        indices_shifted = (np.ones(N-i_from_E(511, E_array))*i_from_E(511, E_array)).astype(int)
-    else:
-        indices_shifted = np.linspace(0,len(array)-i_shift-1,len(array)-i_shift).astype(int) # Index array for shifted array
+        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of indices to shift by
 
-    # Transform energy array from edge to middle-bin
-    # E_array_middlebin = (E_array[0:N]+E_array[1:N+1])/2
+
+    N_Eg_sh = N_Eg - i_shift
+    indices_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
+    if shift == "annihilation": # If this is the annihilation peak then all counts should end up with their centroid at E = 511 keV
+        # indices_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
+        indices_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
+    else:
+        indices_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
+
 
     if smoothing:
-        matrix = np.zeros((N,N))
-        indices_original = indices_original[np.where(FWHM[indices_original]>0)] # Filter out channels with zero width, we don't want those
-        for i in indices_original: # i is the energy channel in unshifted array
-            try:
-                # matrix[i] = array[i]*p[i]*norm.pdf(E_array_middlebin, loc=Eg_range_middlebin[indices_shifted[i]], scale=FWHM[indices_shifted[i]]/2.355) \
-                # Update 20171110: Removing "middle bin" as this is alread what comes from read_pyma.
-                matrix[i] = array[i]*p[i]*norm.pdf(E_array[0:N], loc=E_array[indices_shifted[i]], scale=FWHM[indices_shifted[i]]/2.355) \
-                * a1 # Multiplying by bin width to preserve number of counts
-                            # TODO: Figure out how FWHM relates to bin width
-            except IndexError:
-                pass
+        # Scale each Eg count by the corresponding probability
+        # Do this for all Ex bins at once:
+        array = array * p[0:N_Eg].reshape(1,N_Eg)
+        # Shift array down in energy by i_shift indices,
+        # so that index i_shift of array is index 0 of array_shifted.
+        # Also flatten array along Ex axis to facilitate multiplication.
+        array_shifted_flattened = array[:,indices_original].ravel()
+        # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions 
+        # to multiply each Eg channel by. This array is the same for all Ex bins,
+        # so it will be repeated N_Ex times and stacked for multiplication
+        # To get correct normalization we multiply by bin width
+        pdfarray = a1_Eg* norm.pdf(
+                            np.tile(Eg_array[0:N_Eg_sh], N_Eg_sh).reshape((N_Eg_sh, N_Eg_sh)),
+                            loc=Eg_array[indices_shifted].reshape(N_Eg_sh,1),
+                            scale=FWHM[indices_shifted].reshape(N_Eg_sh,1)/2.355
+                        )
+                        
+        # Remove eventual NaN values:
+        pdfarray = np.nan_to_num(pdfarray, copy=False)
+        # print("Eg_array[indices_shifted] =", Eg_array[indices_shifted], flush=True)
+        # print("pdfarray =", pdfarray, flush=True)
+        # Repeat and stack:
+        pdfarray_repeated_stacked = np.tile(pdfarray, (N_Ex,1))
 
-        # plt.matshow(matrix)
-        # plt.show()
-        array_out = matrix.sum(axis=0)
+        # Multiply array of counts with pdfarray:
+        multiplied = pdfarray_repeated_stacked*array_shifted_flattened.reshape(N_Ex*N_Eg_sh,1)
+
+        # Finally, for each Ex bin, we now need to sum the contributions from the smoothing
+        # of each Eg bin to get a total Eg spectrum containing the entire smoothed spectrum:
+        # Do this by reshaping into 3-dimensional array where each Eg bin (axis 0) contains a 
+        # N_Eg_sh x N_Eg_sh matrix, where each row is the smoothed contribution from one 
+        # original Eg pixel. We sum the columns of each of these matrices:
+        array_out = multiplied.reshape((N_Ex, N_Eg_sh, N_Eg_sh)).sum(axis=1)
+        # print("array_out.shape =", array_out.shape)
+        # print("array.shape[0],array.shape[1]-N_Eg_sh =", array.shape[0],array.shape[1]-N_Eg_sh)
+
     else:
-        array_out = np.zeros(N)
+        # array_out = np.zeros(N)
         # for i in range(N):
         #     try:
         #         array_out[i-i_shift] = array[i] #* p[i+1]
@@ -153,8 +230,11 @@ def shift_and_smooth2D(array, E_array, FWHM, p, shift, smoothing=True):
         #         pass
 
         # Instead of above, vectorizing:
-        array_out[indices_shifted] = p[indices_original]*array[indices_original]
+        array_out = p[indices_original].reshape(1,N_Eg_sh)*array[:,indices_original]
 
+    # Append zeros to the end of Eg axis so we match the length of the original array:
+    if i_shift > 0:
+        array_out = np.concatenate((array_out, np.zeros((N_Ex, N_Eg-N_Eg_sh))),axis=1)
     return array_out
 
 
@@ -168,29 +248,59 @@ if __name__=="__main__":
     fname_resp_mat = 'response-si28-20171112.m'
     
     
+    # == Step 0: Import data and response matrix ==
     
     # Import raw mama matrix
     data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
     # data_raw, cal, Ex_array, Eg_array = read_mama('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
-    
+    N_Ex, N_Eg = data_raw.shape
+
+    print("Lowest Eg value =", Eg_array[0], flush=True)
+    print("Lowest Ex value =", Ex_array[0], flush=True)
+   
+    # Rebin it:
+    N_rebin = int(N_Eg/2)
+    # Take it in Ex portions to avoid memory problems
+    data_raw_rebinned = np.zeros((N_Ex, N_rebin))
+    N_Ex_portions = 10
+    N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+    for i in range(N_Ex_portions):
+        data_raw_rebinned[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array_rebinned = rebin_and_shift(data_raw[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array, N_rebin, rebin_axis=1)
+
+
+
+    # Import response matrix
+    R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
+
+    # Rebin response matrix by interpolating:
+    from scipy.interpolate import RectBivariateSpline
+    f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
+    R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
+
+
+    # Rename everything:    
+    data_raw = data_raw_rebinned
+    R = R_rebinned    
+    Eg_array = Eg_array_rebinned
+
+
+
     # Plot raw matrix:
     f, ((ax_raw, ax_fold), (ax_unfold, ax_unfold_smooth)) = plt.subplots(2,2)
     ax_raw.set_title("raw")
     ax_fold.set_title("folded")
     ax_unfold.set_title("unfolded")
     ax_unfold_smooth.set_title("Compton subtracted")
-    cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm())
+    cbar_raw = ax_raw.pcolormesh(Eg_array_rebinned, Ex_array, data_raw, norm=LogNorm(vmin=1))
     f.colorbar(cbar_raw, ax=ax_raw)
-
-
-
-    # Rebin 
+    
 
 
     
-    # Import response matrix
-    R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
-    
+
+
+
+
     # Check that response matrix matches data, at least in terms of calibration:
     eps = 1e-3
     if not (np.abs(cal["a0x"]-cal_R["a0x"])<eps and np.abs(cal["a1x"]-cal_R["a1x"])<eps and np.abs(cal["a2x"]-cal_R["a2x"])<eps):
@@ -218,11 +328,6 @@ if __name__=="__main__":
     cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
                   i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
     # cut_points = [ 72,   5,  1050,  257]
-    def line(x, points):
-        a = (points[3]-points[1])/float(points[2]-points[0])
-        b = points[1] - a*points[0]
-        print("a = {}, b = {}".format(a,b))
-        return a*x + b
     # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
     # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
     i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
@@ -304,63 +409,75 @@ if __name__=="__main__":
     # c is the estimated Compton spectrum.
     
     # Plot compton subtraction spectra for debugging:
-    # f_compt, ax_compt = plt.subplots(1,1)
+    f_compt, ax_compt = plt.subplots(1,1)
     
     # TODO consider parallelizing this loop? Or can it be simply vectorized?
     # Allocate array to store properly unfolded spectrum:
     unfolded = np.zeros(unfoldmat.shape)
     # Select a single channel for testing:
-    i_Ex_testing = 300
-    for i_Ex in range(i_Ex_testing,i_Ex_testing+1):
-    # for i_Ex in range(0,50):
-    # for i_Ex in range(iEx_low,iEx_high):
-        if i_Ex%5==0:
-            print("Unfolding, i_Ex =", i_Ex, flush=True)
-        r = rawmat[i_Ex,:]
-        u0 = unfoldmat[i_Ex,:]
-        uf = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
-        us = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
-        ud = shift_and_smooth2D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
-        ua = shift_and_smooth2D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-        w = us + ud + ua
-        v = uf + w
-        c = r - v
-    
-        # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-        c_s = shift_and_smooth2D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)
-    
-        # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-        u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat
-    
-        unfolded[i_Ex,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
-        # print(unfolded[i_Ex,:], flush=True)
-    
-        # # Diagnostic plotting:
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], r, label="r")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], u0, label="u0")
-        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], uf, label="uf")
-        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], us, label="us")
-        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ud, label="ud")
-        # # ax_compt.plot(Eg_array[iEg_low:iEg_high], ua, label="ua")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], w, label="w")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], v, label="v")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], c, label="c")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], c_s, label="c_s")
-        # ax_compt.plot(Eg_array[iEg_low:iEg_high], u, label="u")
-        # ax_compt.legend()
+    i_Ex_testing = range(0,iEx_high)
+
+
+    # Check that there is enough memory:
+    mem_avail = psutil.virtual_memory()[1]
+    mem_need = 8 * len(i_Ex_testing) * unfoldmat.shape[1] * unfoldmat.shape[1]
+    print("mem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail)
+    if mem_need > 0.48*mem_avail: # Empirical limit from my Thinkpad, corresponds to 100 % system memory load
+        raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+
+
+
+    u0 = unfoldmat[i_Ex_testing,:]
+    print("u0.shape =", u0.shape, flush=True)
+    r = rawmat[i_Ex_testing,:]
+    # pf = np.ones(u0.shape[1]) # Test
+    uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
+    print("uf smoothed, integral =", uf.sum())
+    uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=False)
+    print("uf unsmoothed, integral =", uf_unsm.sum())
+    us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
+    ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
+    ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+    w = us + ud + ua
+    v = uf + w
+    c = r - v    
+    # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+    c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)    
+    # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+    u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
+    unfolded = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+    # print(unfolded[i_Ex,:], flush=True)    
+    # Diagnostic plotting:
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], r[0,:], label="r")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], u0[0,:], label="u0")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], uf[0,:], label="uf")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], uf_unsm[0,:], label="uf unsmoothed")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], us[0,:], label="us")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], ud[0,:], label="ud")
+    ax_compt.plot(Eg_array[iEg_low:iEg_high], ua[0,:], label="ua")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], w[0,:], label="w")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], v[0,:], label="v")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], c[0,:], label="c")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], c_s[0,:], label="c_s")
+    # ax_compt.plot(Eg_array[iEg_low:iEg_high], u[0,:], label="u")
+    ax_compt.legend()
     
     
     # Trim result:
-    unfolded = mask_cut*unfolded
+    unfolded = mask_cut[i_Ex_testing,:]*unfolded
     
     # Plot unfolded and Compton subtracted matrices:
     cbar_unfold = ax_unfold.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfoldmat, norm=LogNorm(vmin=1))
     # f.colorbar(cbar_unfold, ax=ax_unfold)
-    cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfolded, norm=LogNorm(vmin=1))
+    cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[i_Ex_testing], unfolded, norm=LogNorm(vmin=1))
     # f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
-    
     
     # Save compton subtracted matrix
     write_mama(unfolded, 'unfolded-28Si.m', Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
+    
+    # f_1d, ax_1d = plt.subplots(1,1)
+    # for i in range(len(i_Ex_testing)):
+    #     i_Ex = i_Ex_testing[i]
+    #     ax_1d.plot(Eg_array[iEg_low:iEg_high], unfolded[i,:], label="i_Ex={:d}".format(i_Ex))
     
     plt.show()
