@@ -295,7 +295,7 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# Remove negative counts
 	H[H<0] = 0
 	# Return
-	return H, H-H_old, Egamma_range, Ex_range
+	return H, H-H_old, Ex_range, Egamma_range
 
 def rebin(array, N_final, rebin_axis=0):
 	# Function to rebin an M-dimensional array either to larger or smaller binsize.
@@ -324,7 +324,7 @@ if __name__=="__main__":
 	Ex_max = 12000 # keV - maximum excitation energy
 	dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
 	N_Exbins = 300
-	firstgen, diff, Eg_array_fg, Ex_array_fg = first_generation_spectrum(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
+	firstgen, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
 
 
 
