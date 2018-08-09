@@ -273,7 +273,8 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
 
 
     # Rebin data -- take it in Ex portions to avoid memory problems:
-    N_rebin = int(N_Eg/4)
+    # N_rebin = int(N_Eg/4)
+    N_rebin = N_Eg
 
     if N_rebin != N_Eg:
         # Allocate matrix to store finished result, filled in chunks:
