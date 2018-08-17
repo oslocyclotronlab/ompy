@@ -11,7 +11,7 @@ import time
 
 
 # === Utility functions. Place in separate library file in the end. ===
-def read_mama(filename):
+def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array, 
     # as well as a list containing the four calibration coefficients
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
@@ -253,8 +253,8 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
     if verbose:
         time_readfiles_start = time.process_time()
     # Import raw mama matrix
-    # data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
-    # data_raw, cal, Ex_array, Eg_array = read_mama('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
+    # data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
+    # data_raw, cal, Ex_array, Eg_array = read_mama_2D('/home/jorgenem/gitrepos/pyma/unfolding-testing-20161115/alfna-20160518.m') # Just to verify import works generally
     cal = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
          "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
     N_Ex, N_Eg = data_raw.shape
@@ -265,7 +265,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
    
 
     # Import response matrix
-    R, cal_R, Ex_array_R, Eg_array_R = read_mama(fname_resp_mat)
+    R, cal_R, Ex_array_R, Eg_array_R = read_mama_2D(fname_resp_mat)
 
     if verbose:
         time_readfiles_end = time.process_time()
@@ -332,8 +332,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
     eps = 1e-3
     if not (np.abs(cal["a0x"]-cal_R["a0x"])<eps and np.abs(cal["a1x"]-cal_R["a1x"])<eps and np.abs(cal["a2x"]-cal_R["a2x"])<eps):
         raise Exception("Calibration mismatch between data and response matrices")
-    
-    
+
     
     
     # = Step 1: Run iterative unfolding =
@@ -435,6 +434,13 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
     pd = resp[:,6]
     pa = resp[:,7]
     
+
+    # Debugging: Test normalization of response matrix and reponse pieces:
+    i_R = 50
+    print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
+    print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
+
+
     # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
     # u0 is the unfolded spectrum from above, r is the raw spectrum, 
     # w = us + ud + ua is the folding contributions from everything except Compton,
@@ -538,7 +544,7 @@ if __name__=="__main__":
     fname_resp_mat = 'response-si28-20171112.m'
 
     # Read raw matrix
-    data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
+    data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
     
     unfolded, Ex_array, Eg_array = unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=True, plot=True)
     # unfolded, Ex_array, Eg_array = unfold(fname_data_raw, fname_resp, fname_resp_mat)
