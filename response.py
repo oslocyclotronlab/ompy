@@ -11,7 +11,7 @@ from unfold import *
 
 
 
-def response(folderpath, Eout_array):
+def response(folderpath, Eout_array, FWHM):
     """
     Function to make response matrix and related arrays from 
     source files. 
@@ -19,8 +19,17 @@ def response(folderpath, Eout_array):
     and that they are formatted in a certain standard way.
 
     The function interpolates the data to give a response matrix with
-    the desired energy binning specified by Eg_array.
+    the desired energy binning specified by Eout_array.
+
+    Inputs: 
+    folderpath: The path to the folder containing Compton spectra and resp.dat
+    Eout_array: The desired energies of the output response matrix. 
+    FWHM: The experimental relative full-width-half-max at 1.33 MeV.
     """
+    # Define helping variables from input
+    N_out = len(Eout_array)
+    a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
+
     # Read resp.dat file, which gives information about the energy bins 
     # and discrete peaks
     resp = []
@@ -37,7 +46,7 @@ def response(folderpath, Eout_array):
                 break
 
         line = file.readline()
-        print("line =", line)
+        # print("line =", line)
         if not line:
             raise Exception("Error reading resp.dat")
 
@@ -82,17 +91,36 @@ def response(folderpath, Eout_array):
     for i_plt in [0,5,10,20,50]:
         ax.plot(Ecmp_array, compton_matrix[i_plt,:], label="Eg = {:.0f}".format(Eg_array[i_plt]))
 
-    # # Each Compton array is already smoothed, so we should not need to worry about individual channel fluctuations.
-    # # Therefore I think it is reasonable to interpolate between the different spectra first, before downsampling
-    # # each spectrum to the required bin size.
-    # # ...or just use scipy's 2D spline interpolator (with linear setting?)
+    # We need to use the interpolation scheme given in Guttormsen 1996.
+    # Brute-force it with loops to make sure I get it right (based on MAMA code)
+    # After all, this is done once and for all, so it does not need to be lightning fast
 
-    # # Allocate response matrix
-    # N_out = len(Eout_array)
-    # f_cmp = interp2d(Ecmp_array, Eg_array, compton_matrix, kind="linear")
-    # R = f_cmp(Eout_array, Eout_array)
+    # Start looping over the rows of the response function,
+    # indexed by j to match MAMA code:
+    Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
+    for j in range(N_out):
+        # Skip if below lower threshold
+        if Eout_array[j] < Egmin:
+            continue
 
-    # Nope, we need to use the interpolation scheme given in Guttormsen 1996.
+
+        # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
+        Egmax = Eout_array[j] + 6*FWHM*FWHM_rel[j]/2.35 
+        # TODO check which factors FWHM should be multiplied with. FWHM at 1.33 MeV must be user-supplied? 
+        # Also MAMA unfolds with 1/10 of real FWHM for convergence reasons.
+        # But let's stick to letting FWHM denote the actual value, and divide by 10 in computations if necessary.
+        
+        # Find the closest energies among the available response functions, to interpolate between:
+        # TODO what to do when E_out[j] is below lowest Eg_array element? Interpolate between two larger?
+        i_g_low = np.where(Eg_array >= Eout_array[j])[0][0]
+        i_g_high = np.where(Eg_array >= Eout_array[j])[0][1]
+        print("i_g_low =", i_g_low, "i_g_high =", i_g_high, )
+        print("Eout_array[{:d}] = {:.1f}".format(j, Eout_array[j]), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high])
+
+        sys.exit(0)
+
+
+
     
 
 
@@ -118,4 +146,5 @@ def response(folderpath, Eout_array):
 if __name__ == "__main__":
     folderpath = "oscar2017_scale1.0"
     Eg_array = np.linspace(0,2000, 100)
-    print("response(\"{:s}\") =".format(folderpath), response(folderpath, Eg_array))
+    FWHM = 2.0
+    print("response(\"{:s}\") =".format(folderpath), response(folderpath, Eg_array, FWHM))
