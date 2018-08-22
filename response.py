@@ -52,7 +52,7 @@ def response(folderpath, Eout_array, FWHM):
 
         for i in range(Nlines):
             line = file.readline()
-            print("line =", line)
+            # print("line =", line)
             row = np.array(line.split(), dtype="double")
             resp.append(row)
     
@@ -98,39 +98,64 @@ def response(folderpath, Eout_array, FWHM):
     # Start looping over the rows of the response function,
     # indexed by j to match MAMA code:
     Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
-    for j in range(N_out):
+    for j in [0,2,10,99]: # range(N_out):
         # Skip if below lower threshold
         if Eout_array[j] < Egmin:
             continue
 
 
         # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
-        Egmax = Eout_array[j] + 6*FWHM*FWHM_rel[j]/2.35 
+        Egmax = Eout_array[j] + 6*FWHM*FWHM_rel.max()/2.35 # + 6*FWHM*FWHM_rel[j]/2.35 
+        # TODO does the FWHM array need to be interpolated before it is used here? j is not the right index? A quick fix since this is just an upper limit is to safeguard with FWHM.max()
         # TODO check which factors FWHM should be multiplied with. FWHM at 1.33 MeV must be user-supplied? 
         # Also MAMA unfolds with 1/10 of real FWHM for convergence reasons.
         # But let's stick to letting FWHM denote the actual value, and divide by 10 in computations if necessary.
         
         # Find the closest energies among the available response functions, to interpolate between:
         # TODO what to do when E_out[j] is below lowest Eg_array element? Interpolate between two larger?
-        i_g_low = np.where(Eg_array >= Eout_array[j])[0][0]
-        i_g_high = np.where(Eg_array >= Eout_array[j])[0][1]
+        i_g_low = 0
+        try:
+            i_g_low = np.where(Eg_array <= Eout_array[j])[0][-1]
+        except IndexError:
+            pass
+        i_g_high = N_Eg
+        try:
+            i_g_high = np.where(Eg_array >= Eout_array[j])[0][0]
+        except IndexError:
+            pass
+        if i_g_low == i_g_high:
+            if i_g_low > 0:
+                i_g_low -= 1
+            else:
+                i_g_high += 1
+
+        # TODO double check that this works for all j, that it indeed finds E_g above and below
         print("i_g_low =", i_g_low, "i_g_high =", i_g_high, )
         print("Eout_array[{:d}] = {:.1f}".format(j, Eout_array[j]), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high])
 
-        sys.exit(0)
+        # Next, select the Compton spectra at index i_g_low and i_g_high. These are called Fs1 and Fs2 in MAMA.
+        cmp_low = compton_matrix[i_g_low,:]
+        cmp_high = compton_matrix[i_g_high,:]
+        # These need to be recalibrated to Eout_array
+        cmp_low, Ecmp_recal = rebin_and_shift(cmp_low, Ecmp_array, int(N_out*Ecmp_array[-1]/Eout_array[-1]))
+        print("Eout_array =", Eout_array)
+        print("Ecmp_array =", Ecmp_array)
+        print("Ecmp_recal =", Ecmp_recal)
+
+    sys.exit(0)
 
 
 
     
 
 
-    for i_plt in [10,30,60,90]:
-        ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
+    # for i_plt in [10,30,60,90]:
+    #     ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
 
 
 
-    ax.legend()
-    plt.show()
+    # ax.legend()
+    # plt.show()
 
 
     # Normalize and interpolate the other structures of the response:

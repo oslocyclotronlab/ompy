@@ -128,7 +128,7 @@ def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
         array = array[0]
 
     
-    N_initial = array.shape[rebin_axis] # Initial number of counts along rebin axis
+    N_initial = array.shape[rebin_axis] # Initial number of bins along rebin axis
 
     # TODO: Loop this part over chunks of the Ex axis to avoid running out of memory.
     # Just take the loop from main program in here. Have some test on the dimensionality 
