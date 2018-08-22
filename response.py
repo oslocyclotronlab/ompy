@@ -39,8 +39,6 @@ def rebin_by_arrays(counts_in, Ein_array, Eout_array):
     Ein_array = np.linspace(a0_in - a1_in/2, a0_in - a1_in/2 + a1_in*Nin, Nin+1)
     Eout_array = np.linspace(a0_out - a1_out/2, a0_out - a1_out/2 + a1_out*Nout, Nout+1)
 
-    print("Ein_array bin-edge =", Ein_array)
-    print("Eout_array bin-edge =", Eout_array)
 
 
 
@@ -53,9 +51,6 @@ def rebin_by_arrays(counts_in, Ein_array, Eout_array):
             overlap = np.minimum(Eout_array[i+1], Ein_array[j+1]) - np.maximum(Eout_array[i], Ein_array[j])
             overlap = overlap if overlap > 0 else 0
             counts_out[i] += counts_in[j] * overlap / a1_in
-            if i == 2:
-                print("i =", i, ", j =", j, "overlap =", overlap, "prop =", overlap/a1_in, flush=True)
-                print("Eout_array[i+1], Ein_array[j+1], Eout_array[i], Ein_array[j] =", Eout_array[i+1], Ein_array[j+1], Eout_array[i], Ein_array[j], flush=True)
 
     return counts_out
 
@@ -186,12 +181,14 @@ def response(folderpath, Eout_array, FWHM):
         # Next, select the Compton spectra at index i_g_low and i_g_high. These are called Fs1 and Fs2 in MAMA.
         cmp_low = compton_matrix[i_g_low,:]
         cmp_high = compton_matrix[i_g_high,:]
-        # These need to be recalibrated to Eout_array
-        cmp_low, Ecmp_recal = rebin_and_shift(cmp_low, Ecmp_array, int(N_out*Ecmp_array[-1]/Eout_array[-1]))
-        print("Eout_array =", Eout_array)
-        print("Ecmp_array =", Ecmp_array)
-        print("Ecmp_recal =", Ecmp_recal)
+        # These need to be recalibrated to Eout_array:
+        cmp_low = rebin_by_arrays(cmp_low, Ecmp_array, Eout_array)
+        cmp_high = rebin_by_arrays(cmp_high, Ecmp_array, Eout_array)
 
+        
+
+
+        
     sys.exit(0)
 
 
