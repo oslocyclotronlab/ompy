@@ -185,6 +185,15 @@ def response(folderpath, Eout_array, FWHM):
         cmp_low = rebin_by_arrays(cmp_low, Ecmp_array, Eout_array)
         cmp_high = rebin_by_arrays(cmp_high, Ecmp_array, Eout_array)
 
+        # Fetch corresponding values for full-energy, etc:
+        
+
+        # Normalize total spectrum to 1:
+        sum_low = 
+        cmp_low = cmp_low 
+        cmp_high = cmp_high / cmp_high.sum()
+        # TODO: Also normalize other peaks to 
+
         
 
 
