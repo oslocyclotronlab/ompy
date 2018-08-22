@@ -186,7 +186,7 @@ def response(folderpath, Eout_array, FWHM):
         cmp_high = rebin_by_arrays(cmp_high, Ecmp_array, Eout_array)
 
         # Fetch corresponding values for full-energy, etc:
-        
+        FE_low = FE[i_g_low]
 
         # Normalize total spectrum to 1:
         sum_low = 
