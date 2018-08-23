@@ -72,6 +72,13 @@ def E_compton(Eg, theta):
     # Return Eg if Eg <= 0.1, else use formula
     return np.where(Eg > 0.1, Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))), Eg)
 
+def corr(Eg, theta):
+    """
+    Function to correct number of counts due to delta(theta)
+    Adapted from MAMA in the file kelvin.f
+    """
+    return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
+
 
 def response(folderpath, Eout_array, FWHM):
     """
@@ -149,6 +156,7 @@ def response(folderpath, Eout_array, FWHM):
     Ecmp_array = np.linspace(a0_cmp, a1_cmp*(N_cmp-1), N_cmp)
     print("Ecmp_array =", Ecmp_array)
 
+    # TODO normalize once and for all outside j loop
     f, ax = plt.subplots(1,1)
     for i_plt in [0,5,10,20,50]:
         ax.plot(Ecmp_array, compton_matrix[i_plt,:], label="Eg = {:.0f}".format(Eg_array[i_plt]))
@@ -160,6 +168,10 @@ def response(folderpath, Eout_array, FWHM):
     # Start looping over the rows of the response function,
     # indexed by j to match MAMA code:
     Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
+    i_Egmin = int((Egmin - a0_out)/a1_out + 0.5)
+
+    # Allocate response matrix array:
+    R = np.zeros((N_out, N_out))
     for j in [0,2,10,99]: # range(N_out):
         E_j = Eout_array[j]
         # Skip if below lower threshold
@@ -169,6 +181,7 @@ def response(folderpath, Eout_array, FWHM):
 
         # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
         Egmax = E_j + 6*FWHM*FWHM_rel.max()/2.35 # + 6*FWHM*FWHM_rel[j]/2.35 
+        i_Egmax = int((Egmax - a0_out)/a1_out + 0.5)
         # TODO does the FWHM array need to be interpolated before it is used here? j is not the right index? A quick fix since this is just an upper limit is to safeguard with FWHM.max()
         # TODO check which factors FWHM should be multiplied with. FWHM at 1.33 MeV must be user-supplied? 
         # Also MAMA unfolds with 1/10 of real FWHM for convergence reasons.
@@ -192,9 +205,12 @@ def response(folderpath, Eout_array, FWHM):
             else:
                 i_g_high += 1
 
+        Eg_low = Eout_array[i_g_low]
+        Eg_high = Eout_array[i_g_high]
+
         # TODO double check that this works for all j, that it indeed finds E_g above and below
-        print("i_g_low =", i_g_low, "i_g_high =", i_g_high, )
-        print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high])
+        print("i_g_low =", i_g_low, "i_g_high =", i_g_high, flush=True)
+        print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high], flush=True)
 
         # Next, select the Compton spectra at index i_g_low and i_g_high. These are called Fs1 and Fs2 in MAMA.
         cmp_low = compton_matrix[i_g_low,:]
@@ -227,18 +243,21 @@ def response(folderpath, Eout_array, FWHM):
         # then we apply the "fan method" (Guttormsen 1996) in the region
         # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
 
+        # Get maximal energy by taking 6*sigma above full-energy peak
+        E_low_max = Eout_array[i_g_low] + 6*FWHM*FWHM_rel[i_g_low]/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
+        i_low_max = int((E_low_max - a0_out)/a1_out + 0.5)
+        E_high_max = Eout_array[i_g_high] + 6*FWHM*FWHM_rel[i_g_high]/2.35
+        i_high_max = int((E_high_max - a0_out)/a1_out + 0.5)
+
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
         Ece = E_compton(E_j, theta=0)
         Ebsc = E_j - Ece
         # Indices in Eout calibration corresponding to these energies:
-        i_ce_out = int((Ece - a0_out)/a1_out + 0.5)
-        i_bsc_out = int((Ebsc - a0_out)/a1_out + 0.5)
+        i_ce_out = min(int((Ece - a0_out)/a1_out + 0.5), i_Egmax)
+        i_bsc_out = max(int((Ebsc - a0_out)/a1_out + 0.5), i_Egmin)
 
-        i_low_max = Eout_array[i_low] + 6*# check calibration of FWHM, FWHM[i_low]
-        i_high_max =  # same as line above
-        # TODO add tests to check we're not above or below Min/Max Eg limits (line 1734 in MAMA)
 
-        # Interpolate 1-to-1 up to j_bsc_out:
+        # Interpolate one-to-one up to j_bsc_out:
         for i in range(0,i_bsc_out):
             R[j,i] = cmp_low[i] + (cmp_low[i]-cmp_high[i])*(E_j - Eg_low)/(Eg_high-Eg_low)
 
@@ -255,6 +274,9 @@ def response(folderpath, Eout_array, FWHM):
                     # by Compton formula
                     i_low_interp = max(int((E_compton(E_low,theta)-a0_out)/a1_out + 0.5), i_bsc_out)
                     i_high_interp = min(int((E_compton(E_high,theta)-a0_out)/a1_out + 0.5), i_high_max)
+                    # TODO figure out CORR() function in MAMA
+                    R[j,i] = cmp_low[i_low_interp]*corr(E_low,theta) + (E_j-E_low)/(E_high-E_low) * (cmp_high[i_high_interp] * corr(E_high,theta) - cmp_low[i_low_interp] * corr(E_low,theta))
+
                     
 
 
@@ -266,7 +288,7 @@ def response(folderpath, Eout_array, FWHM):
         
 
         
-    sys.exit(0)
+    # sys.exit(0)
 
 
 
