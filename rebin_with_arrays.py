@@ -69,8 +69,8 @@ np.random.seed(2)
 counts_in = np.random.uniform(low=0, high=100, size=Nbins_in)
 
 
-a0_out, a1_out = 1, 2
-# a0_out, a1_out = 0, 4
+# a0_out, a1_out = 1, 2
+a0_out, a1_out = 0, 4
 # a0_out, a1_out = 0, 10
 # a0_out, a1_out = a0_in, a1_in # This makes no change, as it should be.
 Nbins_out = 40

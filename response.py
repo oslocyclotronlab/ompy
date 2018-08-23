@@ -55,6 +55,23 @@ def rebin_by_arrays(counts_in, Ein_array, Eout_array):
     return counts_out
 
 
+def E_compton(Eg, theta):
+    """
+    Calculates the energy of an electron that is scattered an angle
+    theta by a gamma-ray of energy Eg.
+    Adapted from MAMA, file "folding.f", which references 
+    Canberra catalog ed.7, p.2.
+
+    Inputs:
+    Eg: Energy of gamma-ray in keV
+    theta: Angle of scatter in radians
+
+    Returns:
+    Energy Ee of scattered electron
+    """
+    # Return Eg if Eg <= 0.1, else use formula
+    return np.where(Eg > 0.1, Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))), Eg)
+
 
 def response(folderpath, Eout_array, FWHM):
     """
@@ -144,13 +161,14 @@ def response(folderpath, Eout_array, FWHM):
     # indexed by j to match MAMA code:
     Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
     for j in [0,2,10,99]: # range(N_out):
+        E_j = Eout_array[j]
         # Skip if below lower threshold
-        if Eout_array[j] < Egmin:
+        if E_j < Egmin:
             continue
 
 
         # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
-        Egmax = Eout_array[j] + 6*FWHM*FWHM_rel.max()/2.35 # + 6*FWHM*FWHM_rel[j]/2.35 
+        Egmax = E_j + 6*FWHM*FWHM_rel.max()/2.35 # + 6*FWHM*FWHM_rel[j]/2.35 
         # TODO does the FWHM array need to be interpolated before it is used here? j is not the right index? A quick fix since this is just an upper limit is to safeguard with FWHM.max()
         # TODO check which factors FWHM should be multiplied with. FWHM at 1.33 MeV must be user-supplied? 
         # Also MAMA unfolds with 1/10 of real FWHM for convergence reasons.
@@ -160,12 +178,12 @@ def response(folderpath, Eout_array, FWHM):
         # TODO what to do when E_out[j] is below lowest Eg_array element? Interpolate between two larger?
         i_g_low = 0
         try:
-            i_g_low = np.where(Eg_array <= Eout_array[j])[0][-1]
+            i_g_low = np.where(Eg_array <= E_j)[0][-1]
         except IndexError:
             pass
         i_g_high = N_Eg
         try:
-            i_g_high = np.where(Eg_array >= Eout_array[j])[0][0]
+            i_g_high = np.where(Eg_array >= E_j)[0][0]
         except IndexError:
             pass
         if i_g_low == i_g_high:
@@ -176,7 +194,7 @@ def response(folderpath, Eout_array, FWHM):
 
         # TODO double check that this works for all j, that it indeed finds E_g above and below
         print("i_g_low =", i_g_low, "i_g_high =", i_g_high, )
-        print("Eout_array[{:d}] = {:.1f}".format(j, Eout_array[j]), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high])
+        print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high])
 
         # Next, select the Compton spectra at index i_g_low and i_g_high. These are called Fs1 and Fs2 in MAMA.
         cmp_low = compton_matrix[i_g_low,:]
@@ -189,7 +207,7 @@ def response(folderpath, Eout_array, FWHM):
         FE_low, SE_low, DE_low, c511_low = FE[i_g_low], SE[i_g_low], DE[i_g_low], c511[i_g_low]
         FE_high, SE_high, DE_high, c511_high = FE[i_g_high], SE[i_g_high], DE[i_g_high], c511[i_g_high]
 
-        # Normalize total spectrum to 1:
+        # Normalize total spectrum to 1, including FE, SE, etc:
         sum_low = cmp_low.sum() + FE_low + SE_low + DE_low + c511_low
         sum_high = cmp_high.sum() + FE_high + SE_high + DE_high + c511_high
 
@@ -204,9 +222,48 @@ def response(folderpath, Eout_array, FWHM):
         DE_high /= sum_high
         c511_high /= sum_high
 
+        # The interpolation is split into energy regions.
+        # Below the back-scattering energy Ebsc we interpolate linearly,
+        # then we apply the "fan method" (Guttormsen 1996) in the region
+        # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
+
+        # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
+        Ece = E_compton(E_j, theta=0)
+        Ebsc = E_j - Ece
+        # Indices in Eout calibration corresponding to these energies:
+        i_ce_out = int((Ece - a0_out)/a1_out + 0.5)
+        i_bsc_out = int((Ebsc - a0_out)/a1_out + 0.5)
+
+        i_low_max = Eout_array[i_low] + 6*# check calibration of FWHM, FWHM[i_low]
+        i_high_max =  # same as line above
+        # TODO add tests to check we're not above or below Min/Max Eg limits (line 1734 in MAMA)
+
+        # Interpolate 1-to-1 up to j_bsc_out:
+        for i in range(0,i_bsc_out):
+            R[j,i] = cmp_low[i] + (cmp_low[i]-cmp_high[i])*(E_j - Eg_low)/(Eg_high-Eg_low)
+
+        # Then interpolate with the fan method up to j_ce_out:
+        z = 0 # Initialize variable 
+        for i in range(i_bsc_out, i_ce_out):
+            E_i = Eout_array[i] # Energy of current point in interpolated spectrum
+            if E_i > 0.1 and E < Ece:
+                if np.abs(E_j - E_i) > 0.001:
+                    z = E_i/(E_j/511 * (E_j - E_i))
+                theta = np.arccos(1-z)
+                if theta > 0 and theta < np.pi:
+                    # Determine interpolation indices in low and high arrays
+                    # by Compton formula
+                    i_low_interp = max(int((E_compton(E_low,theta)-a0_out)/a1_out + 0.5), i_bsc_out)
+                    i_high_interp = min(int((E_compton(E_high,theta)-a0_out)/a1_out + 0.5), i_high_max)
+                    
+
+
+
+
+
+
 
         
-
 
         
     sys.exit(0)
@@ -216,13 +273,13 @@ def response(folderpath, Eout_array, FWHM):
     
 
 
-    # for i_plt in [10,30,60,90]:
-    #     ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
+    for i_plt in [10,30,60,90]:
+        ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
 
 
 
-    # ax.legend()
-    # plt.show()
+    ax.legend()
+    plt.show()
 
 
     # Normalize and interpolate the other structures of the response:
