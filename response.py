@@ -281,6 +281,8 @@ def response(folderpath, Eout_array, FWHM):
                     # by Compton formula
                     i_low_interp = max(int((E_compton(Eg_low,theta)-a0_out)/a1_out + 0.5), i_bsc_out)
                     i_high_interp = min(int((E_compton(Eg_high,theta)-a0_out)/a1_out + 0.5), i_high_max)
+                    # TODO For some reason the following line gives very negative numbers. Prime suspect is the corr() function
+                    # May also need to add check to remove below-zero values.
                     R[j,i] = cmp_low[i_low_interp]*corr(Eg_low,theta) + (E_j-Eg_low)/(Eg_high-Eg_low) \
                             * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
                     if R[j,i] < 0:
