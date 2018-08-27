@@ -38,7 +38,7 @@ def read_mama_2D(filename):
                                                     # center-bin everywhere. 
     return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
 
-def write_mama(matrix, filename, y_array, x_array, comment=""):
+def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
     import time
     outfile = open(filename, 'w')
 
