@@ -304,10 +304,10 @@ def response(folderpath, Eout_array, FWHM):
                     # * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
                     # FA = cmp_high[i_high_interp]*corr(Eg_high, theta) - cmp_low[i_low_interp]*corr(Eg_low,theta)
                     FA = cmp_high[i_high_interp] - cmp_low[i_low_interp]
-                    # FB = cmp_low[i_low_interp]*corr(Eg_low,theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
-                    # R[j,i] = FA/corr(E_j,theta)
-                    print("E_j = {:.2f}, Eg_low = {:.2f}, Eg_high = {:.2f}".format(E_j, Eg_low, Eg_high))
-                    R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
+                    FB = cmp_low[i_low_interp]*corr(Eg_low,theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
+                    R[j,i] = FB/corr(E_j,theta)
+                    # print("E_j = {:.2f}, Eg_low = {:.2f}, Eg_high = {:.2f}".format(E_j, Eg_low, Eg_high))
+                    # R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
                     if R[j,i] < 0:
                         print("R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
 
