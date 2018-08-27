@@ -77,6 +77,7 @@ def corr(Eg, theta):
     """
     Function to correct number of counts due to delta(theta)
     Adapted from MAMA in the file kelvin.f
+    It is dE/dtheta of the E(theta) in Eq. (2) in Guttormsen 1996.
     """
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
@@ -99,6 +100,7 @@ def response(folderpath, Eout_array, FWHM):
     # Define helping variables from input
     N_out = len(Eout_array)
     a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
+    print("a0_out, a1_out =", a0_out, a1_out)
 
     # Read resp.dat file, which gives information about the energy bins 
     # and discrete peaks
@@ -131,14 +133,19 @@ def response(folderpath, Eout_array, FWHM):
 
     resp = np.array(resp)
 
-    Eg_array, FWHM_rel, Eff_tot, FE, SE, DE, c511 = resp.T # Unpack the resp matrix into its columns
+    Eg_sim_array, FWHM_rel, Eff_tot, FE, SE, DE, c511 = resp.T # Unpack the resp matrix into its columns
+    a0_sim, a1_sim = Eg_sim_array[0], Eg_sim_array[1]-Eg_sim_array[0]
+    print("a0_sim, a1_sim =", a0_sim, a1_sim, flush=True)
+    # "Eg_sim" means "gamma, simulated", and refers to the gamma energies where we have simulated Compton spectra.
 
     # Read in Compton spectra for each Eg channel:
-    N_Eg = len(Eg_array)
+    N_Eg = len(Eg_sim_array)
     # Read first Compton spectrum to get number of energy channels in each:
     N_cmp = -1
     a0_cmp, a1_cmp = -1, -1
-    with open(os.path.join(folderpath,"cmp"+str(int(Eg_array[0])))) as file:
+    # Get calibration and array length from highest-energy spectrum, because the spectra
+    # may have differing length but this is bound to be the longest.
+    with open(os.path.join(folderpath,"cmp"+str(int(Eg_sim_array[-1])))) as file:
         lines = file.readlines()
         a0_cmp = float(lines[6].split(",")[1]) # calibration
         a1_cmp = float(lines[6].split(",")[2]) # coefficients [keV]
@@ -147,20 +154,21 @@ def response(folderpath, Eout_array, FWHM):
     compton_matrix = np.zeros((N_Eg, N_cmp))
     # Read the rest:
     for i in range(0,N_Eg):
-        fn = "cmp"+str(Eg_array[i])
-        compton_matrix[i,:] = np.genfromtxt(os.path.join(folderpath,"cmp"+str(int(Eg_array[i]))), comments="!")
+        fn = "cmp"+str(Eg_sim_array[i])
+        cmp_current = np.genfromtxt(os.path.join(folderpath,"cmp"+str(int(Eg_sim_array[i]))), comments="!")
+        compton_matrix[i,0:len(cmp_current)] = cmp_current
 
     print("compton_matrix =", compton_matrix)
 
 
-    # == Make response matrix by interpolating to Eg_array ==
+    # == Make response matrix by interpolating to Eg_sim_array ==
     Ecmp_array = np.linspace(a0_cmp, a1_cmp*(N_cmp-1), N_cmp)
     print("Ecmp_array =", Ecmp_array)
 
     # TODO normalize once and for all outside j loop
     f, ax = plt.subplots(1,1)
     # for i_plt in [0,5,10,20,50]:
-        # ax.plot(Ecmp_array, compton_matrix[i_plt,:]/compton_matrix[i_plt,:].sum(), label="Eg = {:.0f}".format(Eg_array[i_plt]))
+        # ax.plot(Ecmp_array, compton_matrix[i_plt,:]/compton_matrix[i_plt,:].sum(), label="Eg = {:.0f}".format(Eg_sim_array[i_plt]))
 
     # We need to use the interpolation scheme given in Guttormsen 1996.
     # Brute-force it with loops to make sure I get it right (based on MAMA code)
@@ -168,7 +176,8 @@ def response(folderpath, Eout_array, FWHM):
 
     # Start looping over the rows of the response function,
     # indexed by j to match MAMA code:
-    Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
+    # Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
+    Egmin = max(30, Eout_array[0]) # Don't go below input energy limit
     i_Egmin = int((Egmin - a0_out)/a1_out + 0.5)
 
     # Allocate response matrix array:
@@ -189,40 +198,47 @@ def response(folderpath, Eout_array, FWHM):
         # But let's stick to letting FWHM denote the actual value, and divide by 10 in computations if necessary.
         
         # Find the closest energies among the available response functions, to interpolate between:
-        # TODO what to do when E_out[j] is below lowest Eg_array element? Interpolate between two larger?
-        i_g_low = 0
+        # TODO what to do when E_out[j] is below lowest Eg_sim_array element? Interpolate between two larger?
+        i_g_sim_low = 0
         try:
-            i_g_low = np.where(Eg_array <= E_j)[0][-1]
+            i_g_sim_low = np.where(Eg_sim_array <= E_j)[0][-1]
         except IndexError:
             pass
-        i_g_high = N_Eg
+        i_g_sim_high = N_Eg
         try:
-            i_g_high = np.where(Eg_array >= E_j)[0][0]
+            i_g_sim_high = np.where(Eg_sim_array >= E_j)[0][0]
         except IndexError:
             pass
-        if i_g_low == i_g_high:
-            if i_g_low > 0:
-                i_g_low -= 1
+        if i_g_sim_low == i_g_sim_high:
+            if i_g_sim_low > 0:
+                i_g_sim_low -= 1
             else:
-                i_g_high += 1
+                i_g_sim_high += 1
 
-        Eg_low = Eout_array[i_g_low]
-        Eg_high = Eout_array[i_g_high]
+        Eg_low = Eg_sim_array[i_g_sim_low]
+        Eg_high = Eg_sim_array[i_g_sim_high]
 
         # TODO double check that this works for all j, that it indeed finds E_g above and below
-        print("i_g_low =", i_g_low, "i_g_high =", i_g_high, flush=True)
-        print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_array[i_g_low], "Eg_high =", Eg_array[i_g_high], flush=True)
 
-        # Next, select the Compton spectra at index i_g_low and i_g_high. These are called Fs1 and Fs2 in MAMA.
-        cmp_low = compton_matrix[i_g_low,:]
-        cmp_high = compton_matrix[i_g_high,:]
+        # Next, select the Compton spectra at index i_g_sim_low and i_g_sim_high. These are called Fs1 and Fs2 in MAMA.
+        # NB! The compton_matrix cannot be indexed by Eout indices, but indices corresponding to the Eg steps between GEANT simulations
+        # i_g_sim_low = int((Eg_low-a0_sim)/a1_sim + 0.5)
+        # i_g_sim_high = int((Eg_high-a0_sim)/a1_sim + 0.5)
+
+        print("Eg_low =", Eg_low, "Eg_high =", Eg_high)
+        # print("i_g_sim_low =", i_g_sim_low, "i_g_sim_high =", i_g_sim_high, flush=True)
+        print("i_g_sim_low =", i_g_sim_low, "i_g_sim_high =", i_g_sim_high, flush=True)
+
+        cmp_low = compton_matrix[i_g_sim_low,:]
+        cmp_high = compton_matrix[i_g_sim_high,:]
         # These need to be recalibrated to Eout_array:
         cmp_low = rebin_by_arrays(cmp_low, Ecmp_array, Eout_array)
         cmp_high = rebin_by_arrays(cmp_high, Ecmp_array, Eout_array)
+        print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_sim_array[i_g_sim_low], "Eg_high =", Eg_sim_array[i_g_sim_high], flush=True)
 
         # Fetch corresponding values for full-energy, etc:
-        FE_low, SE_low, DE_low, c511_low = FE[i_g_low], SE[i_g_low], DE[i_g_low], c511[i_g_low]
-        FE_high, SE_high, DE_high, c511_high = FE[i_g_high], SE[i_g_high], DE[i_g_high], c511[i_g_high]
+        FE_low, SE_low, DE_low, c511_low = FE[i_g_sim_low], SE[i_g_sim_low], DE[i_g_sim_low], c511[i_g_sim_low]
+        FE_high, SE_high, DE_high, c511_high = FE[i_g_sim_high], SE[i_g_sim_high], DE[i_g_sim_high], c511[i_g_sim_high]
 
         # Normalize total spectrum to 1, including FE, SE, etc:
         sum_low = cmp_low.sum() + FE_low + SE_low + DE_low + c511_low
@@ -245,15 +261,16 @@ def response(folderpath, Eout_array, FWHM):
         # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
 
         # Get maximal energy by taking 6*sigma above full-energy peak
-        E_low_max = Eout_array[i_g_low] + 6*FWHM*FWHM_rel[i_g_low]/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
+        E_low_max = Eout_array[i_g_sim_low] + 6*FWHM*FWHM_rel[i_g_sim_low]/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
         i_low_max = int((E_low_max - a0_out)/a1_out + 0.5)
-        E_high_max = Eout_array[i_g_high] + 6*FWHM*FWHM_rel[i_g_high]/2.35
+        E_high_max = Eout_array[i_g_sim_high] + 6*FWHM*FWHM_rel[i_g_sim_high]/2.35
         i_high_max = int((E_high_max - a0_out)/a1_out + 0.5)
 
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
         Ece = E_compton(E_j, theta=np.pi)
         print("Ece =", Ece)
         Ebsc = E_j - Ece
+        print("Ebsc =", Ebsc)
         # Indices in Eout calibration corresponding to these energies:
         i_ce_out = min(int((Ece - a0_out)/a1_out + 0.5), i_Egmax)
         i_bsc_out = max(int((Ebsc - a0_out)/a1_out + 0.5), i_Egmin)
@@ -283,8 +300,14 @@ def response(folderpath, Eout_array, FWHM):
                     i_high_interp = min(int((E_compton(Eg_high,theta)-a0_out)/a1_out + 0.5), i_high_max)
                     # TODO For some reason the following line gives very negative numbers. Prime suspect is the corr() function
                     # May also need to add check to remove below-zero values.
-                    R[j,i] = cmp_low[i_low_interp]*corr(Eg_low,theta) + (E_j-Eg_low)/(Eg_high-Eg_low) \
-                            * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
+                    # R[j,i] = cmp_low[i_low_interp]*corr(Eg_low,theta) + (E_j-Eg_low)/(Eg_high-Eg_low) \
+                    # * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
+                    # FA = cmp_high[i_high_interp]*corr(Eg_high, theta) - cmp_low[i_low_interp]*corr(Eg_low,theta)
+                    FA = cmp_high[i_high_interp] - cmp_low[i_low_interp]
+                    # FB = cmp_low[i_low_interp]*corr(Eg_low,theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
+                    # R[j,i] = FA/corr(E_j,theta)
+                    print("E_j = {:.2f}, Eg_low = {:.2f}, Eg_high = {:.2f}".format(E_j, Eg_low, Eg_high))
+                    R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
                     if R[j,i] < 0:
                         print("R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
 
@@ -306,7 +329,7 @@ def response(folderpath, Eout_array, FWHM):
     
 
 
-    for i_plt in [0,10,20]:
+    for i_plt in [0,5,10,20]:
         ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
 
 
@@ -326,7 +349,8 @@ def response(folderpath, Eout_array, FWHM):
 
 
 if __name__ == "__main__":
-    folderpath = "oscar2017_scale1.0"
-    Eg_array = np.linspace(200,1000, 30)
+    # folderpath = "oscar2017_scale1.0"
+    folderpath = "oscar2017_scale1.15"
+    Eg_sim_array = np.linspace(0,2000, 21)
     FWHM = 2.0
-    print("response(\"{:s}\") =".format(folderpath), response(folderpath, Eg_array, FWHM))
+    print("response(\"{:s}\") =".format(folderpath), response(folderpath, Eg_sim_array, FWHM))
