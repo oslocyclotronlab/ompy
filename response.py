@@ -9,6 +9,8 @@ from firstgen import *
 from unfold import *
 
 
+# j_test = 50
+
 def rebin_by_arrays(counts_in, Ein_array, Eout_array):
     """
     Rebins, i.e. redistributes the numbers from vector counts 
@@ -70,7 +72,7 @@ def E_compton(Eg, theta):
     Energy Ee of scattered electron
     """
     # Return Eg if Eg <= 0.1, else use formula
-    print("From E_compton(): Eg =", Eg, ", theta =", theta, ", formula =", Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))))
+    # print("From E_compton(): Eg =", Eg, ", theta =", theta, ", formula =", Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))))
     return np.where(Eg > 0.1, Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))), Eg)
 
 def corr(Eg, theta):
@@ -182,7 +184,7 @@ def response(folderpath, Eout_array, FWHM):
 
     # Allocate response matrix array:
     R = np.zeros((N_out, N_out))
-    for j in range(N_out):#[0,2,10,99]: 
+    for j in range(N_out):#[j_test]: 
         E_j = Eout_array[j]
         # Skip if below lower threshold
         if E_j < Egmin:
@@ -261,10 +263,11 @@ def response(folderpath, Eout_array, FWHM):
         # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
 
         # Get maximal energy by taking 6*sigma above full-energy peak
-        E_low_max = Eout_array[i_g_sim_low] + 6*FWHM*FWHM_rel[i_g_sim_low]/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
+        E_low_max = Eg_low + 6*FWHM*FWHM_rel.max()/2.35#FWHM_rel[i_g_sim_low]/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
         i_low_max = int((E_low_max - a0_out)/a1_out + 0.5)
-        E_high_max = Eout_array[i_g_sim_high] + 6*FWHM*FWHM_rel[i_g_sim_high]/2.35
+        E_high_max = Eg_high + 6*FWHM*FWHM_rel.max()/2.35#FWHM_rel[i_g_sim_high]/2.35
         i_high_max = int((E_high_max - a0_out)/a1_out + 0.5)
+        print("E_low_max =", E_low_max, "E_high_max =", E_high_max, flush=True)
 
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
         Ece = E_compton(E_j, theta=np.pi)
@@ -277,6 +280,10 @@ def response(folderpath, Eout_array, FWHM):
         print("i_ce_out =", i_ce_out, ", i_bsc_out =", i_bsc_out, ", i_Egmax =", i_Egmax)
 
 
+        ax.axvline(Ebsc)
+        ax.axvline(Ece)
+
+
         # Interpolate one-to-one up to j_bsc_out:
         for i in range(0,i_bsc_out):
             R[j,i] = cmp_low[i] + (cmp_high[i]-cmp_low[i])*(E_j - Eg_low)/(Eg_high-Eg_low)
@@ -286,13 +293,16 @@ def response(folderpath, Eout_array, FWHM):
 
         # Then interpolate with the fan method up to j_ce_out:
         z = 0 # Initialize variable 
+        i_last = i_bsc_out # Keep track of how far up the fan method goes
+        i_low_last = i_bsc_out
+        i_high_last = i_bsc_out
         for i in range(i_bsc_out, i_ce_out):
             E_i = Eout_array[i] # Energy of current point in interpolated spectrum
             if E_i > 0.1 and E_i < Ece:
                 if np.abs(E_j - E_i) > 0.001:
                     z = E_i/(E_j/511 * (E_j - E_i))
                 theta = np.arccos(1-z)
-                print("theta = ", theta, flush=True)
+                # print("theta = ", theta, flush=True)
                 if theta > 0 and theta < np.pi:
                     # Determine interpolation indices in low and high arrays
                     # by Compton formula
@@ -302,14 +312,51 @@ def response(folderpath, Eout_array, FWHM):
                     # May also need to add check to remove below-zero values.
                     # R[j,i] = cmp_low[i_low_interp]*corr(Eg_low,theta) + (E_j-Eg_low)/(Eg_high-Eg_low) \
                     # * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
-                    # FA = cmp_high[i_high_interp]*corr(Eg_high, theta) - cmp_low[i_low_interp]*corr(Eg_low,theta)
-                    FA = cmp_high[i_high_interp] - cmp_low[i_low_interp]
+                    FA = cmp_high[i_high_interp]*corr(Eg_high, theta) - cmp_low[i_low_interp]*corr(Eg_low,theta)
+                    # FA = cmp_high[i_high_interp] - cmp_low[i_low_interp]
                     FB = cmp_low[i_low_interp]*corr(Eg_low,theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
+                    print("i =", i, flush=True)
                     R[j,i] = FB/corr(E_j,theta)
                     # print("E_j = {:.2f}, Eg_low = {:.2f}, Eg_high = {:.2f}".format(E_j, Eg_low, Eg_high))
                     # R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
-                    if R[j,i] < 0:
-                        print("R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
+                    # if R[j,i] < 0:
+                        # print("R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
+                    i_last = i
+                    i_low_last = i_low_interp
+                    i_high_last = i_high_interp
+
+        # Interpolate 1-to-1 the last distance up to E+3*sigma
+        print("i_Egmax =", i_Egmax, ", i_last =", i_last, flush=True)
+        # Check if this is needed:
+        if i_last >= i_Egmax:
+            continue 
+        s_low = (i_low_max-i_low_last)/(i_Egmax-i_last)
+        s_high = (i_high_max-i_high_last)/(i_Egmax-i_last)
+        for i in range(i_last+1, i_Egmax):
+            i_low_interp = min(int(i_low_last + s_low*(i-i_last) + 0.5), i_low_max)
+            i_high_interp = min(int(i_high_last + s_high*(i-i_last) + 0.5), i_high_max)
+            R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
+            print("Last bit of interpolation: R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
+            # if R[j,i] < 0:
+            #     print("R[j,i] =", R[j,i], flush=True)
+            #     R[j,i] = 0
+
+        # DEBUG: Plot cmp_low and cmp_high:
+        ax.plot(Eout_array, cmp_low, label="cmp_low")
+        ax.plot(Eout_array, cmp_high, label="cmp_high")
+
+
+
+
+
+
+    # END loop over Eout energies Ej
+
+    # Remove any negative elements from response matrix:
+    R[R<0] = 0
+
+
+
 
                     
 
@@ -329,7 +376,7 @@ def response(folderpath, Eout_array, FWHM):
     
 
 
-    for i_plt in [0,5,10,20]:
+    for i_plt in [j_test]:
         ax.plot(Eout_array, R[i_plt,:], label="interpolated, Eout = {:.0f}".format(Eout_array[i_plt]), linestyle="--")
 
 
@@ -351,6 +398,6 @@ def response(folderpath, Eout_array, FWHM):
 if __name__ == "__main__":
     # folderpath = "oscar2017_scale1.0"
     folderpath = "oscar2017_scale1.15"
-    Eg_sim_array = np.linspace(0,2000, 21)
+    Eg_sim_array = np.linspace(0,1400,100)
     FWHM = 2.0
     print("response(\"{:s}\") =".format(folderpath), response(folderpath, Eg_sim_array, FWHM))
