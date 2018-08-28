@@ -17,12 +17,14 @@ def read_mama_2D(filename):
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
     # and 1-D arrays of calibrated x and y values for plotting and similar.
     matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1)
-    datafile = open(filename, 'r')
-    calibration_line = datafile.readlines()[6].split(",")
-    # a = [float(calibration_line[2][:-1]), float(calibration_line[3][:-1]), float(calibration_line[5][:-1]), float(calibration_line[6][:-1])]
-    # JEM update 20180723: Changing to dict, including second-order term for generality:
-    cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]), 
-         "a0y":float(calibration_line[4]), "a1y":float(calibration_line[5]), "a2y":float(calibration_line[6])}
+    cal = {}
+    with open(filename, 'r') as datafile:
+        calibration_line = datafile.readlines()[6].split(",")
+        # a = [float(calibration_line[2][:-1]), float(calibration_line[3][:-1]), float(calibration_line[5][:-1]), float(calibration_line[6][:-1])]
+        # JEM update 20180723: Changing to dict, including second-order term for generality:
+        # print("calibration_line =", calibration_line, flush=True)
+        cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]), 
+             "a0y":float(calibration_line[4]), "a1y":float(calibration_line[5]), "a2y":float(calibration_line[6])}
     # TODO: INSERT CORRECTION FROM CENTER-BIN TO LOWER EDGE CALIBRATION HERE.
     # MAKE SURE TO CHECK rebin_and_shift() WHICH MIGHT NOT LIKE NEGATIVE SHIFT COEFF.
     # (alternatively consider using center-bin throughout, but then need to correct when plotting.)
@@ -37,6 +39,37 @@ def read_mama_2D(filename):
                                                     # but started to hesitate. For now I'm inclined to keep it as
                                                     # center-bin everywhere. 
     return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
+
+
+def read_response(fname_resp_mat, fname_resp_dat):
+    # Import response matrix
+    R, cal_R, Eg_array_R, tmp = read_mama_2D(fname_resp_mat)
+    # We also need info from the resp.dat file:
+    resp = []
+    with open(fname_resp_dat) as file:
+        # Read line by line as there is crazyness in the file format
+        lines = file.readlines()
+        for i in range(4,len(lines)):
+            try:
+                row = np.array(lines[i].split(), dtype="double")
+                resp.append(row)
+            except:
+                break
+    
+    
+    resp = np.array(resp)
+    # Name the columns for ease of reading
+    FWHM = resp[:,1]
+    eff = resp[:,2]
+    pf = resp[:,3]
+    pc = resp[:,4]
+    ps = resp[:,5]
+    pd = resp[:,6]
+    pa = resp[:,7]
+    
+    return R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array_R
+
+
 
 def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
     import time
@@ -154,6 +187,144 @@ def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
 
 
 
+def rebin_and_shift_memoryguard(array, E_range, N_final, rebin_axis=0):
+    # Function to rebin an M-dimensional array either to larger or smaller binsize.
+    # Written by J{\o}rgen E. Midtb{\o}, University of Oslo, j.e.midtbo@fys.uio.no, github.com/jorgenem
+    # Latest change made 20161029.
+
+    # Rebinning is done with simple proportionality. E.g. for down-scaling rebinning (N_final < N_initial): 
+    # if a bin in the original spacing ends up between two bins in the reduced spacing, 
+    # then the counts of that bin are split proportionally between adjacent bins in the 
+    # rebinned array. 
+    # Upward binning (N_final > N_initial) is done in the same way, dividing the content of bins
+    # equally among adjacent bins.
+
+    # Technically it's done by repeating each element of array N_final times and dividing by N_final to 
+    # preserve total number of counts, then reshaping the array from M dimensions to M+1 before summing 
+    # along the new dimension of length N_initial, resulting in an array of the desired dimensionality.
+
+    # This version (called rebin_and_shift rather than just rebin) takes in also the energy range array (lower bin edge)
+    # corresponding to the counts array, in order to be able to change the calibration. What it does is transform the
+    # coordinates such that the starting value of the rebinned axis is zero energy. This is done by shifting all
+    # bins, so we are discarding some of the eventual counts in the highest energy bins. However, there is usually a margin.
+
+    # 201808: This version implements a memory guard, chunking the rebinning process if necessary, in the same way as 
+
+    if isinstance(array, tuple): # Check if input array is actually a tuple, which may happen if rebin_and_shift() is called several times nested for different axes.
+        array = array[0]
+
+    
+    N_initial = array.shape[rebin_axis] # Initial number of bins along rebin axis
+
+    # TODO: Loop this part over chunks of the Ex axis to avoid running out of memory.
+    # Just take the loop from main program in here. Have some test on the dimensionality 
+    # to judge whether chunking is necessary?
+
+    # Begin memory guard (i.e. chunking along the first axis that is not the rebin axis):
+    verbose = True
+    chunk_axis = 0
+    if rebin_axis == 0:
+        chunk_axis = 1
+    N_chunk_axis = array.shape[chunk_axis]
+    N_chunks = 1 # How many portions to chunk, initially try just 1
+    mem_avail = psutil.virtual_memory()[1]
+    mem_need = 8 * N_chunk_axis/N_chunks * np.prod(array.shape) * N_final # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
+    if verbose:
+        print("rebin_and_shift(): \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+    while mem_need > mem_avail: 
+        # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+        N_chunks += 1 # Double number of portions 
+        mem_need = 8 * N_chunk_axis/N_chunks * np.prod(array.shape) * N_final
+    if verbose:
+        print("Adjusted to N_chunks =", N_chunks, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+
+    indices_rebinned = list(array.shape)
+    print("indices_rebinned =", indices_rebinned, flush=True)
+    indices_rebinned[rebin_axis] = N_final
+    array_rebinned = np.zeros((indices_rebinned))
+
+    N_per_chunk = int(N_chunk_axis/N_chunks)
+    for i in range(N_chunks):
+        print("i (current chunk) =", i, flush=True)
+
+        indices_currentchunk = list(array.shape)
+        indices_currentchunk[rebin_axis] = np.linspace(i*N_per_chunk,(i+1)*N_per_chunk-1, N_per_chunk).astype(int)
+        print("indices_currentchunk =", indices_currentchunk, flush=True)
+
+        # Repeat each bin of array Nfinal times and scale to preserve counts
+        array_rebinned_currentchunk = array[tuple(indices_currentchunk)].repeat(N_final, axis=rebin_axis)/N_final
+
+        if E_range[0] < 0 or E_range[1] < E_range[0]:
+            raise Exception("Error in function rebin_and_shift(): Negative zero energy is not supported. (But it should be relatively easy to implement.)")
+        else:
+            # Calculate number of extra slices in Nf*Ni sized array required to get down to zero energy
+            n_extra = int(np.ceil(N_final * (E_range[0]/(E_range[1]-E_range[0]))))
+            # Append this matrix of zero counts in front of the array
+            indices_append = np.array(array_rebinned_currentchunk.shape)
+            indices_append[rebin_axis] = n_extra
+            array_rebinned_currentchunk = np.append(np.zeros(indices_append), array_rebinned_currentchunk, axis=rebin_axis)
+            array_rebinned_currentchunk = np.split(array_rebinned_currentchunk, [0, N_initial*N_final], axis=rebin_axis)[1]
+            indices = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
+            array_rebinned_currentchunk = array_rebinned_currentchunk.reshape(indices).sum(axis=(rebin_axis+1)) 
+            array_rebinned[indices_currentchunk] = array_rebinned_currentchunk
+
+    E_range_shifted_and_scaled = np.linspace(0, E_range[-1]-E_range[0], N_final)
+        
+    return array_rebinned, E_range_shifted_and_scaled
+
+
+
+    
+    
+
+
+
+
+def rebin_by_arrays_1d(counts_in, Ein_array, Eout_array):
+    """
+    Rebins, i.e. redistributes the numbers from vector counts 
+    (which is assumed to have calibration given by Ein_array) 
+    into a new vector, which is returned. 
+    The total number of counts is preserved.
+
+    In case of upsampling (smaller binsize out than in), 
+    the distribution of counts between bins is done by simple 
+    proportionality.
+
+    Inputs:
+    counts: Numpy array of counts in each bin
+    Ein_array: Numpy array of energies, assumed to be linearly spaced, 
+               corresponding to the middle-bin energies of counts
+    Eout_array: Numpy array of energies corresponding to the desired
+                rebinning of the output vector, also middle-bin
+    """
+
+    # Get calibration coefficients and number of elements from array:
+    Nin = len(Ein_array)
+    a0_in, a1_in = Ein_array[0], Ein_array[1]-Ein_array[0]
+    Nout = len(Eout_array)
+    a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
+
+    # Replace the arrays by bin-edge energy arrays of length N+1 
+    # (so that all bins are covered on both sides).
+    Ein_array = np.linspace(a0_in - a1_in/2, a0_in - a1_in/2 + a1_in*Nin, Nin+1)
+    Eout_array = np.linspace(a0_out - a1_out/2, a0_out - a1_out/2 + a1_out*Nout, Nout+1)
+
+
+
+
+    # Allocate vector to fill with rebinned counts
+    counts_out = np.zeros(Nout)
+    # Loop over all indices in both arrays. Maybe this can be speeded up?
+    for i in range(Nout):
+        for j in range(Nin):
+            # Calculate proportionality factor based on current overlap:
+            overlap = np.minimum(Eout_array[i+1], Ein_array[j+1]) - np.maximum(Eout_array[i], Ein_array[j])
+            overlap = overlap if overlap > 0 else 0
+            counts_out[i] += counts_in[j] * overlap / a1_in
+
+    return counts_out
+
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     # Updated 201807: Trying to vectorize so all Ex bins are handled simultaneously.
@@ -244,10 +415,10 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
 
 
 
-# === Unfolding -- convert the following into a function when it's done ===
+# === Unfolding ===
     
     
-def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=False, plot=False):
+def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, plot=False):
     # = Step 0: Import data and response matrix =
     
     if verbose:
@@ -265,7 +436,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
    
 
     # Import response matrix
-    R, cal_R, Ex_array_R, Eg_array_R = read_mama_2D(fname_resp_mat)
+    R, cal_R, Eg_array_R, tmp = read_mama_2D(fname_resp_mat)
 
     if verbose:
         time_readfiles_end = time.process_time()
@@ -413,7 +584,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
     # TODO: Consider writing a function that makes the response matrix (R) from this file
     # (or other input), so we don't have to keep track of redundant info.
     resp = []
-    with open(fname_resp) as file:
+    with open(fname_resp_dat) as file:
         # Read line by line as there is crazyness in the file format
         lines = file.readlines()
         for i in range(4,len(lines)):
@@ -540,13 +711,13 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=Fal
     
 if __name__=="__main__":
     fname_data_raw = 'alfna28si.m'
-    fname_resp = 'resp.dat'
+    fname_resp_dat = 'resp.dat'
     fname_resp_mat = 'response-si28-20171112.m'
 
     # Read raw matrix
     data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
     
-    unfolded, Ex_array, Eg_array = unfold(data_raw, Ex_array, Eg_array, fname_resp, fname_resp_mat, verbose=True, plot=True)
+    unfolded, Ex_array, Eg_array = unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=True, plot=True)
     # unfolded, Ex_array, Eg_array = unfold(fname_data_raw, fname_resp, fname_resp_mat)
     
     # Save unfolded matrix:

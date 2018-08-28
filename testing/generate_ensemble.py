@@ -10,14 +10,29 @@ from unfold import *
 
 # Read raw matrix
 fname_data_raw = '../alfna28si.m'
-data_raw, cal, Ex_array, Eg_array = read_mama(fname_data_raw)
+data_raw, cal_raw, Ex_array, Eg_array_raw = read_mama_2D(fname_data_raw)
+
 
 # TODO implement rebinning before calling unfold()
 # The optimal solution is to construct the response
 # matrix here.
-fname_resp_mat = '../response-si28-20171112.m'
-fname_resp = '../resp.dat'
+# Update 20180828: Have implemented reponse construction, 
+# but it is too slow. Opting to load from MAMA for now.
+fname_resp_mat = '../response_matrix-Si28-14keV.m'
+fname_resp_dat = '../resp-Si28-14keV.dat'
+R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array = read_response(fname_resp_mat, fname_resp_dat)
 
+# Rebin the raw matrix to match reponse:
+# data_raw_rebinned = np.zeros((len(Ex_array), len(Eg_array)))
+# for i in range(len(Ex_array)):
+# 	data_raw_rebinned[i,:] = rebin_by_arrays_1d(data_raw[i,:], Eg_array_raw, Eg_array)
+N_rebin = int(len(Eg_array_raw)/2)
+data_raw, Eg_array_rebinned = rebin_and_shift_memoryguard(data_raw, Eg_array_raw, N_rebin, rebin_axis=1)
+print("Eg_array =", Eg_array)
+print("Eg_array_rebinned =", Eg_array_rebinned)
+
+
+sys.exit(0)
 
 
 N_stat = 1 # How many perturbed copies do we want in our ensemble?
