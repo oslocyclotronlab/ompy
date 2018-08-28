@@ -11,7 +11,7 @@ E_resp_array = np.linspace(a0_resp, a0_resp + a1_resp*(N_resp-1),N_resp)
 print("E_resp_array =", E_resp_array)
 # import sys
 # sys.exit(0)
-FWHM = 100.0 # keV - value at 1.33 MeV
+FWHM = 6.8 # keV - value at 1.33 MeV
 R, FWHM_rel, Eff_tot, pcmp, pFE, pSE, pDE, p511 = response(folderpath, E_resp_array, FWHM)
 
 write_mama_2D(R, "response_interpolation_test.m", E_resp_array, E_resp_array, comment="Made by JEM using response.pyx August 2018.")
