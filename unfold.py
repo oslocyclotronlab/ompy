@@ -94,7 +94,7 @@ def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
     header_string +='!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
     header_string +='!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(x_array[0], (x_array[1]-x_array[0]), y_array[0], (y_array[1]-y_array[0]))
     header_string +='!PRECISION=16 \n'
-    header_string +='!DIMENSION=2,0:%4d,0:%4d \n' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
+    header_string +="!DIMENSION=2,0:{:4d},0:{:4d} \n".format(len(matrix[0,:])-1, len(matrix[:,0])-1)
     header_string +='!CHANNEL=(0:%4d,0:%4d) ' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
 
     footer_string = "!IDEND=\n"
@@ -176,12 +176,12 @@ def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
         # Calculate number of extra slices in Nf*Ni sized array required to get down to zero energy
         n_extra = int(np.ceil(N_final * (E_range[0]/(E_range[1]-E_range[0]))))
         # Append this matrix of zero counts in front of the array
-        indices_append = np.array(array_rebinned.shape)
-        indices_append[rebin_axis] = n_extra
-        array_rebinned = np.append(np.zeros(indices_append), array_rebinned, axis=rebin_axis)
+        dimensions_append = np.array(array_rebinned.shape)
+        dimensions_append[rebin_axis] = n_extra
+        array_rebinned = np.append(np.zeros(dimensions_append), array_rebinned, axis=rebin_axis)
         array_rebinned = np.split(array_rebinned, [0, N_initial*N_final], axis=rebin_axis)[1]
-        indices = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
-        array_rebinned = array_rebinned.reshape(indices).sum(axis=(rebin_axis+1)) 
+        dimensions = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
+        array_rebinned = array_rebinned.reshape(dimensions).sum(axis=(rebin_axis+1)) 
         E_range_shifted_and_scaled = np.linspace(0, E_range[-1]-E_range[0], N_final)
     return array_rebinned, E_range_shifted_and_scaled
 
@@ -234,25 +234,35 @@ def rebin_and_shift_memoryguard(array, E_range, N_final, rebin_axis=0):
     while mem_need > mem_avail: 
         # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
         N_chunks += 1 # Double number of portions 
-        mem_need = 8 * N_chunk_axis/N_chunks * np.prod(array.shape) * N_final
+        mem_need = 8 / N_chunks * np.prod(array.shape) * N_final
+    N_chunks = max(N_chunks, int(np.ceil(N_chunk_axis/N_chunks)))
     if verbose:
         print("Adjusted to N_chunks =", N_chunks, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
 
-    indices_rebinned = list(array.shape)
-    print("indices_rebinned =", indices_rebinned, flush=True)
-    indices_rebinned[rebin_axis] = N_final
-    array_rebinned = np.zeros((indices_rebinned))
+    dimensions_rebinned = list(array.shape)
+    # print("dimensions_rebinned =", dimensions_rebinned, flush=True)
+    dimensions_rebinned[rebin_axis] = N_final
+    array_rebinned = np.zeros((dimensions_rebinned))
 
     N_per_chunk = int(N_chunk_axis/N_chunks)
+    # print("N_per_chunk =", N_per_chunk, flush=True)
     for i in range(N_chunks):
-        print("i (current chunk) =", i, flush=True)
+        # print("i (current chunk) =", i, flush=True)
 
-        indices_currentchunk = list(array.shape)
-        indices_currentchunk[rebin_axis] = np.linspace(i*N_per_chunk,(i+1)*N_per_chunk-1, N_per_chunk).astype(int)
-        print("indices_currentchunk =", indices_currentchunk, flush=True)
+        dimensions_currentchunk = list(array.shape)
+        dimensions_currentchunk[chunk_axis] = N_per_chunk
+        index_vectors_currentchunk = [np.linspace(0,Ni-1,Ni).astype(int) for Ni in array.shape]
+        index_vectors_currentchunk[chunk_axis] = np.linspace(i*N_per_chunk,(i+1)*N_per_chunk-1, N_per_chunk).astype(int)
+        # print("index_vectors_currentchunk =", index_vectors_currentchunk, flush=True)
 
         # Repeat each bin of array Nfinal times and scale to preserve counts
-        array_rebinned_currentchunk = array[tuple(indices_currentchunk)].repeat(N_final, axis=rebin_axis)/N_final
+        # print("array.shape =", array.shape, flush=True)
+        print("dimensions_currentchunk =", dimensions_currentchunk)
+        print("tuple(index_vectors_currentchunk) =", tuple(index_vectors_currentchunk), flush=True)
+        array_rebinned_currentchunk = array[tuple(index_vectors_currentchunk)].reshape(dimensions_currentchunk).repeat(N_final, axis=rebin_axis)/N_final
+        # print("array_rebinned_currentchunk.shape = ", array_rebinned_currentchunk, flush=True)
+        # array_rebinned_currentchunk = array[0:1,:].repeat(N_final, axis=rebin_axis)/N_final
+        sys.exit(0)
 
         if E_range[0] < 0 or E_range[1] < E_range[0]:
             raise Exception("Error in function rebin_and_shift(): Negative zero energy is not supported. (But it should be relatively easy to implement.)")
@@ -260,13 +270,16 @@ def rebin_and_shift_memoryguard(array, E_range, N_final, rebin_axis=0):
             # Calculate number of extra slices in Nf*Ni sized array required to get down to zero energy
             n_extra = int(np.ceil(N_final * (E_range[0]/(E_range[1]-E_range[0]))))
             # Append this matrix of zero counts in front of the array
-            indices_append = np.array(array_rebinned_currentchunk.shape)
-            indices_append[rebin_axis] = n_extra
-            array_rebinned_currentchunk = np.append(np.zeros(indices_append), array_rebinned_currentchunk, axis=rebin_axis)
+            dimensions_append = np.array(array_rebinned_currentchunk.shape)
+            dimensions_append[rebin_axis] = n_extra
+            array_rebinned_currentchunk = np.append(np.zeros(dimensions_append), array_rebinned_currentchunk, axis=rebin_axis)
             array_rebinned_currentchunk = np.split(array_rebinned_currentchunk, [0, N_initial*N_final], axis=rebin_axis)[1]
-            indices = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
-            array_rebinned_currentchunk = array_rebinned_currentchunk.reshape(indices).sum(axis=(rebin_axis+1)) 
-            array_rebinned[indices_currentchunk] = array_rebinned_currentchunk
+            dimensions = np.insert(array.shape, rebin_axis, N_final) # Indices to reshape to
+            dimensions[chunk_axis] = N_per_chunk
+            array_rebinned_currentchunk = array_rebinned_currentchunk.reshape(dimensions).sum(axis=(rebin_axis+1)) 
+            index_vectors_currentchunk_rebinned = index_vectors_currentchunk.copy()
+            index_vectors_currentchunk_rebinned[rebin_axis] = np.linspace(0,N_final-1,N_final).astype(int)
+            array_rebinned[tuple(index_vectors_currentchunk_rebinned)] = array_rebinned_currentchunk
 
     E_range_shifted_and_scaled = np.linspace(0, E_range[-1]-E_range[0], N_final)
         
@@ -315,7 +328,7 @@ def rebin_by_arrays_1d(counts_in, Ein_array, Eout_array):
 
     # Allocate vector to fill with rebinned counts
     counts_out = np.zeros(Nout)
-    # Loop over all indices in both arrays. Maybe this can be speeded up?
+    # Loop over all dimensions in both arrays. Maybe this can be speeded up?
     for i in range(Nout):
         for j in range(Nin):
             # Calculate proportionality factor based on current overlap:
@@ -344,43 +357,43 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     if shift == "annihilation":
         # For the annihilation peak, all channels should be mapped on E = 511 keV. Of course, gamma channels below 511 keV,
         # and even well above that, cannot produce annihilation counts, but this is taken into account by the fact that p
-        # is zero for these channels. Thus, we set i_shift=0 and make a special indices_shifted array to map all channels of
+        # is zero for these channels. Thus, we set i_shift=0 and make a special dimensions_shifted array to map all channels of
         # original array to i(511). 
         i_shift = 0 
     else:
-        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of indices to shift by
+        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of dimensions to shift by
 
 
     N_Eg_sh = N_Eg - i_shift
-    indices_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
+    dimensions_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
     if shift == "annihilation": # If this is the annihilation peak then all counts should end up with their centroid at E = 511 keV
-        # indices_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
-        indices_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
+        # dimensions_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
+        dimensions_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
     else:
-        indices_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
+        dimensions_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
 
 
     if smoothing:
         # Scale each Eg count by the corresponding probability
         # Do this for all Ex bins at once:
         array = array * p[0:N_Eg].reshape(1,N_Eg)
-        # Shift array down in energy by i_shift indices,
+        # Shift array down in energy by i_shift dimensions,
         # so that index i_shift of array is index 0 of array_shifted.
         # Also flatten array along Ex axis to facilitate multiplication.
-        array_shifted_flattened = array[:,indices_original].ravel()
+        array_shifted_flattened = array[:,dimensions_original].ravel()
         # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions 
         # to multiply each Eg channel by. This array is the same for all Ex bins,
         # so it will be repeated N_Ex times and stacked for multiplication
         # To get correct normalization we multiply by bin width
         pdfarray = a1_Eg* norm.pdf(
                             np.tile(Eg_array[0:N_Eg_sh], N_Eg_sh).reshape((N_Eg_sh, N_Eg_sh)),
-                            loc=Eg_array[indices_shifted].reshape(N_Eg_sh,1),
-                            scale=FWHM[indices_shifted].reshape(N_Eg_sh,1)/2.355
+                            loc=Eg_array[dimensions_shifted].reshape(N_Eg_sh,1),
+                            scale=FWHM[dimensions_shifted].reshape(N_Eg_sh,1)/2.355
                         )
                         
         # Remove eventual NaN values:
         pdfarray = np.nan_to_num(pdfarray, copy=False)
-        # print("Eg_array[indices_shifted] =", Eg_array[indices_shifted], flush=True)
+        # print("Eg_array[dimensions_shifted] =", Eg_array[dimensions_shifted], flush=True)
         # print("pdfarray =", pdfarray, flush=True)
         # Repeat and stack:
         pdfarray_repeated_stacked = np.tile(pdfarray, (N_Ex,1))
@@ -406,7 +419,7 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
         #         pass
 
         # Instead of above, vectorizing:
-        array_out = p[indices_original].reshape(1,N_Eg_sh)*array[:,indices_original]
+        array_out = p[dimensions_original].reshape(1,N_Eg_sh)*array[:,dimensions_original]
 
     # Append zeros to the end of Eg axis so we match the length of the original array:
     if i_shift > 0:
@@ -418,8 +431,18 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
 # === Unfolding ===
     
     
-def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, plot=False):
+def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
     # = Step 0: Import data and response matrix =
+
+    # If energy limits are not provided, use extremal array values:
+    if Ex_min == "default":
+        Ex_min = Ex_array[0]
+    if Ex_max == "default":
+        Ex_max = Ex_array[-1]
+    if Eg_min == "default":
+        Eg_min = Eg_array[0]
+    if Eg_max == "default":
+        Eg_max = Eg_array[-1]
     
     if verbose:
         time_readfiles_start = time.process_time()
@@ -513,11 +536,11 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose
     
     # Set limits for excitation and gamma energy bins to be considered for unfolding
     Ex_low = 0
-    Ex_high = 12000 # keV
+    Ex_high = 14000 # keV
     # Use index 0 of array as lower limit instead of energy because it can be negative!
     iEx_low, iEx_high = 0, i_from_E(Ex_high, Ex_array)
     Eg_low = 0
-    Eg_high = 12000 # keV
+    Eg_high = 14000 # keV
     iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
     Nit = 10 #27
     
@@ -721,7 +744,7 @@ if __name__=="__main__":
     # unfolded, Ex_array, Eg_array = unfold(fname_data_raw, fname_resp, fname_resp_mat)
     
     # Save unfolded matrix:
-    write_mama(unfolded, 'unfolded-28Si.m', Ex_array, Eg_array, comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
+    write_mama_2D(unfolded, 'unfolded-28Si.m', Ex_array, Eg_array, comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
 
 
 
