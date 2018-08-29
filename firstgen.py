@@ -12,12 +12,14 @@ from unfold import *
 
 # === Utility functions ===
 
-def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_max, dE_gamma, N_iterations=1):
+def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=2):
 	"""
 	Function implementing the first generation method from Guttormsen et al. (NIM 1987)
 	The code is heavily influenced by the original implementation by Magne in MAMA.
-	Mainly written autumn 2016 at MSU
+	Mainly written autumn 2016 at MSU.
 	"""
+
+	# TODO option statistical_or_total=2 (total) does not work
 
 
 	Ny = len(matrix[:,0])
@@ -28,7 +30,7 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	by = Ex_range_mat[0]
 	ay = Ex_range_mat[1] - Ex_range_mat[0]
 
-	statistical_or_total = 1
+	
 	ThresSta = 430.0
 	# AreaCorr = 1
 	ThresTot = 	200.000000
@@ -51,9 +53,26 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	Ex_range = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
 	Egamma_range = np.linspace(0,Nx-1,Nx)*ax + bx # Range of Egamma values
 	
-	# Compress matrix along Ex
-	#matrix_ex_compressed = matrix[0:int(N_Exbins*grouping),:].reshape(N_Exbins, grouping, Nx).sum(axis=1)
-	matrix_ex_compressed = rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+	if N_Exbins != Ny:
+		# Compress matrix along Ex
+		#matrix_ex_compressed = matrix[0:int(N_Exbins*grouping),:].reshape(N_Exbins, grouping, Nx).sum(axis=1)
+		# matrix_ex_compressed = rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+		# Update 20180828: Trying other rebin functions
+		matrix_ex_compressed = np.zeros((N_Exbins, Nx))
+		for i in range(Nx):
+			# This is too slow.
+			# TODO understand if the int((Ex_max + dE_gamma etc...)) stuff is necessary.
+			# matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),i], Ex_range_mat[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny)], Ex_range) 
+			print("i=",i,flush=True)
+			# print("Ex_range_mat.shape =", Ex_range_mat.shape, flush=True)
+			# print("matrix.shape =", matrix.shape, flush=True)
+			matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[:,i], Ex_range_mat, Ex_range) 
+		# matrix_ex_compressed = rebin_and_shift_2D_memoryguard(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+	else:
+		matrix_ex_compressed = matrix
+
+
+
 	# print Ny, N_Exbins, N_Exbins_original	
 	# plt.pcolormesh(Egamma_range, Ex_range, matrix_ex_compressed, norm=LogNorm(vmin=0.001, vmax=matrix_ex_compressed.max()))
 	# plt.matshow(matrix_ex_compressed)
@@ -115,8 +134,8 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	H = np.zeros((N_Exbins, Nx))
 	for i in range(N_Exbins):
 		Ni = len(Egamma_range[Egamma_range<Ex_range[i] + dE_gamma])
-		# print Ni
-		H[i, Egamma_range < Ex_range[i] + dE_gamma] = 1/Ni
+		print("Ni =", Ni, flush=True)
+		H[i, Egamma_range < Ex_range[i] + dE_gamma] = 1/max(Ni, 1)
 	# print np.sum(H0, axis=1) # Seems to work!
 
 	# Set up normalization matrix N
@@ -246,7 +265,8 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 			elif statistical_or_total == 2:
 				# Total multiplicity calculation
 				# good_indices_G = np.where(Egamma_mesh_compressed < Egamma_max_grid, True, False)
-				G_area = np.where(Egamma_mesh_compressed < Egamma_max_grid, G, 0).sum(axis=1)
+				# G_area = np.where(Egamma_mesh_compressed < Egamma_max_grid, G, 0).sum(axis=1)
+				G_area = np.where(Egamma_mesh < Egamma_max_grid, G, 0).sum(axis=1)
 			# G_area = np.where(good_indices_G, G, 0).sum(axis=1)
 			# print "print G_area.shape"
 			# print G_area.shape
@@ -288,8 +308,8 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 
 
 		# Check convergence
-		max_diff = np.max(np.power(H-H_old,2))
-		# print max_diff
+		max_diff = np.max(np.abs(H-H_old))
+		print("iteration =", iteration, "max_diff =", max_diff, flush=True)
 
 	
 	# Remove negative counts
@@ -319,16 +339,18 @@ def rebin(array, N_final, rebin_axis=0):
 if __name__=="__main__":
 	
 	fname_unf = "unfolded-28Si.m"
-	unfolded, cal_unf, Ex_array_unf, Eg_array_unf = read_mama(fname_unf)
+	unfolded, cal_unf, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unf)
 
-	Ex_max = 12000 # keV - maximum excitation energy
 	dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
-	N_Exbins = 300
-	firstgen, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded, Eg_array_unf, Ex_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
+	# Ex_max = 12000 # keV - maximum excitation energy
+	# N_Exbins = 300
+	Ex_max = Ex_array_unf[-1] # keV - maximum excitation energy
+	N_Exbins = len(Ex_array_unf)
+	firstgen, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded, Ex_array_unf, Eg_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=20)
 
 
 
-	write_mama(firstgen, 'firstgen-28Si.m', Eg_array_fg, Ex_array_fg, comment="Made using firstgen.py by JEM, during development of pyma, summer 2018")	
+	write_mama_2D(firstgen, 'firstgen-28Si.m', Eg_array_fg, Ex_array_fg, comment="Made using firstgen.py by JEM, during development of pyma, summer 2018")	
 	
 	# Diagnostic plots:
 	fig, (ax_unf, ax_fg) = plt.subplots(2,1)
