@@ -216,9 +216,6 @@ def rebin_and_shift_memoryguard(array, E_range, N_final, rebin_axis=0):
     
     N_initial = array.shape[rebin_axis] # Initial number of bins along rebin axis
 
-    # TODO: Loop this part over chunks of the Ex axis to avoid running out of memory.
-    # Just take the loop from main program in here. Have some test on the dimensionality 
-    # to judge whether chunking is necessary?
 
     # Begin memory guard (i.e. chunking along the first axis that is not the rebin axis):
     verbose = True
@@ -427,11 +424,22 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     return array_out
 
 
+def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
+    # Make masking array to cut away noise below Eg=Ex+dEg diagonal
+    # Define cut   x1    y1    x2    y2
+    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array), 
+                  i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
+    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
+    i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
+    return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+
+
 
 # === Unfolding ===
     
     
-def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
+def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
     # = Step 0: Import data and response matrix =
 
     # If energy limits are not provided, use extremal array values:
@@ -544,18 +552,19 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min=
     iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
     Nit = 10 #27
     
-    # Make masking array to cut away noise below Eg=Ex+dEg diagonal
+    # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     dEg = 1000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
-    # Define cut   x1    y1    x2    y2
-    cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
-                  i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
-    # cut_points = [ 72,   5,  1050,  257]
+    # # Define cut   x1    y1    x2    y2
+    # cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
+    #               i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
+    # # cut_points = [ 72,   5,  1050,  257]
+    # # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    # # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
     # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
     # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
-    j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-    i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
-    mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+    # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
+    # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+    mask = make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
     
     
     
@@ -630,9 +639,9 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min=
     
 
     # Debugging: Test normalization of response matrix and reponse pieces:
-    i_R = 50
-    print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
-    print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
+    # i_R = 50
+    # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
+    # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
 
 
     # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
@@ -668,20 +677,23 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min=
         u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
         r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
         
-        uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=True)
+        # Apply smoothing to the different peak structures. 
+        # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
+        # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
+        uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
         # print("uf smoothed, integral =", uf.sum())
-        uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pf, shift=0, smoothing=False)
+        uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
         # print("uf unsmoothed, integral =", uf_unsm.sum())
-        us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, ps, shift=511, smoothing=True)
-        ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM, pd, shift=1022, smoothing=True)
+        us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
+        ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
         ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
         w = us + ud + ua
         v = uf + w
         c = r - v    
         # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-        c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM, np.ones(len(FWHM)), shift=0, smoothing=True)    
+        c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
         # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-        u = div0((r - c - w),np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
+        u = div0((r - c - w), np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
         unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
 
 
@@ -734,8 +746,8 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, Ex_min=
     
 if __name__=="__main__":
     fname_data_raw = 'alfna28si.m'
-    fname_resp_dat = 'resp.dat'
-    fname_resp_mat = 'response-si28-20171112.m'
+    fname_resp_dat = 'resp-Si28-7keV.dat'
+    fname_resp_mat = 'response_matrix-Si28-7keV.m'
 
     # Read raw matrix
     data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
