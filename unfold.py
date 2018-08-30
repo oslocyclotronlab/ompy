@@ -745,9 +745,15 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
 
     
 if __name__=="__main__":
-    fname_data_raw = 'alfna28si.m'
-    fname_resp_dat = 'resp-Si28-7keV.dat'
-    fname_resp_mat = 'response_matrix-Si28-7keV.m'
+    # fname_data_raw = 'alfna28si.m'
+    # fname_resp_dat = 'resp-Si28-7keV.dat'
+    # fname_resp_mat = 'response_matrix-Si28-7keV.m'
+    # fname_unf_save = 'unfolded-28Si.m'
+
+    fname_data_raw = 'data/alfna-Re187.m'
+    fname_resp_dat = 'data/resp-Re187-10keV.dat'
+    fname_resp_mat = 'data/response_matrix-Re187-10keV.m'
+    fname_unf_save = 'unfolded-Re187.m'
 
     # Read raw matrix
     data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
@@ -756,7 +762,7 @@ if __name__=="__main__":
     # unfolded, Ex_array, Eg_array = unfold(fname_data_raw, fname_resp, fname_resp_mat)
     
     # Save unfolded matrix:
-    write_mama_2D(unfolded, 'unfolded-28Si.m', Ex_array, Eg_array, comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
+    write_mama_2D(unfolded, fname_unf_save, Ex_array, Eg_array, comment="Unfolded using unfold.py by JEM, during development of pyma, summer 2018")
 
 
 
