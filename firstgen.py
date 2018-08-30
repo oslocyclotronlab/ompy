@@ -12,7 +12,7 @@ from unfold import *
 
 # === Utility functions ===
 
-def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=1):
+def first_generation_spectrum(matrix, Ex_array_mat, Egamma_array, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=1):
 	"""
 	Function implementing the first generation method from Guttormsen et al. (NIM 1987)
 	The code is heavily influenced by the original implementation by Magne in MAMA.
@@ -25,10 +25,10 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	Ny = len(matrix[:,0])
 	Nx = len(matrix[0,:])
 	# Extract / calculate calibration coefficients
-	bx = Egamma_range[0]
-	ax = Egamma_range[1] - Egamma_range[0]
-	by = Ex_range_mat[0]
-	ay = Ex_range_mat[1] - Ex_range_mat[0]
+	bx = Egamma_array[0]
+	ax = Egamma_array[1] - Egamma_array[0]
+	by = Ex_array_mat[0]
+	ay = Ex_array_mat[1] - Ex_array_mat[0]
 
 	
 	ThresSta = 430.0
@@ -38,7 +38,7 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# ExH = 7520.00000
 	ExEntry0s = 300.000000
 	ExEntry0t = 0.00000000
-	apply_area_correction = False
+	apply_area_correction = True
 
 
 	# Ex_max = 7500 # keV - maximum excitation energy
@@ -50,10 +50,10 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# grouping = int(np.ceil(len(y_array[np.logical_and(0 < y_array, y_array < Ex_max + dE_gamma)])/N_Exbins)) # The integer number of bins that need to be grouped to have approximately N_Exbins bins between Ex_min and Ex_max after compression (rounded up)
 
 	# Make arrays of Ex and Egamma axis values
-	Ex_range = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
-	# Egamma_range = np.linspace(0,Nx-1,Nx)*ax + bx # Range of Egamma values # Update: This is passed into the function.
+	Ex_array = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
+	# Egamma_array = np.linspace(0,Nx-1,Nx)*ax + bx # Range of Egamma values # Update: This is passed into the function.
 	
-	matrix_ex_compressed = rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+	matrix_ex_compressed = rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
 	# if N_Exbins != Ny:
 		# Compress matrix along Ex
 		#matrix_ex_compressed = matrix[0:int(N_Exbins*grouping),:].reshape(N_Exbins, grouping, Nx).sum(axis=1)
@@ -62,25 +62,25 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 		# for i in range(Nx):
 		# 	# This is too slow.
 		# 	# TODO understand if the int((Ex_max + dE_gamma etc...)) stuff is necessary.
-		# 	# matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),i], Ex_range_mat[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny)], Ex_range) 
+		# 	# matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),i], Ex_array_mat[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny)], Ex_array) 
 		# 	print("i=",i,flush=True)
-		# 	# print("Ex_range_mat.shape =", Ex_range_mat.shape, flush=True)
+		# 	# print("Ex_array_mat.shape =", Ex_array_mat.shape, flush=True)
 		# 	# print("matrix.shape =", matrix.shape, flush=True)
-		# 	matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[:,i], Ex_range_mat, Ex_range) 
-		# # matrix_ex_compressed = rebin_and_shift_2D_memoryguard(matrix[0:int((Ex_max+dE_gamma)/Ex_range_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+		# 	matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[:,i], Ex_array_mat, Ex_array) 
+		# # matrix_ex_compressed = rebin_and_shift_2D_memoryguard(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
 	# else:
 		# matrix_ex_compressed = matrix
 
 
 
 	# print Ny, N_Exbins, N_Exbins_original	
-	# plt.pcolormesh(Egamma_range, Ex_range, matrix_ex_compressed, norm=LogNorm(vmin=0.001, vmax=matrix_ex_compressed.max()))
+	# plt.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed, norm=LogNorm(vmin=0.001, vmax=matrix_ex_compressed.max()))
 	# plt.matshow(matrix_ex_compressed)
 	# plt.colorbar()
 	# plt.show()
 
 	# Remove counts in matrix for Ex higher than Ex_max:
-	matrix_ex_compressed[Ex_range>Ex_max, :] = 0
+	matrix_ex_compressed[Ex_array>Ex_max, :] = 0
 	# plt.matshow(matrix_ex_compressed)
 	# plt.colorbar()
 	# plt.show()
@@ -89,8 +89,8 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# ==== Calculate multiplicities: ====
 
 	# Setup meshgrids for making boolean indexing arrays
-	Egamma_mesh, Ex_mesh = np.meshgrid(Egamma_range, Ex_range)
-	Egamma_max = Ex_range + dE_gamma # Maximal Egamma value for each Ex bin
+	Egamma_mesh, Ex_mesh = np.meshgrid(Egamma_array, Ex_array)
+	Egamma_max = Ex_array + dE_gamma # Maximal Egamma value for each Ex bin
 	Egamma_max_grid = np.meshgrid(np.ones(Nx), Egamma_max)[1]
 	if statistical_or_total == 1:
 		# Statistical multiplicity calculation (i.e. trying to use statistical/continuum region only)
@@ -111,7 +111,7 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# Cut away counts higher than Egamma = Ex + dE_gamma
 	# matrix_ex_compressed_cut = np.where(good_indices, matrix_ex_compressed, 0)
 	# plt.figure(1)
-	# plt.pcolormesh(Egamma_range, Ex_range, matrix_ex_compressed_cut, norm=LogNorm(vmin=0.01, vmax=matrix_ex_compressed.max()))
+	# plt.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed_cut, norm=LogNorm(vmin=0.01, vmax=matrix_ex_compressed.max()))
 	# plt.show()
 	# sys.exit(0)
 
@@ -120,27 +120,28 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	Egamma_average = div0( np.sum(Egamma_mesh * matrix_ex_compressed_cut, axis =1) , area_matrix_ex_compressed_cut )
 	if statistical_or_total == 1:
 		# Statistical multiplicity - use the effective Ex0 value
-		multiplicity = div0( Ex_range - np.maximum( np.minimum(Ex_range - 200, ExEntry0s), 0), Egamma_average)
+		multiplicity = div0( Ex_array - np.maximum( np.minimum(Ex_array - 200, ExEntry0s), 0), Egamma_average)
 	elif statistical_or_total == 2:
 		# Total multiplicity - use actual Ex0 = 0
-		multiplicity = div0( Ex_range, Egamma_average )
+		multiplicity = div0( Ex_array, Egamma_average )
+
 
 	# plt.figure(2)
-	# plt.step(Ex_range, multiplicity) # This rises like a straight line from 0 to about 3-4 - seems very right!
+	# plt.step(Ex_array, multiplicity) # This rises like a straight line from 0 to about 3-4 - seems very right!
 	# plt.show()
 	# sys.exit(0)
 
 	# Set up dummy first-generation matrix to start iterations, made of normalized boxes:
 	H = np.zeros((N_Exbins, Nx))
 	for i in range(N_Exbins):
-		Ni = len(Egamma_range[Egamma_range<Ex_range[i] + dE_gamma])
+		Ni = len(Egamma_array[Egamma_array<Ex_array[i] + dE_gamma])
 		# print("Ni =", Ni, flush=True)
-		H[i, Egamma_range < Ex_range[i] + dE_gamma] = 1/max(Ni, 1)
+		H[i, Egamma_array < Ex_array[i] + dE_gamma] = 1/max(Ni, 1)
 	# print np.sum(H0, axis=1) # Seems to work!
 
 	# Set up normalization matrix N
 	area = np.sum(matrix_ex_compressed_cut, axis=1) # Get total number of counts in each Ex bin
-	# plt.plot(Ex_range, area)
+	# plt.plot(Ex_array, area)
 	# plt.show()
 
 	area_grid = np.tile(area, (N_Exbins, 1)) # Copy the array N_Exbins times down to make a square matrix
@@ -159,14 +160,14 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	# plt.show()
 
 	# Set up compression parameters for Egamma axis to be used by H below:
-	i_Egamma_max = np.where(Egamma_range > Ex_max+ dE_gamma)[0][0] # Get the maximal allowed gamma energy (need to make H square, thus Egamma <= Ex + dE_gamma, since that's the maximal Ex channel in the compressed matrix)
-	# print i_Egamma_max, Egamma_range[i_Egamma_max], N_Exbins, int(i_Egamma_max/N_Exbins)
+	i_Egamma_max = np.where(Egamma_array > Ex_max+ dE_gamma)[0][0] # Get the maximal allowed gamma energy (need to make H square, thus Egamma <= Ex + dE_gamma, since that's the maximal Ex channel in the compressed matrix)
+	# print i_Egamma_max, Egamma_array[i_Egamma_max], N_Exbins, int(i_Egamma_max/N_Exbins)
 	# i_Egamma_max = i_Egamma_max + N_Exbins - i_Egamma_max%N_Exbins # Make sure the number of indices is a whole multiple of N_Exbins (rounded up)
 	# print i_Egamma_max
 	grouping_Egamma = int(np.ceil(i_Egamma_max/N_Exbins))
 	# print grouping_Egamma
-	# Egamma_range_compressed = Egamma_range[0:i_Egamma_max]*grouping_Egamma
-	Egamma_range_compressed = Ex_range
+	# Egamma_array_compressed = Egamma_array[0:i_Egamma_max]*grouping_Egamma
+	Egamma_array_compressed = Ex_array
 
 	# plt.matshow(H[:,0:i_Egamma_max])
 	# plt.show()
@@ -195,6 +196,23 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 	vmin_diff = -100
 	vmax_diff = 100
 
+	# Prepare weight function based on Fermi gas approximation:
+	a_f = 16 # 1/MeV
+	n_f = 4.2 # Exponent for E_gamma
+	# Make the weight array by the formula W(Ex,Eg) = Eg^n_f / (Ex-Eg)^2 * exp(2*sqrt(a*(Ex-Eg)))
+	Ex_mesh, Eg_mesh = np.meshgrid(Ex_array, Ex_array, indexing="ij")
+	# Make mesh of final energies:
+	Ef_mesh = Ex_mesh-Eg_mesh
+	# Set everything above Ex=Eg diagonal to zero so the weights also become zero
+	Ef_mesh[Ef_mesh < 0] = 0
+	# Calculate weights. Remember that energies are in keV, while a is in 1/MeV, so we correct in the exponent:
+	W_old = np.where(Eg_mesh > 0, np.power(Eg_mesh,n_f) / np.power(Ef_mesh, 2) * np.exp(2*np.sqrt(a_f*Ef_mesh/1000)), 0)
+	W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins,1))
+
+
+	dEg = 1000
+	mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[0]+dEg, Ex_array[-1], Ex_array[-1]+dEg)
+
 	# Perform the iterative subtraction:
 	for iteration in range(N_iterations):
 	# convergence_criterion = 1
@@ -206,24 +224,41 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 		# H_compressed = H[:,0:i_Egamma_max].reshape(N_Exbins, N_Exbins, grouping_Egamma).sum(axis=2)
 		H_compressed = rebin(H[:,0:i_Egamma_max], N_Exbins, rebin_axis=1)
 
-		# plt.pcolormesh(Egamma_range_compressed, Ex_range, H_compressed)
+		# plt.pcolormesh(Egamma_array_compressed, Ex_array, H_compressed)
 		# plt.show()
 
-		# Convert first-generation spectra H into weights W
-		W = np.zeros((N_Exbins, N_Exbins))
-		for i in range(0,N_Exbins):
-			# print H_compressed[i,i:0:-1].shape
-			W[i,0:i] = H_compressed[i,i:0:-1]
+		# if iteration == 0:
+			# Don't use H as weights for first iteration.
+			# W = W_old
+		# else:
+		if True:
+			# Convert first-generation spectra H into weights W
+			W = np.zeros((N_Exbins, N_Exbins))
+			for i in range(0,N_Exbins):
+				# print H_compressed[i,i:0:-1].shape
+				W[i,0:i] = H_compressed[i,i:0:-1]
+				# TODO Consider implementing something like Massage(), but try to understand if it is necessary first.
+			# plt.figure()
+			# plt.pcolormesh(Ex_array, Ex_array, W, norm=LogNorm())
+			# plt.show()
+			# sys.exit(0)
+		# Prevent oscillations, following MAMA:
+		if iteration > 4:
+			W = 0.7 * W + 0.3 * W_old
 		# plt.matshow(W, origin='lower', vmin=W.min(), vmax=W.max())
 		# plt.colorbar()
 		# plt.title('Before')
 		# plt.show()
 		# Remove negative weights
 		W[W<0] = 0
+		# Apply mask 
+		# W = W * mask_W
 		# Normalize each Ex channel to unity
 		# W = np.where(np.invert(np.isnan(W/W.sum(axis=1).astype(float))),  W/W.sum(axis=1).astype(float), 0)
 		# Remove Inf and NaN
 		W = div0(W, W.sum(axis=1).reshape(N_Exbins,1))
+		# Store for next iteration:
+		W_old = np.copy(W)
 		# W = np.nan_to_num(W) 
 		# plt.matshow(W, origin='lower', vmin=W.min(), vmax=W.max())
 		# plt.colorbar()
@@ -246,8 +281,8 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 		# Apply area correction
 		if apply_area_correction:
 			# Setup meshgrids for making boolean indexing arrays
-			# Egamma_mesh_compressed, Ex_mesh_compressed = np.meshgrid(Egamma_range_compressed, Ex_range)
-			# Egamma_max = Ex_range + dE_gamma # Maximal Egamma value for each Ex bin
+			# Egamma_mesh_compressed, Ex_mesh_compressed = np.meshgrid(Egamma_array_compressed, Ex_array)
+			# Egamma_max = Ex_array + dE_gamma # Maximal Egamma value for each Ex bin
 			# Egamma_max_grid_compressed = np.meshgrid(np.ones(N_Exbins), Egamma_max)[1]
 			# print "Egamma_mesh_compressed, Egamma_max, Egamma_max_grid"
 			# print Egamma_mesh_compressed.shape, Egamma_max.shape, Egamma_max_grid.shape
@@ -295,13 +330,13 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 		# plt.figure(10)
 		# plt.subplot(1,2,1)
 		# plt.title('First gen spectrum, current')
-		# plt.pcolormesh(Egamma_range, Ex_range, H, norm=LogNorm(vmin=0.01, vmax=vmax_spec))
+		# plt.pcolormesh(Egamma_array, Ex_array, H, norm=LogNorm(vmin=0.01, vmax=vmax_spec))
 		# plt.colorbar()
 		# plt.subplot(1,2,2)
 		
 
 		# plt.title('Diff with previous')
-		# plt.pcolormesh(Egamma_range, Ex_range, H-H_old, vmin=vmin_diff, vmax=vmax_diff)
+		# plt.pcolormesh(Egamma_array, Ex_array, H-H_old, vmin=vmin_diff, vmax=vmax_diff)
 		# plt.colorbar()
 		# plt.show()
 
@@ -311,11 +346,11 @@ def first_generation_spectrum(matrix, Ex_range_mat, Egamma_range, N_Exbins, Ex_m
 		max_diff = np.max(np.abs(H-H_old))
 		print("iteration =", iteration, "max_diff =", max_diff, flush=True)
 
-	
 	# Remove negative counts
 	H[H<0] = 0
+	
 	# Return
-	return H, H-H_old, Ex_range, Egamma_range
+	return H, H-H_old, Ex_array, Egamma_array
 
 def rebin(array, N_final, rebin_axis=0):
 	# Function to rebin an M-dimensional array either to larger or smaller binsize.
@@ -339,7 +374,12 @@ def rebin(array, N_final, rebin_axis=0):
 if __name__=="__main__":
 	
 	# fname_unf = "unfolded-28Si.m"
-	fname_unf = "mama-testing/unfolded-si28.m"
+	# fname_unf = "mama-testing/unfolded-si28.m"
+	# fname_fg_save = 'firstgen-28Si.m'
+
+	fname_unf = "unfolded-Re187.m"
+	fname_fg_save = "firstgen-Re187.m"
+
 	unfolded, cal_unf, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unf)
 
 	dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
@@ -356,12 +396,13 @@ if __name__=="__main__":
 
 
 
-	write_mama_2D(firstgen, 'firstgen-28Si.m', Eg_array_fg, Ex_array_fg, comment="Made using firstgen.py by JEM, during development of pyma, summer 2018")	
+	write_mama_2D(firstgen, fname_fg_save, Eg_array_fg, Ex_array_fg, comment="Made using firstgen.py by JEM, during development of pyma, summer 2018")	
 	
 	# Diagnostic plots:
-	fig, (ax_unf, ax_fg) = plt.subplots(2,1)
+	fig, (ax_unf, ax_fg, ax_diff) = plt.subplots(3,1)
 	ax_unf.pcolormesh(Eg_array_unf, Ex_array_unf, unfolded, norm=LogNorm(vmin=1, vmax=1e4), cmap="jet")
 	ax_fg.pcolormesh(Eg_array_fg, Ex_array_fg, firstgen, norm=LogNorm(vmin=1, vmax=1e4), cmap="jet")
+	ax_diff.pcolormesh(Eg_array_fg, Ex_array_fg, diff, norm=LogNorm(vmin=1, vmax=1e4), cmap="jet")
 	
 	
 	plt.show()
