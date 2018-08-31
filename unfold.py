@@ -358,39 +358,39 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
         # original array to i(511). 
         i_shift = 0 
     else:
-        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of dimensions to shift by
+        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of indices to shift by
 
 
     N_Eg_sh = N_Eg - i_shift
-    dimensions_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
+    indices_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
     if shift == "annihilation": # If this is the annihilation peak then all counts should end up with their centroid at E = 511 keV
-        # dimensions_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
-        dimensions_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
+        # indices_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
+        indices_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
     else:
-        dimensions_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
+        indices_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
 
 
     if smoothing:
         # Scale each Eg count by the corresponding probability
         # Do this for all Ex bins at once:
         array = array * p[0:N_Eg].reshape(1,N_Eg)
-        # Shift array down in energy by i_shift dimensions,
+        # Shift array down in energy by i_shift indices,
         # so that index i_shift of array is index 0 of array_shifted.
         # Also flatten array along Ex axis to facilitate multiplication.
-        array_shifted_flattened = array[:,dimensions_original].ravel()
+        array_shifted_flattened = array[:,indices_original].ravel()
         # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions 
         # to multiply each Eg channel by. This array is the same for all Ex bins,
         # so it will be repeated N_Ex times and stacked for multiplication
         # To get correct normalization we multiply by bin width
         pdfarray = a1_Eg* norm.pdf(
                             np.tile(Eg_array[0:N_Eg_sh], N_Eg_sh).reshape((N_Eg_sh, N_Eg_sh)),
-                            loc=Eg_array[dimensions_shifted].reshape(N_Eg_sh,1),
-                            scale=FWHM[dimensions_shifted].reshape(N_Eg_sh,1)/2.355
+                            loc=Eg_array[indices_shifted].reshape(N_Eg_sh,1),
+                            scale=FWHM[indices_shifted].reshape(N_Eg_sh,1)/2.355
                         )
                         
         # Remove eventual NaN values:
         pdfarray = np.nan_to_num(pdfarray, copy=False)
-        # print("Eg_array[dimensions_shifted] =", Eg_array[dimensions_shifted], flush=True)
+        # print("Eg_array[indices_shifted] =", Eg_array[indices_shifted], flush=True)
         # print("pdfarray =", pdfarray, flush=True)
         # Repeat and stack:
         pdfarray_repeated_stacked = np.tile(pdfarray, (N_Ex,1))
@@ -416,7 +416,7 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
         #         pass
 
         # Instead of above, vectorizing:
-        array_out = p[dimensions_original].reshape(1,N_Eg_sh)*array[:,dimensions_original]
+        array_out = p[indices_original].reshape(1,N_Eg_sh)*array[:,indices_original]
 
     # Append zeros to the end of Eg axis so we match the length of the original array:
     if i_shift > 0:
@@ -745,15 +745,15 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
 
     
 if __name__=="__main__":
-    # fname_data_raw = 'alfna28si.m'
-    # fname_resp_dat = 'resp-Si28-7keV.dat'
-    # fname_resp_mat = 'response_matrix-Si28-7keV.m'
-    # fname_unf_save = 'unfolded-28Si.m'
+    fname_data_raw = 'data/alfna-Si28.m'
+    fname_resp_dat = 'data/resp-Si28-7keV.dat'
+    fname_resp_mat = 'data/response_matrix-Si28-7keV.m'
+    fname_unf_save = 'unfolded-28Si.m'
 
-    fname_data_raw = 'data/alfna-Re187.m'
-    fname_resp_dat = 'data/resp-Re187-10keV.dat'
-    fname_resp_mat = 'data/response_matrix-Re187-10keV.m'
-    fname_unf_save = 'unfolded-Re187.m'
+    # fname_data_raw = 'data/alfna-Re187.m'
+    # fname_resp_dat = 'data/resp-Re187-10keV.dat'
+    # fname_resp_mat = 'data/response_matrix-Re187-10keV.m'
+    # fname_unf_save = 'unfolded-Re187.m'
 
     # Read raw matrix
     data_raw, cal, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
