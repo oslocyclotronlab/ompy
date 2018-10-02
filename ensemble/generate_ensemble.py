@@ -16,7 +16,7 @@ name = "si28"
 folder = "ensemble_si28_7keV"
 
 # Read raw matrix
-fname_data_raw = '../alfna28si.m'
+fname_data_raw = '../data/alfna-Si28.m'
 data_raw, cal_raw, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
 
 
@@ -25,8 +25,8 @@ data_raw, cal_raw, Ex_array, Eg_array = read_mama_2D(fname_data_raw)
 # matrix here.
 # Update 20180828: Have implemented reponse construction, 
 # but it is too slow. Opting to load from MAMA for now.
-fname_resp_mat = '../response_matrix-Si28-7keV.m'
-fname_resp_dat = '../resp-Si28-7keV.dat'
+fname_resp_mat = '../data/response_matrix-Si28-7keV.m'
+fname_resp_dat = '../data/resp-Si28-7keV.dat'
 R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array_resp = read_response(fname_resp_mat, fname_resp_dat)
 
 # No need to rebin if using the 7keV response, it matches data.
@@ -83,7 +83,7 @@ for i in range(N_stat):
 	else:
 		print("Generating raw matrix", flush=True)
 		# matrix_ensemble_current = np.maximum(matrix + np.random.normal(size=matrix_shape)*np.sqrt(matrix), np.zeros(matrix_shape)) # Each bin of the matrix is perturbed with a gaussian centered on the bin count, with standard deviation sqrt(bin count). Also, no negative counts are accepted.
-		data_raw_ensemble_current = data_raw + np.random.normal(size=data_raw.shape)*np.sqrt(np.where(data_raw > 0, data_raw, 0)) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
+		data_raw_ensemble_current = data_raw + np.random.normal(size=data_raw.shape, scale=np.sqrt(np.where(data_raw > 0, data_raw, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
 		data_raw_ensemble_current[data_raw_ensemble_current < 0] = 0
 		write_mama_2D(data_raw_ensemble_current, fname_raw_current, Ex_array, Eg_array, comment="raw matrix, ensemble member no. "+str(i))
 		# data_raw_ensemble[:,:,i] = data_raw_ensemble_current

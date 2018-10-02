@@ -59,7 +59,7 @@ def read_response(fname_resp_mat, fname_resp_dat):
     
     resp = np.array(resp)
     # Name the columns for ease of reading
-    FWHM = resp[:,1]
+    FWHM = resp[:,1]*6.8 # Correct with fwhm @ 1.33 MeV?
     eff = resp[:,2]
     pf = resp[:,3]
     pc = resp[:,4]
@@ -550,7 +550,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     Eg_low = 0
     Eg_high = 14000 # keV
     iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
-    Nit = 10 #27
+    Nit = 33 # 8 # 27
     
     # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     dEg = 1000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
@@ -565,6 +565,8 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
     mask = make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
+    # HACK TEST 20181004: Does the mask do any good?
+    mask = np.ones(mask.shape)
     
     
     
@@ -748,7 +750,7 @@ if __name__=="__main__":
     fname_data_raw = 'data/alfna-Si28.m'
     fname_resp_dat = 'data/resp-Si28-7keV.dat'
     fname_resp_mat = 'data/response_matrix-Si28-7keV.m'
-    fname_unf_save = 'unfolded-28Si.m'
+    fname_unf_save = 'python_unfolded-28Si.m'
 
     # fname_data_raw = 'data/alfna-Re187.m'
     # fname_resp_dat = 'data/resp-Re187-10keV.dat'
