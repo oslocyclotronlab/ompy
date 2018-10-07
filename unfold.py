@@ -59,7 +59,7 @@ def read_response(fname_resp_mat, fname_resp_dat):
     
     resp = np.array(resp)
     # Name the columns for ease of reading
-    FWHM = resp[:,1]*6.8 # Correct with fwhm @ 1.33 MeV?
+    FWHM = resp[:,1]#*6.8 # Correct with fwhm @ 1.33 MeV?
     eff = resp[:,2]
     pf = resp[:,3]
     pc = resp[:,4]
@@ -436,6 +436,23 @@ def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
 
 
 
+def EffExp(Eg_array):
+    # Function from MAMA which makes an additional efficiency correction based on discriminator thresholds etc.
+    # Basically there is a hard-coded set of energies and corresponding efficiencies in MAMA, and it should be 
+    # zero below and 1 above this range.
+    Egs = np.array([30.,80.,122.,183.,244.,294.,344.,562.,779.,1000])
+    Effs = np.array([0.0,0.0,0.0,0.06,0.44,0.60,0.87,0.99,1.00,1.000])
+    EffExp_array =  np.zeros(len(Eg_array))
+    for iEg in range(len(Eg_array)):
+        if Eg_array[iEg] < Egs.min():
+            EffExp_array[iEg] = 0
+        elif Eg_array[iEg] >= Egs.max():
+            EffExp_array[iEg] = 1
+        else:
+            EffExp_array[iEg] = Effs[np.argmin(np.abs(Egs - Eg_array[iEg]))]
+
+    return EffExp_array
+
 # === Unfolding ===
     
     
@@ -547,13 +564,14 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     Ex_high = 14000 # keV
     # Use index 0 of array as lower limit instead of energy because it can be negative!
     iEx_low, iEx_high = 0, i_from_E(Ex_high, Ex_array)
-    Eg_low = 0
+    Eg_low = 0 # keV - minimum
+    # Eg_low = 500 # keV 
     Eg_high = 14000 # keV
     iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
-    Nit = 33 # 8 # 27
+    Nit = 12#33 # 8 # 27
     
     # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
-    dEg = 1000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
+    dEg = 3000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
     # # Define cut   x1    y1    x2    y2
     # cut_points = [i_from_E(Eg_low + dEg, Eg_array), i_from_E(Ex_low, Ex_array), 
     #               i_from_E(Eg_high+dEg, Eg_array), i_from_E(Ex_high, Ex_array)]
@@ -565,7 +583,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
     mask = make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
-    # HACK TEST 20181004: Does the mask do any good?
+    # HACK TEST 20181004: Does the mask do any good?:
     mask = np.ones(mask.shape)
     
     
@@ -579,21 +597,36 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     foldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
     chisquares = np.zeros(Nit)
     R = R[iEg_low:iEg_high,iEg_low:iEg_high]
+    # Normalize R to conserve probability
+    # R = div0(R, R.sum(axis=1))
     
     # Run folding iterations:
     for iteration in range(Nit):
         if iteration == 0:
             unfoldmat = rawmat
+            # unfoldmat = mask_cut.copy() # 201810: Trying to debug by checking effect of using a box to start. No difference. 
         else:
-            unfoldmat = unfoldmat + (rawmat - foldmat)
+            # Option 1, difference:
+            unfoldmat = unfoldmat + (rawmat - foldmat) # Difference method 
+            # Option 2, ratio:
+            # unfoldmat = unfoldmat * div0(rawmat, foldmat) # Ratio method (MAMA seems to use both alternatingly?)
+            # Option 3, alternate between them:
+            # if iteration % 2 == 0:
+            #     unfoldmat = unfoldmat + (rawmat - foldmat) # Difference method 
+            # else:
+            #     unfoldmat = unfoldmat * div0(rawmat, foldmat) # Ratio method (MAMA seems to use both alternatingly?)
+
         foldmat = np.dot(R.T, unfoldmat.T).T # Have to do some transposing to get the axis orderings right for matrix product
+        # 201810: Trying to debug by checking if it makes a difference to loop over rows as individual vectors (should not make a difference, and does not):
+        # for i_row in range(foldmat.shape[0]):
+            # foldmat[i_row,:] = np.dot(R.T, unfoldmat[i_row,:].T).T
         foldmat = mask_cut*foldmat # Apply mask for every iteration to suppress stuff below diag
         # 20171110: Tried transposing R. Was it that simple? Immediately looks good.
         #           Or at least much better. There is still something wrong giving negative counts left of peaks.
         #           Seems to come from unfolding and not from compton subtraction
     
         # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
-        chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() / Ndof
+        chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() #/ Ndof
         if verbose:
             print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
     
@@ -613,90 +646,100 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     
     
     # = Step 2: Compton subtraction =
+    comptonsubtraction = False
+    if comptonsubtraction: # Check if compton subtraction is turned on
     
-    # We also need the resp.dat file for this.
-    # TODO: Consider writing a function that makes the response matrix (R) from this file
-    # (or other input), so we don't have to keep track of redundant info.
-    resp = []
-    with open(fname_resp_dat) as file:
-        # Read line by line as there is crazyness in the file format
-        lines = file.readlines()
-        for i in range(4,len(lines)):
-            try:
-                row = np.array(lines[i].split(), dtype="double")
-                resp.append(row)
-            except:
-                break
-    
-    
-    resp = np.array(resp)
-    # Name the columns for ease of reading
-    FWHM = resp[:,1]
-    eff = resp[:,2]
-    pf = resp[:,3]
-    pc = resp[:,4]
-    ps = resp[:,5]
-    pd = resp[:,6]
-    pa = resp[:,7]
-    
-
-    # Debugging: Test normalization of response matrix and reponse pieces:
-    # i_R = 50
-    # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
-    # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
-
-
-    # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
-    # u0 is the unfolded spectrum from above, r is the raw spectrum, 
-    # w = us + ud + ua is the folding contributions from everything except Compton,
-    # i.e. us = single escape, ua = double escape, ua = annihilation (511).
-    # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
-    # c is the estimated Compton spectrum.
-    
-    
-
-
-    # Check that there is enough memory:
-
-    # Split this operation into Ex chunks to not exceed memory:
-    # Allocate matrix to fill with result:
-    unfolded = np.zeros(unfoldmat.shape)
-
-    N_Ex_portions = 1 # How many portions to chunk, initially try just 1
-    mem_avail = psutil.virtual_memory()[1]
-    mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
-    if verbose:
-        print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-    while mem_need > mem_avail: 
-        # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
-        N_Ex_portions += 1 # Double number of portions 
-        mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
-    if verbose:
-        print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-
-    N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-    for i in range(N_Ex_portions):
-        u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
-        r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        # We also need the resp.dat file for this.
+        # TODO: Consider writing a function that makes the response matrix (R) from this file
+        # (or other input), so we don't have to keep track of redundant info.
+        resp = []
+        with open(fname_resp_dat) as file:
+            # Read line by line as there is crazyness in the file format
+            lines = file.readlines()
+            for i in range(4,len(lines)):
+                try:
+                    row = np.array(lines[i].split(), dtype="double")
+                    resp.append(row)
+                except:
+                    break
         
-        # Apply smoothing to the different peak structures. 
-        # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
-        # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
-        uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
-        # print("uf smoothed, integral =", uf.sum())
-        uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
-        # print("uf unsmoothed, integral =", uf_unsm.sum())
-        us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
-        ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
-        ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-        w = us + ud + ua
-        v = uf + w
-        c = r - v    
-        # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-        c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
-        # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-        u = div0((r - c - w), np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
-        unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,np.append(0,eff)[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+        
+        resp = np.array(resp)
+        # Name the columns for ease of reading
+        FWHM = resp[:,1]
+        eff = resp[:,2]
+        pf = resp[:,3]
+        pc = resp[:,4]
+        ps = resp[:,5]
+        pd = resp[:,6]
+        pa = resp[:,7]
+        
+        # Correct efficiency by multiplying with EffExp(Eg):
+        EffExp_array = EffExp(Eg_array)
+        # eff_corr = np.append(0,eff)*EffExp_array
+        eff_corr = eff*EffExp_array
+    
+        # Debugging: Test normalization of response matrix and reponse pieces:
+        # i_R = 50
+        # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
+        # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
+    
+    
+        # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
+        # u0 is the unfolded spectrum from above, r is the raw spectrum, 
+        # w = us + ud + ua is the folding contributions from everything except Compton,
+        # i.e. us = single escape, ua = double escape, ua = annihilation (511).
+        # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
+        # c is the estimated Compton spectrum.
+        
+        
+    
+    
+        # Check that there is enough memory:
+    
+        # Split this operation into Ex chunks to not exceed memory:
+        # Allocate matrix to fill with result:
+        unfolded = np.zeros(unfoldmat.shape)
+    
+        N_Ex_portions = 1 # How many portions to chunk, initially try just 1
+        mem_avail = psutil.virtual_memory()[1]
+        mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
+        if verbose:
+            print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        while mem_need > mem_avail: 
+            # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+            N_Ex_portions += 1 # Double number of portions 
+            mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
+        if verbose:
+            print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+    
+        N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+        for i in range(N_Ex_portions):
+            u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+            r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+            
+            # Apply smoothing to the different peak structures. 
+            # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
+            # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
+            uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
+            # print("uf smoothed, integral =", uf.sum())
+            uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
+            # print("uf unsmoothed, integral =", uf_unsm.sum())
+            us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
+            ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
+            ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+            w = us + ud + ua
+            v = uf + w
+            c = r - v    
+            # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+            c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
+            # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+            u = div0((r - c - w), np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
+            unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+
+        # end if comptonsubtraction
+    else:
+        unfolded = unfoldmat
 
 
     # Diagnostic plotting:
@@ -747,10 +790,18 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
 
     
 if __name__=="__main__":
-    fname_data_raw = 'data/alfna-Si28.m'
-    fname_resp_dat = 'data/resp-Si28-7keV.dat'
-    fname_resp_mat = 'data/response_matrix-Si28-7keV.m'
-    fname_unf_save = 'python_unfolded-28Si.m'
+    # fname_data_raw = 'data/alfna-Si28.m'
+    # fname_resp_dat = 'data/resp-Si28-7keV.dat'
+    # fname_resp_mat = 'data/response_matrix-Si28-7keV.m'
+    # # fname_resp_mat = 'mama-testing/response_matrix-1p0FWHM-si28-7keV.m' # This gives insane (in a bad way) results.
+    # fname_unf_save = 'python_unfolded-28Si.m'
+
+
+    fname_data_raw = 'data/alfna-Si28-14keV.m'
+    fname_resp_dat = 'data/resp-Si28-14keV.dat'
+    fname_resp_mat = 'data/response_matrix-Si28-14keV.m'
+    fname_unf_save = 'python_unfolded-28Si-14keV.m'
+
 
     # fname_data_raw = 'data/alfna-Re187.m'
     # fname_resp_dat = 'data/resp-Re187-10keV.dat'
