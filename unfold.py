@@ -136,6 +136,29 @@ def line(x, points):
     return a*x + b
 
 
+def rebin_new(array, E_range, N_final, rebin_axis=0):
+    # 20181008: Trying to implement a simpler version of rebin which does not shift the array, 
+    # but simply proportionally redistributes the counts along rebin_axis so it gets dimension N_final, 
+    # then makes a new E_range array reflecting the new calibration that results from the change
+    
+    if isinstance(array, tuple): # Check if input array is actually a tuple, which may happen if function is called several times nested for different axes.
+        array = array[0]
+
+    N_orig = array.shape[rebin_axis]
+    dim = np.insert(array.shape, rebin_axis, N_final)
+
+    # TODO insert a loop here over chunks along another axis than the rebin axis, to try to avoid memory problems
+    array_final = (array.repeat(N_final)/N_final).reshape(dim).sum(axis=(rebin_axis+1))
+
+    # Recalculate calibration:
+    a0 = E_range[0]
+    a1_orig = E_range[1]-E_range[0]
+    a1_final = N_orig/N_final*a1_orig
+    E_range_final = np.linspace(a0, a0 + a1_final*(N_final-1), N_final)
+
+    return array_final, E_range_final
+
+
 def rebin_and_shift(array, E_range, N_final, rebin_axis=0):
     # Function to rebin an M-dimensional array either to larger or smaller binsize.
     # Written by J{\o}rgen E. Midtb{\o}, University of Oslo, j.e.midtbo@fys.uio.no, github.com/jorgenem
@@ -456,7 +479,7 @@ def EffExp(Eg_array):
 # === Unfolding ===
     
     
-def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
+def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False, use_comptonsubtraction=True):
     # = Step 0: Import data and response matrix =
 
     # If energy limits are not provided, use extremal array values:
@@ -646,8 +669,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     
     
     # = Step 2: Compton subtraction =
-    comptonsubtraction = False
-    if comptonsubtraction: # Check if compton subtraction is turned on
+    if use_comptonsubtraction: # Check if compton subtraction is turned on
     
         # We also need the resp.dat file for this.
         # TODO: Consider writing a function that makes the response matrix (R) from this file
@@ -679,7 +701,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
         # eff_corr = np.append(0,eff)*EffExp_array
         eff_corr = eff*EffExp_array
     
-        # Debugging: Test normalization of response matrix and reponse pieces:
+        # Debugging: Test normalization of response matrix and response pieces:
         # i_R = 50
         # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
         # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
@@ -723,7 +745,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
             # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
             uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
             # print("uf smoothed, integral =", uf.sum())
-            uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
+            # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
             # print("uf unsmoothed, integral =", uf_unsm.sum())
             us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
             ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
@@ -737,7 +759,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
             u = div0((r - c - w), np.append(0,pf)[iEg_low:iEg_high]) # Channel 0 is missing from resp.dat    
             unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_low:iEg_high]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
 
-        # end if comptonsubtraction
+        # end if use_comptonsubtraction
     else:
         unfolded = unfoldmat
 
