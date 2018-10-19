@@ -607,7 +607,7 @@ def unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, FWHM_fa
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
     mask = make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
     # HACK TEST 20181004: Does the mask do any good?:
-    mask = np.ones(mask.shape)
+    # mask = np.ones(mask.shape)
     
     
     

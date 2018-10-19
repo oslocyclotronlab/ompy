@@ -7,19 +7,22 @@ f, (ax_mat, ax_proj) = plt.subplots(2,1)
 
 # fname = "data/alfna-Si28-14keV.m"
 # fname = "mama-testing/unfolded-si28.m"
-fname = "mama-testing/unfolded-si28-14keV.m"
+# fname = "mama-testing/unfolded-si28-14keV.m"
 # fname = "mama-testing/firstgen-si28.m"
 # fname = "data/alfna-Re187.m"
 # fname = "data/response_matrix-Si28-7keV.m"
 # fname = "python_unfolded-28Si.m"
 # fname = "python_unfolded-28Si-14keV-roounfold.m"
 # fname = "python_unfolded-28Si-14keV-1p0FWHM-roounfold.m"
-fname = "python_unfolded-28Si-14keV.m"
+# fname = "python_unfolded-28Si-14keV.m"
+# fname = "ensemble/ensemble_si28i_14keV/si28-firstgen_variance.m"
+# fname = "ensemble/ensemble_Re187_10keV/Re187-firstgen_variance.m"
+# fname = "ensemble/ensemble_Re187_10keV/Re187-firstgen-orig.m"
 
 matrix, cal, Ex_array, Eg_array = read_mama_2D(fname)
 
 from matplotlib.colors import LogNorm
-ax_mat.pcolormesh(Eg_array, Ex_array, matrix, norm=LogNorm(vmin=1e0, vmax=1e4), cmap="jet")
+ax_mat.pcolormesh(Eg_array, Ex_array, matrix, norm=LogNorm(vmin=1e0, vmax=5e2), cmap="jet")
 
 ax_mat.set_title("fname = "+fname)
 

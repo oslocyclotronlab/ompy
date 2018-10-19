@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 
 import rhosigchi_f2py_importvar as rsc 
 
-# fname_fg = "firstgen-Re187.m"
-fname_fg = "ensemble/ensemble_si28_14keV/si28-firstgen-orig.m"
-fname_varfg = "ensemble/ensemble_si28_14keV/si28-firstgen-variance.m"
+fname_fg = "ensemble/ensemble_Re187_10keV/Re187-firstgen-orig.m"
+fname_varfg = "ensemble/ensemble_Re187_10keV/Re187-firstgen-variance.m"
+# fname_fg = "ensemble/ensemble_si28_14keV/si28-firstgen-orig.m"
+# fname_varfg = "ensemble/ensemble_si28_14keV/si28-firstgen-variance.m"
 
 fg_in, cal_fg, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_fg)
 varfg_in, cal_varfg, Ex_array_varfg, Eg_array_varfg = read_mama_2D(fname_fg)
@@ -27,14 +28,19 @@ np.random.seed(2)
 
 rho, T = rsc.rhosigchi(fg_in,varfg_in,calib,eg_min,ex_min,ex_max)
 
+alpha = 0.0001
 
 f, (ax_rho, ax_T) = plt.subplots(2,1)
-ax_rho.plot(rho)
+ax_rho.plot(E_array_rebinned[0:len(rho)], rho, label="original")
+# ax_rho.plot(E_array_rebinned[0:len(rho)], rho*np.exp(alpha*E_array_rebinned[0:len(rho)]), label="alpha="+str(alpha))
 ax_rho.set_title("rho")
 ax_rho.set_yscale("log")
-ax_T.plot(T)
+ax_rho.legend()
+ax_T.plot(E_array_rebinned[0:len(T)], T, label="original")
+# ax_T.plot(E_array_rebinned[0:len(T)], T*np.exp(alpha*E_array_rebinned[0:len(T)]), label="alpha="+str(alpha))
 ax_T.set_title("T")
 ax_T.set_yscale("log")
+ax_T.legend()
 
 
 plt.show()

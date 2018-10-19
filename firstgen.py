@@ -377,8 +377,11 @@ if __name__=="__main__":
 	# fname_unf = "mama-testing/unfolded-si28.m"
 	# fname_fg_save = 'firstgen-28Si.m'
 
-	fname_unf = "unfolded-Re187.m"
-	fname_fg_save = "firstgen-Re187.m"
+	fname_unf = "python_unfolded-28Si-14keV.m"
+	fname_fg_save = 'firstgen-28Si-14keV.m'
+
+	# fname_unf = "unfolded-Re187.m"
+	# fname_fg_save = "firstgen-Re187.m"
 
 	unfolded, cal_unf, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unf)
 
