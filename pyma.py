@@ -10,11 +10,31 @@ class pyma():
     def __init__(self, fname_raw):
         self.fname_raw = fname_raw # File name of raw spectrum
 
-        self.matrix_raw, self.calib_raw, self.Ex_array_raw, self.Eg_array_raw = self.read_mama_2D(fname_raw)
+        matrix_raw, calib_raw, Ex_array_raw, Eg_array_raw = self.read_mama_2D(fname_raw)
+        self.raw = self.matrix(matrix_raw, Ex_array_raw, Eg_array_raw)
 
         self.matrix_unfolded = None
         self.matrix_firstgen = None
 
+
+
+    class matrix():
+        """ 
+        The matrix class stores matrices along with calibration and energy axis arrays.
+
+        """
+        def __init__(self, matrix, Ex_array, Eg_array):
+            self.matrix = matrix
+            self.Ex_array = Ex_array
+            self.Eg_array = Eg_array
+
+        def plot(self, norm="log"):
+            import matplotlib.pyplot as plt
+            plot_object = None
+            if norm == "log":
+                from matplotlib.colors import LogNorm
+                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix, norm=LogNorm())
+            return 
 
     def read_mama_2D(self,filename):
         # Reads a MAMA matrix file and returns the matrix as a numpy array, 
@@ -969,5 +989,14 @@ class pyma():
 
 # === Test it ===
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
     fname_raw = "data/alfna-Re187.m"
     pm = pyma(fname_raw)
+
+
+    print(pm.raw.matrix.shape)
+
+    f, (ax1, ax2) = plt.subplots(2,1)
+    ax1 = pm.raw.plot()
+    plt.show()
