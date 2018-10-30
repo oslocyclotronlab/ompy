@@ -60,13 +60,17 @@ class pyma():
             self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
              "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
 
-        def plot(self, norm="log"):
+        def plot(self, title="", norm="log"):
             import matplotlib.pyplot as plt
             plot_object = None
             if norm == "log":
                 from matplotlib.colors import LogNorm
-                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix, norm=LogNorm())
-            return 
+                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix, norm=LogNorm(vmin=1e-1))
+            else:
+                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix)
+            plt.title(title)
+            plt.show()
+            return True
 
         def save(self, fname):
             """
@@ -75,7 +79,7 @@ class pyma():
             pml.write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array, comment="Made by pyma")
             return True
 
-    def load_unfolded(fname_unfolded):
+    def load_unfolded(self, fname_unfolded):
         """
         Load an unfolded matrix from mama file
         
@@ -85,11 +89,11 @@ class pyma():
         Fills the variable self.unfolded
         Returns True upon completion
         """
-        matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = self.read_mama_2D(fname_unfolded)
+        matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
         self.unfolded = self.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
         return True
 
-    def load_firstgen(fname_firstgen):
+    def load_firstgen(self, fname_firstgen):
         """
         Load an firstgen matrix from mama file
         
@@ -99,7 +103,7 @@ class pyma():
         Fills the variable self.firstgen
         Returns True upon completion
         """
-        matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = self.read_mama_2D(fname_firstgen)
+        matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
         self.firstgen = self.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
         return True    
 
@@ -177,10 +181,11 @@ class pyma():
             for i in range(N_Ex_portions):
                 data_raw_rebinned[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array_rebinned = rebin_and_shift(data_raw[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array, N_rebin, rebin_axis=1)
         
-            # Rebin response matrix by interpolating:
-            from scipy.interpolate import RectBivariateSpline
-            f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
-            R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
+            # # Rebin response matrix by interpolating:
+            # NO! This does not work. Need to use more advanced interpolation, see MAMA.
+            # from scipy.interpolate import RectBivariateSpline
+            # f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
+            # R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
         
         
             # Rename everything:    
@@ -453,12 +458,22 @@ class pyma():
 
 
 
-    def first_generation_spectrum(self, matrix, Ex_array_mat, Egamma_array, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=1):
+    def first_generation(self, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=1):
         """
         Function implementing the first generation method from Guttormsen et al. (NIM 1987)
         The code is heavily influenced by the original implementation by Magne in MAMA.
         Mainly written autumn 2016 at MSU.
         """
+
+        # = Check that unfolded matrix is present 
+        if "self.unfolded" is None:
+            raise Exception("Error: No unfolded matrix is loaded.")
+
+        # Rename variables for local use:
+        matrix = self.unfolded.matrix
+        Ex_array_mat = self.unfolded.Ex_array
+        Egamma_array = self.unfolded.Eg_array
+
 
         # TODO option statistical_or_total=2 (total) does not work
 
@@ -466,10 +481,14 @@ class pyma():
         Ny = len(matrix[:,0])
         Nx = len(matrix[0,:])
         # Extract / calculate calibration coefficients
-        bx = Egamma_array[0]
-        ax = Egamma_array[1] - Egamma_array[0]
-        by = Ex_array_mat[0]
-        ay = Ex_array_mat[1] - Ex_array_mat[0]
+        # bx = Egamma_array[0]
+        # ax = Egamma_array[1] - Egamma_array[0]
+        # by = Ex_array_mat[0]
+        # ay = Ex_array_mat[1] - Ex_array_mat[0]
+        bx = self.unfolded.calibration["a0x"]
+        ax = self.unfolded.calibration["a1x"]
+        by = self.unfolded.calibration["a0y"]
+        ay = self.unfolded.calibration["a1y"]
 
         
         ThresSta = 430.0
@@ -491,10 +510,14 @@ class pyma():
         # grouping = int(np.ceil(len(y_array[np.logical_and(0 < y_array, y_array < Ex_max + dE_gamma)])/N_Exbins)) # The integer number of bins that need to be grouped to have approximately N_Exbins bins between Ex_min and Ex_max after compression (rounded up)
 
         # Make arrays of Ex and Egamma axis values
-        Ex_array = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
+        # Ex_array = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
         # Egamma_array = np.linspace(0,Nx-1,Nx)*ax + bx # Range of Egamma values # Update: This is passed into the function.
-        
-        matrix_ex_compressed = rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+
+        matrix_ex_compressed, Ex_array = pml.rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], Ex_array_mat[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny)], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+        # HACK: Checking if the compression along Ex is really necessary (shouldn't it be done outside of firstgen method anyway?)
+        matrix_ex_compressed = matrix
+        Ex_array = Ex_array_mat
+
         # if N_Exbins != Ny:
             # Compress matrix along Ex
             #matrix_ex_compressed = matrix[0:int(N_Exbins*grouping),:].reshape(N_Exbins, grouping, Nx).sum(axis=1)
@@ -558,13 +581,13 @@ class pyma():
 
         # Calculate average multiplicity for each Ex channel
         area_matrix_ex_compressed_cut = np.sum(matrix_ex_compressed_cut, axis=1)
-        Egamma_average = div0( np.sum(Egamma_mesh * matrix_ex_compressed_cut, axis =1) , area_matrix_ex_compressed_cut )
+        Egamma_average = pml.div0( np.sum(Egamma_mesh * matrix_ex_compressed_cut, axis =1) , area_matrix_ex_compressed_cut )
         if statistical_or_total == 1:
             # Statistical multiplicity - use the effective Ex0 value
-            multiplicity = div0( Ex_array - np.maximum( np.minimum(Ex_array - 200, ExEntry0s), 0), Egamma_average)
+            multiplicity = pml.div0( Ex_array - np.maximum( np.minimum(Ex_array - 200, ExEntry0s), 0), Egamma_average)
         elif statistical_or_total == 2:
             # Total multiplicity - use actual Ex0 = 0
-            multiplicity = div0( Ex_array, Egamma_average )
+            multiplicity = pml.div0( Ex_array, Egamma_average )
 
 
         # plt.figure(2)
@@ -589,7 +612,7 @@ class pyma():
         # print area_grid.shape
         multiplicity_grid = np.tile(multiplicity, (N_Exbins, 1)) 
         # print multiplicity_grid.shape
-        normalization_matrix = div0(( np.transpose(multiplicity_grid) * area_grid ) , (multiplicity_grid * np.transpose(area_grid) )).T # The transpose gives the right result. Haven't twisted my head around exactly why.
+        normalization_matrix = pml.div0(( np.transpose(multiplicity_grid) * area_grid ) , (multiplicity_grid * np.transpose(area_grid) )).T # The transpose gives the right result. Haven't twisted my head around exactly why.
         # normalization_matrix_check = np.zeros((N_Exbins, N_Exbins))
         # for i in range(N_Exbins):
         #   for j in range(N_Exbins):
@@ -608,7 +631,7 @@ class pyma():
         grouping_Egamma = int(np.ceil(i_Egamma_max/N_Exbins))
         # print grouping_Egamma
         # Egamma_array_compressed = Egamma_array[0:i_Egamma_max]*grouping_Egamma
-        Egamma_array_compressed = Ex_array
+        # Egamma_array_compressed = Ex_array
 
         # plt.matshow(H[:,0:i_Egamma_max])
         # plt.show()
@@ -648,11 +671,11 @@ class pyma():
         Ef_mesh[Ef_mesh < 0] = 0
         # Calculate weights. Remember that energies are in keV, while a is in 1/MeV, so we correct in the exponent:
         W_old = np.where(Eg_mesh > 0, np.power(Eg_mesh,n_f) / np.power(Ef_mesh, 2) * np.exp(2*np.sqrt(a_f*Ef_mesh/1000)), 0)
-        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins,1))
+        W_old = pml.div0(W_old, W_old.sum(axis=1).reshape(N_Exbins,1))
 
 
         dEg = 1000
-        mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[0]+dEg, Ex_array[-1], Ex_array[-1]+dEg)
+        mask_W = pml.make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[0]+dEg, Ex_array[-1], Ex_array[-1]+dEg)
 
         # Perform the iterative subtraction:
         for iteration in range(N_iterations):
@@ -661,9 +684,9 @@ class pyma():
         # while max_diff > convergence_criterion:
             # Store H from previous iteration to compare at the end
             H_old = H
-            # Compress the H matrix along gamma axis to facilitate conversion to excitation energy
+            # Compress the H matrix along gamma axis to make it square and facilitate conversion to excitation energy
             # H_compressed = H[:,0:i_Egamma_max].reshape(N_Exbins, N_Exbins, grouping_Egamma).sum(axis=2)
-            H_compressed = rebin(H[:,0:i_Egamma_max], N_Exbins, rebin_axis=1)
+            H_compressed, Egamma_array_compressed = pml.rebin(H[:,0:i_Egamma_max], Egamma_array[0:i_Egamma_max], N_Exbins, rebin_axis=1)
 
             # plt.pcolormesh(Egamma_array_compressed, Ex_array, H_compressed)
             # plt.show()
@@ -697,7 +720,7 @@ class pyma():
             # Normalize each Ex channel to unity
             # W = np.where(np.invert(np.isnan(W/W.sum(axis=1).astype(float))),  W/W.sum(axis=1).astype(float), 0)
             # Remove Inf and NaN
-            W = div0(W, W.sum(axis=1).reshape(N_Exbins,1))
+            W = pml.div0(W, W.sum(axis=1).reshape(N_Exbins,1))
             # Store for next iteration:
             W_old = np.copy(W)
             # W = np.nan_to_num(W) 
@@ -748,7 +771,7 @@ class pyma():
                 # print G_area.shape
                 # print "print G_area"
                 # print G_area
-                alpha = np.where(G_area > 0, (1 - div0(1,multiplicity)) * div0( area_matrix_ex_compressed_cut, G_area ), 1)
+                alpha = np.where(G_area > 0, (1 - pml.div0(1,multiplicity)) * pml.div0( area_matrix_ex_compressed_cut, G_area ), 1)
                 alpha[alpha < 0.85] = 0.85
                 alpha[alpha > 1.15] = 1.15
                 # print "alpha.shape"
@@ -790,8 +813,15 @@ class pyma():
         # Remove negative counts
         H[H<0] = 0
         
-        # Return
-        return H, H-H_old, Ex_array, Egamma_array
+        # Update internal variables and return True upon completion
+        # return H, H-H_old, Ex_array, Egamma_array
+
+        print("H.shape =", H.shape)
+        print("Ex_array.shape =", Ex_array.shape)
+        print("Egamma_array.shape =", Egamma_array.shape, flush=True)
+
+        self.firstgen = self.matrix(H, Ex_array, Egamma_array)
+        return True
 
 
 
@@ -807,21 +837,44 @@ if __name__ == "__main__":
     # Check that it has loaded a sensible raw matrix:
     print(pm.raw.matrix.shape)
 
-    # Do unfolding: 
-    fname_resp_mat = "data/response_matrix-Re187-10keV.m"
-    fname_resp_dat = "data/resp-Re187-10keV.dat"
-    pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
+    # Plot it
+    pm.raw.plot(title="raw")
 
-    # Plot the unfolded matrix:
-    pm.unfolded.plot()
+    # # Do unfolding: 
+    # fname_resp_mat = "data/response_matrix-Re187-10keV.m"
+    # fname_resp_dat = "data/resp-Re187-10keV.dat"
+    # pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
 
-    # Save the unfolded matrix:
-    fname_save_unfolded = "data/unfolded-Re187.m"
-    pm.unfolded.save(fname_save_unfolded)
+    # # Plot the unfolded matrix:
+    # pm.unfolded.plot()
+
+    # # Save the unfolded matrix:
+    fname_unfolded = "data/unfolded-Re187.m"
+    # pm.unfolded.save(fname_save_unfolded)
 
     # Load the unfolded matrix from file:
-    pm.load_unfolded(fname_save_unfolded)
+    pm.load_unfolded(fname_unfolded)
 
+
+    # Run first generation method:
+    N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
+    Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
+
+    # Plot unfolded matrix
+    pm.unfolded.plot(title="unfolded")
+
+    dEg_fg = 1000 # keV
+    pm.first_generation(N_Exbins=N_Exbins_fg, Ex_max=Ex_max_fg, dE_gamma=dEg_fg)
+
+    # Plot first generation matrix
+    pm.firstgen.plot(title="first generation")
+
+    # Save it
+    fname_firstgen = "data/firstgen-Re187.m"
+    pm.firstgen.save(fname_firstgen)
+
+
+    # Try plotting the raw matrix -- need to figure out the best way to implement this
     # f, (ax1, ax2) = plt.subplots(2,1)
     # ax1 = pm.raw.plot()
     plt.show()
