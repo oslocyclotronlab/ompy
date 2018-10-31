@@ -837,44 +837,46 @@ if __name__ == "__main__":
     # Check that it has loaded a sensible raw matrix:
     print(pm.raw.matrix.shape)
 
+
+
     # Plot it
     pm.raw.plot(title="raw")
 
-    # # Do unfolding: 
-    # fname_resp_mat = "data/response_matrix-Re187-10keV.m"
-    # fname_resp_dat = "data/resp-Re187-10keV.dat"
-    # pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
+    # Do unfolding: 
+    fname_resp_mat = "data/response_matrix-Re187-10keV.m"
+    fname_resp_dat = "data/resp-Re187-10keV.dat"
+    pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
 
     # # Plot the unfolded matrix:
-    # pm.unfolded.plot()
+    pm.unfolded.plot()
 
-    # # Save the unfolded matrix:
-    fname_unfolded = "data/unfolded-Re187.m"
+    # # # Save the unfolded matrix:
+    # fname_unfolded = "data/unfolded-Re187.m"
     # pm.unfolded.save(fname_save_unfolded)
 
-    # Load the unfolded matrix from file:
-    pm.load_unfolded(fname_unfolded)
+    # # Load the unfolded matrix from file:
+    # pm.load_unfolded(fname_unfolded)
 
 
-    # Run first generation method:
-    N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
-    Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
+    # # Run first generation method:
+    # N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
+    # Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
 
-    # Plot unfolded matrix
-    pm.unfolded.plot(title="unfolded")
+    # # Plot unfolded matrix
+    # pm.unfolded.plot(title="unfolded")
 
-    dEg_fg = 1000 # keV
-    pm.first_generation(N_Exbins=N_Exbins_fg, Ex_max=Ex_max_fg, dE_gamma=dEg_fg)
+    # dEg_fg = 1000 # keV
+    # pm.first_generation(N_Exbins=N_Exbins_fg, Ex_max=Ex_max_fg, dE_gamma=dEg_fg)
 
-    # Plot first generation matrix
-    pm.firstgen.plot(title="first generation")
+    # # Plot first generation matrix
+    # pm.firstgen.plot(title="first generation")
 
-    # Save it
-    fname_firstgen = "data/firstgen-Re187.m"
-    pm.firstgen.save(fname_firstgen)
+    # # Save it
+    # fname_firstgen = "data/firstgen-Re187.m"
+    # pm.firstgen.save(fname_firstgen)
 
 
-    # Try plotting the raw matrix -- need to figure out the best way to implement this
-    # f, (ax1, ax2) = plt.subplots(2,1)
-    # ax1 = pm.raw.plot()
-    plt.show()
+    # # Try plotting the raw matrix -- need to figure out the best way to implement this
+    # # f, (ax1, ax2) = plt.subplots(2,1)
+    # # ax1 = pm.raw.plot()
+    # plt.show()
