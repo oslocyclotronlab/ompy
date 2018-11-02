@@ -26,23 +26,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np 
+# Load library of pyma utility functions from separate file:
 import pyma_lib as pml
 
+# Set seed for reproducibility:
+np.random.seed(1256770)
 
 
 class pyma():
     def __init__(self, fname_raw):
         self.fname_raw = fname_raw # File name of raw spectrum
 
-        # Load raw matrix from file:
-        matrix_raw, calib_raw, Ex_array_raw, Eg_array_raw = pml.read_mama_2D(fname_raw)
-        self.raw = self.matrix(matrix_raw, Ex_array_raw, Eg_array_raw)
-        # TODO consider moving raw matrix loading into a separate function. 
-        # If so, remember to initialise self.raw = None
 
-        # Allocate storage of unfolded and firstgen matrices to be filled by functions in class later:
-        self.unfolded = None
-        self.firstgen = None
+        # Allocate matrices to be filled by functions in class later:
+        self.raw = self.matrix()
+        self.unfolded = self.matrix()
+        self.firstgen = self.matrix()
+        self.var_firstgen = self.matrix()
+
 
 
 
@@ -51,14 +52,20 @@ class pyma():
         The matrix class stores matrices along with calibration and energy axis arrays.
 
         """
-        def __init__(self, matrix, Ex_array, Eg_array):
+        def __init__(self, matrix=None, Ex_array=None, Eg_array=None):
+            """
+            Initialise the class. There is the option to initialise 
+            it in an empty state. In that case, all class variables will be None.
+            It can be filled later using the load() method.
+            """
             self.matrix = matrix
             self.Ex_array = Ex_array
             self.Eg_array = Eg_array
 
-            # Calculate calibration based on energy arrays, assuming linear calibration:
-            self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
-             "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
+            if matrix is not None and Ex_array is not None and Eg_array is not None:
+                # Calculate calibration based on energy arrays, assuming linear calibration:
+                self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
+                  "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
 
         def plot(self, title="", norm="log"):
             import matplotlib.pyplot as plt
@@ -79,33 +86,50 @@ class pyma():
             pml.write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array, comment="Made by pyma")
             return True
 
-    def load_unfolded(self, fname_unfolded):
-        """
-        Load an unfolded matrix from mama file
-        
-        Inputs:
-        fname_unfolded: the file path to the MAMA file
-        Outputs: 
-        Fills the variable self.unfolded
-        Returns True upon completion
-        """
-        matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
-        self.unfolded = self.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
-        return True
+        def load(self, fname):
+            """
+            Load matrix from mama file
+            """
+            if self.matrix is not None:
+                print("Warning: load() called on non-empty matrix", flush=True)
 
-    def load_firstgen(self, fname_firstgen):
-        """
-        Load an firstgen matrix from mama file
+            # Load matrix from file:
+            matrix, calibration, Ex_array, Eg_array = pml.read_mama_2D(fname)
+            self.matrix = matrix
+            self.Ex_array = Ex_array
+            self.Eg_array = Eg_array
+            self.calibration = calibration
+
+            return True
+
+
+    # def load_unfolded(self, fname_unfolded):
+    #     """
+    #     Load an unfolded matrix from mama file
         
-        Inputs:
-        fname_firstgen: the file path to the MAMA file
-        Outputs: 
-        Fills the variable self.firstgen
-        Returns True upon completion
-        """
-        matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
-        self.firstgen = self.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
-        return True    
+    #     Inputs:
+    #     fname_unfolded: the file path to the MAMA file
+    #     Outputs: 
+    #     Fills the variable self.unfolded
+    #     Returns True upon completion
+    #     """
+    #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
+    #     self.unfolded = self.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
+    #     return True
+
+    # def load_firstgen(self, fname_firstgen):
+    #     """
+    #     Load an firstgen matrix from mama file
+        
+    #     Inputs:
+    #     fname_firstgen: the file path to the MAMA file
+    #     Outputs: 
+    #     Fills the variable self.firstgen
+    #     Returns True upon completion
+    #     """
+    #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
+    #     self.firstgen = self.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
+    #     return True    
 
     
 
@@ -113,7 +137,7 @@ class pyma():
 
     def unfold(self, fname_resp_mat, fname_resp_dat, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False, use_comptonsubtraction=True):
         # = Check that raw matrix is present 
-        if "self.raw" is None:
+        if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
 
         # Rename variables for local use:
@@ -466,7 +490,7 @@ class pyma():
         """
 
         # = Check that unfolded matrix is present 
-        if "self.unfolded" is None:
+        if self.unfolded.matrix is None:
             raise Exception("Error: No unfolded matrix is loaded.")
 
         # Rename variables for local use:
@@ -824,6 +848,104 @@ class pyma():
         return True
 
 
+    def fit(self, Eg_min, Ex_min, Ex_max, estimate_variance_matrix=False):
+        """
+        Fit transmission coefficient + level density function to
+        the first-generation matrix. This code is famously known as
+        "rhosigchi" in MAMA. Since it is quite tricky to get the fit
+        right, pyma actually runs a compiled version of the original
+        rhosicghi Fortran code.
+        """
+
+        # = Check that first generation matrix is present 
+        if self.firstgen.matrix is None:
+            raise Exception("Error: No first generation matrix is loaded.")
+
+        if self.var_firstgen.matrix is None:
+            if not estimate_variance_matrix:
+                raise Exception("Error: No first generation variance matrix is loaded, but estimate_variance_matrix is set to False.")
+            print("The variance will be estimated (with a very uncertain method).", flush=True)
+
+        rho, T = None, None
+        if estimate_variance_matrix:
+            raise Exception("Rhosigchi with the original variance estimate is not implemented yet.")
+
+        else: # Use variance matrix estimated by Monte Carlo
+            import rhosigchi_f2py_importvar as rsc 
+
+            # Check that dimensions meet the requirement. Rhosigchi needs dimension 512x512.
+            fg_matrix_orig = self.firstgen.matrix
+            Eg_array_orig = self.firstgen.Eg_array
+            Ex_array_orig = self.firstgen.Ex_array
+            dim_rsc = 512
+                
+            # Start with Eg because this probably requires the most rebinning: 
+            if fg_matrix_orig.shape[1] < dim_rsc:
+                # Concatenate array with an array of zeros:
+                fg_matrix_dimcorr_Eg = np.concatenate((fg_matrix_orig, np.zeros((fg_matrix_orig.shape[0], dim_rsc-fg_matrix_orig.shape[1]))), axis=1)
+                # Make a corresponding Eg array:
+                Eg_array_dimcorr = pml.E_array_from_calibration(self.firstgen.calibration["a0x"],self.firstgen.calibration["a1x"],dim_rsc)
+            elif fg_matrix_orig.shape[1] > dim_rsc: 
+                # Rebin down to correct number of bins:
+                fg_matrix_dimcorr_Eg, Eg_array_dimcorr = pml.rebin(fg_matrix_orig, Eg_array_orig, dim_rsc, rebin_axis=1)
+            else:
+                # Copy original matrix, it's already the right dimension
+                fg_matrix_dimcorr_Eg = fg_matrix_orig
+                Eg_array_dimcorr = Eg_array_orig
+
+            # Then do the same with Ex:
+            if fg_matrix_dimcorr_Eg.shape[0] < dim_rsc:
+                # Concatenate array with an array of zeros:
+                fg_matrix_dimcorr_Ex = np.concatenate((fg_matrix_dimcorr_Eg, np.zeros((dim_rsc-fg_matrix_dimcorr_Eg.shape[0],fg_matrix_dimcorr_Eg.shape[1]))), axis=0)
+                # Make a corresponding Eg array:
+                Ex_array_dimcorr = pml.E_array_from_calibration(self.firstgen.calibration["a0y"],self.firstgen.calibration["a1y"],dim_rsc)
+            elif fg_matrix_dimcorr_Eg.shape[0] > dim_rsc: 
+                # Rebin down to correct number of bins:
+                fg_matrix_dimcorr_Ex, Ex_array_dimcorr = pml.rebin(fg_matrix_dimcorr_Eg, Ex_array_orig, dim_rsc, rebin_axis=0)
+            else:
+                # Copy original matrix, it's already the right dimension
+                fg_matrix_dimcorr_Ex = fg_matrix_dimcorr_Eg
+                Ex_array_dimcorr = Eg_array_orig
+
+            # Update variable names
+            fg_matrix = fg_matrix_dimcorr_Ex
+            Ex_array = Ex_array_dimcorr
+            Eg_array = Eg_array_dimcorr
+                
+
+            print(Ex_array, flush=True)
+
+
+            var_fg_matrix = np.sqrt(fg_matrix)
+
+
+            calibration = np.array([Eg_array[0], Eg_array[1]-Eg_array[0], Ex_array[0], Ex_array[1]-Ex_array[0]])
+            rho, T = rsc.rhosigchi(fg_matrix,var_fg_matrix,calibration,Eg_min,Ex_min,Ex_max)
+
+
+
+
+        return rho, T, Ex_array, Eg_array
+
+
+
+    def generate_ensemble(self, N_ensemble):
+        """
+        Function which generates an ensemble of raw spectra, unfolds and first-generation-methods them
+
+        """
+
+        # = Check that first generation matrix is present 
+        if self.firstgen.matrix is None:
+            raise Exception("Error: No first generation matrix is loaded.")
+
+        TODO copy things from generate_ensemble.py.
+        Set up the folder and file structure,
+        run the loop and perturb each member.
+        Consider how best to do the member handling -- instantiate the pyma class inside itself for each member?
+
+
+
 
 
 # === Test it ===
@@ -834,37 +956,35 @@ if __name__ == "__main__":
 
     # Initialise pyma for current experiment
     pm = pyma(fname_raw)
+
+    # Load raw matrix
+    pm.raw.load(fname_raw)
+
     # Check that it has loaded a sensible raw matrix:
     print(pm.raw.matrix.shape)
 
 
 
     # Plot it
-    pm.raw.plot(title="raw")
+    # pm.raw.plot(title="raw")
 
     # Do unfolding: 
-    fname_resp_mat = "data/response_matrix-Re187-10keV.m"
-    fname_resp_dat = "data/resp-Re187-10keV.dat"
-    pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
+    # fname_resp_mat = "data/response_matrix-Re187-10keV.m"
+    # fname_resp_dat = "data/resp-Re187-10keV.dat"
+    # pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
 
-    # # Plot the unfolded matrix:
-    pm.unfolded.plot()
 
-    # # # Save the unfolded matrix:
-    # fname_unfolded = "data/unfolded-Re187.m"
+    # Save the unfolded matrix:
+    fname_unfolded = "data/unfolded-Re187.m"
     # pm.unfolded.save(fname_save_unfolded)
 
-    # # Load the unfolded matrix from file:
-    # pm.load_unfolded(fname_unfolded)
+    # Load the unfolded matrix from file:
+    pm.unfolded.load(fname_unfolded)
 
 
     # # Run first generation method:
     # N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
     # Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
-
-    # # Plot unfolded matrix
-    # pm.unfolded.plot(title="unfolded")
-
     # dEg_fg = 1000 # keV
     # pm.first_generation(N_Exbins=N_Exbins_fg, Ex_max=Ex_max_fg, dE_gamma=dEg_fg)
 
@@ -872,11 +992,21 @@ if __name__ == "__main__":
     # pm.firstgen.plot(title="first generation")
 
     # # Save it
-    # fname_firstgen = "data/firstgen-Re187.m"
+    fname_firstgen = "data/firstgen-Re187.m"
     # pm.firstgen.save(fname_firstgen)
 
+    # Load it
+    pm.firstgen.load(fname_firstgen)
 
-    # # Try plotting the raw matrix -- need to figure out the best way to implement this
-    # # f, (ax1, ax2) = plt.subplots(2,1)
-    # # ax1 = pm.raw.plot()
-    # plt.show()
+
+
+    # Fit T and rho
+    Eg_min = 1000
+    Ex_min = 3000
+    Ex_max = 6700 # keV
+    rho, T, Ex_array, Eg_array = pm.fit(Eg_min, Ex_min, Ex_max, estimate_variance_matrix=False)
+
+    plt.plot(rho, label="rho")
+    plt.plot(T, label="T")
+    plt.legend()
+    plt.show()

@@ -302,3 +302,10 @@ def EffExp(Eg_array):
             EffExp_array[iEg] = Effs[np.argmin(np.abs(Egs - Eg_array[iEg]))]
 
     return EffExp_array
+
+
+def E_array_from_calibration(a0, a1, N):
+    """
+    Return an array of energy values corresponding to the specified calibration.
+    """
+    return np.linspace(a0, a0+a1*(N-1), N)
