@@ -40,8 +40,8 @@ np.random.seed(1256770)
 
 
 class pymama():
-    def __init__(self, fname_raw):
-        self.fname_raw = fname_raw # File name of raw spectrum
+    def __init__(self):
+        # self.fname_raw = fname_raw # File name of raw spectrum
 
 
         # Allocate matrices to be filled by functions in class later:

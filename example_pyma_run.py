@@ -11,7 +11,7 @@ from pyma_mc import pyma_mc
 
 # Initialise pyma for current experiment
 fname_raw = "data/alfna-Re187.m"
-pm = pymama(fname_raw)
+pm = pymama()
 
 # Load raw matrix
 pm.raw.load(fname_raw)
@@ -58,8 +58,9 @@ pm.firstgen.load(fname_firstgen)
 
 # Run the error propagation module to get the variance matrix
 folder = "ensemble_Re187"
-pmc = pyma_mc(pm, folder=folder, seed=42)
-pmc.generate_ensemble(N_members = 1, verbose=True)
+N_members = 1
+pmc = pyma_mc(pm, folder=folder, randomness="gaussian", seed=42)
+pmc.generate_ensemble(N_members=N_members, verbose=True, purge_files=True)
 
 
 

@@ -39,9 +39,10 @@ import pyma_lib as pml
 import pyma_matrix as pmmat
 
 class pyma_mc:
-    def __init__(self, pymama_instance, folder="pyma_ensemble_folder", seed=None):
+    def __init__(self, pymama_instance, folder="pyma_ensemble_folder", randomness="gaussian", seed=None):
         self.pm_orig = pymama_instance
         self.folder = folder
+        self.randomness = randomness
         # Create folder
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -74,7 +75,7 @@ class pyma_mc:
 
 
 
-    def generate_ensemble(self, N_members, verbose=False):
+    def generate_ensemble(self, N_members, verbose=False, purge_files=False):
         """
         Function which generates an ensemble of raw spectra, unfolds and first-generation-methods them
 
@@ -82,6 +83,8 @@ class pyma_mc:
 
 
         folder = self.folder
+        pm_orig = self.pm_orig
+        randomness = self.randomness
 
         # TODO copy things from generate_ensemble.py.
         # Set up the folder and file structure,
@@ -93,7 +96,7 @@ class pyma_mc:
         # fname_resp_dat = '../data/resp-Re187-10keV.dat'
         # R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array_resp = pml.read_response(fname_resp_mat, fname_resp_dat)
 
-        purge_files = False#True # Set to True if we want to regenerate the saved matrices
+        # purge_files = False#True # Set to True if we want to regenerate the saved matrices
 
         # === Unfold and get firstgen without perturbations: ===
         # === Unfold it ===:
@@ -165,36 +168,59 @@ class pyma_mc:
 
 
         # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
-        firstgen_ensemble = np.zeros((N_stat,firstgen_orig.shape[0],firstgen_orig.shape[1]))
+        firstgen_ensemble = np.zeros((N_members,pm_orig.firstgen.matrix.shape[0],pm_orig.firstgen.matrix.shape[1]))
+
+        # Loop over and generate the random perturbations
         for i in range(N_members):
-            print("Begin ensemble member ",i, flush=True)
+            if verbose:
+                print("Begin ensemble member ",i, flush=True)
             # === Perturb initial raw matrix ===:
-            fname_raw_current = os.path.join(folder, name+"-raw-"+str(i)+".m")
+            fname_raw_current = os.path.join(folder, "raw-"+str(i)+".m")
+
+            # Allocate pymama instance for current ensemble member:
+            pm_curr = pymama()
+            # Check if the current ensemble member exists on file, create it if not:
             if os.path.isfile(fname_raw_current) and not purge_files:
-                data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
-                print("Read raw matrix from file", flush=True)
+                # data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
+                pm_curr.raw.load(fname_raw_current)
+                if verbose:
+                    print("Read raw matrix from file", flush=True)
             else:
-                print("Generating raw matrix", flush=True)
+                if verbose:
+                    print("Generating raw matrix", flush=True)
                 # matrix_ensemble_current = np.maximum(matrix + np.random.normal(size=matrix_shape)*np.sqrt(matrix), np.zeros(matrix_shape)) # Each bin of the matrix is perturbed with a gaussian centered on the bin count, with standard deviation sqrt(bin count). Also, no negative counts are accepted.
-                data_raw_ensemblemember = data_raw + np.random.normal(size=data_raw.shape, scale=np.sqrt(np.where(data_raw > 0, data_raw, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
-                data_raw_ensemblemember[data_raw_ensemblemember < 0] = 0
-                write_mama_2D(data_raw_ensemblemember, fname_raw_current, Ex_array, Eg_array, comment="raw matrix, ensemble member no. "+str(i))
+                if randomness=="gaussian":
+                    matrix_perturbed = pm_orig.raw.matrix + np.random.normal(size=pm_orig.raw.matrix.shape, scale=np.sqrt(np.where(pm_orig.raw.matrix > 0, pm_orig.raw.matrix, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
+                    matrix_perturbed[matrix_perturbed<0] = 0
+                    # Update the "raw" member of pm_curr:
+                    pm_curr.raw = pmmat.matrix(matrix_perturbed, pm_orig.raw.Ex_array, pm_orig.raw.Eg_array)
+                else:
+                    raise Exception("Unknown value for randomness variable: "+str(randomness))
+                    
+                # Save ensemble member to disk:
+                pm_curr.raw.save(fname_raw_current)
                 # data_raw_ensemble[:,:,i] = data_raw_ensemblemember
 
-                print("data_raw_ensemblemember.shape =", data_raw_ensemblemember.shape, flush=True)
+                # if verbose:
+                    # print("data_raw_ensemblemember.shape =", data_raw_ensemblemember.shape, flush=True)
 
             # === Unfold it ===:
-            fname_unfolded_current = os.path.join(folder, name+"-unfolded-"+str(i)+".m")
+            fname_unfolded_current = os.path.join(folder, "unfolded-"+str(i)+".m")
             if os.path.isfile(fname_unfolded_current) and not purge_files:
-                unfolded_ensemblemember, tmp, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unfolded_current)
-                print("Read unfolded matrix from file", flush=True)
+                pm_curr.unfolded.load(fname_unfolded_current)
+                # unfolded_ensemblemember, tmp, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unfolded_current)
+                if verbose:
+                    print("Read unfolded matrix from file", flush=True)
             else:
-                print("Unfolding matrix", flush=True)
+                if verbose:
+                    print("Unfolding matrix", flush=True)
                 # Unfold:
-                unfolded_ensemblemember, Ex_array_unf, Eg_array_unf = unfold(data_raw_ensemblemember, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, use_comptonsubtraction=False)
-                write_mama_2D(unfolded_ensemblemember, fname_unfolded_current, Ex_array_unf, Eg_array_unf, comment="unfolded matrix, ensemble member no. "+str(i))
+                # unfolded_ensemblemember, Ex_array_unf, Eg_array_unf = unfold(data_raw_ensemblemember, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, use_comptonsubtraction=False)
+                pm_curr.unfold()
+                pm_curr.unfolded.save(fname_unfolded_current)
 
-                print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
+                if verbose:
+                    print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
 
 
 
