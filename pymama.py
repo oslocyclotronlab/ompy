@@ -1,10 +1,15 @@
 """
+Class pymama, the "core" matrix manipulation module of pyma.
+It handles unfolding and the first-generation method on Ex-Eg matrices.
+
+---
+
 This is pyma, the python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
 
-It is heavily inspired by MAMA, written by Magne Guttormsen,
+It is heavily inspired by MAMA, written by Magne Guttormsen and others,
 available at https://github.com/oslocyclotronlab/oslo-method-software
 
 Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
@@ -26,81 +31,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np 
-# Load library of pyma utility functions from separate file:
+# Load other pyma functions from separate files:
 import pyma_lib as pml
+import pyma_matrix as pmmat
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
 
 
-class pyma():
+class pymama():
     def __init__(self, fname_raw):
         self.fname_raw = fname_raw # File name of raw spectrum
 
 
         # Allocate matrices to be filled by functions in class later:
-        self.raw = self.matrix()
-        self.unfolded = self.matrix()
-        self.firstgen = self.matrix()
-        self.var_firstgen = self.matrix()
+        self.raw = pmmat.matrix()
+        self.unfolded = pmmat.matrix()
+        self.firstgen = pmmat.matrix()
+        self.var_firstgen = pmmat.matrix()
 
 
 
 
-    class matrix():
-        """ 
-        The matrix class stores matrices along with calibration and energy axis arrays.
-
-        """
-        def __init__(self, matrix=None, Ex_array=None, Eg_array=None):
-            """
-            Initialise the class. There is the option to initialise 
-            it in an empty state. In that case, all class variables will be None.
-            It can be filled later using the load() method.
-            """
-            self.matrix = matrix
-            self.Ex_array = Ex_array
-            self.Eg_array = Eg_array
-
-            if matrix is not None and Ex_array is not None and Eg_array is not None:
-                # Calculate calibration based on energy arrays, assuming linear calibration:
-                self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
-                  "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
-
-        def plot(self, title="", norm="log"):
-            import matplotlib.pyplot as plt
-            plot_object = None
-            if norm == "log":
-                from matplotlib.colors import LogNorm
-                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix, norm=LogNorm(vmin=1e-1))
-            else:
-                plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix)
-            plt.title(title)
-            plt.show()
-            return True
-
-        def save(self, fname):
-            """
-            Save matrix to mama file
-            """
-            pml.write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array, comment="Made by pyma")
-            return True
-
-        def load(self, fname):
-            """
-            Load matrix from mama file
-            """
-            if self.matrix is not None:
-                print("Warning: load() called on non-empty matrix", flush=True)
-
-            # Load matrix from file:
-            matrix, calibration, Ex_array, Eg_array = pml.read_mama_2D(fname)
-            self.matrix = matrix
-            self.Ex_array = Ex_array
-            self.Eg_array = Eg_array
-            self.calibration = calibration
-
-            return True
+    
 
 
     # def load_unfolded(self, fname_unfolded):
@@ -114,7 +67,7 @@ class pyma():
     #     Returns True upon completion
     #     """
     #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
-    #     self.unfolded = self.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
+    #     self.unfolded = pmmat.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
     #     return True
 
     # def load_firstgen(self, fname_firstgen):
@@ -128,7 +81,7 @@ class pyma():
     #     Returns True upon completion
     #     """
     #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
-    #     self.firstgen = self.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
+    #     self.firstgen = pmmat.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
     #     return True    
 
     
@@ -475,7 +428,7 @@ class pyma():
 
 
         # Update global variables:
-        self.unfolded = self.matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
+        self.unfolded = pmmat.matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
 
         # return unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high]
         return True
@@ -844,7 +797,7 @@ class pyma():
         print("Ex_array.shape =", Ex_array.shape)
         print("Egamma_array.shape =", Egamma_array.shape, flush=True)
 
-        self.firstgen = self.matrix(H, Ex_array, Egamma_array)
+        self.firstgen = pmmat.matrix(H, Ex_array, Egamma_array)
         return True
 
 

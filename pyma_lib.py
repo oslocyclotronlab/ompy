@@ -1,8 +1,15 @@
 """
 Library of utility functions for pyma.
 
-Heavily influenced by Magne Guttormsen's MAMA code, available
-at http://github.com/oslocyclotronlab/oslo-method-software
+---
+
+This is pyma, the python implementation of the Oslo method.
+It handles two-dimensional matrices of event count spectra, and
+implements detector response unfolding, first generation method
+and other manipulation of the spectra.
+
+It is heavily inspired by MAMA, written by Magne Guttormsen and others,
+available at https://github.com/oslocyclotronlab/oslo-method-software
 
 Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
 Oslo Cyclotron Laboratory
