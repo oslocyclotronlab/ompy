@@ -51,6 +51,12 @@ class pymama():
         self.var_firstgen = pmmat.matrix()
 
 
+        # Allocate other variables and settings:
+        self.fname_resp_mat = None
+        self.fname_resp_dat = None
+        self.N_Exbins_fg = None
+        self.Ex_max_fg = None
+        self.dEg_fg = None
 
 
     
@@ -88,12 +94,14 @@ class pymama():
 
 
 
-    def unfold(self, fname_resp_mat, fname_resp_dat, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False, use_comptonsubtraction=True):
+    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False, use_comptonsubtraction=True):
         # = Check that raw matrix is present 
         if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
 
         # Rename variables for local use:
+        fname_resp_mat = self.fname_resp_mat
+        fname_resp_dat = self.fname_resp_dat
         data_raw = self.raw.matrix
         Ex_array = self.raw.Ex_array
         Eg_array = self.raw.Eg_array
@@ -435,7 +443,7 @@ class pymama():
 
 
 
-    def first_generation(self, N_Exbins, Ex_max, dE_gamma, N_iterations=1, statistical_or_total=1):
+    def first_generation_method(self, N_iterations=1, statistical_or_total=1):
         """
         Function implementing the first generation method from Guttormsen et al. (NIM 1987)
         The code is heavily influenced by the original implementation by Magne in MAMA.
@@ -450,6 +458,11 @@ class pymama():
         matrix = self.unfolded.matrix
         Ex_array_mat = self.unfolded.Ex_array
         Egamma_array = self.unfolded.Eg_array
+
+        # TODO check if they are None, and if so raise exception?
+        N_Exbins = self.N_Exbins_fg
+        Ex_max = self.Ex_max_fg
+        dE_gamma = self.dEg_fg
 
 
         # TODO option statistical_or_total=2 (total) does not work
@@ -882,22 +895,7 @@ class pymama():
 
 
 
-    def generate_ensemble(self, N_ensemble):
-        """
-        Function which generates an ensemble of raw spectra, unfolds and first-generation-methods them
-
-        """
-
-        # = Check that first generation matrix is present 
-        if self.firstgen.matrix is None:
-            raise Exception("Error: No first generation matrix is loaded.")
-
-        TODO copy things from generate_ensemble.py.
-        Set up the folder and file structure,
-        run the loop and perturb each member.
-        Consider how best to do the member handling -- instantiate the pyma class inside itself for each member?
-
-
+    
 
 
 
@@ -908,7 +906,7 @@ if __name__ == "__main__":
     fname_raw = "data/alfna-Re187.m"
 
     # Initialise pyma for current experiment
-    pm = pyma(fname_raw)
+    pm = pymama(fname_raw)
 
     # Load raw matrix
     pm.raw.load(fname_raw)
@@ -936,20 +934,20 @@ if __name__ == "__main__":
 
 
     # # Run first generation method:
-    # N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
-    # Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
-    # dEg_fg = 1000 # keV
-    # pm.first_generation(N_Exbins=N_Exbins_fg, Ex_max=Ex_max_fg, dE_gamma=dEg_fg)
+    pm.N_Exbins_fg = pm.unfolded.matrix.shape[0] # Take all bins
+    pm.Ex_max_fg = pm.unfolded.Ex_array[-1] - 2000 # TODO figure out if this is needed and how it relates to max Eg
+    pm.dEg_fg = 1000 # keV
+    pm.first_generation_method()
 
     # # Plot first generation matrix
-    # pm.firstgen.plot(title="first generation")
+    pm.firstgen.plot(title="first generation")
 
     # # Save it
     fname_firstgen = "data/firstgen-Re187.m"
-    # pm.firstgen.save(fname_firstgen)
+    pm.firstgen.save(fname_firstgen)
 
     # Load it
-    pm.firstgen.load(fname_firstgen)
+    # pm.firstgen.load(fname_firstgen)
 
 
 
