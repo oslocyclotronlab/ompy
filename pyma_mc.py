@@ -231,7 +231,8 @@ class pyma_mc:
             N_Exbins = len(Ex_array_unf)
             fname_firstgen_current = os.path.join(folder, name+"-firstgen-"+str(i)+".m")
             if os.path.isfile(fname_firstgen_current) and not purge_files:
-                firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_current)
+                pm_curr.firstgen.load(fname_firstgen_current)
+                # firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_current)
                 print("Read first generation matrix from file", flush=True)
             else:
                 print("Calculating first generation matrix", flush=True)
