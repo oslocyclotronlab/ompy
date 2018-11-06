@@ -1,5 +1,5 @@
 """
-Class mama(), the "core" matrix manipulation module of pyma.
+Class pymama(), the "core" matrix manipulation module of pyma.
 It handles unfolding and the first-generation method on Ex-Eg matrices.
 
 ---
@@ -39,7 +39,7 @@ import pyma_matrix as pmmat
 np.random.seed(1256770)
 
 
-class mama():
+class pymama():
     def __init__(self):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
