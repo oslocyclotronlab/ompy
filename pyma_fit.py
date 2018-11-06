@@ -37,11 +37,11 @@ import pyma_lib as pml
 import pyma_matrix as pmmat
 
 
-class pyma_fit:
+class fit:
     def __init__(self, firstgen, var_firstgen=pmmat.matrix()):
         self.firstgen = firstgen 
         self.var_firstgen = var_firstgen
-        return True
+        return None
         
     def fit(self, Eg_min, Ex_min, Ex_max, estimate_variance_matrix=False):
         """

@@ -30,6 +30,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
+import matplotlib.pyplot as plt
 import numpy as np 
 # Load other pyma functions from separate files:
 import pyma_lib as pml
@@ -40,7 +41,7 @@ np.random.seed(1256770)
 
 
 class pymama():
-    def __init__(self):
+    def __init__(self, fname_resp_mat, fname_resp_dat):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
 
@@ -48,12 +49,13 @@ class pymama():
         self.raw = pmmat.matrix()
         self.unfolded = pmmat.matrix()
         self.firstgen = pmmat.matrix()
-        self.var_firstgen = pmmat.matrix()
+        # self.var_firstgen = pmmat.matrix() # variance matrix of first-generation matrix
+        self.response = pmmat.matrix() # response matrix
 
 
         # Allocate other variables and settings:
-        self.fname_resp_mat = None
-        self.fname_resp_dat = None
+        self.fname_resp_mat = fname_resp_mat
+        self.fname_resp_dat = fname_resp_dat
         self.N_Exbins_fg = None
         self.Ex_max_fg = None
         self.dEg_fg = None
@@ -135,7 +137,9 @@ class pymama():
        
 
         # Import response matrix
-        R, cal_R, Eg_array_R, tmp = pml.read_mama_2D(fname_resp_mat)
+        R, cal_R, Eg_array_R, tmp = pml.read_mama_2D(self.fname_resp_mat)
+        # Copy it to a global variable
+        self.response = pmmat.matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for matrix()
 
         if verbose:
             time_readfiles_end = time.process_time()
@@ -306,7 +310,7 @@ class pymama():
             # TODO: Consider writing a function that makes the response matrix (R) from this file
             # (or other input), so we don't have to keep track of redundant info.
             resp = []
-            with open(fname_resp_dat) as file:
+            with open(self.fname_resp_dat) as file:
                 # Read line by line as there is crazyness in the file format
                 lines = file.readlines()
                 for i in range(4,len(lines)):
@@ -328,8 +332,9 @@ class pymama():
             pa = resp[:,7]
             
             # Correct efficiency by multiplying with EffExp(Eg):
-            EffExp_array = EffExp(Eg_array)
+            EffExp_array = pml.EffExp(Eg_array)
             # eff_corr = np.append(0,eff)*EffExp_array
+            print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
             eff_corr = eff*EffExp_array
         
             # Debugging: Test normalization of response matrix and response pieces:
@@ -920,8 +925,6 @@ if __name__ == "__main__":
     # pm.raw.plot(title="raw")
 
     # Do unfolding: 
-    # fname_resp_mat = "data/response_matrix-Re187-10keV.m"
-    # fname_resp_dat = "data/resp-Re187-10keV.dat"
     # pm.unfold(fname_resp_mat, fname_resp_dat, use_comptonsubtraction=False, verbose=True, plot=True) # Call unfolding routine
 
 

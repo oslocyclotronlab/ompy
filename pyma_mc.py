@@ -38,7 +38,7 @@ from pymama import pymama
 import pyma_lib as pml
 import pyma_matrix as pmmat
 
-class pyma_mc:
+class mc:
     def __init__(self, pymama_instance, folder="pyma_ensemble_folder", randomness="gaussian", seed=None):
         self.pm_orig = pymama_instance
         self.folder = folder
@@ -75,7 +75,7 @@ class pyma_mc:
 
 
 
-    def generate_ensemble(self, N_members, verbose=False, purge_files=False):
+    def generate_ensemble(self, N_members, verbose=False, purge_files=False, use_comptonsubtraction=True):
         """
         Function which generates an ensemble of raw spectra, unfolds and first-generation-methods them
 
@@ -170,7 +170,7 @@ class pyma_mc:
         # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
         firstgen_ensemble = np.zeros((N_members,pm_orig.firstgen.matrix.shape[0],pm_orig.firstgen.matrix.shape[1]))
 
-        # Loop over and generate the random perturbations
+        # Loop over and generate the random perturbations, then unfold and first-generation-method them:
         for i in range(N_members):
             if verbose:
                 print("Begin ensemble member ",i, flush=True)
@@ -178,7 +178,9 @@ class pyma_mc:
             fname_raw_current = os.path.join(folder, "raw-"+str(i)+".m")
 
             # Allocate pymama instance for current ensemble member:
-            pm_curr = pymama()
+            import copy
+            pm_curr = copy.deepcopy(pm_orig)
+            # pm_curr = pymama(fname_resp_mat=pm_orig.fname_resp_mat, fname_resp_dat=pm_orig.fname_resp_dat)
             # Check if the current ensemble member exists on file, create it if not:
             if os.path.isfile(fname_raw_current) and not purge_files:
                 # data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
@@ -194,6 +196,8 @@ class pyma_mc:
                     matrix_perturbed[matrix_perturbed<0] = 0
                     # Update the "raw" member of pm_curr:
                     pm_curr.raw = pmmat.matrix(matrix_perturbed, pm_orig.raw.Ex_array, pm_orig.raw.Eg_array)
+                    print("pm_orig.raw.matrix.shape =", pm_orig.raw.matrix.shape)
+                    print("pm_curr.raw.matrix.shape =", pm_curr.raw.matrix.shape, flush=True)
                 else:
                     raise Exception("Unknown value for randomness variable: "+str(randomness))
                     
@@ -216,33 +220,37 @@ class pyma_mc:
                     print("Unfolding matrix", flush=True)
                 # Unfold:
                 # unfolded_ensemblemember, Ex_array_unf, Eg_array_unf = unfold(data_raw_ensemblemember, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, use_comptonsubtraction=False)
-                pm_curr.unfold()
+                pm_curr.unfold(use_comptonsubtraction=use_comptonsubtraction)
                 pm_curr.unfolded.save(fname_unfolded_current)
 
-                if verbose:
-                    print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
+                # if verbose:
+                    # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
 
 
 
             # === Extract first generation spectrum ===: 
-            Ex_max = 12000 # keV - maximum excitation energy
-            dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
+            # Ex_max = 12000 # keV - maximum excitation energy
+            # dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
             # N_Exbins = 300
-            N_Exbins = len(Ex_array_unf)
-            fname_firstgen_current = os.path.join(folder, name+"-firstgen-"+str(i)+".m")
+            # N_Exbins = len(Ex_array_unf)
+            fname_firstgen_current = os.path.join(folder, "firstgen-"+str(i)+".m")
             if os.path.isfile(fname_firstgen_current) and not purge_files:
                 pm_curr.firstgen.load(fname_firstgen_current)
                 # firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_current)
-                print("Read first generation matrix from file", flush=True)
+                if verbose:
+                    print("Read first generation matrix from file", flush=True)
             else:
-                print("Calculating first generation matrix", flush=True)
-                print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
+                if verbose:
+                    print("Calculating first generation matrix", flush=True)
+                # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
                 # Find first generation spectrum:
-                firstgen_ensemblemember, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded_ensemblemember, Ex_array_unf, Eg_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=10)
-                write_mama_2D(firstgen_ensemblemember, fname_firstgen_current, Ex_array_fg, Eg_array_fg, comment="first generation matrix, ensemble member no. "+str(i))
+                # firstgen_ensemblemember, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded_ensemblemember, Ex_array_unf, Eg_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=10)
+                # write_mama_2D(firstgen_ensemblemember, fname_firstgen_current, Ex_array_fg, Eg_array_fg, comment="first generation matrix, ensemble member no. "+str(i))
+                pm_curr.first_generation_method()
+                pm_curr.firstgen.save(fname_firstgen_current)
 
 
-            firstgen_ensemble[i,0:firstgen_ensemblemember.shape[0],0:firstgen_ensemblemember.shape[1]] = firstgen_ensemblemember
+            firstgen_ensemble[i,0:pm_curr.firstgen.matrix.shape[0],0:pm_curr.firstgen.matrix.shape[1]] = pm_curr.firstgen.matrix
 
 
             # TESTING: Plot ensemble of first-gen matrices:
@@ -259,12 +267,14 @@ class pyma_mc:
 
         # === Calculate variance ===:
         firstgen_ensemble_variance = np.var(firstgen_ensemble, axis=0)
-        fname_firstgen_variance = os.path.join(folder, name+"-firstgen_variance.m")
-        write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, Ex_array_fg, Eg_array_fg, comment="variance of first generation matrix ensemble")
+        var_firstgen = pmmat.matrix(firstgen_ensemble_variance, pm_orig.firstgen.Ex_array, pm_orig.firstgen.Eg_array)
+        fname_firstgen_variance = os.path.join(folder, "firstgen_variance.m")
+        var_firstgen.save(fname_firstgen_variance)
+        # pml.write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, pm_orig.firstgen.Ex_array, pm_orig.firstgen.Eg_array, comment="variance of first generation matrix ensemble")
 
 
 
-        return True
+        return var_firstgen
 
 
 
