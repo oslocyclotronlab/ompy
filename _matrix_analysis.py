@@ -1,5 +1,5 @@
 """
-Class pymama(), the "core" matrix manipulation module of pyma.
+Class matrix_analysis(), the "core" matrix manipulation module of pyma.
 It handles unfolding and the first-generation method on Ex-Eg matrices.
 
 ---
@@ -33,24 +33,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import matplotlib.pyplot as plt
 import numpy as np 
 # Load other pyma functions from separate files:
-import pyma_lib as pml
-import pyma_matrix as pmmat
+from _library import *
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
 
 
-class pymama():
-    def __init__(self, fname_resp_mat, fname_resp_dat):
+class matrix_analysis():
+    def __init__(self, fname_resp_mat=None, fname_resp_dat=None):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
 
         # Allocate matrices to be filled by functions in class later:
-        self.raw = pmmat.matrix()
-        self.unfolded = pmmat.matrix()
-        self.firstgen = pmmat.matrix()
-        # self.var_firstgen = pmmat.matrix() # variance matrix of first-generation matrix
-        self.response = pmmat.matrix() # response matrix
+        self.raw = matrix()
+        self.unfolded = matrix()
+        self.firstgen = matrix()
+        # self.var_firstgen = matrix() # variance matrix of first-generation matrix
+        self.response = matrix() # response matrix
 
 
         # Allocate other variables and settings:
@@ -75,7 +74,7 @@ class pymama():
     #     Returns True upon completion
     #     """
     #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
-    #     self.unfolded = pmmat.matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
+    #     self.unfolded = matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
     #     return True
 
     # def load_firstgen(self, fname_firstgen):
@@ -89,7 +88,7 @@ class pymama():
     #     Returns True upon completion
     #     """
     #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
-    #     self.firstgen = pmmat.matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
+    #     self.firstgen = matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
     #     return True    
 
     
@@ -139,7 +138,7 @@ class pymama():
         # Import response matrix
         R, cal_R, Eg_array_R, tmp = pml.read_mama_2D(self.fname_resp_mat)
         # Copy it to a global variable
-        self.response = pmmat.matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for matrix()
+        self.response = matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for matrix()
 
         if verbose:
             time_readfiles_end = time.process_time()
@@ -441,19 +440,20 @@ class pymama():
 
 
         # Update global variables:
-        self.unfolded = pmmat.matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
+        self.unfolded = matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
 
         # return unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high]
         return True
 
 
 
-    def first_generation_method(self, N_iterations=1, statistical_or_total=1):
+    def first_generation_method(self, N_iterations=10, statistical_or_total=1):
         """
         Function implementing the first generation method from Guttormsen et al. (NIM 1987)
         The code is heavily influenced by the original implementation by Magne in MAMA.
         Mainly written autumn 2016 at MSU.
         """
+
 
         # = Check that unfolded matrix is present 
         if self.unfolded.matrix is None:
@@ -815,7 +815,7 @@ class pymama():
         print("Ex_array.shape =", Ex_array.shape)
         print("Egamma_array.shape =", Egamma_array.shape, flush=True)
 
-        self.firstgen = pmmat.matrix(H, Ex_array, Egamma_array)
+        self.firstgen = matrix(H, Ex_array, Egamma_array)
         return True
 
 
