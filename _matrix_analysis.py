@@ -58,6 +58,7 @@ class matrix_analysis():
         self.N_Exbins_fg = None
         self.Ex_max_fg = None
         self.dEg_fg = None
+        self.use_comptonsubtraction = None
 
 
     
@@ -73,7 +74,7 @@ class matrix_analysis():
     #     Fills the variable self.unfolded
     #     Returns True upon completion
     #     """
-    #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = pml.read_mama_2D(fname_unfolded)
+    #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = read_mama_2D(fname_unfolded)
     #     self.unfolded = matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
     #     return True
 
@@ -87,7 +88,7 @@ class matrix_analysis():
     #     Fills the variable self.firstgen
     #     Returns True upon completion
     #     """
-    #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = pml.read_mama_2D(fname_firstgen)
+    #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = read_mama_2D(fname_firstgen)
     #     self.firstgen = matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
     #     return True    
 
@@ -95,7 +96,7 @@ class matrix_analysis():
 
 
 
-    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False, use_comptonsubtraction=True):
+    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
         # = Check that raw matrix is present 
         if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
@@ -106,6 +107,8 @@ class matrix_analysis():
         data_raw = self.raw.matrix
         Ex_array = self.raw.Ex_array
         Eg_array = self.raw.Eg_array
+
+        use_comptonsubtraction = self.use_comptonsubtraction
 
         # = Import data and response matrix =
 
@@ -136,7 +139,7 @@ class matrix_analysis():
        
 
         # Import response matrix
-        R, cal_R, Eg_array_R, tmp = pml.read_mama_2D(self.fname_resp_mat)
+        R, cal_R, Eg_array_R, tmp = read_mama_2D(self.fname_resp_mat)
         # Copy it to a global variable
         self.response = matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for matrix()
 
@@ -220,11 +223,11 @@ class matrix_analysis():
         Ex_low = 0
         Ex_high = 14000 # keV
         # Use index 0 of array as lower limit instead of energy because it can be negative!
-        iEx_low, iEx_high = 0, pml.i_from_E(Ex_high, Ex_array)
+        iEx_low, iEx_high = 0, i_from_E(Ex_high, Ex_array)
         Eg_low = 0 # keV - minimum
         # Eg_low = 500 # keV 
         Eg_high = 14000 # keV
-        iEg_low, iEg_high = 0, pml.i_from_E(Eg_high, Eg_array)
+        iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
         Nit = 12#33 # 8 # 27
         
         # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
@@ -239,7 +242,7 @@ class matrix_analysis():
         # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
         # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
         # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
-        mask = pml.make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
+        mask = make_mask(Ex_array, Eg_array, Ex_low, Eg_low+dEg, Ex_high, Eg_high+dEg)
         # HACK TEST 20181004: Does the mask do any good?:
         # mask = np.ones(mask.shape)
         
@@ -283,7 +286,7 @@ class matrix_analysis():
             #           Seems to come from unfolding and not from compton subtraction
         
             # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
-            chisquares[iteration] = pml.div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() #/ Ndof
+            chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() #/ Ndof
             if verbose:
                 print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
         
@@ -331,7 +334,7 @@ class matrix_analysis():
             pa = resp[:,7]
             
             # Correct efficiency by multiplying with EffExp(Eg):
-            EffExp_array = pml.EffExp(Eg_array)
+            EffExp_array = EffExp(Eg_array)
             # eff_corr = np.append(0,eff)*EffExp_array
             print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
             eff_corr = eff*EffExp_array
@@ -460,7 +463,7 @@ class matrix_analysis():
             raise Exception("Error: No unfolded matrix is loaded.")
 
         # Rename variables for local use:
-        matrix = self.unfolded.matrix
+        unfolded_matrix = self.unfolded.matrix
         Ex_array_mat = self.unfolded.Ex_array
         Egamma_array = self.unfolded.Eg_array
 
@@ -473,8 +476,8 @@ class matrix_analysis():
         # TODO option statistical_or_total=2 (total) does not work
 
 
-        Ny = len(matrix[:,0])
-        Nx = len(matrix[0,:])
+        Ny = len(unfolded_matrix[:,0])
+        Nx = len(unfolded_matrix[0,:])
         # Extract / calculate calibration coefficients
         # bx = Egamma_array[0]
         # ax = Egamma_array[1] - Egamma_array[0]
@@ -508,9 +511,9 @@ class matrix_analysis():
         # Ex_array = np.linspace(by, Ex_max + dE_gamma, N_Exbins)
         # Egamma_array = np.linspace(0,Nx-1,Nx)*ax + bx # Range of Egamma values # Update: This is passed into the function.
 
-        matrix_ex_compressed, Ex_array = pml.rebin(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], Ex_array_mat[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny)], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
+        # matrix_ex_compressed, Ex_array = rebin(unfolded_matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], Ex_array_mat[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny)], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
         # HACK: Checking if the compression along Ex is really necessary (shouldn't it be done outside of firstgen method anyway?)
-        matrix_ex_compressed = matrix
+        matrix_ex_compressed = unfolded_matrix
         Ex_array = Ex_array_mat
 
         # if N_Exbins != Ny:
@@ -576,13 +579,13 @@ class matrix_analysis():
 
         # Calculate average multiplicity for each Ex channel
         area_matrix_ex_compressed_cut = np.sum(matrix_ex_compressed_cut, axis=1)
-        Egamma_average = pml.div0( np.sum(Egamma_mesh * matrix_ex_compressed_cut, axis =1) , area_matrix_ex_compressed_cut )
+        Egamma_average = div0( np.sum(Egamma_mesh * matrix_ex_compressed_cut, axis =1) , area_matrix_ex_compressed_cut )
         if statistical_or_total == 1:
             # Statistical multiplicity - use the effective Ex0 value
-            multiplicity = pml.div0( Ex_array - np.maximum( np.minimum(Ex_array - 200, ExEntry0s), 0), Egamma_average)
+            multiplicity = div0( Ex_array - np.maximum( np.minimum(Ex_array - 200, ExEntry0s), 0), Egamma_average)
         elif statistical_or_total == 2:
             # Total multiplicity - use actual Ex0 = 0
-            multiplicity = pml.div0( Ex_array, Egamma_average )
+            multiplicity = div0( Ex_array, Egamma_average )
 
 
         # plt.figure(2)
@@ -607,7 +610,7 @@ class matrix_analysis():
         # print area_grid.shape
         multiplicity_grid = np.tile(multiplicity, (N_Exbins, 1)) 
         # print multiplicity_grid.shape
-        normalization_matrix = pml.div0(( np.transpose(multiplicity_grid) * area_grid ) , (multiplicity_grid * np.transpose(area_grid) )).T # The transpose gives the right result. Haven't twisted my head around exactly why.
+        normalization_matrix = div0(( np.transpose(multiplicity_grid) * area_grid ) , (multiplicity_grid * np.transpose(area_grid) )).T # The transpose gives the right result. Haven't twisted my head around exactly why.
         # normalization_matrix_check = np.zeros((N_Exbins, N_Exbins))
         # for i in range(N_Exbins):
         #   for j in range(N_Exbins):
@@ -666,11 +669,11 @@ class matrix_analysis():
         Ef_mesh[Ef_mesh < 0] = 0
         # Calculate weights. Remember that energies are in keV, while a is in 1/MeV, so we correct in the exponent:
         W_old = np.where(Eg_mesh > 0, np.power(Eg_mesh,n_f) / np.power(Ef_mesh, 2) * np.exp(2*np.sqrt(a_f*Ef_mesh/1000)), 0)
-        W_old = pml.div0(W_old, W_old.sum(axis=1).reshape(N_Exbins,1))
+        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins,1))
 
 
         dEg = 1000
-        mask_W = pml.make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[0]+dEg, Ex_array[-1], Ex_array[-1]+dEg)
+        mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[0]+dEg, Ex_array[-1], Ex_array[-1]+dEg)
 
         # Perform the iterative subtraction:
         for iteration in range(N_iterations):
@@ -681,7 +684,7 @@ class matrix_analysis():
             H_old = H
             # Compress the H matrix along gamma axis to make it square and facilitate conversion to excitation energy
             # H_compressed = H[:,0:i_Egamma_max].reshape(N_Exbins, N_Exbins, grouping_Egamma).sum(axis=2)
-            H_compressed, Egamma_array_compressed = pml.rebin(H[:,0:i_Egamma_max], Egamma_array[0:i_Egamma_max], N_Exbins, rebin_axis=1)
+            H_compressed, Egamma_array_compressed = rebin(H[:,0:i_Egamma_max], Egamma_array[0:i_Egamma_max], N_Exbins, rebin_axis=1)
 
             # plt.pcolormesh(Egamma_array_compressed, Ex_array, H_compressed)
             # plt.show()
@@ -715,7 +718,7 @@ class matrix_analysis():
             # Normalize each Ex channel to unity
             # W = np.where(np.invert(np.isnan(W/W.sum(axis=1).astype(float))),  W/W.sum(axis=1).astype(float), 0)
             # Remove Inf and NaN
-            W = pml.div0(W, W.sum(axis=1).reshape(N_Exbins,1))
+            W = div0(W, W.sum(axis=1).reshape(N_Exbins,1))
             # Store for next iteration:
             W_old = np.copy(W)
             # W = np.nan_to_num(W) 
@@ -766,7 +769,7 @@ class matrix_analysis():
                 # print G_area.shape
                 # print "print G_area"
                 # print G_area
-                alpha = np.where(G_area > 0, (1 - pml.div0(1,multiplicity)) * pml.div0( area_matrix_ex_compressed_cut, G_area ), 1)
+                alpha = np.where(G_area > 0, (1 - div0(1,multiplicity)) * div0( area_matrix_ex_compressed_cut, G_area ), 1)
                 alpha[alpha < 0.85] = 0.85
                 alpha[alpha > 1.15] = 1.15
                 # print "alpha.shape"
@@ -855,10 +858,10 @@ class matrix_analysis():
                 # Concatenate array with an array of zeros:
                 fg_matrix_dimcorr_Eg = np.concatenate((fg_matrix_orig, np.zeros((fg_matrix_orig.shape[0], dim_rsc-fg_matrix_orig.shape[1]))), axis=1)
                 # Make a corresponding Eg array:
-                Eg_array_dimcorr = pml.E_array_from_calibration(self.firstgen.calibration["a0x"],self.firstgen.calibration["a1x"],dim_rsc)
+                Eg_array_dimcorr = E_array_from_calibration(self.firstgen.calibration["a0x"],self.firstgen.calibration["a1x"],dim_rsc)
             elif fg_matrix_orig.shape[1] > dim_rsc: 
                 # Rebin down to correct number of bins:
-                fg_matrix_dimcorr_Eg, Eg_array_dimcorr = pml.rebin(fg_matrix_orig, Eg_array_orig, dim_rsc, rebin_axis=1)
+                fg_matrix_dimcorr_Eg, Eg_array_dimcorr = rebin(fg_matrix_orig, Eg_array_orig, dim_rsc, rebin_axis=1)
             else:
                 # Copy original matrix, it's already the right dimension
                 fg_matrix_dimcorr_Eg = fg_matrix_orig
@@ -869,10 +872,10 @@ class matrix_analysis():
                 # Concatenate array with an array of zeros:
                 fg_matrix_dimcorr_Ex = np.concatenate((fg_matrix_dimcorr_Eg, np.zeros((dim_rsc-fg_matrix_dimcorr_Eg.shape[0],fg_matrix_dimcorr_Eg.shape[1]))), axis=0)
                 # Make a corresponding Eg array:
-                Ex_array_dimcorr = pml.E_array_from_calibration(self.firstgen.calibration["a0y"],self.firstgen.calibration["a1y"],dim_rsc)
+                Ex_array_dimcorr = E_array_from_calibration(self.firstgen.calibration["a0y"],self.firstgen.calibration["a1y"],dim_rsc)
             elif fg_matrix_dimcorr_Eg.shape[0] > dim_rsc: 
                 # Rebin down to correct number of bins:
-                fg_matrix_dimcorr_Ex, Ex_array_dimcorr = pml.rebin(fg_matrix_dimcorr_Eg, Ex_array_orig, dim_rsc, rebin_axis=0)
+                fg_matrix_dimcorr_Ex, Ex_array_dimcorr = rebin(fg_matrix_dimcorr_Eg, Ex_array_orig, dim_rsc, rebin_axis=0)
             else:
                 # Copy original matrix, it's already the right dimension
                 fg_matrix_dimcorr_Ex = fg_matrix_dimcorr_Eg
