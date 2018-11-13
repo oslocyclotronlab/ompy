@@ -30,7 +30,7 @@ from _library import *
 import _error_propagation
 
 class oslo_method():
-    def __init__(self, fname_resp_mat, fname_resp_dat):
+    def __init__(self, fname_resp_mat=None, fname_resp_dat=None):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
         # Create an instance of matrix_analysis() which will be the
