@@ -101,6 +101,9 @@ class matrix_analysis():
         if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
 
+        if self.fname_resp_mat is None or self.fname_resp_dat is None:
+            raise Exception("Error: fname_resp_mat and/or fname_resp_dat not set.")
+
         # Rename variables for local use:
         fname_resp_mat = self.fname_resp_mat
         fname_resp_dat = self.fname_resp_dat
