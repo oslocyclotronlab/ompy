@@ -46,6 +46,7 @@ class matrix():
         self.Ex_array = Ex_array
         self.Eg_array = Eg_array
 
+        self.calibration = None
         if matrix is not None and Ex_array is not None and Eg_array is not None:
             # Calculate calibration based on energy arrays, assuming linear calibration:
             self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
