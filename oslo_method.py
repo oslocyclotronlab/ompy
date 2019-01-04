@@ -29,7 +29,9 @@ from _matrix_analysis import matrix_analysis
 from _library import *
 import _error_propagation
 
-class oslo_method():
+
+class OsloMethod:
+
     def __init__(self, fname_resp_mat=None, fname_resp_dat=None):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
@@ -43,9 +45,9 @@ class oslo_method():
         self.unfolded = self.base_analysis.unfolded
         self.firstgen = self.base_analysis.firstgen
 
-        self.var_firstgen = matrix() # variance matrix of first-generation matrix
-        # self.response = matrix() # response matrix -- unsure if this should be a global variable
-
+        self.var_firstgen = matrix()  # variance matrix of first-generation matrix
+        # self.response = matrix() # response matrix -- unsure if this should
+        # be a global variable
 
         # Allocate other variables and settings:
         self.fname_resp_mat = fname_resp_mat
@@ -53,13 +55,16 @@ class oslo_method():
         self.N_Exbins_fg = None
         self.Ex_max_fg = None
         self.dEg_fg = None
-        self.error_propagation = None # Placeholder for error_propagation instance
+        self.error_propagation = None  # Placeholder for error_propagation instance
+        
 
         return None
 
-    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
+    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", 
+                Eg_max="default", verbose=False, plot=False):
         # Call unfold method on the base_analysis instance:
-        self.base_analysis.unfold(FWHM_factor, Ex_min, Ex_max, Eg_min, Eg_max, verbose, plot)
+        self.base_analysis.unfold(
+            FWHM_factor, Ex_min, Ex_max, Eg_min, Eg_max, verbose, plot)
         # Update the top-level copy of unfolded matrix:
         self.unfolded = self.base_analysis.unfolded
 
@@ -67,7 +72,8 @@ class oslo_method():
 
     def first_generation_method(self, N_iterations=10, statistical_or_total=1):
         # Call first_generation_method() on the base_analysis instance:
-        self.base_analysis.first_generation_method(N_iterations, statistical_or_total)
+        self.base_analysis.first_generation_method(
+            N_iterations, statistical_or_total)
         # Update the top-level copy of firstgen matrix:
         self.firstgen = self.base_analysis.firstgen
 
@@ -77,15 +83,17 @@ class oslo_method():
         """
         Set up error propagation by creating an instance of class _error_propagation.error_propagation
         """
-        self.error_propagation = _error_propagation.error_propagation(base_analysis_instance=self.base_analysis, folder=folder, randomness=randomness, seed=seed)
+        self.error_propagation = _error_propagation.error_propagation(
+            base_analysis_instance=self.base_analysis, folder=folder, randomness=randomness, seed=seed)
 
         return None
 
-    def propagate_errors(self, N_ensemble_members, purge_files=True): 
+    def propagate_errors(self, N_ensemble_members, purge_files=True):
         if self.error_propagation is None:
-            raise Exception("Method setup_error_propagation() must be called before propagate_errors()")
+            raise Exception(
+                "Method setup_error_propagation() must be called before propagate_errors()")
 
-        self.var_firstgen = self.error_propagation.generate_ensemble(N_ensemble_members=N_ensemble_members, purge_files=purge_files)
-
+        self.var_firstgen = self.error_propagation.generate_ensemble(
+            N_ensemble_members=N_ensemble_members, purge_files=purge_files)
 
         return None
