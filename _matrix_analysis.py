@@ -844,10 +844,13 @@ class matrix_analysis():
             print("The variance will be estimated (with a very uncertain method).", flush=True)
 
         rho, T = None, None
-        if estimate_variance_matrix:
-            raise Exception("Rhosigchi with the original variance estimate is not implemented yet.")
+        # Which verison of rhosigchi should be used? The original
+        # which estimates the variance matrix, or the modified
+        # one where the variance matrix is imported?
+        if estimate_variance_matrix: # Estimate the variance matrix internally in rhosigchi
+            import rhosigchi_f2py_origvar as rsc
 
-        else: # Use variance matrix estimated by Monte Carlo
+        else: # Use user-supplied variance matrix (typically from error propagated ensemble)
             import rhosigchi_f2py_importvar as rsc 
 
             # Check that dimensions meet the requirement. Rhosigchi needs dimension 512x512.
