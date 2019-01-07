@@ -908,6 +908,26 @@ class matrix_analysis():
         return rho, T, Ex_array, Eg_array
 
 
+    def fit_rhosigpy(self):
+        """
+        Perform the rho and T fit using Fabio Zeiser's code rhosig.py from 
+        https://github.com/oslocyclotronlab/rhosig.py/
+        """
+        import sys
+        from rhosigpy import rhosig as rsp 
+        from rhosigpy import utilities as rsputils
+
+        # Copied from Fabio's run_analysis.py script:
+
+        ## Rebin and cut matrix
+        pars_fg = {"Egmin" : 1.0,
+                   "Exmin" : 2.0,
+                   "Emax" : 5.0}
+
+        oslo_matrix, Nbins, Emid = rsputils.rebin_both_axis(oslo_matrix, Emid, rebin_fac = 4)
+        oslo_matrix, Emid_Eg, Emid_Ex, Emid_nld = rsputils.fg_cut_matrix(oslo_matrix,
+                                                                Emid, **pars_fg)
+        
 
     
 

@@ -1,6 +1,6 @@
 
-      SUBROUTINE rhosigchi(Fg_in,calib,Eg_min,Ex_min,Ex_max,
-     &                     Rho_fin,Sig_fin)
+      SUBROUTINE rhosigchi(Fg_in,calib_in,Eg_min,Ex_min,Ex_max,
+     &                     Rho_fin,Sig_fin,calib_out)
 C Read/write stuff (mama)
 CJEM      COMMON/Sp1Dim/rSPEC(2,0:8191),MAXCH
 CJEM      COMMON/Sp2Dim/rMAT(2,0:4095,0:511),APP(512),XDIM,YDIM
@@ -18,14 +18,16 @@ C Stuff for the rhosig iteration
       REAL Fg(0:511,0:511),FgTeo(0:511,0:511),FgN(0:511,0:511)
       REAL Fgv(0:511,0:511),sFg(0:511,0:511),sFgN(0:511,0:511)
 CJEM  Added some variables and f2py magic lines:
-      REAL calib(4)
+      REAL calib_in(4)
       REAL Fg_in(0:511,0:511)
-      REAL sSum, sFi(0:511), sFf(0:511)
-CJEM  calib contains calibration coefficients in the order (aEg0, aEg1,
+CJEM 2019 cannot see that this is needed? REAL sSum, sFi(0:511), sFf(0:511)
+      REAL calib_out(2)
+CJEM  calib_in contains calibration coefficients in the order (aEg0, aEg1,
 CJEM  aEx0, aEx1), where Ei = aEi1*channel + aEi0
-Cf2py REAL intent(in) :: Fg_in, calib
+CJEM  calib_out contains common calibration coefficients in the order (a0, a1)
+Cf2py REAL intent(in) :: Fg_in, calib_in
       REAL Rho_fin(0:100), Sig_fin(0:100)
-Cf2py REAL intent(out) :: Rho_fin, Sig_fin
+Cf2py REAL intent(out) :: Rho_fin, Sig_fin, calib_out
       REAL sRho(0:511),sSig(0:511)
       REAL rRho(0:511),rSig(0:511),Sum,Sum2
       REAL Chi(0:100),a1,a0
@@ -117,10 +119,10 @@ CJEM      bx = calib(2)
 CJEM      by = calib(4)
 CJEM  Added by JEM: Calibration coefficients for gamma and ex axes
 CJEM  read from input argument. Specification: Ei = aEi1*channel + aEi0
-      aEg0 = calib(1)
-      aEg1 = calib(2)
-      aEx0 = calib(3)
-      aEx1 = calib(4)
+      aEg0 = calib_in(1)
+      aEg1 = calib_in(2)
+      aEx0 = calib_in(3)
+      aEx1 = calib_in(4)
 
       write(6,*)'Calibration coefficients: ',aEg0, aEg1, aEx0, aEx1
 
@@ -149,6 +151,11 @@ C middle of a channel after change of calibration
 
 C Now calculating max energy for NaI to cover resolution. Max is 800 keV
       a0  = a0 - INT((800./a1) + 0.5)*a1
+
+CJEM addition: return a0 and a1 as calib_out
+      calib_out = (/ a0, a1 /)
+
+
       iu0 = INT((ABS(a0/a1) + 0.5))
       DO j=0, 511
         Ex = a0 + j*a1
@@ -167,8 +174,8 @@ C Compressing (or stretching) along X and Y - axis
       DO i=0,511
          Fi(i)=0.
          Ff(i)=0.
-         sFi(i)=0.
-         sFf(i)=0.
+CJEM          sFi(i)=0.
+CJEM         sFf(i)=0.
       ENDDO
 
       DO j=0,YDIM-1
@@ -182,13 +189,13 @@ C             if(Fg_in(i,j).GT.eps) write(6,*)'Fg_in(',i,j,')=',Fg_in(i,j)
       ENDDO
       DO j=0,YDIM-1
          Sum=0.
-         sSum=0.
+CJEM         sSum=0.
          DO i=0,XDIM-1
 CJEM            Fi(i)=rMAT(IDEST,i,j)                       ! Fi(i) and Ff(i) real type
 CJEM  Changed rMAT to Fg_in
                Fi(i) = Fg_in(i,j)
             Sum=Sum+Fi(i)
-            sSum=sSum+sFi(i)
+CJEM            sSum=sSum+sFi(i)
          ENDDO
          IF(Sum.NE.0.)THEN
             CALL ELASTIC(Fi,Ff,aEg0,aEg1,a0,a1,512,512) ! Modifies spectrum to give  
@@ -202,13 +209,13 @@ CJEM  Changed rMAT to Fg_in
       DO i=0,511
          Fi(i)=0.
          Ff(i)=0.
-         sFi(i)=0.
-         sFf(i)=0.
+CJEM         sFi(i)=0.
+CJEM         sFf(i)=0.
       ENDDO
 
       DO i=0,XDIM-1                                     ! Y-axis
          Sum=0.
-         sSum=0.
+CJEM         sSum=0.
          DO j=0,YDIM-1
             Fi(j)=Fg(i,j)
             Sum=Sum+Fi(j)
@@ -342,7 +349,7 @@ C          write(6,*)'SumFg(',ix,')=',SumFg(ix)
          DO ig=igmin,igmax(ix)
             IF(SumFg(ix).LE.0.)THEN
                FgN(ig,ix)=0.
-CJEM               sFg(ig,ix)=0.
+               sFg(ig,ix)=0.
             ELSE
                FgN(ig,ix)=Fg(ig,ix)/SumFg(ix)
 CJEM                write(6,*)'FgN(',ig,ix,')=',FgN(ig,ix)

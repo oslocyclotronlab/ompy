@@ -257,6 +257,10 @@ def rebin(array, E_range, N_final, rebin_axis=0):
 
     return array_final, E_range_final
 
+#def rebin_to_Earray(array, E_range_in, E_range_final, rebin_axis=0):
+    # JEM 20190107: Would be useful to have a version of the rebin routine that
+    # rebins the array to a new calibration instead of a new set number of bins...
+
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     # Updated 201807: Trying to vectorize so all Ex bins are handled simultaneously.
