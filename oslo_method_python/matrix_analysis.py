@@ -32,14 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import matplotlib.pyplot as plt
 import numpy as np 
-# Load other pyma functions from separate files:
-from _library import *
+
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
 
 
-class matrix_analysis():
+class MatrixAnalysis():
     def __init__(self, fname_resp_mat=None, fname_resp_dat=None):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
