@@ -3,7 +3,7 @@ Library of utility classes and functions for the Oslo method.
 
 ---
 
-This is the python implementation of the Oslo method.
+This is a python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
@@ -31,14 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 
-class matrix():
-    """ 
-    The matrix class stores matrices along with calibration and energy axis arrays.
+
+class Matrix():
+    """
+    The matrix class stores matrices along with calibration and energy axis
+    arrays.
 
     """
     def __init__(self, matrix=None, Ex_array=None, Eg_array=None):
         """
-        Initialise the class. There is the option to initialise 
+        Initialise the class. There is the option to initialise
         it in an empty state. In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
@@ -46,28 +48,100 @@ class matrix():
         self.Ex_array = Ex_array
         self.Eg_array = Eg_array
 
-        if matrix is not None and Ex_array is not None and Eg_array is not None:
-            # Calculate calibration based on energy arrays, assuming linear calibration:
-            self.calibration = {"a0x":Eg_array[0], "a1x":Eg_array[1]-Eg_array[0], "a2x":0, 
-              "a0y":Ex_array[0], "a1y":Eg_array[1]-Eg_array[0], "a2y":0}
+        self.calibration = None
+        if (matrix is not None and Ex_array is not None
+                and Eg_array is not None):
+            # Calculate calibration based on energy arrays, assuming linear
+            # calibration:
+            self.calibration = {
+                                "a0x": Eg_array[0],
+                                "a1x": Eg_array[1]-Eg_array[0],
+                                "a2x": 0,
+                                "a0y": Ex_array[0],
+                                "a1y": Eg_array[1]-Eg_array[0],
+                                "a2y": 0
+                                }
 
-    def plot(self, title="", norm="log"):
+    def plot(self, ax=None, title="", norm="log", zmin=None, zmax=None):
         import matplotlib.pyplot as plt
-        plot_object = None
+        cbar = None
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
         if norm == "log":
+            # z axis shall have log scale
             from matplotlib.colors import LogNorm
-            plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix, norm=LogNorm(vmin=1e-1))
+            # Check whether z limits were given:
+            if (zmin is not None and zmax is None):
+                # zmin only,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     norm=LogNorm(vmin=zmin)
+                                     )
+            elif (zmin is None and zmax is not None):
+                # or zmax only,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     norm=LogNorm(vmax=zmax)
+                                     )
+            if (zmin is not None and zmax is not None):
+                # or both,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     norm=LogNorm(vmin=zmin, vmax=zmax)
+                                     )
+            else:
+                # or finally, no limits:
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     norm=LogNorm()
+                                     )
+
         else:
-            plot_object = plt.pcolormesh(self.Eg_array, self.Ex_array, self.matrix)
-        plt.title(title)
-        plt.show()
-        return True
+            # z axis shall have linear scale
+            # Check whether z limits were given:
+            if (zmin is not None and zmax is None):
+                # zmin only,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     vmin=zmin
+                                     )
+            elif (zmin is None and zmax is not None):
+                # or zmax only,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     vmax=zmax
+                                     )
+            if (zmin is not None and zmax is not None):
+                # or both,
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix,
+                                     vmin=zmin,
+                                     vmax=zmax
+                                     )
+            if (zmin is not None and zmax is not None):
+                # or finally, no limits.
+                cbar = ax.pcolormesh(self.Eg_array,
+                                     self.Ex_array,
+                                     self.matrix
+                                     )
+        ax.set_title(title)
+        if ax is None:
+            plt.show()
+        return cbar  # Return the colorbar to allow it to be plotted outside
 
     def save(self, fname):
         """
         Save matrix to mama file
         """
-        write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array, comment="Made by pyma")
+        write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array,
+                      comment="Made by pyma")
         return True
 
     def load(self, fname):
@@ -255,6 +329,10 @@ def rebin(array, E_range, N_final, rebin_axis=0):
     E_range_final = np.linspace(a0, a0 + a1_final*(N_final-1), N_final)
 
     return array_final, E_range_final
+
+#def rebin_to_Earray(array, E_range_in, E_range_final, rebin_axis=0):
+    # JEM 20190107: Would be useful to have a version of the rebin routine that
+    # rebins the array to a new calibration instead of a new set number of bins...
 
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):

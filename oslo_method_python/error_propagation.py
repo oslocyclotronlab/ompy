@@ -5,7 +5,7 @@ statistical perturbations, and can make first generation variance matrices.
 
 ---
 
-This is the python implementation of the Oslo method.
+# This is a python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np 
 import os
-from _library import *
+from .library import *
 # from _matrix_analysis import matrix_analysis
 
 class error_propagation:
