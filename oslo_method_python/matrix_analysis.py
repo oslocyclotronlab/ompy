@@ -4,7 +4,7 @@ It handles unfolding and the first-generation method on Ex-Eg matrices.
 
 ---
 
-This is pyma, the python implementation of the Oslo method.
+This is a python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
@@ -32,28 +32,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import matplotlib.pyplot as plt
 import numpy as np 
-
+from .library import *
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
 
 
 class MatrixAnalysis():
-    def __init__(self, fname_resp_mat=None, fname_resp_dat=None):
+    def __init__(self):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
 
         # Allocate matrices to be filled by functions in class later:
-        self.raw = matrix()
-        self.unfolded = matrix()
-        self.firstgen = matrix()
-        # self.var_firstgen = matrix() # variance matrix of first-generation matrix
-        self.response = matrix() # response matrix
+        self.raw = Matrix()
+        self.unfolded = Matrix()
+        self.firstgen = Matrix()
+        # self.var_firstgen = Matrix() # variance matrix of first-generation matrix
+        self.response = Matrix() # response matrix
 
 
         # Allocate other variables and settings:
-        self.fname_resp_mat = fname_resp_mat
-        self.fname_resp_dat = fname_resp_dat
         self.N_Exbins_fg = None
         self.Ex_max_fg = None
         self.dEg_fg = None
@@ -74,7 +72,7 @@ class MatrixAnalysis():
     #     Returns True upon completion
     #     """
     #     matrix_unfolded, calib_unfolded, Ex_array_unfolded, Eg_array_unfolded = read_mama_2D(fname_unfolded)
-    #     self.unfolded = matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
+    #     self.unfolded = Matrix(matrix_unfolded, Ex_array_unfolded, Eg_array_unfolded)
     #     return True
 
     # def load_firstgen(self, fname_firstgen):
@@ -88,24 +86,23 @@ class MatrixAnalysis():
     #     Returns True upon completion
     #     """
     #     matrix_firstgen, calib_firstgen, Ex_array_firstgen, Eg_array_firstgen = read_mama_2D(fname_firstgen)
-    #     self.firstgen = matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
+    #     self.firstgen = Matrix(matrix_firstgen, Ex_array_firstgen, Eg_array_firstgen)
     #     return True    
 
     
 
 
 
-    def unfold(self, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
+    def unfold(self, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10, Ex_min="default", Ex_max="default", Eg_min="default", Eg_max="default", verbose=False, plot=False):
         # = Check that raw matrix is present 
         if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
 
-        if self.fname_resp_mat is None or self.fname_resp_dat is None:
-            raise Exception("Error: fname_resp_mat and/or fname_resp_dat not set.")
+        if fname_resp_mat is None or fname_resp_dat is None:
+            if self.response.matrix is None:
+                raise Exception("fname_resp_mat and/or fname_resp_dat not given, and no response matrix is previously loaded.")
 
         # Rename variables for local use:
-        fname_resp_mat = self.fname_resp_mat
-        fname_resp_dat = self.fname_resp_dat
         data_raw = self.raw.matrix
         Ex_array = self.raw.Ex_array
         Eg_array = self.raw.Eg_array
@@ -141,9 +138,9 @@ class MatrixAnalysis():
        
 
         # Import response matrix
-        R, cal_R, Eg_array_R, tmp = read_mama_2D(self.fname_resp_mat)
+        R, cal_R, Eg_array_R, tmp = read_mama_2D(fname_resp_mat)
         # Copy it to a global variable
-        self.response = matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for matrix()
+        self.response = Matrix(R, Eg_array_R, Eg_array_R) # Both axes are gamma energies here, but it does not matter for Matrix()
 
         if verbose:
             time_readfiles_end = time.process_time()
@@ -445,7 +442,7 @@ class MatrixAnalysis():
 
 
         # Update global variables:
-        self.unfolded = matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
+        self.unfolded = Matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
 
         # return unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high]
         return True
@@ -820,7 +817,7 @@ class MatrixAnalysis():
         print("Ex_array.shape =", Ex_array.shape)
         print("Egamma_array.shape =", Egamma_array.shape, flush=True)
 
-        self.firstgen = matrix(H, Ex_array, Egamma_array)
+        self.firstgen = Matrix(H, Ex_array, Egamma_array)
         return True
 
 
@@ -924,7 +921,7 @@ class MatrixAnalysis():
                    "Emax" : 5.0}
 
         oslo_matrix, Nbins, Emid = rsputils.rebin_both_axis(oslo_matrix, Emid, rebin_fac = 4)
-        oslo_matrix, Emid_Eg, Emid_Ex, Emid_nld = rsputils.fg_cut_matrix(oslo_matrix,
+        oslo_matrix, Emid_Eg, Emid_Ex, Emid_nld = rsputils.fg_cut_Matrix(oslo_matrix,
                                                                 Emid, **pars_fg)
         
 

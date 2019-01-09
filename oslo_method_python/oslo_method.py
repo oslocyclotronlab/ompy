@@ -1,5 +1,5 @@
 """
-This is the python implementation of the Oslo method.
+This is a python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
@@ -25,8 +25,3 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-from _matrix_analysis import matrix_analysis
-from _library import *
-import _error_propagation
-
-
