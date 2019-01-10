@@ -1,0 +1,58 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module rhosigchi_f2py_origvar ! in 
+    interface  ! in :rhosigchi_f2py_origvar
+        subroutine rhosigchi(fg_in,calib_in,eg_min,ex_min,ex_max,rho_fin,sig_fin,calib_out) ! in :rhosigchi_f2py_origvar:rhosigchi_f2py-original_variance_matrix.f
+            real dimension(512,512),intent(in) :: fg_in
+            real dimension(4),intent(in) :: calib_in
+            real intent(in) :: eg_min
+            real intent(in) :: ex_min
+            real intent(in) :: ex_max
+            real dimension(101),intent(out) :: rho_fin
+            real dimension(101),intent(out) :: sig_fin
+            real dimension(2),intent(out) :: calib_out
+            integer :: jmin
+            integer :: jmax
+            integer :: igmin
+            integer :: nit
+            integer dimension(512) :: igmax
+            integer :: iu0
+            common /iter/ jmin,jmax,igmin,nit,igmax,iu0
+        end subroutine rhosigchi
+        function gm(ex) ! in :rhosigchi_f2py_origvar:rhosigchi_f2py-original_variance_matrix.f
+            real :: ex
+            real :: gm
+        end function gm
+        subroutine elastic(fi,ff,a0i,a1i,a0f,a1f,di,df) ! in :rhosigchi_f2py_origvar:rhosigchi_f2py-original_variance_matrix.f
+            real dimension(di) :: fi
+            real dimension(df) :: ff
+            real :: a0i
+            real :: a1i
+            real :: a0f
+            real :: a1f
+            integer, optional,check(len(fi)>=di),depend(fi) :: di=len(fi)
+            integer, optional,check(len(ff)>=df),depend(ff) :: df=len(ff)
+        end subroutine elastic
+        subroutine iteration(fgn,sfgn,rho,sig) ! in :rhosigchi_f2py_origvar:rhosigchi_f2py-original_variance_matrix.f
+            real dimension(512,512) :: fgn
+            real dimension(512,512) :: sfgn
+            real dimension(101,512) :: rho
+            real dimension(101,512) :: sig
+            integer :: jmin
+            integer :: jmax
+            integer :: igmin
+            integer :: nit
+            integer dimension(512) :: igmax
+            integer :: iu0
+            common /iter/ jmin,jmax,igmin,nit,igmax,iu0
+        end subroutine iteration
+        function finvert(y0) ! in :rhosigchi_f2py_origvar:rhosigchi_f2py-original_variance_matrix.f
+            real :: y0
+            real :: finvert
+        end function finvert
+    end interface 
+end python module rhosigchi_f2py_origvar
+
+! This file was auto-generated with f2py (version:2).
+! See http://cens.ioc.ee/projects/f2py2e/
