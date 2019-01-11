@@ -22,6 +22,9 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
 
     Returns:
         unfolded -- the unfolded matrix as an instance of the Matrix() class
+
+    Todo:
+        Implement the Matrix() and Vector() classes throughout the function.
     """
 
     if fname_resp_mat is None or fname_resp_dat is None:
@@ -368,6 +371,9 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
             cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_low:iEg_high], Ex_array[iEx_low:iEx_high], unfolded, norm=LogNorm(vmin=1))
             f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
         plt.show()
+
+
+    # DEBUG: Print Ex array to find out why it 
 
 
     # Update global variables:
