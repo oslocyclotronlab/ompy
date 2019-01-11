@@ -53,6 +53,8 @@ class Matrix():
                 and Eg_array is not None):
             # Calculate calibration based on energy arrays, assuming linear
             # calibration:
+            # TODO figure out how to update this if Ex_array or Eg_array is 
+            # changed.
             self.calibration = {
                                 "a0x": Eg_array[0],
                                 "a1x": Eg_array[1]-Eg_array[0],
