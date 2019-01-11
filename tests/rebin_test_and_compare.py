@@ -4,14 +4,22 @@ from context import oslo_method_python as om
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import sys
 
-N = 10
+N = 1000
+
+# Test the calc_overlap function
+overlap = om.calc_overlap(0, 1, 0, 2)
+print("overlap =", overlap)
+# Seems to work!
+# sys.exit(0)
+
 counts_in = np.random.uniform(size=N)
 print("counts_in.dtype =", counts_in.dtype, flush=True)
 E_array_in = np.linspace(0, 5000, N)
 
 # E_array_out = np.linspace(200, 5000, 300)
-E_array_out = np.linspace(0, 5000, int(3*N))
+E_array_out = np.linspace(0, 5000, int(N/2))
 
 t1 = time.time()
 counts_out_python = om.rebin_python(counts_in, E_array_in, E_array_out)
@@ -26,7 +34,7 @@ print("cython time =", t2-t1)
 # Plot them all
 f, ax = plt.subplots(1, 1)
 ax.step(E_array_in, counts_in, where="post", label="in")
-ax.step(E_array_out, counts_out_python, where="mid", label="out (python)")
+ax.step(E_array_out, counts_out_python, where="post", label="out (python)")
 ax.step(E_array_out, counts_out_cython, where="post", label="out (cython)")
 
 ax.legend()

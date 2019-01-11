@@ -11,8 +11,12 @@ cimport cython
 DTYPE = np.float64
 
 
-cdef double calc_overlap(double Ein_l, double Ein_h,
+# cdef double calc_overlap(double Ein_l, double Ein_h,
+def calc_overlap(double Ein_l, double Ein_h,  # Testing in python with print
                          double Eout_l, double Eout_h):
+    print("Ein_l =", Ein_l, "Ein_h =", Ein_h, "Eout_l =", 
+          Eout_l, "Eout_h = ", Eout_h)
+    cdef double overlap
     overlap = max(0,
                   min(Eout_h, Ein_h)
                   - max(Eout_l, Ein_l)
@@ -42,14 +46,13 @@ def rebin_cython(double[:] counts_in, double[:] E_array_in,
     Nout = E_array_out.shape[0]
     a0_out, a1_out = E_array_out[0], E_array_out[1]-E_array_out[0]
 
-    a1_in = E_array_in[1]-E_array_in[0]
 
     # For the overlap calculation, it is convenient to have energy arrays with
     # one extra bin (the upper edge of the last bin):
-    # E_array_in_ext = np.append(E_array_in, E_array_in[Nin]+a1_in)
-    # E_array_out_ext = np.append(E_array_out,
-                                # E_array_out[Nout]
-                                # + (E_array_out[1]-E_array_out[0]))
+    E_array_in_ext = np.append(E_array_in, E_array_in[Nin]+a1_in)
+    E_array_out_ext = np.append(E_array_out,
+                                E_array_out[Nout]
+                                + (E_array_out[1]-E_array_out[0]))
 
     # Allocate rebinned array to fill:
     counts_out = np.zeros(Nout, dtype=DTYPE)
@@ -60,19 +63,24 @@ def rebin_cython(double[:] counts_in, double[:] E_array_in,
         # for j in range(Nin):
         # Can we make it faster by looping j over a subset? What is a
         # sufficient subset? Yes!
-        jmin = max(0, <int>((a0_out + a1_out*(i-1) - a0_in)/a1_in))
-        jmax = min(Nin-1, <int>((a0_out + a1_out*(i+1) - a0_in)/a1_in))
+        jmin = max(0, int((a0_out + a1_out*(i-1) - a0_in)/a1_in))
+        jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
         # Calculate the bin edge energies manually for speed:
-        Eout_i = a0_in + a1_in*i
+        Eout_i = a0_out + a1_out*i
         for j in range(jmin, jmax+1):
             # Calculate proportionality factor based on current overlap:
-            Ein_j = a0_out + a1_out*j
+            Ein_j = a0_in + a1_in*j
+            print("Ein_j =", Ein_j, "Ein_j+a1_in =", Ein_j+a1_in, 
+                  "Eout_i =", Eout_i, "Eout_i+a1_out =", Eout_i+a1_out)
             overlap = calc_overlap(Ein_j, Ein_j+a1_in,
                                    Eout_i, Eout_i+a1_out)
-            # overlap = max(0, (
-            #                     min(E_array_out_ext[i+1], E_array_in_ext[j+1])
-            #                     - max(E_array_out_ext[i], E_array_in_ext[j]))
-            #               )
+            print("calc_overlap =", overlap)
+            overlap2 = max(0, (
+                                min(E_array_out_ext[i+1], E_array_in_ext[j+1])
+                                - max(E_array_out_ext[i], E_array_in_ext[j])
+                              )
+                           )
+            print("old overlap =", overlap2)
             counts_out_view[i] += counts_in[j] * overlap / a1_in
 
     return counts_out
@@ -91,9 +99,9 @@ def rebin_python(counts_in, Ein_array, Eout_array):
     Inputs:
     counts: Numpy array of counts in each bin
     Ein_array: Numpy array of energies, assumed to be linearly spaced, 
-               corresponding to the middle-bin energies of counts
+               corresponding to the lower-bin-edge energies of counts
     Eout_array: Numpy array of energies corresponding to the desired
-                rebinning of the output vector, also middle-bin
+                rebinning of the output vector, also lower-bin-edge
     """
 
     # Get calibration coefficients and number of elements from array:
@@ -104,8 +112,8 @@ def rebin_python(counts_in, Ein_array, Eout_array):
 
     # Replace the arrays by bin-edge energy arrays of length N+1 
     # (so that all bins are covered on both sides).
-    Ein_array = np.linspace(a0_in - a1_in/2, a0_in - a1_in/2 + a1_in*Nin, Nin+1)
-    Eout_array = np.linspace(a0_out - a1_out/2, a0_out - a1_out/2 + a1_out*Nout, Nout+1)
+    Ein_array = np.linspace(a0_in, a0_in + a1_in*Nin, Nin+1)
+    Eout_array = np.linspace(a0_out, a0_out + a1_out*Nout, Nout+1)
 
 
 
@@ -121,8 +129,10 @@ def rebin_python(counts_in, Ein_array, Eout_array):
         jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
         for j in range(jmin, jmax+1):
             # Calculate proportionality factor based on current overlap:
+            print("Eout_array[{:d}] =".format(i), Eout_array[i], "Ein_array[{:d}] =".format(j), Ein_array[j])
             overlap = np.minimum(Eout_array[i+1], Ein_array[j+1]) - np.maximum(Eout_array[i], Ein_array[j])
             overlap = overlap if overlap > 0 else 0
+            print("overlap =", overlap)
             counts_out[i] += counts_in[j] * overlap / a1_in
 
     return counts_out
