@@ -220,6 +220,11 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() #/ Ndof
         if verbose:
             print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
+
+
+    # Score the solutions based on chisquare value for each Ex bin
+    # and select the best one:
+
     
     
     # Remove negative counts and trim:
@@ -373,10 +378,18 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         plt.show()
 
 
-    # DEBUG: Print Ex array to find out why it 
 
 
     # Update global variables:
     unfolded = Matrix(unfolded, Ex_array[iEx_low:iEx_high], Eg_array[iEg_low:iEg_high])
 
     return unfolded
+
+
+
+def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct):
+    """
+    Calculates the score of each unfolding iteration for each Ex
+    bin based on a weighting of chisquare and fluctuations.
+    
+    """
