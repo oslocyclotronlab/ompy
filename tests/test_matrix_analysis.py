@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from context import oslo_method_python as om
+import matplotlib.pyplot as plt
 
 
 # Check that all the machinery is well oiled by running through the analysis pipeline.
@@ -28,12 +29,14 @@ ma.unfold(fname_resp_dat=fname_resp_dat, fname_resp_mat=fname_resp_mat)
 ma.unfolded.plot()
 
 
+plt.show()
 
 
-# == Firstgen ==
-ma.first_generation_method()
 
-ma.firstgen.plot()
+# # == Firstgen ==
+# ma.first_generation_method()
+
+# ma.firstgen.plot()
 
 
 # == Should ideally have some unit tests: ==
