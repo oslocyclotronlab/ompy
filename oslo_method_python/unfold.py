@@ -159,7 +159,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # Eg_low = 500 # keV 
     Eg_high = 14000 # keV
     iEg_low, iEg_high = 0, i_from_E(Eg_high, Eg_array)
-    Nit = 12#33 # 8 # 27
+    Nit = 33 #12 # 8 # 27
     
     # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     dEg = 3000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
@@ -182,15 +182,26 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     rawmat = (data_raw*mask)[iEx_low:iEx_high,iEg_low:iEg_high] 
     
     mask_cut = mask[iEx_low:iEx_high,iEg_low:iEg_high]
-    Ndof = mask_cut.sum()
+
+    #Ndof = mask_cut.sum() # This was for a 2D chisquare, which is wrong.
+    # We take the chisquare for each Ex bin separately. So rather, 
+    Ndof_vector = mask_cut.sum(axis=1)
     
     unfoldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
     foldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
-    chisquares = np.zeros(Nit)
+    chisquare_matrix = np.zeros((rawmat.shape[0], Nit))
+    fluctuations_matrix = np.zeros((rawmat.shape[0], Nit))
     R = R[iEg_low:iEg_high,iEg_low:iEg_high]
     # Normalize R to conserve probability
     # R = div0(R, R.sum(axis=1))
+
+    Ex_array_cut = Ex_array[iEx_low:iEx_high]
+    Eg_array_cut = Eg_array[iEg_low:iEg_high]
+
+    # Calculate fluctuations of the raw spectrum to compare with the unfolded later
+    fluctuations_vector_raw = fluctuations(rawmat, Eg_array_cut)
     
+    unfoldmat_cube = np.zeros((Nit, rawmat.shape[0], rawmat.shape[1]))
     # Run folding iterations:
     for iteration in range(Nit):
         if iteration == 0:
@@ -206,6 +217,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
             #     unfoldmat = unfoldmat + (rawmat - foldmat) # Difference method 
             # else:
             #     unfoldmat = unfoldmat * div0(rawmat, foldmat) # Ratio method (MAMA seems to use both alternatingly?)
+        unfoldmat_cube[iteration,:,:] = unfoldmat
 
         foldmat = np.dot(R.T, unfoldmat.T).T # Have to do some transposing to get the axis orderings right for matrix product
         # 201810: Trying to debug by checking if it makes a difference to loop over rows as individual vectors (should not make a difference, and does not):
@@ -217,15 +229,28 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         #           Seems to come from unfolding and not from compton subtraction
     
         # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
-        chisquares[iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum() #/ Ndof
+        # for each Ex bin separately
+        # TODO reduced chisquare or normal?
+        chisquare_matrix[:,iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum(axis=1) / Ndof_vector
+
+        # Also calculate fluctuations in each Ex bin
+        fluctuations_matrix[:,iteration] = fluctuations(unfoldmat, Eg_array_cut)
+
         if verbose:
             print("Folding iteration = {}, chisquare = {}".format(iteration,chisquares[iteration]), flush=True)
 
 
     # Score the solutions based on chisquare value for each Ex bin
     # and select the best one:
+    fluctuations_matrix = fluctuations_matrix/fluctuations_vector_raw[:,None] # TODO check that this broadcasts the vector over the right dimension
+    # Get the vector indicating iteration index of best score for each Ex bin:
+    weight_fluc = 0.2#0.6 # TODO make this an argument
+    i_score_vector = scoring(chisquare_matrix, fluctuations_matrix, weight_fluc)
+    unfoldmat = np.zeros(rawmat.shape)
+    for i_Ex in range(rawmat.shape[0]):
+        unfoldmat[i_Ex, :] = unfoldmat_cube[i_score_vector[i_Ex], i_Ex, :]
 
-    
+    print(i_score_vector)
     
     # Remove negative counts and trim:
     unfoldmat[unfoldmat<=0] = 0
@@ -393,3 +418,22 @@ def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct):
     bin based on a weighting of chisquare and fluctuations.
     
     """
+    score_matrix = ((1-weight_fluct) * chisquare_matrix + 
+                   weight_fluct * fluctuations_matrix)
+    return np.argmin(score_matrix, axis=1)
+
+
+def fluctuations(counts_matrix, Eg_array):
+    """
+    Calculates fluctuations in each Ex bin gamma spectrum by summing
+    the absolute diff between the spectrum and a smoothed version of it.
+
+    Returns a column vector of fluctuations in each Ex bin
+    """
+    from scipy.ndimage import gaussian_filter1d
+
+    a1 = Eg_array[1]-Eg_array[0]
+    counts_matrix_smoothed = gaussian_filter1d(counts_matrix, sigma=0.12*a1, axis=1)
+    fluctuations = np.sum(np.abs(counts_matrix_smoothed - counts_matrix), axis=1)
+
+    return fluctuations
