@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Matrix():
@@ -38,34 +39,31 @@ class Matrix():
     arrays.
 
     """
-    def __init__(self, matrix=None, Ex_array=None, Eg_array=None):
+    def __init__(self, matrix=None, E0_array=None, E1_array=None):
         """
         Initialise the class. There is the option to initialise
         it in an empty state. In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
         self.matrix = matrix
-        self.Ex_array = Ex_array
-        self.Eg_array = Eg_array
+        self.E0_array = E0_array
+        self.E1_array = E1_array
 
-        self.calibration = None
-        if (matrix is not None and Ex_array is not None
-                and Eg_array is not None):
-            # Calculate calibration based on energy arrays, assuming linear
-            # calibration:
-            # TODO figure out how to update this if Ex_array or Eg_array is 
-            # changed.
-            self.calibration = {
-                                "a0x": Eg_array[0],
-                                "a1x": Eg_array[1]-Eg_array[0],
-                                "a2x": 0,
-                                "a0y": Ex_array[0],
-                                "a1y": Eg_array[1]-Eg_array[0],
-                                "a2y": 0
-                                }
+    def calibration(self):
+        """Calculate and return the calibration coefficients of the energy axes
+        """
+        if (self.matrix is not None and self.E0_array is not None
+                and self.E1_array is not None):
+            calibration = {
+                           # Formatted as "a{axis}{power of E}"
+                           "a00": self.E0_array[0],
+                           "a01": self.E0_array[1]-self.E0_array[0],
+                           "a10": self.E1_array[0],
+                           "a11": self.E1_array[1]-self.E1_array[0],
+                          }
+        return calibration
 
     def plot(self, ax=None, title="", norm="log", zmin=None, zmax=None):
-        import matplotlib.pyplot as plt
         cbar = None
         if ax is None:
             f, ax = plt.subplots(1, 1)
@@ -75,29 +73,29 @@ class Matrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin)
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmax=zmax)
                                      )
             if (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin, vmax=zmax)
                                      )
             else:
                 # or finally, no limits:
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm()
                                      )
@@ -107,30 +105,30 @@ class Matrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmax=zmax
                                      )
             if (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
                                      vmax=zmax
                                      )
             if (zmin is not None and zmax is not None):
                 # or finally, no limits.
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix
                                      )
         ax.set_title(title)
@@ -142,7 +140,7 @@ class Matrix():
         """
         Save matrix to mama file
         """
-        write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array,
+        write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
                       comment="Made by pyma")
         return True
 
@@ -154,12 +152,12 @@ class Matrix():
             print("Warning: load() called on non-empty matrix", flush=True)
 
         # Load matrix from file:
-        matrix, calibration, Ex_array, Eg_array = read_mama_2D(fname)
-        self.matrix = matrix
-        self.Ex_array = Ex_array
-        self.Eg_array = Eg_array
-        self.calibration = calibration
-
+        # matrix, calibration, Ex_array, Eg_array = read_mama_2D(fname)
+        matrix_object = read_mama_2D(fname)
+        self.matrix = matrix_object.matrix
+        self.E0_array = matrix_object.E0_array
+        self.E1_array = matrix_object.E1_array
+        
         return True
 
 
@@ -170,7 +168,6 @@ class vector():
         
         # if vector is not None and 
         # self.calibration = {}
-
 
 
 
@@ -201,12 +198,14 @@ def read_mama_2D(filename):
                                                     # Update 20171024: Started changing everything to lower bin edge,
                                                     # but started to hesitate. For now I'm inclined to keep it as
                                                     # center-bin everywhere. 
-    return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
+    out = Matrix(matrix=matrix, E0_array=y_array, E1_array=x_array)
+    return out
 
 
 def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
     import time
     outfile = open(filename, 'w')
+    # TODO update function to take Matrix object as input
 
     # Write mandatory header:
     # outfile.write('!FILE=Disk \n')
