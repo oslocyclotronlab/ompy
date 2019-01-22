@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Test that the Vector class is behaving correctly, 
+# Test that the Matrix class is behaving correctly, 
 # including plotting
 # TODO convert asserts to unittest system
 
