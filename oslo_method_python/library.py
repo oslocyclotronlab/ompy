@@ -337,49 +337,6 @@ def line(x, points):
     return a*x + b
 
 
-def rebin(array, E_range, N_final, rebin_axis=0):
-    """
-    Rebins an array to have N_final bins
-
-    Inputs:
-    array -- the array to rebin
-    E_range -- the energy values specifying the calibration of the array 
-               (lower bin edge + assumes linear calibration)
-    N_final -- the desired number of bins after rebin
-    rebin_axis -- which axis of array to rebin, if multi-dimensional. 
-                  In that case, E_range must correspond to chosen axis.
-
-
-    Returns: 
-    array_final -- the rebinned array
-    E_range_final -- the array of lower bin edge values in the rebinned array
-
-    
-    TODO: Implement a "memory guard" to avoid running out of memory by chunking 
-    the .repeat() operations into parts if there is not enough memory to do every-
-    thing at once.
-
-    """
-    if isinstance(array, tuple): # Check if input array is actually a tuple, which may happen if function is called several times nested for different axes.
-        array = array[0]
-
-    N_orig = array.shape[rebin_axis]
-    dim = np.insert(array.shape, rebin_axis, N_final)
-
-    # TODO insert a loop here over chunks along another axis than the rebin axis, to try to avoid memory problems
-    array_final = (array.repeat(N_final)/N_final).reshape(dim).sum(axis=(rebin_axis+1))
-
-    # Recalculate calibration:
-    a0 = E_range[0]
-    a1_orig = E_range[1]-E_range[0]
-    a1_final = N_orig/N_final*a1_orig
-    E_range_final = np.linspace(a0, a0 + a1_final*(N_final-1), N_final)
-
-    return array_final, E_range_final
-
-#def rebin_to_Earray(array, E_range_in, E_range_final, rebin_axis=0):
-    # JEM 20190107: Would be useful to have a version of the rebin routine that
-    # rebins the array to a new calibration instead of a new set number of bins...
 
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
