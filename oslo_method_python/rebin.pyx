@@ -38,7 +38,7 @@ cdef double calc_overlap(double Ein_l, double Ein_h,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin_cython(double[:] counts_in, double[:] E_array_in,
+def rebin(double[:] counts_in, double[:] E_array_in,
                  double[:] E_array_out):
     """Rebin an array of counts from binning E_array_in to binning E_array_out
     """
@@ -76,7 +76,7 @@ def rebin_cython(double[:] counts_in, double[:] E_array_in,
 
 
 # Look at this for inspiration, delete after:
-def rebin_python(counts_in, Ein_array, Eout_array):
+def TEST_rebin_python(counts_in, Ein_array, Eout_array):
     """
     Rebins, i.e. redistributes the numbers from vector counts
     (which is assumed to have calibration given by Ein_array) 
