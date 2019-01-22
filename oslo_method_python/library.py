@@ -52,6 +52,7 @@ class Matrix():
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
         """
+        calibration = None
         if (self.matrix is not None and self.E0_array is not None
                 and self.E1_array is not None):
             calibration = {
@@ -61,13 +62,15 @@ class Matrix():
                            "a10": self.E1_array[0],
                            "a11": self.E1_array[1]-self.E1_array[0],
                           }
+        else:
+            raise Exception("calibration() called on empty Matrix instance")
         return calibration
 
-    def plot(self, ax=None, title="", norm="log", zmin=None, zmax=None):
+    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None):
         cbar = None
         if ax is None:
             f, ax = plt.subplots(1, 1)
-        if norm == "log":
+        if zscale == "log":
             # z axis shall have log scale
             from matplotlib.colors import LogNorm
             # Check whether z limits were given:
@@ -100,7 +103,7 @@ class Matrix():
                                      norm=LogNorm()
                                      )
 
-        else:
+        elif zscale == "linear":
             # z axis shall have linear scale
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
@@ -125,12 +128,14 @@ class Matrix():
                                      vmin=zmin,
                                      vmax=zmax
                                      )
-            if (zmin is not None and zmax is not None):
+            else:
                 # or finally, no limits.
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix
                                      )
+        else:
+            raise Exception("Unknown zscale type", zscale)
         ax.set_title(title)
         if ax is None:
             plt.show()
@@ -157,19 +162,60 @@ class Matrix():
         self.matrix = matrix_object.matrix
         self.E0_array = matrix_object.E0_array
         self.E1_array = matrix_object.E1_array
-        
+
         return True
 
 
-class vector():
+class Vector():
     def __init__(self, vector=None, E_array=None):
         self.vector = vector
         self.E_array = E_array
-        
-        # if vector is not None and 
-        # self.calibration = {}
 
+    def calibration(self):
+        """Calculate and return the calibration coefficients of the energy axes
+        """
+        calibration = None
+        if (self.vector is not None and self.E_array is not None):
+            calibration = {
+                           # Formatted as "a{axis}{power of E}"
+                           "a0": self.E_array[0],
+                           "a1": self.E_array[1]-self.E_array[0],
+                          }
+        else:
+            raise Exception("calibration() called on empty Vector instance")
+        return calibration
 
+    def plot(self, ax=None, title="", yscale="linear", ylim=None, xlim=None):
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
+
+        ax.plot(self.E_array, self.vector)
+
+        ax.set_yscale(yscale)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        ax.set_title(title)
+        if ax is None:
+            plt.show()
+        return True
+
+    def save(self, fname):
+        """
+        Save vector to mama file
+        """
+        raise Exception("Not implemented yet")
+
+        return None
+
+    def load(self, fname):
+        """
+        Load vector from mama file
+        """
+        raise Exception("Not implemented yet")
+
+        return None
 
 def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array, 
