@@ -93,3 +93,16 @@ counts_rebinned = om.rebin(counts, E_array, E_array_out)
 np.testing.assert_array_almost_equal(counts_rebinned,
                                      counts_python_rebinned,
                                      decimal=decimal)
+
+
+# === Test rebin_matrix() ===
+# Set up test array
+E0_array = np.linspace(-200, 200, 201)
+E1_array = np.linspace(-100, 300, 101)
+counts = np.random.normal(loc=0.01*np.meshgrid(E0_array, E1_array,
+                                               indexing="ij")[0],
+                          size=(len(E0_array), len(E1_array)))
+
+E1_array_out = np.linspace(100, 400, 55)
+counts_out = om.rebin_matrix(counts, E1_array, E1_array_out,
+                             rebin_axis=1)

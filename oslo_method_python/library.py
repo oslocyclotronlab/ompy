@@ -460,8 +460,31 @@ def EffExp(Eg_array):
     return EffExp_array
 
 
-def E_array_from_calibration(a0, a1, N):
+def E_array_from_calibration(a0, a1, N=None, E_max=None):
     """
-    Return an array of energy values corresponding to the specified calibration.
+    Return an array of lower-bin-edge energy values corresponding to the
+    specified calibration.
+
+    Args:
+        a0, a1 (float): Calibration coefficients; E = a0 + a1*i
+        either
+            N (int): Number of bins
+        or
+            E_max (float): Max energy. Array is constructed to ensure last bin
+                           covers E_max. In other words,
+                           E_array[-1] >= E_max - a1
+    Returns:
+        E_array (np.ndarray): Array of lower-bin-edge energy values
     """
-    return np.linspace(a0, a0+a1*(N-1), N)
+    E_array = None
+    if E_max is not None and N is not None:
+        raise Exception("Cannot give both N and E_max -- must choose one")
+    if N is not None:
+        E_array = np.linspace(a0, a0+a1*(N-1), N)
+    elif E_max is not None:
+        N = int(np.ceil((E_max - a0)/a1))
+        E_array = np.linspace(a0, a0+a1*(N-1), N)
+    else:
+        raise Exception("Either N or E_max must be given")
+
+    return E_array

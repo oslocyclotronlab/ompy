@@ -1,6 +1,9 @@
 # Function to rebin spectra
 # Implemented using Cython, with inspiration from here:
 # https://cython.readthedocs.io/en/latest/src/userguide/numpy_tutorial.html
+# Compile by running
+#    python setup.py build_ext --inplace
+# in the top directory of the git repo
 import numpy as np
 cimport cython
 
@@ -39,8 +42,18 @@ cdef double calc_overlap(double Ein_l, double Ein_h,
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
 def rebin(double[:] counts_in, double[:] E_array_in,
-                 double[:] E_array_out):
+          double[:] E_array_out):
     """Rebin an array of counts from binning E_array_in to binning E_array_out
+
+    Args:
+        counts_in (np.ndarray): Array of counts to be rebinned
+        E_array_in (np.ndarray): Array of lower-bin-edge energies giving
+                                 the calibration of counts_in
+        E_array_out (np.ndarray): Array of lower-bin-edge energies of the
+                                  counts array after rebin
+    Returns:
+        counts_out (np.ndarray): Array of rebinned counts with calibration
+                                 given by E_array_out
     """
 
     cdef int Nin, Nout
@@ -59,7 +72,7 @@ def rebin(double[:] counts_in, double[:] E_array_in,
     cdef int i, j
     cdef double Eout_i, Ein_j
     for i in range(Nout):
-        # Only loop over the relevant subset of j indices where there may be 
+        # Only loop over the relevant subset of j indices where there may be
         # overlap:
         jmin = max(0, int((a0_out + a1_out*(i-1) - a0_in)/a1_in))
         jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
@@ -73,3 +86,62 @@ def rebin(double[:] counts_in, double[:] E_array_in,
             counts_out_view[i] += counts_in[j] * overlap / a1_in
 
     return counts_out
+
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
+@cython.cdivision(True)
+def rebin_matrix(double[:, :] mat_counts_in, double[:] E_array_in,
+                 double[:] E_array_out, int rebin_axis=0):
+    """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+
+    This is a currently just a wrapper for rebin() to handle the logistics
+    of getting a matrix as input.
+    Todo: It is unnecessary to calculate the overlap for each bin along
+    the axis that is not being rebinned.
+
+    Args:
+        mat_counts_in (np.ndarray): Matrix of counts to rebin
+        E_array_in (np.ndarray): Lower-bin-edge energy calibration of input
+                                 matrix along rebin axis
+        E_array_out (np.ndarray): Lower-bin-edge energy calibration of output
+                                  matrix along rebin axis
+        rebin_axis (int): Axis to rebin
+    Returns:
+        mat_counts_out (np.ndarray): Matrix of rebinned counts
+
+
+
+    """
+
+    # Define variables for Cython:
+    cdef int other_axis, N_loop, i
+    # cdef int[:] shape_out
+
+    # Axis number of non-rebin axis (Z2 group, fancy!):
+    assert (rebin_axis == 0 or rebin_axis == 1)
+    other_axis = (rebin_axis + 1) % 2
+    # Number of bins along that axis:
+    N_loop = mat_counts_in.shape[other_axis]
+
+    # Calculate shape of rebinned matrix and allocate it:
+    shape_out = np.array([mat_counts_in.shape[0], mat_counts_in.shape[1]],
+                         dtype=int)
+    shape_out[rebin_axis] = len(E_array_out)
+    mat_counts_out = np.zeros(shape_out, dtype=DTYPE)
+
+    # For simplicity I use an if test to know axis ordering. Can probably
+    # be done smarter later:
+    cdef double[:, :] mat_counts_out_view = mat_counts_out
+    if rebin_axis == 0:
+        TODO figure out how to best put arrays into mat_counts_out. Use memoryview or no?
+        for i in range(N_loop):
+            mat_counts_out_view[:, i] = rebin(mat_counts_in[:, i],
+                                         E_array_in, E_array_out)
+    else:
+        for i in range(1):#N_loop):
+            counts_out = rebin(mat_counts_in[i, :],
+                                         E_array_in, E_array_out)
+            print(mat_counts_out[i, :])
+            mat_counts_out[i, :] = counts_out
+    return mat_counts_out
