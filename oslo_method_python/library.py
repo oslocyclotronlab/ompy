@@ -217,6 +217,7 @@ class Vector():
 
         return None
 
+
 def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array, 
     # as well as a list containing the four calibration coefficients
