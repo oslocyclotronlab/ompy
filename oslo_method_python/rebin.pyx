@@ -132,16 +132,16 @@ def rebin_matrix(double[:, :] mat_counts_in, double[:] E_array_in,
 
     # For simplicity I use an if test to know axis ordering. Can probably
     # be done smarter later:
-    cdef double[:, :] mat_counts_out_view = mat_counts_out
+    # cdef double[:, :] mat_counts_out_view = mat_counts_out
     if rebin_axis == 0:
-        TODO figure out how to best put arrays into mat_counts_out. Use memoryview or no?
+        # TODO figure out how to best put arrays into mat_counts_out. 
+        # Use memoryview or no?
         for i in range(N_loop):
-            mat_counts_out_view[:, i] = rebin(mat_counts_in[:, i],
+            mat_counts_out[:, i] = rebin(mat_counts_in[:, i],
                                          E_array_in, E_array_out)
     else:
-        for i in range(1):#N_loop):
+        for i in range(N_loop):
             counts_out = rebin(mat_counts_in[i, :],
-                                         E_array_in, E_array_out)
-            print(mat_counts_out[i, :])
+                               E_array_in, E_array_out)
             mat_counts_out[i, :] = counts_out
     return mat_counts_out

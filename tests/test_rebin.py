@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Test that the Vector class is behaving correctly, 
+# Test that the Vector class is behaving correctly,
 # including plotting
 # TODO convert asserts to unittest system
 
@@ -96,13 +96,21 @@ np.testing.assert_array_almost_equal(counts_rebinned,
 
 
 # === Test rebin_matrix() ===
-# Set up test array
-E0_array = np.linspace(-200, 200, 201)
+# Set up test array with only 2 bins along non-rebin dim
+E0_array = np.linspace(-200, 200, 2)
 E1_array = np.linspace(-100, 300, 101)
 counts = np.random.normal(loc=0.01*np.meshgrid(E0_array, E1_array,
                                                indexing="ij")[0],
                           size=(len(E0_array), len(E1_array)))
 
 E1_array_out = np.linspace(100, 400, 55)
-counts_out = om.rebin_matrix(counts, E1_array, E1_array_out,
+counts_rebinned = om.rebin_matrix(counts, E1_array, E1_array_out,
                              rebin_axis=1)
+counts_rebinned_manual = np.zeros((len(E0_array), len(E1_array_out)))
+# Use the vector rebin function to test the matrix rebin,
+# since we just checked that it passes its own unittests:
+for i in range(len(E0_array)):
+    counts_rebinned_manual[i, :] = om.rebin(counts[i, :], E1_array,
+                                            E1_array_out)
+np.testing.assert_array_almost_equal(counts_rebinned, counts_rebinned_manual,
+                                     decimal=decimal)
