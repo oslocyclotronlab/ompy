@@ -39,7 +39,8 @@ class Matrix():
     arrays.
 
     """
-    def __init__(self, matrix=None, E0_array=None, E1_array=None):
+    def __init__(self, matrix=None, E0_array=None, E1_array=None,
+                 std=None):
         """
         Initialise the class. There is the option to initialise
         it in an empty state. In that case, all class variables will be None.
@@ -48,6 +49,7 @@ class Matrix():
         self.matrix = matrix
         self.E0_array = E0_array
         self.E1_array = E1_array
+        self.std = std  # slot for matrix of standard deviations
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
