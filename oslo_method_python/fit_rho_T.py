@@ -32,6 +32,10 @@ def fit_rho_T(firstgen_in, calib_out,
         deviation using the rhosigchi techniques.
     """
 
+    # Cut the firstgen.matrix and firstgen.std to shape [Ex_min:Ex_max,
+    # Eg_min:Eg_max].
+    
+
     # Set up the energy array common to rho and T
     E_array = E_array_from_calibration(a0=calib_out["a0"],
                                        a1=calib_out["a1"],
