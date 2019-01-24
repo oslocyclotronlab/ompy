@@ -167,6 +167,43 @@ class Matrix():
 
         return True
 
+    def cut_rect(self, axis, E_limits, inplace=True):
+        """
+        Cuts the matrix (and std, if present) to the sub-interval E_limits.
+
+        Args:
+            axis (int): Which axis to apply the cut to.
+            E_limits (list): [E_min, E_max], where
+                E_min, E_max (float): Upper and lower energy limits for cut
+            inplace (bool): Whether to make the cut in place or not
+
+        Returns:
+            None if inplace==False
+            cut_matrix (Matrix): The cut version of the matrix
+        """
+        matrix_cut = None
+        std_cut = None
+
+        if axis == 0:
+            i_E_min = np.argmin(np.abs(E0_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(E0_array-E_limits[1]))
+            matrix_cut = self.matrix[i_E_min:i_E_max, :]
+        elif axis == 1:
+            i_E_min = np.argmin(np.abs(E1_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(E1_array-E_limits[1]))
+            matrix_cut = self.matrix[:, i_E_min:i_E_max]
+        else:
+            raise Exception("Axis must be one of (0, 1), but is", axis)
+
+
+        out = None
+        if inplace:
+
+        else:
+            out = Matrix()
+
+        return out
+
 
 class Vector():
     def __init__(self, vector=None, E_array=None):
