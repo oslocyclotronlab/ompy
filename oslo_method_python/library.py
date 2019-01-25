@@ -183,24 +183,32 @@ class Matrix():
         """
         matrix_cut = None
         std_cut = None
-
+        out = None
         if axis == 0:
-            i_E_min = np.argmin(np.abs(E0_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(E0_array-E_limits[1]))
+            i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
             matrix_cut = self.matrix[i_E_min:i_E_max, :]
+            E0_array_cut = self.E0_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+                out = True
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array)
+
         elif axis == 1:
-            i_E_min = np.argmin(np.abs(E1_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(E1_array-E_limits[1]))
+            i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
             matrix_cut = self.matrix[:, i_E_min:i_E_max]
+            E1_array_cut = self.E1_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E1_array = E1_array_cut
+                out = True
+            else:
+                out = Matrix(matrix_cut, E0_array, E1_array_cut)
         else:
             raise Exception("Axis must be one of (0, 1), but is", axis)
-
-
-        out = None
-        if inplace:
-
-        else:
-            out = Matrix()
 
         return out
 
