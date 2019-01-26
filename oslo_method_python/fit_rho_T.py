@@ -6,9 +6,10 @@ import numpy as np
 from .library import *
 from .rebin import *
 from scipy.optimize import minimize
+import copy
 
 
-def fit_rho_T(firstgen_in, calib_out,
+def fit_rho_T(firstgen_in, bin_width_out,
               Ex_min, Ex_max, Eg_min):
     """Fits the firstgen spectrum to the product of transmission coeff T and
     level density rho
@@ -34,8 +35,16 @@ def fit_rho_T(firstgen_in, calib_out,
 
     # Cut the firstgen.matrix and firstgen.std to shape [Ex_min:Ex_max,
     # Eg_min:Eg_max].
-    
+    # Protect the input matrix:
+    firstgen_in = copy.deepcopy(firstgen_in)
+    firstgen_in.cut_rect(axis=0, E_limits=[Ex_min, Ex_max], inplace=True)
+    firstgen_in.cut_rect(axis=1, E_limits=[Eg_min, Ex_max], inplace=True)
 
+    firstgen_in.plot()
+
+    # Set the calibration for the output result.
+    # TODO think about and test proper a0 value. Check rhosigchi.f.
+    calib_out = {"a0": -500, "a1": bin_width_out}
     # Set up the energy array common to rho and T
     E_array = E_array_from_calibration(a0=calib_out["a0"],
                                        a1=calib_out["a1"],

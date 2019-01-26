@@ -143,13 +143,72 @@ class Matrix():
             plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
 
+    def plot_projection(self, E_limits, axis, ax=None, normalize=False,
+                        label=""):
+        """Plots the projection of the matrix along axis
+
+        Args:
+            axis (int, 0 or 1): The axis to project onto.
+            E_limits (list of two floats): The energy limits for the
+                                           projection.
+            ax (matplotlib axes object, optional): The axes object to put
+                                                   the plot in.
+        """
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
+        else:
+            pass
+
+        if axis == 0:
+            i_E_low = i_from_E(E_limits[0], self.E0_array)
+            i_E_high = i_from_E(E_limits[1], self.E0_array)
+            if normalize:
+                projection = np.sum(
+                                div0(
+                                    self.matrix[:, i_E_low:i_E_high],
+                                    np.sum(self.matrix[:, i_E_low:i_E_high],
+                                           axis=0
+                                           )
+                                    ),
+                                axis=1
+                                )
+            else:
+                projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
+            ax.plot(self.E0_array,
+                    projection,
+                    label=label
+                    )
+        elif axis == 1:
+            i_E_low = i_from_E(E_limits[0], self.E1_array)
+            i_E_high = i_from_E(E_limits[1], self.E1_array)
+            if normalize:
+                projection = np.sum(
+                                div0(
+                                    self.matrix[i_E_low:i_E_high, :],
+                                    np.sum(self.matrix[i_E_low:i_E_high, :],
+                                           axis=1
+                                           )
+                                    ),
+                                axis=0
+                                )
+            else:
+                projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
+            ax.plot(self.E1_array,
+                    projection,
+                    label=label
+                    )
+        else:
+            raise Exception("Variable axis must be one of (0, 1) but is",
+                            axis)
+        if label is not None:
+            ax.legend()
+
     def save(self, fname):
         """
         Save matrix to mama file
         """
         write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
                       comment="Made by pyma")
-        return True
 
     def load(self, fname):
         """
@@ -164,8 +223,6 @@ class Matrix():
         self.matrix = matrix_object.matrix
         self.E0_array = matrix_object.E0_array
         self.E1_array = matrix_object.E1_array
-
-        return True
 
     def cut_rect(self, axis, E_limits, inplace=True):
         """
