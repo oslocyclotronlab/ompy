@@ -47,17 +47,24 @@ axgsf.set_yscale("log")
 firstgen.plot()
 
 E_limits = [5000, 6000]
+
+
 firstgen.plot_projection(E_limits=E_limits, axis=1,
                          ax=axdiw, label="exp", normalize=True)
 
-# DEBUG
-i_E_low = om.i_from_E(E_limits[0], firstgen.E1_array)
-i_E_high = om.i_from_E(E_limits[1], firstgen.E1_array)
-axdiw.plot(firstgen.E1_array,
-           firstgen.matrix[i_E_low:i_E_high, :].sum(axis=0),
-           label="exp manual"
-           )
-# END DEBUG
+# # DEBUG
+# # i_E_low = om.i_from_E(E_limits[0], firstgen.E1_array)
+# # i_E_high = om.i_from_E(E_limits[1], firstgen.E1_array)
+# i_E_low = np.argmin(np.abs(E_limits[0] - firstgen.E0_array))
+# i_E_high = np.argmin(np.abs(E_limits[1] - firstgen.E0_array))
+
+# print(i_E_low, i_E_high)
+# axdiw.plot(firstgen.E1_array,
+#            firstgen.matrix[i_E_low:i_E_high, :].sum(axis=0),
+#            label="exp manual"
+#            )
+# print(firstgen.matrix[i_E_low:i_E_high, :])
+# # END DEBUG
 
 P_fit = om.construct_P(rho.vector, T.vector, rho.E_array)
 P_fit = P_fit / P_fit.sum(axis=1)  # Normalize to unity

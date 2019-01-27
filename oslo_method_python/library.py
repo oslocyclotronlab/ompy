@@ -160,10 +160,10 @@ class Matrix():
             pass
 
         if axis == 0:
-            i_E_low = i_from_E(E_limits[0], self.E0_array)
-            i_E_high = i_from_E(E_limits[1], self.E0_array)
+            i_E_low = i_from_E(E_limits[0], self.E1_array)
+            i_E_high = i_from_E(E_limits[1], self.E1_array)
             if normalize:
-                projection = np.sum(
+                projection = np.mean(
                                 div0(
                                     self.matrix[:, i_E_low:i_E_high],
                                     np.sum(self.matrix[:, i_E_low:i_E_high],
@@ -179,15 +179,15 @@ class Matrix():
                     label=label
                     )
         elif axis == 1:
-            i_E_low = i_from_E(E_limits[0], self.E1_array)
-            i_E_high = i_from_E(E_limits[1], self.E1_array)
+            i_E_low = i_from_E(E_limits[0], self.E0_array)
+            i_E_high = i_from_E(E_limits[1], self.E0_array)
             if normalize:
-                projection = np.sum(
+                projection = np.mean(
                                 div0(
                                     self.matrix[i_E_low:i_E_high, :],
                                     np.sum(self.matrix[i_E_low:i_E_high, :],
                                            axis=1
-                                           )
+                                           )[:,None]
                                     ),
                                 axis=0
                                 )
@@ -202,6 +202,12 @@ class Matrix():
                             axis)
         if label is not None:
             ax.legend()
+
+    def plot_projection_x(self, E_limits, ax=None, normalize=False,
+                          label=""):
+        """ Wrapper to call plot_projection(axis=1) to project on x axis"""
+        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
+                               normalize=normalize, label=label)
 
     def save(self, fname):
         """
