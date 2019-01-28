@@ -185,9 +185,9 @@ class Matrix():
                 projection = np.mean(
                                 div0(
                                     self.matrix[i_E_low:i_E_high, :],
-                                    np.sum(self.matrix[i_E_low:i_E_high, :],
-                                           axis=1
-                                           )[:,None]
+                                    (np.sum(self.matrix[i_E_low:i_E_high, :],
+                                           axis=1)
+                                     * self.calibration()["a01"])[:, None]
                                     ),
                                 axis=0
                                 )
