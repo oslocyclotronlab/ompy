@@ -30,10 +30,9 @@ rho, T = om.fit_rho_T(firstgen, bin_width_out,
 
 # Plot
 f, ((axrho, axT), (axgsf, axdiw)) = plt.subplots(2, 2)
-axrho.set_title("rho")
-rho.plot(ax=axrho, yscale="log")
+rho.plot(ax=axrho, yscale="log", title="rho")
 axT.set_title("T")
-T.plot(ax=axT, yscale="log")
+T.plot(ax=axT, yscale="log", title="T")
 # Also plot gsf, i.e. T/Eg^3
 gsf = om.div0(T.vector, T.E_array**3)
 axgsf.plot(T.E_array, gsf)
@@ -70,6 +69,6 @@ P_fit = om.construct_P(rho.vector, T.vector, rho.E_array)
 P_fit = P_fit / P_fit.sum(axis=1)  # Normalize to unity
 P_fit = om.Matrix(P_fit, rho.E_array, rho.E_array)
 P_fit.plot_projection(E_limits=E_limits, axis=1,
-                      ax=axdiw, label="fit")
+                      ax=axdiw, label="fit", normalize=True)
 
 plt.show()
