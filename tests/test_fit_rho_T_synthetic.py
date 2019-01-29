@@ -57,8 +57,10 @@ cbar = ax_P_fit.pcolormesh(E_array, E_array, P_fit, norm=LogNorm())
 ax_P_fit.set_title("P_fit")
 f2D.colorbar(cbar, ax=ax_P_fit)
 
-cbar = ax_P_diff.pcolormesh(E_array, E_array, P_fit-P_true)
+P_diff = P_fit - P_true
+cbar = ax_P_diff.pcolormesh(E_array, E_array, P_diff)
 f2D.colorbar(cbar, ax=ax_P_diff)
+print("P_diff.max() =", P_diff.max())
 
 
 plt.show()
