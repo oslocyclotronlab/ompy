@@ -144,7 +144,7 @@ class Matrix():
         return cbar  # Return the colorbar to allow it to be plotted outside
 
     def plot_projection(self, E_limits, axis, ax=None, normalize=False,
-                        label=""):
+                        label=None):
         """Plots the projection of the matrix along axis
 
         Args:
@@ -174,10 +174,18 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
-            ax.plot(self.E0_array,
-                    projection,
-                    label=label
-                    )
+            if label is None:
+                ax.plot(self.E0_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E0_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
         elif axis == 1:
             i_E_low = i_from_E(E_limits[0], self.E0_array)
             i_E_high = i_from_E(E_limits[1], self.E0_array)
@@ -193,10 +201,18 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
-            ax.plot(self.E1_array,
-                    projection,
-                    label=label
-                    )
+            if label is None:
+                ax.plot(self.E1_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E1_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
         else:
             raise Exception("Variable axis must be one of (0, 1) but is",
                             axis)
@@ -244,6 +260,7 @@ class Matrix():
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
+        assert(E_limits[1] >= E_limits[0])  # Sanity check
         matrix_cut = None
         std_cut = None
         out = None
@@ -255,7 +272,6 @@ class Matrix():
             if inplace:
                 self.matrix = matrix_cut
                 self.E0_array = E0_array_cut
-                out = True
             else:
                 out = Matrix(matrix_cut, E0_array_cut, E1_array)
 
@@ -267,11 +283,10 @@ class Matrix():
             if inplace:
                 self.matrix = matrix_cut
                 self.E1_array = E1_array_cut
-                out = True
             else:
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
         else:
-            raise Exception("Axis must be one of (0, 1), but is", axis)
+            raise ValueError("Axis must be one of (0, 1), but is", axis)
 
         return out
 
@@ -295,18 +310,28 @@ class Vector():
             raise Exception("calibration() called on empty Vector instance")
         return calibration
 
-    def plot(self, ax=None, title="", yscale="linear", ylim=None, xlim=None):
+    def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
+             title=None, label=None):
         if ax is None:
             f, ax = plt.subplots(1, 1)
 
-        ax.plot(self.E_array, self.vector)
+        # Plot with middle-bin energy values:
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        if label is None:
+            ax.plot(E_array_midbin, self.vector)
+        elif isinstance(label, str):
+            ax.plot(E_array_midbin, self.vector, label=label)
+        else:
+            raise ValueError("Keyword label must be None or string, but is", label)
+
 
         ax.set_yscale(yscale)
         if ylim is not None:
             ax.set_ylim(ylim)
         if xlim is not None:
             ax.set_xlim(xlim)
-        ax.set_title(title)
+        if title is not None:
+            ax.set_title(title)
         if ax is None:
             plt.show()
         return True

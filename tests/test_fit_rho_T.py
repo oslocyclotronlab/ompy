@@ -17,12 +17,9 @@ firstgen.std = np.sqrt(firstgen.matrix)  # In lieu of something better
 # print("firstgen.std =", firstgen.std)
 
 bin_width_out = 120
-Ex_min = 4000
+Ex_min = 3000
 Ex_max = 8000
 Eg_min = 1000
-print("Ex_min =", Ex_min)
-print("Ex_max =", Ex_max)
-print("Eg_min =", Eg_min)
 
 rho, T = om.fit_rho_T(firstgen, bin_width_out,
                       Ex_min, Ex_max, Eg_min)
@@ -63,7 +60,7 @@ firstgen.plot_projection(E_limits=E_limits, axis=1,
 #            label="exp manual"
 #            )
 # print(firstgen.matrix[i_E_low:i_E_high, :])
-# # END DEBUG
+# END DEBUG
 
 P_fit = om.construct_P(rho.vector, T.vector, rho.E_array)
 P_fit = P_fit / P_fit.sum(axis=1)  # Normalize to unity
