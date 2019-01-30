@@ -1,5 +1,6 @@
 # Functions to decompose a first-generation matrix
-# into rho and T by a fit
+# into rho and T by a fit.
+# Some code stolen from Fabio Zeiser.
 # This version uses numpy arrays to do the heavy lifting as much as possible
 
 import numpy as np
