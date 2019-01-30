@@ -5,4 +5,4 @@ from .library import *
 from .error_propagation import *
 from .rebin import rebin, rebin_matrix
 # from .fit_rho_T import *
-from .fit_rho_T_numpy import *
+from .fit_rho_T import *

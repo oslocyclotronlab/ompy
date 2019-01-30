@@ -7,6 +7,8 @@ from context import oslo_method_python as om
 import matplotlib.pyplot as plt
 import numpy as np
 
+decimal = 5  # Precision for np.testing.array_almost_equal
+
 # Set up test array
 E0_array = np.linspace(-200, 200, 201)
 E1_array = np.linspace(-100, 300, 101)
@@ -22,8 +24,22 @@ assert(cal["a01"] == (mat.E0_array[1]-mat.E0_array[0]))
 assert(cal["a10"] == mat.E1_array[0])
 assert(cal["a11"] == (mat.E1_array[1]-mat.E1_array[0]))
 
+# Allocate several subplots for different tests:
+f, (ax1, ax2) = plt.subplots(1, 2)
+
 # == mat.plot() ==
-f, ax = plt.subplots(1,1)
-cbar = mat.plot(ax=ax, zscale="linear", title="plot title")
-f.colorbar(cbar, ax=ax)
+cbar = mat.plot(ax=ax1, zscale="linear", title="plot() works")
+f.colorbar(cbar, ax=ax1)
+
+
+# == mat.cut_rect() ==
+cut_axis = 0
+E0_limits = [E0_array[5], E0_array[-5]]
+if E0_limits[1] <= E0_limits[0]:
+    E0_limits[1] = E0_limits + cal["a01"]
+mat.cut_rect(axis=cut_axis, E_limits=E0_limits, inplace=True)
+mat.plot(ax=ax2, zscale="linear", title="cut_rect() works")
+# TODO write a test to verify that it worked instead of plotting.
+
+# == show plots ==
 plt.show()
