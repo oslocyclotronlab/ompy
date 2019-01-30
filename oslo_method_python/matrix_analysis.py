@@ -78,7 +78,6 @@ class MatrixAnalysis():
             use_comptonsubtraction=use_comptonsubtraction
         )
 
-        return True
 
     def first_generation_method(self, Ex_max, dE_gamma,
                                 N_iterations=10, statistical_or_total=1,
