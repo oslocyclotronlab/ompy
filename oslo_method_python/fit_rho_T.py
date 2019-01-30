@@ -70,7 +70,8 @@ def fit_rho_T(firstgen_in, bin_width_out,
     # axis 0:
     firstgen.matrix = rebin_matrix(firstgen_in.matrix, firstgen_in.E0_array,
                                    E_array, rebin_axis=0)
-    # TODO figure out how to properly "rebin" standard deviations
+    # TODO figure out how to properly "rebin" standard deviations.
+    # Should maybe just be interpolated instead.
     firstgen.std = rebin_matrix(firstgen_in.std, firstgen_in.E0_array,
                                 E_array, rebin_axis=0)
     # axis 1:
@@ -83,12 +84,12 @@ def fit_rho_T(firstgen_in, bin_width_out,
     firstgen.E1_array = E_array
     # Verify that it got rebinned and assigned correctly:
     calib_firstgen = firstgen.calibration()
-    assert(
+    assert (
             calib_firstgen["a00"] == calib_out["a0"] and
             calib_firstgen["a01"] == calib_out["a1"] and
             calib_firstgen["a10"] == calib_out["a0"] and
             calib_firstgen["a11"] == calib_out["a1"]
-           )
+           ), "Matrix does not have correct calibration."
 
     # Normalize the firstgen matrix for each Ex bin:
     P_exp = div0(firstgen.matrix, firstgen.matrix.sum(axis=1))
