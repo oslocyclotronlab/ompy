@@ -13,4 +13,17 @@ ma = om.MatrixAnalysis()
 ma.unfolded.load(fname_unfolded)
 
 f2D, (ax2D1, ax2D2) = plt.subplots(1, 2)
-ax2D1.plot()
+cbar = ma.unfolded.plot(ax=ax2D1, title="Dy164 unfolded",
+                        zscale="log", zmin=1e-3)
+f2D.colorbar(cbar, ax=ax2D1)
+
+# Run first generation method
+Ex_max = 8500
+dE_gamma = 500
+ma.first_generation_method(Ex_max=Ex_max, dE_gamma=dE_gamma)
+ma.firstgen.plot(ax=ax2D2, title="Dy164 first-generation",
+                        zscale="log")
+f2D.colorbar(cbar, ax=ax2D2)
+
+
+plt.show()
