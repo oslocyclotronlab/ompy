@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 
 class Matrix():
@@ -74,7 +75,6 @@ class Matrix():
             f, ax = plt.subplots(1, 1)
         if zscale == "log":
             # z axis shall have log scale
-            from matplotlib.colors import LogNorm
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
@@ -90,7 +90,7 @@ class Matrix():
                                      self.matrix,
                                      norm=LogNorm(vmax=zmax)
                                      )
-            if (zmin is not None and zmax is not None):
+            elif (zmin is not None and zmax is not None):
                 # or both,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
@@ -104,7 +104,6 @@ class Matrix():
                                      self.matrix,
                                      norm=LogNorm()
                                      )
-
         elif zscale == "linear":
             # z axis shall have linear scale
             # Check whether z limits were given:
@@ -122,7 +121,7 @@ class Matrix():
                                      self.matrix,
                                      vmax=zmax
                                      )
-            if (zmin is not None and zmax is not None):
+            elif (zmin is not None and zmax is not None):
                 # or both,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
