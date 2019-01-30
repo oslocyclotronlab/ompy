@@ -289,6 +289,12 @@ class Matrix():
 
         return out
 
+    def fill_negative(self, window_size):
+        self.matrix = fill_negative(self.matrix, window_size)
+
+    def remove_negative(self):
+        self.matrix = np.where(self.matrix > 0, self.matrix, 0)
+
 
 class Vector():
     def __init__(self, vector=None, E_array=None):
@@ -623,3 +629,40 @@ def E_array_from_calibration(a0, a1, N=None, E_max=None):
         raise Exception("Either N or E_max must be given")
 
     return E_array
+
+
+def fill_negative(matrix, window_size):
+    """
+    Fill negative channels with positive counts from neighbouring channels
+
+    The MAMA routine for this is very complicated. It seems to basically
+    use a sliding window along the Eg axis, given by the FWHM, to look for
+    neighbouring bins with lots of counts and then take some counts from there.
+    Can we do something similar in an easy way?
+
+    Todo: Debug me!
+    """
+    matrix_out = np.copy(matrix)
+    # Loop over rows:
+    for i_Ex in range(matrix.shape[0]):
+        for i_Eg in np.where(matrix[i_Ex, :] < 0)[0]:
+            print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
+            # window_size = 4  # Start with a constant window size.
+            # TODO relate it to FWHM by energy arrays
+            i_Eg_low = max(0, i_Eg - window_size)
+            i_Eg_high = min(matrix.shape[1], i_Eg + window_size)
+            # Fill from the channel with the larges positive count
+            # in the neighbourhood
+            i_max = np.argmax(matrix[i_Ex, i_Eg_low:i_Eg_high])
+            print("i_max =", i_max)
+            if matrix[i_Ex, i_max] <= 0:
+                pass
+            else:
+                positive = matrix[i_Ex, i_max]
+                negative = matrix[i_Ex, i_Eg]
+                fill = min(0, positive + negative)  # Don't fill more than to 0
+                rest = positive
+                print("fill =", fill, "rest =", rest)
+                matrix_out[i_Ex, i_Eg] = fill
+                # matrix_out[i_Ex, i_max] = rest
+    return matrix_out
