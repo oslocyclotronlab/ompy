@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from distutils.core import setup
 from Cython.Build import cythonize
 
@@ -11,6 +12,8 @@ setup(name='oslo_method_python',
       url="https://github.com/jorgenem/oslo_method_python",
       py_modules=['oslo_method_python'],
       ext_modules=cythonize(
-                            ["oslo_method_python/rebin.pyx",
-                            "oslo_method_python/fit_rho_T.pyx"])
+                            [
+                            "oslo_method_python/rebin.pyx",
+                            #"oslo_method_python/fit_rho_T.pyx"
+                            ])
       )

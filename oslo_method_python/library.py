@@ -143,13 +143,94 @@ class Matrix():
             plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
 
+    def plot_projection(self, E_limits, axis, ax=None, normalize=False,
+                        label=None):
+        """Plots the projection of the matrix along axis
+
+        Args:
+            axis (int, 0 or 1): The axis to project onto.
+            E_limits (list of two floats): The energy limits for the
+                                           projection.
+            ax (matplotlib axes object, optional): The axes object to put
+                                                   the plot in.
+        """
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
+        else:
+            pass
+
+        if axis == 0:
+            i_E_low = i_from_E(E_limits[0], self.E1_array)
+            i_E_high = i_from_E(E_limits[1], self.E1_array)
+            if normalize:
+                projection = np.mean(
+                                div0(
+                                    self.matrix[:, i_E_low:i_E_high],
+                                    np.sum(self.matrix[:, i_E_low:i_E_high],
+                                           axis=0
+                                           )
+                                    ),
+                                axis=1
+                                )
+            else:
+                projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
+            if label is None:
+                ax.plot(self.E0_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E0_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
+        elif axis == 1:
+            i_E_low = i_from_E(E_limits[0], self.E0_array)
+            i_E_high = i_from_E(E_limits[1], self.E0_array)
+            if normalize:
+                projection = np.mean(
+                                div0(
+                                    self.matrix[i_E_low:i_E_high, :],
+                                    (np.sum(self.matrix[i_E_low:i_E_high, :],
+                                           axis=1)
+                                     * self.calibration()["a01"])[:, None]
+                                    ),
+                                axis=0
+                                )
+            else:
+                projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
+            if label is None:
+                ax.plot(self.E1_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E1_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
+        else:
+            raise Exception("Variable axis must be one of (0, 1) but is",
+                            axis)
+        if label is not None:
+            ax.legend()
+
+    def plot_projection_x(self, E_limits, ax=None, normalize=False,
+                          label=""):
+        """ Wrapper to call plot_projection(axis=1) to project on x axis"""
+        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
+                               normalize=normalize, label=label)
+
     def save(self, fname):
         """
         Save matrix to mama file
         """
         write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
                       comment="Made by pyma")
-        return True
 
     def load(self, fname):
         """
@@ -165,7 +246,49 @@ class Matrix():
         self.E0_array = matrix_object.E0_array
         self.E1_array = matrix_object.E1_array
 
-        return True
+    def cut_rect(self, axis, E_limits, inplace=True):
+        """
+        Cuts the matrix (and std, if present) to the sub-interval E_limits.
+
+        Args:
+            axis (int): Which axis to apply the cut to.
+            E_limits (list): [E_min, E_max], where
+                E_min, E_max (float): Upper and lower energy limits for cut
+            inplace (bool): Whether to make the cut in place or not
+
+        Returns:
+            None if inplace==False
+            cut_matrix (Matrix): The cut version of the matrix
+        """
+        assert(E_limits[1] >= E_limits[0])  # Sanity check
+        matrix_cut = None
+        std_cut = None
+        out = None
+        if axis == 0:
+            i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            matrix_cut = self.matrix[i_E_min:i_E_max, :]
+            E0_array_cut = self.E0_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array)
+
+        elif axis == 1:
+            i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
+            matrix_cut = self.matrix[:, i_E_min:i_E_max]
+            E1_array_cut = self.E1_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E1_array = E1_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array, E1_array_cut)
+        else:
+            raise ValueError("Axis must be one of (0, 1), but is", axis)
+
+        return out
 
 
 class Vector():
@@ -187,18 +310,28 @@ class Vector():
             raise Exception("calibration() called on empty Vector instance")
         return calibration
 
-    def plot(self, ax=None, title="", yscale="linear", ylim=None, xlim=None):
+    def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
+             title=None, label=None):
         if ax is None:
             f, ax = plt.subplots(1, 1)
 
-        ax.plot(self.E_array, self.vector)
+        # Plot with middle-bin energy values:
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        if label is None:
+            ax.plot(E_array_midbin, self.vector)
+        elif isinstance(label, str):
+            ax.plot(E_array_midbin, self.vector, label=label)
+        else:
+            raise ValueError("Keyword label must be None or string, but is", label)
+
 
         ax.set_yscale(yscale)
         if ylim is not None:
             ax.set_ylim(ylim)
         if xlim is not None:
             ax.set_xlim(xlim)
-        ax.set_title(title)
+        if title is not None:
+            ax.set_title(title)
         if ax is None:
             plt.show()
         return True
