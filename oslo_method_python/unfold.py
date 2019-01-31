@@ -3,6 +3,7 @@ from .library import *
 
 def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
+           diag_cut=None,
            Eg_max=None, verbose=False, plot=False,
            use_comptonsubtraction=False):
     """Unfolds the gamma-detector response of a spectrum
@@ -15,6 +16,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         Ex_max (float): Upper limit for excitation energy
         Eg_min (float): Lower limit for gamma-ray energy
         Eg_max (float): Upper limit for gamma-ray energy
+        diag_cut (dict, optional): Points giving upper diagonal boundary on Eg
         verbose (bool): Toggle verbose mode
         plot (bool): Toggle plotting
         use_comptonsubtraction (bool): Toggle whether to use the Compton
@@ -83,38 +85,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # N_rebin = int(N_Eg/4)
     N_rebin = N_Eg
 
-    # Update 2019: Do not think rebin should be done inside the unfolding function
-    # if N_rebin != N_Eg:
-    #     # Allocate matrix to store finished result, filled in chunks:
-    #     data_raw_rebinned = np.zeros((N_Ex, N_rebin)) 
-    
-    #     N_Ex_portions = 1 # How many portions to chunk, initially try just 1
-    #     mem_avail = psutil.virtual_memory()[1]
-    #     mem_need = 8 * N_Ex/N_Ex_portions * N_Eg * N_rebin
-    #     if verbose:
-    #         print("Rebinning: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-    #     while mem_need > mem_avail: # Empirical limit from my Thinkpad, corresponds to 100 % system memory load (i.e. I'm not sure what the number from psutil really means.)
-    #         # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
-    #         N_Ex_portions += 1 # Double number of portions 
-    #         mem_need = 8 * N_Ex/N_Ex_portions * N_Eg * N_rebin
-    #         if verbose:
-    #             print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-    #     N_Ex_portions = 10
-    #     N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-    #     for i in range(N_Ex_portions):
-    #         data_raw_rebinned[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array_rebinned = rebin_and_shift(data_raw[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:], Eg_array, N_rebin, rebin_axis=1)
-    
-    #     # # Rebin response matrix by interpolating:
-    #     # NO! This does not work. Need to use more advanced interpolation, see MAMA.
-    #     # from scipy.interpolate import RectBivariateSpline
-    #     # f_R = RectBivariateSpline(Eg_array_R, Eg_array_R, R)
-    #     # R_rebinned = f_R(Eg_array_rebinned, Eg_array_rebinned)
-    
-    
-    #     # Rename everything:    
-    #     data_raw = data_raw_rebinned
-    #     R = R_rebinned    
-    #     Eg_array = Eg_array_rebinned
 
     if verbose:
         time_rebin_end = time.process_time()
@@ -132,13 +102,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         # cbar_raw = ax_raw.pcolormesh(Eg_array, Ex_array, data_raw, norm=LogNorm(vmin=1))
         cbar_raw = raw.plot(ax=ax_raw)
         f.colorbar(cbar_raw, ax=ax_raw)
-    
-
-
-    
-
-
-
 
     # Check that response matrix matches data, at least in terms of Eg 
     # calibration:
@@ -163,10 +126,10 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # Eg_min = 500 # keV 
     # Eg_max = 14000 # keV
     iEg_min, iEg_max = 0, i_from_E(Eg_max, Eg_array)
+    # Max number of iterations:
     Nit = 33 #12 # 8 # 27
     
     # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
-    dEg = 3000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
     # # Define cut   x1    y1    x2    y2
     # cut_points = [i_from_E(Eg_min + dEg, Eg_array), i_from_E(Ex_min, Ex_array), 
     #               i_from_E(Eg_max+dEg, Eg_array), i_from_E(Ex_max, Ex_array)]
@@ -177,17 +140,28 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
     # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
-    mask = make_mask(Ex_array, Eg_array, Ex_min, Eg_min+dEg, Ex_max, Eg_max+dEg)
+    mask = None
+    if diag_cut is not None:
+        mask = make_mask(Ex_array, Eg_array,
+                         diag_cut["Ex1"], diag_cut["Eg1"],
+                         diag_cut["Ex2"], diag_cut["Eg2"])
+    else:
+        dEg = 3000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
+        mask = make_mask(Ex_array, Eg_array, Ex_min, Eg_min+dEg,
+                         Ex_max, Eg_max+dEg)
     # HACK TEST 20181004: Does the mask do any good?:
-    mask = np.ones(mask.shape)
+    # mask = np.ones(mask.shape)
 
-    rawmat = (raw.matrix*mask)[iEx_min:iEx_max, iEg_min:iEg_max] 
+    # rawmat = (raw.matrix*mask)[iEx_min:iEx_max, iEg_min:iEg_max] 
+    # 20190131: Removed mask, want to keep unfolding routine as
+    # simple as possible.
+    rawmat = raw.matrix[iEx_min:iEx_max, iEg_min:iEg_max] 
 
     mask_cut = mask[iEx_min:iEx_max, iEg_min:iEg_max]
 
     #Ndof = mask_cut.sum() # This was for a 2D chisquare, which is wrong.
     # We take the chisquare for each Ex bin separately. So rather, 
-    Ndof_vector = mask_cut.sum(axis=1)
+    # Ndof_vector = mask_cut.sum(axis=1)
 
     unfoldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
     foldmat = np.zeros((rawmat.shape[0],rawmat.shape[1]))
@@ -233,7 +207,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
         # for each Ex bin separately
         # TODO reduced chisquare or normal?
-        chisquare_matrix[:,iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum(axis=1) / Ndof_vector
+        chisquare_matrix[:,iteration] = div0(np.power(foldmat-rawmat,2),np.where(rawmat>0,rawmat,0)).sum(axis=1) #/ Ndof_vector
 
         # Also calculate fluctuations in each Ex bin
         fluctuations_matrix[:,iteration] = fluctuations(unfoldmat, Eg_array_cut)
@@ -258,8 +232,10 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     print(i_score_vector)
     
     # Remove negative counts and trim:
-    unfoldmat[unfoldmat<=0] = 0
-    unfoldmat = mask_cut*unfoldmat
+    # Update 20190130: Keep unfolding as simple as possible, do these
+    # operations manually.
+    # unfoldmat[unfoldmat<=0] = 0
+    # unfoldmat = mask_cut*unfoldmat
 
     if plot:
         # Plot:
