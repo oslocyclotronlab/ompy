@@ -332,8 +332,8 @@ class Vector():
         elif isinstance(label, str):
             ax.plot(E_array_midbin, self.vector, label=label)
         else:
-            raise ValueError("Keyword label must be None or string, but is", label)
-
+            raise ValueError("Keyword label must be None or string, but is",
+                             label)
 
         ax.set_yscale(yscale)
         if ylim is not None:
@@ -364,7 +364,7 @@ class Vector():
 
 
 def read_mama_2D(filename):
-    # Reads a MAMA matrix file and returns the matrix as a numpy array, 
+    # Reads a MAMA matrix file and returns the matrix as a numpy array,
     # as well as a list containing the four calibration coefficients
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
     # and 1-D arrays of calibrated x and y values for plotting and similar.
