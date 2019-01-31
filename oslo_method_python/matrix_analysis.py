@@ -52,6 +52,15 @@ class MatrixAnalysis():
         # matrix
         self.response = Matrix()  # response matrix
 
+        # Allocate variable names for parameters to be filled by class
+        # functions. This is intended for the error_propagation module
+        # unfold():
+        self.unfold_Ex_max = None
+        self.unfold_dE_gamma = None
+        self.unfold_N_iterations = None
+        self.unfold_statistical_or_total = None
+        self.unfold_area_correction = None
+
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,
                diag_cut=None,
