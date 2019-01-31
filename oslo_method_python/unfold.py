@@ -1,5 +1,9 @@
 from .library import *
 
+global DE_PARTICLE
+global DE_GAMMA_1MEV
+global DE_GAMMA_8MEV
+
 
 def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
@@ -146,9 +150,13 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
                          diag_cut["Ex1"], diag_cut["Eg1"],
                          diag_cut["Ex2"], diag_cut["Eg2"])
     else:
-        dEg = 3000 # keV - padding to allow for energy uncertainty above Ex=Eg diagonal
-        mask = make_mask(Ex_array, Eg_array, Ex_min, Eg_min+dEg,
-                         Ex_max, Eg_max+dEg)
+        # If diag_cut is not given, use global uncertainty widths from
+        # constants.py
+        Ex1 = 1000  # MeV
+        Eg1 = 1000 + np.sqrt(DE_PARTICLE**2 + DE_GAMMA_1MEV**2)  # MeV
+        Ex2 = 8000  # MeV
+        Eg2 = 8000 + np.sqrt(DE_PARTICLE**2 + DE_GAMMA_8MEV**2)  # MeV
+        mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
     # HACK TEST 20181004: Does the mask do any good?:
     # mask = np.ones(mask.shape)
 
@@ -223,8 +231,9 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # and select the best one:
     fluctuations_matrix = fluctuations_matrix/fluctuations_vector_raw[:,None] # TODO check that this broadcasts the vector over the right dimension
     # Get the vector indicating iteration index of best score for each Ex bin:
-    weight_fluc = 0.2#0.6 # TODO make this an argument
-    i_score_vector = scoring(chisquare_matrix, fluctuations_matrix, weight_fluc)
+    weight_fluc = 0.2  # 0.6 # TODO make this an argument
+    i_score_vector = scoring(chisquare_matrix, fluctuations_matrix,
+                             weight_fluc)
     unfoldmat = np.zeros(rawmat.shape)
     for i_Ex in range(rawmat.shape[0]):
         unfoldmat[i_Ex, :] = unfoldmat_cube[i_score_vector[i_Ex], i_Ex, :]
