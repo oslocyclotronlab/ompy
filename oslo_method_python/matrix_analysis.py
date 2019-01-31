@@ -54,6 +54,7 @@ class MatrixAnalysis():
 
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,
+               diag_cut=None,
                verbose=False, plot=False, use_comptonsubtraction=False):
         # = Check that raw matrix is present
         if self.raw.matrix is None:
@@ -74,6 +75,7 @@ class MatrixAnalysis():
             fname_resp_dat=fname_resp_dat,
             FWHM_factor=FWHM_factor,
             Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
+            diag_cut=diag_cut,
             Eg_max=Eg_max, verbose=verbose, plot=plot,
             use_comptonsubtraction=use_comptonsubtraction
         )

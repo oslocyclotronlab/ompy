@@ -139,6 +139,7 @@ class Matrix():
             raise Exception("Unknown zscale type", zscale)
         ax.set_title(title)
         if ax is None:
+            f.colorbar(cbar, ax=ax)
             plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
 
@@ -288,6 +289,10 @@ class Matrix():
             raise ValueError("Axis must be one of (0, 1), but is", axis)
 
         return out
+
+    def cut_diagonal(self, E1, E2):
+        self.matrix = cut_diagonal(self.matrix, self.E0_array,
+                                   self.E1_array, E1, E2)
 
     def fill_negative(self, window_size):
         self.matrix = fill_negative(self.matrix, window_size)
@@ -666,3 +671,23 @@ def fill_negative(matrix, window_size):
                 matrix_out[i_Ex, i_Eg] = fill
                 # matrix_out[i_Ex, i_max] = rest
     return matrix_out
+
+
+def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
+        """
+        Cut away counts to the right of a diagonal line defined by indices
+
+        Args:
+            matrix (np.ndarray): The matrix of counts
+            Ex_array: Energy calibration along Ex
+            Eg_array: Energy calibration along Eg
+            E1 (list of two floats): First point of intercept, ordered as Ex,Eg
+            E2 (list of two floats): Second point of intercept
+        Returns:
+            The matrix with counts above diagonal removed
+        """
+        Ex1, Eg1 = E1
+        Ex2, Eg2 = E2
+        mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
+        matrix_out = np.where(mask, matrix, 0)
+        return matrix_out
