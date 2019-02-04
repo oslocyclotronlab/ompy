@@ -1,4 +1,5 @@
 from .library import *
+from .constants import *
 
 global DE_PARTICLE
 global DE_GAMMA_1MEV
