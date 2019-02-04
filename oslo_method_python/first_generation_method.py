@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from .library import *
+from .rebin import *
 
 
-def first_generation_method(matrix,
+def first_generation_method(matrix_in,
                             Ex_max, dE_gamma, N_iterations=10,
                             multiplicity_estimation="statistical",
                             area_correction=True):
@@ -15,21 +16,20 @@ def first_generation_method(matrix,
     in MAMA. Mainly written autumn 2016 at MSU.
 
     Args:
-        matrix (Matrix): The matrix to apply the first generation method to
+        matrix (Matrix): The matrix to apply the first eneration method to
         multiplicity_estimation (str): One of ["statistical", "total"]
 
     """
 
-    # Rename variables for local use:
-    unfolded_matrix = self.unfolded.matrix
-    Ex_array_mat = self.unfolded.E0_array
-    Egamma_array = self.unfolded.E1_array
+    unfolded_matrix = matrix_in.matrix
+    Ex_array_mat = matrix_in.E0_array
+    Egamma_array = matrix_in.E1_array
 
     # TODO option statistical_or_total=2 (total) does not work
 
     Ny = len(unfolded_matrix[:, 0])
     Nx = len(unfolded_matrix[0, :])
-    calib_in = self.unfolded.calibration()
+    calib_in = matrix_in.calibration()
     bx = calib_in["a10"]
     ax = calib_in["a11"]
     by = calib_in["a00"]
@@ -110,7 +110,8 @@ def first_generation_method(matrix,
     Egamma_mesh, Ex_mesh = np.meshgrid(Egamma_array, Ex_array)
     Egamma_max = Ex_array + dE_gamma  # Maximal Egamma value for each Ex bin
     Egamma_max_grid = np.meshgrid(np.ones(Nx), Egamma_max)[1]
-    if statistical_or_total == 1:
+    multiplicity = None
+    if multiplicity_estimation == "statistical":
         # Statistical multiplicity calculation (i.e. trying to use
         # statistical/continuum region only)
         # The sliding lower limit for Egamma integral - sliding between
@@ -124,40 +125,41 @@ def first_generation_method(matrix,
         # good_indices = np.where(np.logical_and(slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid) , True, False)
         matrix_ex_compressed_cut = np.where(np.logical_and(
             slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid), matrix_ex_compressed, 0)
-    elif statistical_or_total == 2:
-        # Total multiplicity calculation
-        # good_indices = np.where(Egamma_mesh < Egamma_max_grid, True, False)
-        matrix_ex_compressed_cut = np.where(
-            Egamma_mesh < Egamma_max_grid, matrix_ex_compressed, 0)
-    # for i in range(len(good_indices[:,0])):
-    # print len(good_indices[i,good_indices[i,:]]) # OK, it actually works.
 
-    # Cut away counts higher than Egamma = Ex + dE_gamma
-    # matrix_ex_compressed_cut = np.where(good_indices, matrix_ex_compressed, 0)
-    # plt.figure(1)
-    # plt.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed_cut, norm=LogNorm(vmin=0.01, vmax=matrix_ex_compressed.max()))
-    # plt.show()
-    # sys.exit(0)
+        # Calculate average multiplicity for each Ex channel
+        area_matrix_ex_compressed_cut = np.sum(
+            matrix_ex_compressed_cut, axis=1)
+        Egamma_average = div0(np.sum(
+            Egamma_mesh * matrix_ex_compressed_cut, axis=1),
+            area_matrix_ex_compressed_cut)
 
-    # Calculate average multiplicity for each Ex channel
-    area_matrix_ex_compressed_cut = np.sum(
-        matrix_ex_compressed_cut, axis=1)
-    Egamma_average = div0(np.sum(
-        Egamma_mesh * matrix_ex_compressed_cut, axis=1),
-        area_matrix_ex_compressed_cut)
-    if statistical_or_total == 1:
         # Statistical multiplicity - use the effective Ex0 value
         multiplicity = div0(
             Ex_array - np.maximum(np.minimum(
                         Ex_array - 200, ExEntry0s), 0), Egamma_average)
-    elif statistical_or_total == 2:
+
+    elif multiplicity_estimation == "total":
+        # TODO fixme
+        # Total multiplicity calculation
+        # good_indices = np.where(Egamma_mesh < Egamma_max_grid, True, False)
+        matrix_ex_compressed_cut = np.where(
+            Egamma_mesh < Egamma_max_grid, matrix_ex_compressed, 0)
+
+        # Calculate average multiplicity for each Ex channel
+        area_matrix_ex_compressed_cut = np.sum(
+            matrix_ex_compressed_cut, axis=1)
+        Egamma_average = div0(np.sum(
+            Egamma_mesh * matrix_ex_compressed_cut, axis=1),
+            area_matrix_ex_compressed_cut)
+
         # Total multiplicity - use actual Ex0 = 0
         multiplicity = div0(Ex_array, Egamma_average)
 
-    # plt.figure(2)
-    # plt.step(Ex_array, multiplicity) # This rises like a straight line from 0 to about 3-4 - seems very right!
-    # plt.show()
-    # sys.exit(0)
+    else:
+        raise ValueError("Invalid value for variable multiplicity_estimation: ", multiplicity_estimation)
+    # for i in range(len(good_indices[:,0])):
+    # print len(good_indices[i,good_indices[i,:]]) # OK, it actually works.
+
 
     # Set up dummy first-generation matrix to start iterations, made of
     # normalized boxes:
@@ -303,14 +305,14 @@ def first_generation_method(matrix,
             # print "Egamma_mesh_compressed, Egamma_max, Egamma_max_grid"
             # print Egamma_mesh_compressed.shape, Egamma_max.shape,
             # Egamma_max_grid.shape
-            if statistical_or_total == 1:
+            if multiplicity_estimation == "statistical":
                 # Statistical multiplicity calculation (i.e. trying to use statistical/continuum region only)
                 # slide_compressed = np.minimum( np.maximum(ThresRatio*Ex_mesh_compressed, ThresTot), ThresSta ) # The sliding lower limit for Egamma integral - sliding between ThresTot and ThresSta.
 
                 # good_indices_G = np.where(np.logical_and(slide_compressed < Egamma_mesh_compressed, Egamma_mesh_compressed < Egamma_max_grid) , True, False)
                 G_area = np.where(np.logical_and(
                     slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid), G, 0).sum(axis=1)
-            elif statistical_or_total == 2:
+            elif multiplicity_estimation == "total":
                 # Total multiplicity calculation
                 # good_indices_G = np.where(Egamma_mesh_compressed < Egamma_max_grid, True, False)
                 # G_area = np.where(Egamma_mesh_compressed < Egamma_max_grid, G, 0).sum(axis=1)
