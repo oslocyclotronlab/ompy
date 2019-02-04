@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Class matrix_analysis(), the "core" matrix manipulation module of pyma.
 It handles unfolding and the first-generation method on Ex-Eg matrices.
@@ -34,6 +35,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .library import *
 from .rebin import *
+from .unfold import unfold
+from .first_generation_method import first_generation_method
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
@@ -69,7 +72,6 @@ class MatrixAnalysis():
 
         # Update 2019: Moved unfold function to separate file, so this is just
         # a wrapper.
-        from .unfold import unfold
         self.unfolded = unfold(
             raw=self.raw, fname_resp_mat=fname_resp_mat,
             fname_resp_dat=fname_resp_dat,
@@ -80,19 +82,26 @@ class MatrixAnalysis():
             use_comptonsubtraction=use_comptonsubtraction
         )
 
-
     def first_generation_method(self, Ex_max, dE_gamma,
                                 N_iterations=10, statistical_or_total=1,
                                 area_correction=True):
         """
-        Function implementing the first generation method from Guttormsen et al. (NIM 1987)
-        The code is heavily influenced by the original implementation by Magne in MAMA.
-        Mainly written autumn 2016 at MSU.
+        Function implementing the first generation method from Guttormsen et
+        al. (NIM 1987).
+
+        The code is heavily influenced by the original implementation by Magne
+        in MAMA. Mainly written autumn 2016 at MSU.
         """
 
         # = Check that unfolded matrix is present:
         if self.unfolded.matrix is None:
             raise Exception("Error: No unfolded matrix is loaded.")
+
+        # Call first generation method:
+        firstgen = first_generation_method( ... )
+
+        # 20190204: Remove most (all?) of what happens below!
+
 
         # Rename variables for local use:
         unfolded_matrix = self.unfolded.matrix
