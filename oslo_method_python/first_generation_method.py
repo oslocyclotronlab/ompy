@@ -7,7 +7,7 @@ from .rebin import *
 def first_generation_method(matrix_in,
                             Ex_max, dE_gamma, N_iterations=10,
                             multiplicity_estimation="statistical",
-                            area_correction=True):
+                            apply_area_correction=True):
     """
     Function implementing the first generation method from Guttormsen et
     al. (NIM 1987).
@@ -19,13 +19,13 @@ def first_generation_method(matrix_in,
         matrix (Matrix): The matrix to apply the first eneration method to
         multiplicity_estimation (str): One of ["statistical", "total"]
 
+    Todo:
+        Check that option multiplicity_estimation="total" works correctly.
     """
 
     unfolded_matrix = matrix_in.matrix
     Ex_array_mat = matrix_in.E0_array
     Egamma_array = matrix_in.E1_array
-
-    # TODO option statistical_or_total=2 (total) does not work
 
     Ny = len(unfolded_matrix[:, 0])
     Nx = len(unfolded_matrix[0, :])
@@ -42,7 +42,6 @@ def first_generation_method(matrix_in,
     # ExH = 7520.00000
     ExEntry0s = 300.000000
     ExEntry0t = 0.00000000
-    apply_area_correction = area_correction  # TODO rename variable to area_correction throughout
 
     # Ex_max = 7500 # keV - maximum excitation energy
     # Ex_min = 300 # keV - minimal excitation energy, effectively moving
@@ -50,14 +49,9 @@ def first_generation_method(matrix_in,
     # yrast gamma lines. This is weighed up by also using an effective 
     # multiplicity which is lower than the real one, again not considering
     # the low-energy yrast gammas.
-    # dE_gamma = 300 # keV - allow gamma energy to exceed excitation energy
+    # dE_gamma = 500  # keV - allow gamma energy to exceed excitation energy
     # by this much, to account for experimental resolution
-    # Ex_binsize = 40 # keV - bin size that we want on y axis
-    # N_Exbins = 120 # Number of excitation energy bins (NB! It will only
-    # rebin in whole multiples, so a slight change in N_Exbins might only
-    # result in getting some more empty bins on top.)
-    # N_Exbins_original = (Ex_max+dE_gamma)/ay # The number of bins between
-    # 0 and Ex_max + dE_gamma in the original matrix
+
     # grouping = int(np.ceil(len(y_array[np.logical_and(0 < y_array,
     # y_array < Ex_max + dE_gamma)])/N_Exbins)) # The integer number of
     # bins that need to be grouped to have approximately N_Exbins bins
@@ -75,28 +69,6 @@ def first_generation_method(matrix_in,
     matrix_ex_compressed = unfolded_matrix
     Ex_array = Ex_array_mat
 
-    # if N_Exbins != Ny:
-    # Compress matrix along Ex
-    #matrix_ex_compressed = matrix[0:int(N_Exbins*grouping),:].reshape(N_Exbins, grouping, Nx).sum(axis=1)
-    # Update 20180828: Trying other rebin functions
-    # matrix_ex_compressed = np.zeros((N_Exbins, Nx))
-    # for i in range(Nx):
-    #   # This is too slow.
-    #   # TODO understand if the int((Ex_max + dE_gamma etc...)) stuff is necessary.
-    #   # matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),i], Ex_array_mat[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny)], Ex_array)
-    #   print("i=",i,flush=True)
-    #   # print("Ex_array_mat.shape =", Ex_array_mat.shape, flush=True)
-    #   # print("matrix.shape =", matrix.shape, flush=True)
-    #   matrix_ex_compressed[:,i] = rebin_by_arrays_1d(matrix[:,i], Ex_array_mat, Ex_array)
-    # # matrix_ex_compressed = rebin_and_shift_2D_memoryguard(matrix[0:int((Ex_max+dE_gamma)/Ex_array_mat.max()*Ny),:], N_Exbins, rebin_axis = 0) # This seems crazy. Does it cut away anything at all?
-    # else:
-    # matrix_ex_compressed = matrix
-
-    # print Ny, N_Exbins, N_Exbins_original
-    # plt.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed, norm=LogNorm(vmin=0.001, vmax=matrix_ex_compressed.max()))
-    # plt.matshow(matrix_ex_compressed)
-    # plt.colorbar()
-    # plt.show()
 
     # Remove counts in matrix for Ex higher than Ex_max:
     matrix_ex_compressed[Ex_array > Ex_max, :] = 0
@@ -156,7 +128,9 @@ def first_generation_method(matrix_in,
         multiplicity = div0(Ex_array, Egamma_average)
 
     else:
-        raise ValueError("Invalid value for variable multiplicity_estimation: ", multiplicity_estimation)
+        raise ValueError("Invalid value for variable"
+                         " multiplicity_estimation: ",
+                         multiplicity_estimation)
     # for i in range(len(good_indices[:,0])):
     # print len(good_indices[i,good_indices[i,:]]) # OK, it actually works.
 
@@ -238,11 +212,8 @@ def first_generation_method(matrix_in,
         Eg_mesh, n_f) / np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000)), 0)
     W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
 
-    # TODO compare with folding.f, see if mask should be changed to global
-    # uncertainty DE_PARTICLE etc.
-    dEg = 1000
     mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
-                       0] + dEg, Ex_array[-1], Ex_array[-1] + dEg)
+                       0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
 
     # Perform the iterative subtraction:
     for iteration in range(N_iterations):
@@ -261,6 +232,8 @@ def first_generation_method(matrix_in,
             H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], Ex_array,
             rebin_axis=1)
 
+        plt.pcolormesh(Ex_array, Ex_array, H_compressed)
+        plt.show()
 
         # if iteration == 0:
         # Don't use H as weights for first iteration.
@@ -278,26 +251,29 @@ def first_generation_method(matrix_in,
         if iteration > 4:
             W = 0.7 * W + 0.3 * W_old
 
+        # Remove Inf and NaN
+        W = np.nan_to_num(W)
         # Remove negative weights
         W[W < 0] = 0
         # Apply mask
         # W = W * mask_W
         # Normalize each Ex channel to unity
         # W = np.where(np.invert(np.isnan(W/W.sum(axis=1).astype(float))),  W/W.sum(axis=1).astype(float), 0)
-        # Remove Inf and NaN
         W = div0(W, W.sum(axis=1).reshape(N_Exbins, 1))
         # Store for next iteration:
         W_old = np.copy(W)
-        # W = np.nan_to_num(W)
 
 
-        # Calculate product of normalization matrix, weight matrix and raw
-        # count matrix
+        # Calculate product of normalization matrix, weight matrix and
+        # all-generations count matrix:
         # Matrix of weighted sum of spectra below
+        # Todo write better comments on what happens here.
+        # What are the dimensions and calibrations?
         G = np.dot((normalization_matrix * W), matrix_ex_compressed)
 
         # Apply area correction
-        if apply_area_correction:
+        # if apply_area_correction:
+        if False: # DEBUG: Turning off area corr 20190204 to find out why it oversubtracts
             # Setup meshgrids for making boolean indexing arrays
             # Egamma_mesh_compressed, Ex_mesh_compressed = np.meshgrid(Egamma_array_compressed, Ex_array)
             # Egamma_max = Ex_array + dE_gamma # Maximal Egamma value for each Ex bin
@@ -336,7 +312,7 @@ def first_generation_method(matrix_in,
         print("iteration =", iteration, "max_diff =", max_diff, flush=True)
 
     # Remove negative counts
-    H[H < 0] = 0
+    # H[H < 0] = 0
 
     # Update internal variables and return True upon completion
     # return H, H-H_old, Ex_array, Egamma_array
