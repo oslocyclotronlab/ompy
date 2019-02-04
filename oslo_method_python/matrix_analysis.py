@@ -319,6 +319,8 @@ class MatrixAnalysis():
             Eg_mesh, n_f) / np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000)), 0)
         W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
 
+        # TODO compare with folding.f, see if mask should be changed to global
+        # uncertainty DE_PARTICLE etc.
         dEg = 1000
         mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
                            0] + dEg, Ex_array[-1], Ex_array[-1] + dEg)
