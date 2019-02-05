@@ -104,9 +104,9 @@ def first_generation_method_reimplementation(all_generations_matrix,
                          multiplicity_estimation
                          )
 
-    # == Calculate normalization matrix ==
+    # == Calculate S vector ==
     # Begin by making vector S of "cross sections" like in NIM paper.
-    # Normalization matrix is given by ratios of this.
+    # Normalization factor n is given by ratios of this.
     S = np.zeros(len(Ex_array))
     i_Eg_min = i_from_E(FG_EG_THRES_MULTIPLICITY_TOTAL, Ex_array)
     for i_Ex in range(len(Ex_array)):
@@ -124,11 +124,6 @@ def first_generation_method_reimplementation(all_generations_matrix,
         print("Ex = {:f}, S(Ex) = {:f}".format(Ex_array[i_Ex], S[i_Ex]))
     print("", flush=True)
     # END DEBUG
-    # Set up matrix. Shall have calibration Ex along both directions:
-    N = np.zeros((len(Ex_array), len(Ex_array)))
-    for i_Ex in range(len(Ex_array)):
-        for i_Exprim in range(len(Ex_array)):
-            N[i_Ex, i_Exprim] = div0(S[i_Ex], S[i_Exprim])
 
     # === Start iterating to find F ===
     N_iterations = 3  # TODO move to keyword arg
@@ -174,19 +169,22 @@ def first_generation_method_reimplementation(all_generations_matrix,
                     # But i_Egprim is an index to the weights matrix and shall
                     # hence be in Ex calibration! So:
                     i_Egprim = i_Ex - i_Exprim
-                    Y[i_it, i_Ex, i_Eg] += (weights_matrix[i_Ex, i_Egprim]
-                                            # * N[i_Ex, i_Exprim]
+
+                    Y[i_it, i_Ex, i_Eg] += (  # weights w:
+                                            weights_matrix[i_Ex, i_Egprim]
+                                            # normalization n:
                                             * div0(S[i_Ex], S[i_Exprim])
+                                            # all_generations counts:
                                             * A[i_Exprim, i_Eg]
                                             )
 
                 # Apply area correction:
-                apply_area_correction = False  # TODO move to keyword arg.
+                apply_area_correction = True  # TODO move to keyword arg.
                 if apply_area_correction:
                     # alpha = np.where(G_area > 0, (1 - div0(1, multiplicity))
                                      # * div0(area_matrix_ex_compressed_cut, G_area), 1)
                     # Enforce lower and upper limit:
-                    alpha = 1
+                    alpha = 0.85
                     alpha = max(0.85, min(1.15, alpha))
                     Y[i_it, i_Ex, :] *= alpha
 
@@ -196,8 +194,8 @@ def first_generation_method_reimplementation(all_generations_matrix,
         F[i_it+1, :, :] = A - Y[i_it, :, :]
 
     # Put final result into Matrix instance and return:
-    # first_generation_matrix = Matrix(matrix=F[-1, :, :],
-    first_generation_matrix = Matrix(matrix=Y[-2, :, :],
+    first_generation_matrix = Matrix(matrix=F[-1, :, :],
+    # first_generation_matrix = Matrix(matrix=Y[-2, :, :],
                                      E0_array=Ex_array,
                                      E1_array=Eg_array
                                      )
