@@ -125,6 +125,23 @@ def first_generation_method_reimplementation(all_generations_matrix,
     print("", flush=True)
     # END DEBUG
 
+    # Set up masking array for weights. We shall only consider Eg between
+    # Eg_min = FG_EG_THRES_MULTIPLICITY_TOTAL and Eg_max = Ex_max + dE
+    # The weights matrix is in Ex calibration along both axes.
+    mask = make_mask(Ex_array, Ex_array, 0, dE,
+                     Ex_array[int(len(Ex_array)/2)],
+                     Ex_array[int(len(Ex_array)/2)]+dE)
+    # Index of lower Eg limit, in Ex coordinates:
+    i_Eg_min = i_from_E(FG_EG_THRES_MULTIPLICITY_TOTAL, Ex_array)
+    # Set the lower threshold:
+    mask[:, 0:i_Eg_min] = 0
+    mask = mask.astype(bool)
+
+    # DEBUG:
+    plt.pcolormesh(Ex_array, Ex_array, mask)
+    plt.show()
+    # END DEBUG
+
     # === Start iterating to find F ===
     N_iterations = 3  # TODO move to keyword arg
     # Allocate matrices for F and Y. We store each iteration, because
@@ -133,8 +150,12 @@ def first_generation_method_reimplementation(all_generations_matrix,
     Y = np.zeros(np.append(N_iterations, A.shape))
 
     # Assume initial trial F to be flat boxes:
-    F[0, :, :] = np.ones(A.shape)
+    # F[0, :, :] = np.ones(A.shape)
+    # TODO try Fermi gas estimate instead. This should NOT matter...
+    for i_Ex in range(len(Ex_array)):
+        F[0, i_Ex, :] = 
 
+    weights_matrix_old = np.zeros(len(Ex_array))
     for i_it in range(0, N_iterations-1):
         # In this loop we calculate the (i_it+1)'th iteration
         # of the F and Y spectra.
@@ -148,10 +169,15 @@ def first_generation_method_reimplementation(all_generations_matrix,
                                            rebin_axis=1)
         # Remove negative values:
         F_previous_rebinned[F_previous_rebinned < 0] = 0
+        F_previous_rebinned_masked = np.where(mask, F_previous_rebinned, 0)
         # Normalize F_previous_rebinned in each Ex bin:
-        weights_matrix = div0(F_previous_rebinned,
-                              np.sum(F_previous_rebinned, axis=1)
+        weights_matrix = div0(F_previous_rebinned_masked,
+                              np.sum(F_previous_rebinned_masked, axis=1)
                               )
+
+        # Prevent oscillations, like in MAMA:
+        weights_matrix = 0.7*weights_matrix + 0.3*weights_matrix_old
+        weights_matrix_old = np.copy(weights_matrix)
         # TODO "massage" weights_matrix by removing negatives (and more?
         # see MAMA)
 
