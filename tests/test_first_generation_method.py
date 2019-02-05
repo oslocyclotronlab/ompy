@@ -20,7 +20,7 @@ dE_gamma = 500
 N_iterations = 10
 matrix_fg = om.first_generation_method(matrix_in, Ex_max=Ex_max, dE_gamma=dE_gamma,
                                        N_iterations=N_iterations)
-cbar = matrix_fg.plot(ax=ax2D2, title="Dy164 first-generation", zscale="log")
+cbar = matrix_fg.plot(ax=a
 # cbar = matrix_fg.plot(ax=ax2D2, title="firstgen om python", zscale="linear", zmin=-10, zmax=10)
 f2D.colorbar(cbar, ax=ax2D2)
 
