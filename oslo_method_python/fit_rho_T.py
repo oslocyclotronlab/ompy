@@ -1,7 +1,34 @@
-# Functions to decompose a first-generation matrix
-# into rho and T by a fit.
-# Some code stolen from Fabio Zeiser.
-# This version uses numpy arrays to do the heavy lifting as much as possible
+# -*- coding: utf-8 -*-
+"""
+Functions to decompose a first-generation matrix
+into rho and T by a fit.
+Parts of the code is borrowed from Fabio Zeiser's code rhosig.py:
+https://github.com/oslocyclotronlab/rhosig.py
+This version uses numpy arrays to do the heavy lifting as much as possible
+
+---
+
+This file is part of oslo_method_python, a python implementation of the
+Oslo method.
+
+Copyright (C) 2018 Jørgen Eriksson Midtbø
+Oslo Cyclotron Laboratory
+jorgenem [0] gmail.com
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""
 
 import numpy as np
 from .library import *
