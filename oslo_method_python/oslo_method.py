@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-This is a python implementation of the Oslo method.
+This is oslo_method_python, a python implementation of the Oslo method.
 It handles two-dimensional matrices of event count spectra, and
 implements detector response unfolding, first generation method
 and other manipulation of the spectra.
@@ -7,7 +8,7 @@ and other manipulation of the spectra.
 It is heavily inspired by MAMA, written by Magne Guttormsen and others,
 available at https://github.com/oslocyclotronlab/oslo-method-software
 
-Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
+Copyright (C) 2018 Jørgen Eriksson Midtbø
 Oslo Cyclotron Laboratory
 jorgenem [0] gmail.com
 

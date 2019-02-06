@@ -1,4 +1,32 @@
 # -*- coding: utf-8 -*-
+"""
+Implementation of the first generation method
+(Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in
+Physics Research A 255 (1987).)
+
+---
+
+This file is part of oslo_method_python, a python implementation of the
+Oslo method.
+
+Copyright (C) 2018 Jørgen Eriksson Midtbø
+Oslo Cyclotron Laboratory
+jorgenem [0] gmail.com
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+"""
 import numpy as np
 from .library import *
 from .rebin import *
@@ -36,11 +64,20 @@ def first_generation_method(matrix_in,
     # print("", flush=True)
     # # END DEBUG
 
+    # Protect input arrays:
+    unfolded_matrix = np.copy(matrix_in.matrix)
+    Ex_array_mat = np.copy(matrix_in.E0_array)
+    Egamma_array = np.copy(matrix_in.E1_array)
 
-    unfolded_matrix = matrix_in.matrix
-    Ex_array_mat = matrix_in.E0_array
-    Egamma_array = matrix_in.E1_array
+    # Cut the input matrix at or above Ex=0. This is implicitly
+    # done in MAMA by the variable IyL.
+    i_Ex_low = i_from_E(0, Ex_array_mat)
+    if Ex_array_mat[i_Ex_low] < 0:
+        i_Ex_low += 1
+    unfolded_matrix = unfolded_matrix[i_Ex_low:, :]
+    Ex_array_mat = Ex_array_mat[i_Ex_low:]
 
+    # Get some numbers:
     Ny = len(unfolded_matrix[:, 0])
     Nx = len(unfolded_matrix[0, :])
     calib_in = matrix_in.calibration()

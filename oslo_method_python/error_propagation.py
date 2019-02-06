@@ -1,19 +1,15 @@
+# -*- coding: utf-8 -*-
 """
-Class error_propagation in the python Oslo method
-It handles generation of random ensembles of spectra with 
+code for error propagation in oslo_method_python
+It handles generation of random ensembles of spectra with
 statistical perturbations, and can make first generation variance matrices.
 
 ---
 
-# This is a python implementation of the Oslo method.
-It handles two-dimensional matrices of event count spectra, and
-implements detector response unfolding, first generation method
-and other manipulation of the spectra.
+This file is part of oslo_method_python, a python implementation of the
+Oslo method.
 
-It is heavily inspired by MAMA, written by Magne Guttormsen and others,
-available at https://github.com/oslocyclotronlab/oslo-method-software
-
-Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
+Copyright (C) 2018 Jørgen Eriksson Midtbø
 Oslo Cyclotron Laboratory
 jorgenem [0] gmail.com
 
@@ -31,14 +27,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-import numpy as np 
+import numpy as np
 import os
 from .library import *
-# from _matrix_analysis import matrix_analysis
+from .matrix_analysis import *
 
-class error_propagation:
-    def __init__(self, base_analysis_instance, folder="oslo_method_ensemble_folder", randomness="gaussian", seed=None):
-        self.base_analysis = base_analysis_instance
+
+class ErrorPropagation:
+    def __init__(self, matrix_analysis_instance,
+                 folder="oslo_method_ensemble_folder",
+                 randomness="gaussian",
+                 seed=None):
+        self.matrix_analysis = matrix_analysis_instance
         self.folder = folder
         self.randomness = randomness
         # Create folder
@@ -49,27 +49,27 @@ class error_propagation:
         if seed is not None:
             np.random.seed(seed)
 
-        # Check if the passed base_analysis_instance contains
+        # Check if the passed matrix_analysis_instance contains
         # raw, unfolded and firstgen matrices. 
         # If so, copy them to ensemble directory.
         # If not, run through and make them (except raw,
         # which must be there).
 
         # Raw:
-        if self.base_analysis.raw.matrix is None:
+        if self.matrix_analysis.raw.matrix is None:
             raise Exception("Error: No raw matrix passed to pyma_mc. ")
         else:
-            self.base_analysis.raw.save(os.path.join(folder, "raw-orig.m"))
+            self.matrix_analysis.raw.save(os.path.join(folder, "raw-orig.m"))
         # Unfolded:
-        if self.base_analysis.unfolded.matrix is None:
-            self.base_analysis.unfold()
+        if self.matrix_analysis.unfolded.matrix is None:
+            self.matrix_analysis.unfold()
         else:
-            self.base_analysis.unfolded.save(os.path.join(folder, "unfolded-orig.m"))
+            self.matrix_analysis.unfolded.save(os.path.join(folder, "unfolded-orig.m"))
         # First generation
-        if self.base_analysis.firstgen.matrix is None:
-            self.base_analysis.first_generation_method()
+        if self.matrix_analysis.firstgen.matrix is None:
+            self.matrix_analysis.first_generation_method()
         else:
-            self.base_analysis.firstgen.save(os.path.join(folder, "firstgen-orig.m"))
+            self.matrix_analysis.firstgen.save(os.path.join(folder, "firstgen-orig.m"))
 
 
 
@@ -81,7 +81,7 @@ class error_propagation:
 
 
         folder = self.folder
-        base_analysis = self.base_analysis
+        matrix_analysis = self.matrix_analysis
         randomness = self.randomness
 
         # TODO copy things from generate_ensemble.py.
@@ -166,7 +166,7 @@ class error_propagation:
 
 
         # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
-        firstgen_ensemble = np.zeros((N_ensemble_members,base_analysis.firstgen.matrix.shape[0],base_analysis.firstgen.matrix.shape[1]))
+        firstgen_ensemble = np.zeros((N_ensemble_members,matrix_analysis.firstgen.matrix.shape[0],matrix_analysis.firstgen.matrix.shape[1]))
 
         # Loop over and generate the random perturbations, then unfold and first-generation-method them:
         for i in range(N_ensemble_members):
@@ -177,7 +177,7 @@ class error_propagation:
 
             # Allocate matrix_analysis instance for current ensemble member:
             import copy
-            pm_curr = copy.deepcopy(base_analysis)
+            pm_curr = copy.deepcopy(matrix_analysis)
             # Check if the current ensemble member exists on file, create it if not:
             if os.path.isfile(fname_raw_current) and not purge_files:
                 # data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
@@ -189,16 +189,16 @@ class error_propagation:
                     print("Generating raw matrix", flush=True)
                 # matrix_ensemble_current = np.maximum(matrix + np.random.normal(size=matrix_shape)*np.sqrt(matrix), np.zeros(matrix_shape)) # Each bin of the matrix is perturbed with a gaussian centered on the bin count, with standard deviation sqrt(bin count). Also, no negative counts are accepted.
                 if randomness=="gaussian":
-                    matrix_perturbed = base_analysis.raw.matrix + np.random.normal(size=base_analysis.raw.matrix.shape, scale=np.sqrt(np.where(base_analysis.raw.matrix > 0, base_analysis.raw.matrix, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
+                    matrix_perturbed = matrix_analysis.raw.matrix + np.random.normal(size=matrix_analysis.raw.matrix.shape, scale=np.sqrt(np.where(matrix_analysis.raw.matrix > 0, matrix_analysis.raw.matrix, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
                     matrix_perturbed[matrix_perturbed<0] = 0
                     # Update the "raw" member of pm_curr:
-                    pm_curr.raw = pmmat.matrix(matrix_perturbed, base_analysis.raw.Ex_array, base_analysis.raw.Eg_array)
-                    print("base_analysis.raw.matrix.shape =", base_analysis.raw.matrix.shape)
+                    pm_curr.raw = pmmat.matrix(matrix_perturbed, matrix_analysis.raw.Ex_array, matrix_analysis.raw.Eg_array)
+                    print("matrix_analysis.raw.matrix.shape =", matrix_analysis.raw.matrix.shape)
                     print("pm_curr.raw.matrix.shape =", pm_curr.raw.matrix.shape, flush=True)
                 elif randomness=="poisson":
                     # Use the original number of counts as the estimator for lambda (expectation value) in the Poisson
                     # distribution at each bin, and draw a completely new matrix:
-                    matrix_perturbed = np.random.poisson(np.where(base_analysis.raw.matrix>0, base_analysis.raw.matrix, 0))
+                    matrix_perturbed = np.random.poisson(np.where(matrix_analysis.raw.matrix>0, matrix_analysis.raw.matrix, 0))
                 else:
                     raise Exception("Unknown value for randomness variable: "+str(randomness))
                     
@@ -268,10 +268,10 @@ class error_propagation:
 
         # === Calculate variance ===:
         firstgen_ensemble_variance = np.var(firstgen_ensemble, axis=0)
-        var_firstgen = matrix(firstgen_ensemble_variance, base_analysis.firstgen.Ex_array, base_analysis.firstgen.Eg_array)
+        var_firstgen = matrix(firstgen_ensemble_variance, matrix_analysis.firstgen.Ex_array, matrix_analysis.firstgen.Eg_array)
         fname_firstgen_variance = os.path.join(folder, "firstgen_variance.m")
         var_firstgen.save(fname_firstgen_variance)
-        # pml.write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, base_analysis.firstgen.Ex_array, base_analysis.firstgen.Eg_array, comment="variance of first generation matrix ensemble")
+        # pml.write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, matrix_analysis.firstgen.Ex_array, matrix_analysis.firstgen.Eg_array, comment="variance of first generation matrix ensemble")
 
 
 
