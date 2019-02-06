@@ -1,4 +1,4 @@
-# oslo_metod_python
+# oslo_method_python
 
 NB! This repo is currently in testing. Most things do not work correctly. Use at your own risk!
 
