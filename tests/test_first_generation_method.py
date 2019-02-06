@@ -6,24 +6,33 @@ import matplotlib.pyplot as plt
 # Test the first_generation_method() and helper functions
 
 fname_unfolded = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/alfnaun"
-# Call it through the MatrixAnalysis class for now,
-# but firstgen should be made callable as a standalone function.
-ma = om.MatrixAnalysis()
+matrix_in = om.Matrix()
+matrix_in.load(fname_unfolded)
 
-ma.unfolded.load(fname_unfolded)
-
-f2D, (ax2D1, ax2D2) = plt.subplots(1, 2)
-cbar = ma.unfolded.plot(ax=ax2D1, title="Dy164 unfolded",
-                        zscale="log", zmin=1e-3)
+f2D, ((ax2D1, ax2D2), (ax2D3, ax2D4)) = plt.subplots(2, 2)
+cbar = matrix_in.plot(ax=ax2D1, title="Dy164 unfolded",
+                      zscale="log", zmin=1e-3, zmax=5e3)
 f2D.colorbar(cbar, ax=ax2D1)
 
 # Run first generation method
-Ex_max = 8500
+Ex_max = 14000
 dE_gamma = 500
-ma.first_generation_method(Ex_max=Ex_max, dE_gamma=dE_gamma)
-ma.firstgen.plot(ax=ax2D2, title="Dy164 first-generation",
-                        zscale="log")
+N_iterations = 10
+matrix_fg = om.first_generation_method(matrix_in, Ex_max=Ex_max,
+                                       dE_gamma=dE_gamma,
+                                       N_iterations=N_iterations,
+                                       )
+cbar = matrix_fg.plot(ax=ax2D2, title="firstgen om python", zscale="log",
+                      zmin=1e-3, zmax=5e3)
 f2D.colorbar(cbar, ax=ax2D2)
+
+
+# Load MAMA-firstgen to compare
+fname_fg_mama = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/fg"
+matrix_fg_mama = om.Matrix()
+matrix_fg_mama.load(fname_fg_mama)
+cbar = matrix_fg_mama.plot(ax=ax2D3, title="firstgen mama", zmin=1e-3, zmax=5e3)
+f2D.colorbar(cbar, ax=ax2D3)
 
 
 plt.show()
