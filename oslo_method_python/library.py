@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 
 class Matrix():
@@ -38,111 +40,197 @@ class Matrix():
     arrays.
 
     """
-    def __init__(self, matrix=None, Ex_array=None, Eg_array=None):
+    def __init__(self, matrix=None, E0_array=None, E1_array=None,
+                 std=None):
         """
         Initialise the class. There is the option to initialise
         it in an empty state. In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
         self.matrix = matrix
-        self.Ex_array = Ex_array
-        self.Eg_array = Eg_array
+        self.E0_array = E0_array
+        self.E1_array = E1_array
+        self.std = std  # slot for matrix of standard deviations
 
-        self.calibration = None
-        if (matrix is not None and Ex_array is not None
-                and Eg_array is not None):
-            # Calculate calibration based on energy arrays, assuming linear
-            # calibration:
-            self.calibration = {
-                                "a0x": Eg_array[0],
-                                "a1x": Eg_array[1]-Eg_array[0],
-                                "a2x": 0,
-                                "a0y": Ex_array[0],
-                                "a1y": Eg_array[1]-Eg_array[0],
-                                "a2y": 0
-                                }
+    def calibration(self):
+        """Calculate and return the calibration coefficients of the energy axes
+        """
+        calibration = None
+        if (self.matrix is not None and self.E0_array is not None
+                and self.E1_array is not None):
+            calibration = {
+                           # Formatted as "a{axis}{power of E}"
+                           "a00": self.E0_array[0],
+                           "a01": self.E0_array[1]-self.E0_array[0],
+                           "a10": self.E1_array[0],
+                           "a11": self.E1_array[1]-self.E1_array[0],
+                          }
+        else:
+            raise Exception("calibration() called on empty Matrix instance")
+        return calibration
 
-    def plot(self, ax=None, title="", norm="log", zmin=None, zmax=None):
-        import matplotlib.pyplot as plt
+    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None):
         cbar = None
         if ax is None:
             f, ax = plt.subplots(1, 1)
-        if norm == "log":
+        if zscale == "log":
             # z axis shall have log scale
-            from matplotlib.colors import LogNorm
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin)
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmax=zmax)
                                      )
-            if (zmin is not None and zmax is not None):
+            elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin, vmax=zmax)
                                      )
             else:
                 # or finally, no limits:
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm()
                                      )
-
-        else:
+        elif zscale == "linear":
             # z axis shall have linear scale
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmax=zmax
                                      )
-            if (zmin is not None and zmax is not None):
+            elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
                                      vmax=zmax
                                      )
-            if (zmin is not None and zmax is not None):
+            else:
                 # or finally, no limits.
-                cbar = ax.pcolormesh(self.Eg_array,
-                                     self.Ex_array,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix
                                      )
+        else:
+            raise Exception("Unknown zscale type", zscale)
         ax.set_title(title)
         if ax is None:
+            f.colorbar(cbar, ax=ax)
             plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
+
+    def plot_projection(self, E_limits, axis, ax=None, normalize=False,
+                        label=None):
+        """Plots the projection of the matrix along axis
+
+        Args:
+            axis (int, 0 or 1): The axis to project onto.
+            E_limits (list of two floats): The energy limits for the
+                                           projection.
+            ax (matplotlib axes object, optional): The axes object to put
+                                                   the plot in.
+        """
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
+        else:
+            pass
+
+        if axis == 0:
+            i_E_low = i_from_E(E_limits[0], self.E1_array)
+            i_E_high = i_from_E(E_limits[1], self.E1_array)
+            if normalize:
+                projection = np.mean(
+                                div0(
+                                    self.matrix[:, i_E_low:i_E_high],
+                                    np.sum(self.matrix[:, i_E_low:i_E_high],
+                                           axis=0
+                                           )
+                                    ),
+                                axis=1
+                                )
+            else:
+                projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
+            if label is None:
+                ax.plot(self.E0_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E0_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
+        elif axis == 1:
+            i_E_low = i_from_E(E_limits[0], self.E0_array)
+            i_E_high = i_from_E(E_limits[1], self.E0_array)
+            if normalize:
+                projection = np.mean(
+                                div0(
+                                    self.matrix[i_E_low:i_E_high, :],
+                                    (np.sum(self.matrix[i_E_low:i_E_high, :],
+                                           axis=1)
+                                     * self.calibration()["a01"])[:, None]
+                                    ),
+                                axis=0
+                                )
+            else:
+                projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
+            if label is None:
+                ax.plot(self.E1_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E1_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
+        else:
+            raise Exception("Variable axis must be one of (0, 1) but is",
+                            axis)
+        if label is not None:
+            ax.legend()
+
+    def plot_projection_x(self, E_limits, ax=None, normalize=False,
+                          label=""):
+        """ Wrapper to call plot_projection(axis=1) to project on x axis"""
+        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
+                               normalize=normalize, label=label)
 
     def save(self, fname):
         """
         Save matrix to mama file
         """
-        write_mama_2D(self.matrix, fname, self.Ex_array, self.Eg_array,
+        write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
                       comment="Made by pyma")
-        return True
 
     def load(self, fname):
         """
@@ -152,28 +240,131 @@ class Matrix():
             print("Warning: load() called on non-empty matrix", flush=True)
 
         # Load matrix from file:
-        matrix, calibration, Ex_array, Eg_array = read_mama_2D(fname)
-        self.matrix = matrix
-        self.Ex_array = Ex_array
-        self.Eg_array = Eg_array
-        self.calibration = calibration
+        # matrix, calibration, Ex_array, Eg_array = read_mama_2D(fname)
+        matrix_object = read_mama_2D(fname)
+        self.matrix = matrix_object.matrix
+        self.E0_array = matrix_object.E0_array
+        self.E1_array = matrix_object.E1_array
 
-        return True
+    def cut_rect(self, axis, E_limits, inplace=True):
+        """
+        Cuts the matrix (and std, if present) to the sub-interval E_limits.
+
+        Args:
+            axis (int): Which axis to apply the cut to.
+            E_limits (list): [E_min, E_max], where
+                E_min, E_max (float): Upper and lower energy limits for cut
+            inplace (bool): Whether to make the cut in place or not
+
+        Returns:
+            None if inplace==False
+            cut_matrix (Matrix): The cut version of the matrix
+        """
+        assert(E_limits[1] >= E_limits[0])  # Sanity check
+        matrix_cut = None
+        std_cut = None
+        out = None
+        if axis == 0:
+            i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            matrix_cut = self.matrix[i_E_min:i_E_max, :]
+            E0_array_cut = self.E0_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array)
+
+        elif axis == 1:
+            i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
+            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
+            matrix_cut = self.matrix[:, i_E_min:i_E_max]
+            E1_array_cut = self.E1_array[i_E_min:i_E_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E1_array = E1_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array, E1_array_cut)
+        else:
+            raise ValueError("Axis must be one of (0, 1), but is", axis)
+
+        return out
+
+    def cut_diagonal(self, E1, E2):
+        self.matrix = cut_diagonal(self.matrix, self.E0_array,
+                                   self.E1_array, E1, E2)
+
+    def fill_negative(self, window_size):
+        self.matrix = fill_negative(self.matrix, window_size)
+
+    def remove_negative(self):
+        self.matrix = np.where(self.matrix > 0, self.matrix, 0)
 
 
-class vector():
+class Vector():
     def __init__(self, vector=None, E_array=None):
         self.vector = vector
         self.E_array = E_array
-        
-        # if vector is not None and 
-        # self.calibration = {}
 
+    def calibration(self):
+        """Calculate and return the calibration coefficients of the energy axes
+        """
+        calibration = None
+        if (self.vector is not None and self.E_array is not None):
+            calibration = {
+                           # Formatted as "a{axis}{power of E}"
+                           "a0": self.E_array[0],
+                           "a1": self.E_array[1]-self.E_array[0],
+                          }
+        else:
+            raise Exception("calibration() called on empty Vector instance")
+        return calibration
 
+    def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
+             title=None, label=None):
+        if ax is None:
+            f, ax = plt.subplots(1, 1)
+
+        # Plot with middle-bin energy values:
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        if label is None:
+            ax.plot(E_array_midbin, self.vector)
+        elif isinstance(label, str):
+            ax.plot(E_array_midbin, self.vector, label=label)
+        else:
+            raise ValueError("Keyword label must be None or string, but is",
+                             label)
+
+        ax.set_yscale(yscale)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if title is not None:
+            ax.set_title(title)
+        if ax is None:
+            plt.show()
+        return True
+
+    def save(self, fname):
+        """
+        Save vector to mama file
+        """
+        raise Exception("Not implemented yet")
+
+        return None
+
+    def load(self, fname):
+        """
+        Load vector from mama file
+        """
+        raise Exception("Not implemented yet")
+
+        return None
 
 
 def read_mama_2D(filename):
-    # Reads a MAMA matrix file and returns the matrix as a numpy array, 
+    # Reads a MAMA matrix file and returns the matrix as a numpy array,
     # as well as a list containing the four calibration coefficients
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
     # and 1-D arrays of calibrated x and y values for plotting and similar.
@@ -199,12 +390,14 @@ def read_mama_2D(filename):
                                                     # Update 20171024: Started changing everything to lower bin edge,
                                                     # but started to hesitate. For now I'm inclined to keep it as
                                                     # center-bin everywhere. 
-    return matrix, cal, y_array, x_array # Returning y (Ex) first as this is axis 0 in matrix language
+    out = Matrix(matrix=matrix, E0_array=y_array, E1_array=x_array)
+    return out
 
 
 def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
     import time
     outfile = open(filename, 'w')
+    # TODO update function to take Matrix object as input
 
     # Write mandatory header:
     # outfile.write('!FILE=Disk \n')
@@ -263,14 +456,23 @@ def read_response(fname_resp_mat, fname_resp_dat):
     ps = resp[:,5]
     pd = resp[:,6]
     pa = resp[:,7]
-    
+
     return R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array_R
+
 
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
-    with np.errstate(divide='ignore', invalid='ignore'):
-        c = np.true_divide(a, b )
-        c[ ~ np.isfinite(c )] = 0  # -inf inf NaN
+    # Check whether a or b (or both) are numpy arrays. If not, we don't
+    # use the fancy function.
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            c = np.true_divide(a, b )
+            c[ ~ np.isfinite(c )] = 0  # -inf inf NaN
+    else:
+        if b == 0:
+            c = 0
+        else:
+            c = a / b
     return c
 
 
@@ -290,49 +492,6 @@ def line(x, points):
     return a*x + b
 
 
-def rebin(array, E_range, N_final, rebin_axis=0):
-    """
-    Rebins an array to have N_final bins
-
-    Inputs:
-    array -- the array to rebin
-    E_range -- the energy values specifying the calibration of the array 
-               (lower bin edge + assumes linear calibration)
-    N_final -- the desired number of bins after rebin
-    rebin_axis -- which axis of array to rebin, if multi-dimensional. 
-                  In that case, E_range must correspond to chosen axis.
-
-
-    Returns: 
-    array_final -- the rebinned array
-    E_range_final -- the array of lower bin edge values in the rebinned array
-
-    
-    TODO: Implement a "memory guard" to avoid running out of memory by chunking 
-    the .repeat() operations into parts if there is not enough memory to do every-
-    thing at once.
-
-    """
-    if isinstance(array, tuple): # Check if input array is actually a tuple, which may happen if function is called several times nested for different axes.
-        array = array[0]
-
-    N_orig = array.shape[rebin_axis]
-    dim = np.insert(array.shape, rebin_axis, N_final)
-
-    # TODO insert a loop here over chunks along another axis than the rebin axis, to try to avoid memory problems
-    array_final = (array.repeat(N_final)/N_final).reshape(dim).sum(axis=(rebin_axis+1))
-
-    # Recalculate calibration:
-    a0 = E_range[0]
-    a1_orig = E_range[1]-E_range[0]
-    a1_final = N_orig/N_final*a1_orig
-    E_range_final = np.linspace(a0, a0 + a1_final*(N_final-1), N_final)
-
-    return array_final, E_range_final
-
-#def rebin_to_Earray(array, E_range_in, E_range_final, rebin_axis=0):
-    # JEM 20190107: Would be useful to have a version of the rebin routine that
-    # rebins the array to a new calibration instead of a new set number of bins...
 
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
@@ -456,8 +615,88 @@ def EffExp(Eg_array):
     return EffExp_array
 
 
-def E_array_from_calibration(a0, a1, N):
+def E_array_from_calibration(a0, a1, N=None, E_max=None):
     """
-    Return an array of energy values corresponding to the specified calibration.
+    Return an array of lower-bin-edge energy values corresponding to the
+    specified calibration.
+
+    Args:
+        a0, a1 (float): Calibration coefficients; E = a0 + a1*i
+        either
+            N (int): Number of bins
+        or
+            E_max (float): Max energy. Array is constructed to ensure last bin
+                           covers E_max. In other words,
+                           E_array[-1] >= E_max - a1
+    Returns:
+        E_array (np.ndarray): Array of lower-bin-edge energy values
     """
-    return np.linspace(a0, a0+a1*(N-1), N)
+    E_array = None
+    if E_max is not None and N is not None:
+        raise Exception("Cannot give both N and E_max -- must choose one")
+    if N is not None:
+        E_array = np.linspace(a0, a0+a1*(N-1), N)
+    elif E_max is not None:
+        N = int(np.ceil((E_max - a0)/a1))
+        E_array = np.linspace(a0, a0+a1*(N-1), N)
+    else:
+        raise Exception("Either N or E_max must be given")
+
+    return E_array
+
+
+def fill_negative(matrix, window_size):
+    """
+    Fill negative channels with positive counts from neighbouring channels
+
+    The MAMA routine for this is very complicated. It seems to basically
+    use a sliding window along the Eg axis, given by the FWHM, to look for
+    neighbouring bins with lots of counts and then take some counts from there.
+    Can we do something similar in an easy way?
+
+    Todo: Debug me!
+    """
+    matrix_out = np.copy(matrix)
+    # Loop over rows:
+    for i_Ex in range(matrix.shape[0]):
+        for i_Eg in np.where(matrix[i_Ex, :] < 0)[0]:
+            print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
+            # window_size = 4  # Start with a constant window size.
+            # TODO relate it to FWHM by energy arrays
+            i_Eg_low = max(0, i_Eg - window_size)
+            i_Eg_high = min(matrix.shape[1], i_Eg + window_size)
+            # Fill from the channel with the larges positive count
+            # in the neighbourhood
+            i_max = np.argmax(matrix[i_Ex, i_Eg_low:i_Eg_high])
+            print("i_max =", i_max)
+            if matrix[i_Ex, i_max] <= 0:
+                pass
+            else:
+                positive = matrix[i_Ex, i_max]
+                negative = matrix[i_Ex, i_Eg]
+                fill = min(0, positive + negative)  # Don't fill more than to 0
+                rest = positive
+                print("fill =", fill, "rest =", rest)
+                matrix_out[i_Ex, i_Eg] = fill
+                # matrix_out[i_Ex, i_max] = rest
+    return matrix_out
+
+
+def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
+        """
+        Cut away counts to the right of a diagonal line defined by indices
+
+        Args:
+            matrix (np.ndarray): The matrix of counts
+            Ex_array: Energy calibration along Ex
+            Eg_array: Energy calibration along Eg
+            E1 (list of two floats): First point of intercept, ordered as Ex,Eg
+            E2 (list of two floats): Second point of intercept
+        Returns:
+            The matrix with counts above diagonal removed
+        """
+        Ex1, Eg1 = E1
+        Ex2, Eg2 = E2
+        mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
+        matrix_out = np.where(mask, matrix, 0)
+        return matrix_out
