@@ -36,11 +36,20 @@ def first_generation_method(matrix_in,
     # print("", flush=True)
     # # END DEBUG
 
+    # Protect input arrays:
+    unfolded_matrix = np.copy(matrix_in.matrix)
+    Ex_array_mat = np.copy(matrix_in.E0_array)
+    Egamma_array = np.copy(matrix_in.E1_array)
 
-    unfolded_matrix = matrix_in.matrix
-    Ex_array_mat = matrix_in.E0_array
-    Egamma_array = matrix_in.E1_array
+    # Cut the input matrix at or above Ex=0. This is implicitly
+    # done in MAMA by the variable IyL.
+    i_Ex_low = i_from_E(0, Ex_array_mat)
+    if Ex_array_mat[i_Ex_low] < 0:
+        i_Ex_low += 1
+    unfolded_matrix = unfolded_matrix[i_Ex_low:, :]
+    Ex_array_mat = Ex_array_mat[i_Ex_low:]
 
+    # Get some numbers:
     Ny = len(unfolded_matrix[:, 0])
     Nx = len(unfolded_matrix[0, :])
     calib_in = matrix_in.calibration()
