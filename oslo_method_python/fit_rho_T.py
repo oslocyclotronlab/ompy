@@ -17,7 +17,9 @@ global DE_GAMMA_8MEV
 
 
 def fit_rho_T(firstgen_in, bin_width_out,
-              Ex_min, Ex_max, Eg_min):
+              Ex_min, Ex_max, Eg_min,
+              method="Powell",
+              verbose=True):
     """Fits the firstgen spectrum to the product of transmission coeff T and
     level density rho
 
@@ -30,6 +32,11 @@ def fit_rho_T(firstgen_in, bin_width_out,
         Ex_max (float): Maximum excitation energy for the fit
         Eg_min (float): Minimum gamma-ray energy for the fit
                         (Eg_max is equal to Ex_max)
+        method (str): Method to use for minimization.
+                      Must be one of the methods available
+                      in scipy.optimize.minimize.
+        verbose (bool): Whether to print information
+                        from the fitting routine.
 
     Returns:
         rho, T (tuple):
@@ -168,10 +175,8 @@ def fit_rho_T(firstgen_in, bin_width_out,
     res = minimize(chisquare_1D, x0=p0,
                    args=(firstgen.matrix, firstgen.std,
                          E_array, masking_array),
-                   # method="Powell",
-                   # method="Nelder-Mead",
-                   method="CG",
-                   options={'disp': True})
+                   method=method,
+                   options={'disp': verbose})
 
     # Unpack the fit values:
     print("res =", res)

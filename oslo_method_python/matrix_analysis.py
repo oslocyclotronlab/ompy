@@ -85,16 +85,18 @@ class MatrixAnalysis():
     def first_generation_method(self, Ex_max, dE_gamma,
                                 N_iterations=10,
                                 multiplicity_estimation="statistical",
-                                area_correction=True):
+                                apply_area_correction=False,
+                                verbose=False):
         # = Check that unfolded matrix is present:
         if self.unfolded.matrix is None:
             raise Exception("Error: No unfolded matrix is loaded.")
 
         # Call first generation method:
-        self.firstgen = first_generation_method(self.unfolded,
-                                                Ex_max,
-                                                dE_gamma,
-                                                N_iterations,
-                                                multiplicity_estimation,
-                                                area_correction
+        self.firstgen = first_generation_method(matrix_in=self.unfolded,
+                                                Ex_max=Ex_max,
+                                                dE_gamma=dE_gamma,
+                                                N_iterations=N_iterations,
+                                                multiplicity_estimation=multiplicity_estimation,
+                                                apply_area_correction=apply_area_correction,
+                                                verbose=verbose
                                                 )
