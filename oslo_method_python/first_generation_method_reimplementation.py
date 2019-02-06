@@ -41,8 +41,8 @@ def first_generation_method_reimplementation(all_generations_matrix,
     Eg_array = all_generations_matrix.E1_array
 
     # Get calibration coefficients:
-    aEx, bEx = Ex_array[0], Ex_array[1]-Ex_array[0]
-    aEg, bEg = Eg_array[0], Eg_array[1]-Eg_array[0]
+    bEx, aEx = Ex_array[0], Ex_array[1]-Ex_array[0]
+    bEg, aEg = Eg_array[0], Eg_array[1]-Eg_array[0]
 
     # Get the number of bins corresponding to energy padding dE
     dE = 500  # TODO move out to keyword argument
@@ -138,8 +138,8 @@ def first_generation_method_reimplementation(all_generations_matrix,
     mask = mask.astype(bool)
 
     # DEBUG:
-    plt.pcolormesh(Ex_array, Ex_array, mask)
-    plt.show()
+    # plt.pcolormesh(Ex_array, Ex_array, mask)
+    # plt.show()
     # END DEBUG
 
     # === Start iterating to find F ===
@@ -152,8 +152,19 @@ def first_generation_method_reimplementation(all_generations_matrix,
     # Assume initial trial F to be flat boxes:
     # F[0, :, :] = np.ones(A.shape)
     # TODO try Fermi gas estimate instead. This should NOT matter...
+    N_exp = 4.2
+    a_f = 16.0
     for i_Ex in range(len(Ex_array)):
-        F[0, i_Ex, :] = 
+        Ex = Ex_array[i_Ex]
+        for i_Eg in range(len(Eg_array)):
+            Eg = Eg_array[i_Eg]
+            Ef = Ex - Eg
+            F[0, i_Ex, i_Eg] = (Eg**N_exp)*np.exp(2*np.sqrt(a_f*Ef)) / Ef**2
+        # Special treatment for i_Eg=0 to have it non-zero:
+        Eg = aEg*0.25
+        for i_Ex in range(len(Ex_array)):
+            Ef = Ex_array[i_Ex] - Eg
+            F[0, :, 0] = (Eg**N_exp)*np.exp(2*np.sqrt(a_f*Ef)) / Ef**2
 
     weights_matrix_old = np.zeros(len(Ex_array))
     for i_it in range(0, N_iterations-1):
@@ -177,19 +188,22 @@ def first_generation_method_reimplementation(all_generations_matrix,
 
         # Prevent oscillations, like in MAMA:
         weights_matrix = 0.7*weights_matrix + 0.3*weights_matrix_old
+        # Normalize the linear combination:
+        weights_matrix = div0(weights_matrix,
+                              np.sum(weights_matrix, axis=1))
         weights_matrix_old = np.copy(weights_matrix)
         # TODO "massage" weights_matrix by removing negatives (and more?
         # see MAMA)
 
         # === Step 3: Loop over all Ex bins       ===
         # === and calculate Y[i_it] ===
-        for i_Ex in range(A.shape[0]):
+        for i_Ex in range(len(Ex_array)):
             # Calculate younger-generations matrix Y.
             # Loop over all Ex' below Ex:
-            for i_Exprim in range(0, i_Ex-1):
+            for i_Exprim in range(0, i_Ex):
+                Exprim = Ex_array[i_Exprim]
                 # Loop over all Eg bins in each Ex' bin:
                 # Caveat: i_Eg is still in Eg_array calibration!
-                Exprim = Ex_array[i_Exprim]
                 i_Eg_max = i_from_E(Exprim + dE, Eg_array)
                 for i_Eg in range(0, i_Eg_max):
                     # But i_Egprim is an index to the weights matrix and shall
@@ -205,12 +219,12 @@ def first_generation_method_reimplementation(all_generations_matrix,
                                             )
 
                 # Apply area correction:
-                apply_area_correction = True  # TODO move to keyword arg.
+                apply_area_correction = False  # TODO move to keyword arg.
                 if apply_area_correction:
                     # alpha = np.where(G_area > 0, (1 - div0(1, multiplicity))
                                      # * div0(area_matrix_ex_compressed_cut, G_area), 1)
                     # Enforce lower and upper limit:
-                    alpha = 0.85
+                    alpha = 0.95 # 0.85
                     alpha = max(0.85, min(1.15, alpha))
                     Y[i_it, i_Ex, :] *= alpha
 

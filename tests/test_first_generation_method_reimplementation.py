@@ -10,7 +10,8 @@ allgen.load(fname_unfolded)
 firstgen = om.first_generation_method_reimplementation(allgen)
 
 # Load firstgen calculated with MAMA to compare:
-fname_fg_mama = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/fg"
+# fname_fg_mama = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/fg"
+fname_fg_mama = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/JEM_mama/fg-tot_multipl-area_corr-JEM"
 firstgen_mama = om.Matrix()
 firstgen_mama.load(fname_fg_mama)
 
@@ -18,7 +19,8 @@ firstgen_mama.load(fname_fg_mama)
 # === Plot them ===
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 # All generations
-cbar1 = allgen.plot(ax=ax1, title="all generations matrix", zmin=1e-2)
+cbar1 = allgen.plot(ax=ax1, title="all generations matrix",
+                      zmin=1e-2, zmax=5e3)
 f.colorbar(cbar1, ax=ax1)
 # First generation
 cbar2 = firstgen.plot(ax=ax2, title="firstgen reimplementation OM Python",
