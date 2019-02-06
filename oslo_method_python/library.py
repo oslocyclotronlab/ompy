@@ -456,14 +456,23 @@ def read_response(fname_resp_mat, fname_resp_dat):
     ps = resp[:,5]
     pd = resp[:,6]
     pa = resp[:,7]
-    
+
     return R, FWHM, eff, pc, pf, ps, pd, pa, Eg_array_R
+
 
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
-    with np.errstate(divide='ignore', invalid='ignore'):
-        c = np.true_divide(a, b )
-        c[ ~ np.isfinite(c )] = 0  # -inf inf NaN
+    # Check whether a or b (or both) are numpy arrays. If not, we don't
+    # use the fancy function.
+    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            c = np.true_divide(a, b )
+            c[ ~ np.isfinite(c )] = 0  # -inf inf NaN
+    else:
+        if b == 0:
+            c = 0
+        else:
+            c = a / b
     return c
 
 
