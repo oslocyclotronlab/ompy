@@ -125,7 +125,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     # Set limits for excitation and gamma energy bins to be considered for unfolding
     # Ex_max = 14000 # keV
     # Use index 0 of array as lower limit instead of energy because it can be negative!
-    print("Ex_max =", Ex_max)
+    # print("Ex_max =", Ex_max)
     iEx_min, iEx_max = 0, i_from_E(Ex_max, Ex_array)
     Eg_min = 0 # keV - minimum
     # Eg_min = 500 # keV 
@@ -239,8 +239,12 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     for i_Ex in range(rawmat.shape[0]):
         unfoldmat[i_Ex, :] = unfoldmat_cube[i_score_vector[i_Ex], i_Ex, :]
 
-    print(i_score_vector)
-    
+    if verbose:
+        print("The iteration number with the best score for each Ex bin:")
+        for i_Ex in range(len(Ex_array)):
+            print("i_Ex = {:d}, Ex = {:f}, i_score_vector = {:d}".format(i_Ex,
+                  Ex_array[i_Ex], i_score_vector[i_Ex]))
+
     # Remove negative counts and trim:
     # Update 20190130: Keep unfolding as simple as possible, do these
     # operations manually.
