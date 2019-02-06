@@ -1,19 +1,15 @@
+# -*- coding: utf-8 -*-
 """
-Class error_propagation in the python Oslo method
-It handles generation of random ensembles of spectra with 
+code for error propagation in oslo_method_python
+It handles generation of random ensembles of spectra with
 statistical perturbations, and can make first generation variance matrices.
 
 ---
 
-# This is a python implementation of the Oslo method.
-It handles two-dimensional matrices of event count spectra, and
-implements detector response unfolding, first generation method
-and other manipulation of the spectra.
+This file is part of oslo_method_python, a python implementation of the
+Oslo method.
 
-It is heavily inspired by MAMA, written by Magne Guttormsen and others,
-available at https://github.com/oslocyclotronlab/oslo-method-software
-
-Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
+Copyright (C) 2018 Jørgen Eriksson Midtbø
 Oslo Cyclotron Laboratory
 jorgenem [0] gmail.com
 

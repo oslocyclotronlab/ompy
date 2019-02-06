@@ -1,19 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Class matrix_analysis(), the "core" matrix manipulation module of pyma.
+Class MatrixAnalysis. It is a convenience wrapper for the "core" matrix
+manipulation functions of oslo_method_python.
 It handles unfolding and the first-generation method on Ex-Eg matrices.
 
 ---
 
-This is a python implementation of the Oslo method.
-It handles two-dimensional matrices of event count spectra, and
-implements detector response unfolding, first generation method
-and other manipulation of the spectra.
+This file is part of oslo_method_python, a python implementation of the
+Oslo method.
 
-It is heavily inspired by MAMA, written by Magne Guttormsen and others,
-available at https://github.com/oslocyclotronlab/oslo-method-software
-
-Copyright (C) 2018 J{\o}rgen Eriksson Midtb{\o}
+Copyright (C) 2018 Jørgen Eriksson Midtbø
 Oslo Cyclotron Laboratory
 jorgenem [0] gmail.com
 
