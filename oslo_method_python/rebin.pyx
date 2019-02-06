@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Function to rebin spectra.
 Implemented using Cython, with inspiration from here:
