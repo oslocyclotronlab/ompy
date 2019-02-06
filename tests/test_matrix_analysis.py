@@ -12,8 +12,6 @@ import matplotlib.pyplot as plt
 # In the future (as of Jan. 2019), this package should contain functionality to generate the response
 # functions internally.
 
-
-
 fname_resp_mat = "response_matrix.m"
 fname_resp_dat = "response_parameters.dat"
 
@@ -28,17 +26,15 @@ ma.raw.plot()
 ma.unfold(fname_resp_dat=fname_resp_dat, fname_resp_mat=fname_resp_mat)
 ma.unfolded.plot()
 
+# == Firstgen ==
+Ex_max = 8500
+dE_gamma = 500
+ma.first_generation_method(Ex_max, dE_gamma)
+
+ma.firstgen.plot()
+
 
 plt.show()
-
-
-
-# # == Firstgen ==
-# ma.first_generation_method()
-
-# ma.firstgen.plot()
-
-
 # == Should ideally have some unit tests: ==
 # import unittest
 # class BasicTestSuite(unittest.TestCase):
