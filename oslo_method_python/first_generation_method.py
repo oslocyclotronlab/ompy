@@ -6,8 +6,9 @@ from .rebin import *
 
 def first_generation_method(matrix_in,
                             Ex_max, dE_gamma, N_iterations=10,
-                            multiplicity_estimation="statistical",
-                            apply_area_correction=True):
+                            multiplicity_estimation="total",
+                            apply_area_correction=False,
+                            verbose=False):
     """
     Function implementing the first generation method from Guttormsen et
     al. (NIM 1987).
@@ -134,6 +135,12 @@ def first_generation_method(matrix_in,
     # for i in range(len(good_indices[:,0])):
     # print len(good_indices[i,good_indices[i,:]]) # OK, it actually works.
 
+    # DEBUG:
+    print("Multiplicities:")
+    for i_Ex in range(len(Ex_array)):
+        print("Ex = {:f}, multiplicity(Ex) = {:f}".format(Ex_array[i_Ex], multiplicity[i_Ex]))
+    print("", flush=True)
+
 
     # Set up dummy first-generation matrix to start iterations, made of
     # normalized boxes:
@@ -166,11 +173,12 @@ def first_generation_method(matrix_in,
     normalization_matrix_manual = np.zeros((N_Exbins, N_Exbins))
     for i in range(N_Exbins):
         for j in range(N_Exbins):
-            normalization_matrix_manual[i, j] = (multiplicity[i]*area[j]
-                                                 / (multiplicity[j]
-                                                    * area[i]))
+            # normalization_matrix_manual[i, j] = div0(multiplicity[i]*area[j],
+            normalization_matrix_manual[i, j] = div0(multiplicity[j]*area[i],
+                                                     multiplicity[i]*area[j]
+                                                     )
     normalization_matrix = normalization_matrix_manual
-    normalization_matrix[np.isnan(normalization_matrix)] = 0
+    # normalization_matrix[np.isnan(normalization_matrix)] = 0
 
 
     # Set up compression parameters for Egamma axis to be used by H below:
@@ -221,7 +229,7 @@ def first_generation_method(matrix_in,
         # max_diff = 100
         # while max_diff > convergence_criterion:
         # Store H from previous iteration to compare at the end
-        H_old = H
+        H_old = np.copy(H)
         # Compress the H matrix along gamma axis to make it square and facilitate conversion to excitation energy
         # H_compressed = H[:,0:i_Egamma_max].reshape(N_Exbins, N_Exbins, grouping_Egamma).sum(axis=2)
         # H_compressed, Egamma_array_compressed = rebin(
@@ -229,11 +237,14 @@ def first_generation_method(matrix_in,
         # Updated 20190130 to rebin_matrix() with energy calibratiON.
         # TODO cut to i_Egamma_max once and for all above instead of here?
         H_compressed = rebin_matrix(
-            H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], Ex_array,
+            # H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], Ex_array,
+            H, Egamma_array, Ex_array,  # DEBUG 20190206 removed the subset selection. No difference on 164Dy, which is good.
             rebin_axis=1)
 
-        plt.pcolormesh(Ex_array, Ex_array, H_compressed)
-        plt.show()
+        # DEBUG:
+        # plt.pcolormesh(Ex_array, Ex_array, H_compressed)
+        # plt.show()
+        # END DEBUG
 
         # if iteration == 0:
         # Don't use H as weights for first iteration.
@@ -272,8 +283,8 @@ def first_generation_method(matrix_in,
         G = np.dot((normalization_matrix * W), matrix_ex_compressed)
 
         # Apply area correction
-        # if apply_area_correction:
-        if False: # DEBUG: Turning off area corr 20190204 to find out why it oversubtracts
+        if apply_area_correction:
+        # if False: # DEBUG: Turning off area corr 20190204 to find out why it oversubtracts
             # Setup meshgrids for making boolean indexing arrays
             # Egamma_mesh_compressed, Ex_mesh_compressed = np.meshgrid(Egamma_array_compressed, Ex_array)
             # Egamma_max = Ex_array + dE_gamma # Maximal Egamma value for each Ex bin
@@ -304,12 +315,14 @@ def first_generation_method(matrix_in,
             alpha = np.ones(N_Exbins)
 
         # The actual subtraction
-        H = matrix_ex_compressed - alpha.reshape((len(alpha), 1)) * G
+        # H = matrix_ex_compressed - alpha.reshape((len(alpha), 1)) * G
+        H = matrix_ex_compressed - G
 
 
         # Check convergence
         max_diff = np.max(np.abs(H - H_old))
-        print("iteration =", iteration, "max_diff =", max_diff, flush=True)
+        if verbose:
+            print("iteration =", iteration, "max_diff =", max_diff, flush=True)
 
     # Remove negative counts
     # H[H < 0] = 0
@@ -317,9 +330,14 @@ def first_generation_method(matrix_in,
     # Update internal variables and return True upon completion
     # return H, H-H_old, Ex_array, Egamma_array
 
-    print("H.shape =", H.shape)
-    print("Ex_array.shape =", Ex_array.shape)
-    print("Egamma_array.shape =", Egamma_array.shape, flush=True)
+    # DEBUG:
+    # print("H.shape =", H.shape)
+    # print("Ex_array.shape =", Ex_array.shape)
+    # print("Egamma_array.shape =", Egamma_array.shape, flush=True)
+    # END DEBUG
 
-    firstgen = Matrix(H, Ex_array, Egamma_array)
+    firstgen = Matrix(H,
+    # firstgen = Matrix(G,
+                      Ex_array,
+                      Egamma_array)
     return firstgen
