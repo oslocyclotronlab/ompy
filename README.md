@@ -6,6 +6,11 @@ This is a python implementation of the Oslo method. The goal is that this will b
 
 
 ## How to use this package
+First off, make sure to compile the Cython modules by doing (in the main repo folder)
+```
+python setup.py build_ext --inplace
+```
+
 All the functions and classes in the package are available in the main module. You get everything with the import
 
 ```
@@ -36,7 +41,7 @@ mat.save(filename) # Save spectrum to MAMA file
 ### The MatrixAnalysis class
 The core of the Oslo method involves working with two-dimensional spectra, the excitation-energy-gamma-ray-energy-matrices, often called alfna matrices for obscure reasons.<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus. 
 
-In this package, this functionality can be compactly accessed 
+In this package, this functionality can be compactly accessed [to be continued]
 
 
 

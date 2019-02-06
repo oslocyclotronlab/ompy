@@ -464,7 +464,7 @@ def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
     # Check whether a or b (or both) are numpy arrays. If not, we don't
     # use the fancy function.
-    if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             c = np.true_divide(a, b )
             c[ ~ np.isfinite(c )] = 0  # -inf inf NaN

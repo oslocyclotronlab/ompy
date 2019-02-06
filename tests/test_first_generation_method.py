@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 # Test the first_generation_method() and helper functions
 
-fname_unfolded = "/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/alfnaun"
+fname_unfolded = "../tests/Dy164_unfolded.m"
 matrix_in = om.Matrix()
 matrix_in.load(fname_unfolded)
 
@@ -15,7 +15,7 @@ cbar = matrix_in.plot(ax=ax2D1, title="Dy164 unfolded",
 f2D.colorbar(cbar, ax=ax2D1)
 
 # Run first generation method
-Ex_max = 14000
+Ex_max = 8500
 dE_gamma = 500
 N_iterations = 10
 matrix_fg = om.first_generation_method(matrix_in, Ex_max=Ex_max,

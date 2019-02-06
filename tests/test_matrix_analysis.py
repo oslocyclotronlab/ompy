@@ -12,27 +12,33 @@ import matplotlib.pyplot as plt
 # In the future (as of Jan. 2019), this package should contain functionality to generate the response
 # functions internally.
 
-fname_resp_mat = "response_matrix.m"
-fname_resp_dat = "response_parameters.dat"
+fname_resp_mat = "../tests/Dy164_response_matrix.m"
+fname_resp_dat = "../tests/Dy164_response_parameters.dat"
 
 # Set up an instance of the matrix analysis class
 ma = om.MatrixAnalysis()
 
-# Load the Si28 raw matrix
-ma.raw.load("Si28_raw_matrix_compressed.m")
-ma.raw.plot()
+# Load the Dy164 raw matrix
+ma.raw.load("../tests/Dy164_raw.m")
+# Drop Ex lower than 0 and larger than Sn, about 8300 keV
+ma.raw.cut_rect(axis=0, E_limits=[0, 8400])
 
 # == Unfolding==
-ma.unfold(fname_resp_dat=fname_resp_dat, fname_resp_mat=fname_resp_mat)
-ma.unfolded.plot()
-
+diag_cut = {"Ex1": 0, "Eg1": 800, "Ex2": 7300, "Eg2": 7500}
+ma.unfold(fname_resp_dat=fname_resp_dat, fname_resp_mat=fname_resp_mat,
+          diag_cut=diag_cut)
+# Remove negatives remaining
+ma.unfolded.remove_negative()
 # == Firstgen ==
 Ex_max = 8500
 dE_gamma = 500
 ma.first_generation_method(Ex_max, dE_gamma)
 
-ma.firstgen.plot()
-
+# Plot them
+f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+ma.raw.plot(ax=ax1, title="raw", zmin=1e-3, zmax=5e3)
+ma.unfolded.plot(ax=ax2, title="unfolded", zmin=1e-3, zmax=5e3)
+ma.firstgen.plot(ax=ax3, title="firstgen", zmin=1e-3, zmax=5e3)
 
 plt.show()
 # == Should ideally have some unit tests: ==

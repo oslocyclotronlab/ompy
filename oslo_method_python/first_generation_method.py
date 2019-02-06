@@ -6,7 +6,7 @@ from .rebin import *
 
 def first_generation_method(matrix_in,
                             Ex_max, dE_gamma, N_iterations=10,
-                            multiplicity_estimation="total",
+                            multiplicity_estimation="statistical",
                             apply_area_correction=False,
                             verbose=False):
     """
@@ -21,8 +21,21 @@ def first_generation_method(matrix_in,
         multiplicity_estimation (str): One of ["statistical", "total"]
 
     Todo:
-        Check that option multiplicity_estimation="total" works correctly.
+        - Consider removing Ex_max keyword. Can't it just take the whole matrix?
+          Compare with MAMA.
     """
+
+    # # DEBUG
+    # # Printing keywords
+    # print("matrix_in.calibration() =", matrix_in.calibration())
+    # print("Ex_max =", Ex_max)
+    # print("dE_gamma =", dE_gamma)
+    # print("multiplicity_estimation =", multiplicity_estimation)
+    # print("apply_area_correction =", apply_area_correction)
+    # print("verbose =", verbose)
+    # print("", flush=True)
+    # # END DEBUG
+
 
     unfolded_matrix = matrix_in.matrix
     Ex_array_mat = matrix_in.E0_array
@@ -127,6 +140,12 @@ def first_generation_method(matrix_in,
 
         # Total multiplicity - use actual Ex0 = 0
         multiplicity = div0(Ex_array, Egamma_average)
+        # Set any negative values to zero. Looks like this is what is done
+        # in MAMA:
+        multiplicity[multiplicity < 0] = 0
+        # DEBUG
+        # END DEBUG
+        assert((multiplicity >= 0).all())
 
     else:
         raise ValueError("Invalid value for variable"
@@ -135,11 +154,11 @@ def first_generation_method(matrix_in,
     # for i in range(len(good_indices[:,0])):
     # print len(good_indices[i,good_indices[i,:]]) # OK, it actually works.
 
-    # DEBUG:
-    print("Multiplicities:")
-    for i_Ex in range(len(Ex_array)):
-        print("Ex = {:f}, multiplicity(Ex) = {:f}".format(Ex_array[i_Ex], multiplicity[i_Ex]))
-    print("", flush=True)
+    if verbose:
+        print("Multiplicities:")
+        for i_Ex in range(len(Ex_array)):
+            print("Ex = {:f}, multiplicity(Ex) = {:f}".format(Ex_array[i_Ex], multiplicity[i_Ex]))
+        print("")
 
 
     # Set up dummy first-generation matrix to start iterations, made of
@@ -306,6 +325,10 @@ def first_generation_method(matrix_in,
                 G_area = np.where(
                     Egamma_mesh < Egamma_max_grid, G, 0).sum(axis=1)
 
+            # DEBUG
+            print("multiplicity =", multiplicity)
+            print("type(multiplicity) =", type(multiplicity))
+            # END DEBUG
             alpha = np.where(G_area > 0, (1 - div0(1, multiplicity))
                              * div0(area_matrix_ex_compressed_cut, G_area), 1)
             alpha[alpha < 0.85] = 0.85
