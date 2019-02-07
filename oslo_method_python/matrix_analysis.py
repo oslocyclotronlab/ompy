@@ -54,10 +54,25 @@ class MatrixAnalysis():
         # matrix
         self.response = Matrix()  # response matrix
 
-    def unfold(self, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
+        # Allocate variables to store settings and parameters for the class
+        # methods. These shall be filled by member functions when they are
+        # called:
+        self.unfold_fname_resp_mat = None
+        self.unfold_fname_resp_dat = None
+        self.unfold_Ex_min = None
+        self.unfold_Ex_max = None
+        self.unfold_Eg_min = None
+        self.unfold_Eg_max = None
+        self.unfold_diag_cut = None
+        self.unfold_verbose = None
+        self.unfold_plot = None
+        self.unfold_use_comptonsubtraction = None
+
+    def unfold(self, fname_resp_mat=None, fname_resp_dat=None,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,
                diag_cut=None,
-               verbose=False, plot=False, use_comptonsubtraction=False):
+               verbose=False, plot=False, use_comptonsubtraction=False,
+               fill_and_remove_negative=False):
         # = Check that raw matrix is present
         if self.raw.matrix is None:
             raise Exception("Error: No raw matrix is loaded.")
@@ -69,17 +84,35 @@ class MatrixAnalysis():
                      " response matrix is previously loaded.")
                     )
 
-        # Update 2019: Moved unfold function to separate file, so this is just
-        # a wrapper.
+        # Copy input parameters to class parameters:
+        self.unfold_fname_resp_mat = fname_resp_mat
+        self.unfold_fname_resp_dat = fname_resp_dat
+        self.unfold_Ex_min = Ex_min
+        self.unfold_Ex_max = Ex_max
+        self.unfold_Eg_min = Eg_min
+        self.unfold_Eg_max = Eg_max
+        self.unfold_diag_cut = diag_cut
+        self.unfold_verbose = verbose
+        self.unfold_plot = plot
+        self.unfold_use_comptonsubtraction = use_comptonsubtraction
+        self.unfold_fill_and_remove_negative = fill_and_remove_negative
+
+        # Call unfolding function
         self.unfolded = unfold(
             raw=self.raw, fname_resp_mat=fname_resp_mat,
             fname_resp_dat=fname_resp_dat,
-            FWHM_factor=FWHM_factor,
             Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
             diag_cut=diag_cut,
             Eg_max=Eg_max, verbose=verbose, plot=plot,
             use_comptonsubtraction=use_comptonsubtraction
         )
+
+        # Fill and remove negative:
+        if fill_and_remove_negative:
+            # TODO fix fill_negative function, maybe remove window_size
+            # argument
+            self.unfolded.fill_negative(window_size=10)
+            self.unfolded.remove_negative()
 
     def first_generation_method(self, Ex_max, dE_gamma,
                                 N_iterations=10,
