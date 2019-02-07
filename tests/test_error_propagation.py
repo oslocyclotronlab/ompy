@@ -10,20 +10,29 @@ fname_raw = "Dy164_raw.m"
 ma = om.MatrixAnalysis(fname_raw=fname_raw)
 print("ma.raw.calibration() =", ma.raw.calibration())
 
-# Do unfolding and firstgen on it:
+# Do unfolding on it:
 # TODO put all parameters into MatrixAnalysis() as I go along
 fname_resp_mat = "Dy164_response_matrix.m"
 fname_resp_dat = "Dy164_response_parameters.dat"
 fill_and_remove_negative = True
 ma.unfold(fname_resp_mat=fname_resp_mat, fname_resp_dat=fname_resp_dat,
           fill_and_remove_negative=fill_and_remove_negative)
+# BEGIN unfolding asserts
 assert(fname_resp_mat == ma.unfold_fname_resp_mat)
 assert(fname_resp_dat == ma.unfold_fname_resp_dat)
 assert(fill_and_remove_negative == ma.unfold_fill_and_remove_negative)
-# Todo implement fill_negative and remove_negative as matrix_analysis
-# functions, and add self. parameters saying whether to call them after
-# unfold and/or after firstgen
+# END unfolding asserts
 
+# Do first generation method on it:
+Ex_max = 12000
+dE_gamma = 500
+ma.first_generation_method(Ex_max=Ex_max,
+                           dE_gamma=dE_gamma,
+                           fill_and_remove_negative=fill_and_remove_negative)
+
+# BEGIN first generation method asserts
+assert(Ex_max == ma.fg_Ex_max)
+# END first generation method asserts
 
 # TODO do asserts between ma self parameters and inputs, to check
 # that all settings are correctly picked up and used in unfold() and firstgen()
@@ -39,5 +48,7 @@ f.colorbar(cbar1, ax=ax1)
 # Unfolded:
 cbar2 = ma.unfolded.plot(ax=ax2, title="unfolded")
 f.colorbar(cbar2, ax=ax2)
+# Firstgen:
+cbar3 = ma.firstgen.plot(ax=ax3, title="first generation")
 
 plt.show()

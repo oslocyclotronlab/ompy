@@ -71,6 +71,7 @@ class MatrixAnalysis():
         self.fg_N_iterations = None
         self.fg_statistical_or_total = None
         self.fg_area_correction = None
+        self.fg_fill_and_remove_negative = None
 
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,
@@ -122,10 +123,19 @@ class MatrixAnalysis():
                                 N_iterations=10,
                                 multiplicity_estimation="statistical",
                                 apply_area_correction=False,
-                                verbose=False):
+                                verbose=False,
+                                fill_and_remove_negative=False):
         # = Check that unfolded matrix is present:
         if self.unfolded.matrix is None:
             raise Exception("Error: No unfolded matrix is loaded.")
+
+        # Copy input parameters to class parameters:
+        self.fg_Ex_max = Ex_max
+        self.fg_dE_gamma = dE_gamma
+        self.fg_multiplicity_estimation = multiplicity_estimation
+        self.fg_apply_area_correction = apply_area_correction
+        self.fg_verbose = verbose
+        self.fg_fill_and_remove_negative = fill_and_remove_negative
 
         # Call first generation method:
         self.firstgen = first_generation_method(matrix_in=self.unfolded,
@@ -136,3 +146,9 @@ class MatrixAnalysis():
                                                 apply_area_correction=apply_area_correction,
                                                 verbose=verbose
                                                 )
+        # Fill and remove negative:
+        if fill_and_remove_negative:
+            # TODO fix fill_negative function, maybe remove window_size
+            # argument
+            self.firstgen.fill_negative(window_size=10)
+            self.firstgen.remove_negative()
