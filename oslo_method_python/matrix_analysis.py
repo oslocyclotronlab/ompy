@@ -54,9 +54,8 @@ class MatrixAnalysis():
         # matrix
         self.response = Matrix()  # response matrix
 
-        # Allocate variables to store settings and parameters for the class
-        # methods. These shall be filled by member functions when they are
-        # called:
+        # Allocate variable names for parameters to be filled by class
+        # functions. This is intended for the error_propagation module.
         self.unfold_fname_resp_mat = None
         self.unfold_fname_resp_dat = None
         self.unfold_Ex_min = None
@@ -67,6 +66,11 @@ class MatrixAnalysis():
         self.unfold_verbose = None
         self.unfold_plot = None
         self.unfold_use_comptonsubtraction = None
+        self.fg_Ex_max = None
+        self.fg_dE_gamma = None
+        self.fg_N_iterations = None
+        self.fg_statistical_or_total = None
+        self.fg_area_correction = None
 
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,

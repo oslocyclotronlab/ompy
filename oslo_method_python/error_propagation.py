@@ -38,6 +38,7 @@ class ErrorPropagation:
                  folder="oslo_method_ensemble_folder",
                  randomness="gaussian",
                  seed=None):
+
         self.matrix_analysis = matrix_analysis_instance
         self.folder = folder
         self.randomness = randomness
