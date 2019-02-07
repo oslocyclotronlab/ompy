@@ -34,7 +34,8 @@ global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
 
-def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
+def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
+           # FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
            Eg_max=None, verbose=False, plot=False,

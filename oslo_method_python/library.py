@@ -651,11 +651,12 @@ def fill_negative(matrix, window_size):
 
     Todo: Debug me!
     """
+    print("Hello from the fill_negative() function. Please debug me.")
     matrix_out = np.copy(matrix)
     # Loop over rows:
     for i_Ex in range(matrix.shape[0]):
         for i_Eg in np.where(matrix[i_Ex, :] < 0)[0]:
-            print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
+            # print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
             # window_size = 4  # Start with a constant window size.
             # TODO relate it to FWHM by energy arrays
             i_Eg_low = max(0, i_Eg - window_size)
@@ -663,7 +664,7 @@ def fill_negative(matrix, window_size):
             # Fill from the channel with the larges positive count
             # in the neighbourhood
             i_max = np.argmax(matrix[i_Ex, i_Eg_low:i_Eg_high])
-            print("i_max =", i_max)
+            # print("i_max =", i_max)
             if matrix[i_Ex, i_max] <= 0:
                 pass
             else:
@@ -671,7 +672,7 @@ def fill_negative(matrix, window_size):
                 negative = matrix[i_Ex, i_Eg]
                 fill = min(0, positive + negative)  # Don't fill more than to 0
                 rest = positive
-                print("fill =", fill, "rest =", rest)
+                # print("fill =", fill, "rest =", rest)
                 matrix_out[i_Ex, i_Eg] = fill
                 # matrix_out[i_Ex, i_max] = rest
     return matrix_out
