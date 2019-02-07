@@ -40,11 +40,14 @@ np.random.seed(1256770)
 
 class MatrixAnalysis():
 
-    def __init__(self):
+    def __init__(self, fname_raw=None):
         # self.fname_raw = fname_raw # File name of raw spectrum
 
         # Allocate matrices to be filled by functions in class later:
         self.raw = Matrix()
+        # If fname_raw is specified, load the file into self.raw:
+        if fname_raw is not None:
+            self.raw.load(fname_raw)
         self.unfolded = Matrix()
         self.firstgen = Matrix()
         # self.var_firstgen = Matrix() # variance matrix of first-generation
