@@ -17,15 +17,15 @@ All the functions and classes in the package are available in the main module. Y
 import oslo_method_python as om
 ```
 
-My philosophy is that the package shall be flexible and transparent to use and modify. I'd rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
+The overarching philosophy is that the package shall be flexible and transparent to use and modify. I'd rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
 
 ### The Matrix() and Vector() classes
 The two most important utility classes in the package are `om.Matrix()` and `om.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
 ```
 mat = om.Matrix()
 mat.matrix # A 2D numpy array
-mat.Ex_array # Array of lower-bin-edge energy values for axis 0
-mat.Eg_array # Array of lower-bin-edge energy values for axis 1
+mat.E0_array # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
+mat.E1_array # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
 
 vec = om.Vector()
 vec.vector # A 1D numpy array
@@ -38,11 +38,28 @@ mat.save(filename) # Save spectrum to MAMA file
 
 ```
 
-### The MatrixAnalysis class
+### Matrix manipulation
 The core of the Oslo method involves working with two-dimensional spectra, the excitation-energy-gamma-ray-energy-matrices, often called alfna matrices for obscure reasons.<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus. 
 
-In this package, this functionality can be compactly accessed [to be continued]
 
+## The unfold() function
+An implementation of the unfolding method presented in Guttormsen et al., Nuclear Instruments and Methods in Physics Research A 374 (1996).
 
+It may contain bugs. Please report any bugs you encounter to the issue tracker, or if you like, fix them and make a pull request :)
 
-<sup>1</sup>It stands for alfa-na, and comes from the fact that the outgoing projectile hitting the excitation energy detector SiRi used to be exclusively alpha particles and that the gamma-detector array CACTUS consisted of NaI scintillators.
+It also currently lacks some functionality. Notably, the compton subtraction method has some major issues somewhere. Also, it differs slightly from MAMA in the unfolded result, particularly on the lowest gamma-ray energies. I need to study the MAMA code carefully to figure out how 
+
+## The first_generation_method() function
+An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987). 
+
+Like the unfolding function, please be on the lookout for bugs...
+
+## The MatrixAnalysis class
+The MatrixAnalysis class is a convenience wrapper for the `unfold()` and `first_generation_method()` functions, along with some utility functions to use on the spectra. You do not have to use it except if you want to do error propagation. In that case, the parameters to use for unfolding and first generation are stored in the MatrixAnalysis instance that you pass to the ErrorPropagation instance, to ensure that the ensemble of perturbed copies of the spectra are treated identically.
+
+## The ErrorPropagation class
+Propagate statistical errors through the Oslo method by making an ensemble of perturbed copies of the input spectrum. You can choose between gaussian or poisson errors. 
+
+[Write something about the probablity theory and assumptions. Also about how the spectra are stored and how the variance matrix is calculated at the end. Should also have some examples throughout.]
+
+<sup>1</sup>It stands for alfa-natrium, and comes from the fact that the outgoing projectile hitting the excitation energy detector SiRi used to be exclusively alpha particles and that the gamma-detector array CACTUS consisted of NaI scintillators.

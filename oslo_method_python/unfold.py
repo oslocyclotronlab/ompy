@@ -59,8 +59,13 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
         unfolded -- the unfolded matrix as an instance of the Matrix() class
 
     Todo:
-        Implement the Matrix() and Vector() classes throughout the function.
+        - Implement the Matrix() and Vector() classes throughout the function.
+        - Fix the compton subtraction method implementation.
     """
+
+    if use_comptonsubtraction:
+        raise Exception(("The compton subtraction method does not currently"
+                        " work correctly."))
 
     if fname_resp_mat is None or fname_resp_dat is None:
         raise Exception(
@@ -73,7 +78,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     Ex_array = raw.E0_array
     Eg_array = raw.E1_array
 
-    use_comptonsubtraction = use_comptonsubtraction
 
     # = Import data and response matrix =
 
@@ -291,7 +295,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     
     # = Step 2: Compton subtraction =
     if use_comptonsubtraction: # Check if compton subtraction is turned on
-    
+
         # We also need the resp.dat file for this.
         # TODO: Consider writing a function that makes the response matrix (R) from this file
         # (or other input), so we don't have to keep track of redundant info.
