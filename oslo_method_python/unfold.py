@@ -34,7 +34,8 @@ global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
 
-def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
+def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
+           # FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
            Eg_max=None, verbose=False, plot=False,
@@ -265,15 +266,19 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     fluctuations_matrix = fluctuations_matrix/fluctuations_vector_raw[:,None] # TODO check that this broadcasts the vector over the right dimension
     # Get the vector indicating iteration index of best score for each Ex bin:
     weight_fluc = 0.2  # 0.6 # TODO make this an argument
+    minimum_iterations = 3 # Minimum iteration number to accept from the scoring
+    # Check that it's consistent with chosen max number of iterations:
+    if minimum_iterations > Nit:
+        minimum_iterations = Nit
     i_score_vector = scoring(chisquare_matrix, fluctuations_matrix,
-                             weight_fluc)
+                             weight_fluc, minimum_iterations)
     unfoldmat = np.zeros(rawmat.shape)
     for i_Ex in range(rawmat.shape[0]):
         unfoldmat[i_Ex, :] = unfoldmat_cube[i_score_vector[i_Ex], i_Ex, :]
 
     if verbose:
         print("The iteration number with the best score for each Ex bin:")
-        for i_Ex in range(len(Ex_array)):
+        for i_Ex in range(rawmat.shape[0]):
             print("i_Ex = {:d}, Ex = {:f}, i_score_vector = {:d}".format(i_Ex,
                   Ex_array[i_Ex], i_score_vector[i_Ex]))
 
@@ -438,16 +443,23 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None, FWHM_factor=10,
     return unfolded
 
 
-
-def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct):
+def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct,
+            minimum_iterations):
     """
     Calculates the score of each unfolding iteration for each Ex
     bin based on a weighting of chisquare and fluctuations.
-    
+
     """
-    score_matrix = ((1-weight_fluct) * chisquare_matrix + 
-                   weight_fluct * fluctuations_matrix)
-    return np.argmin(score_matrix, axis=1)
+    score_matrix = ((1-weight_fluct) * chisquare_matrix +
+                    weight_fluct * fluctuations_matrix)
+    # Get index of best (lowest) score for each Ex bin:
+    best_iteration = np.argmin(score_matrix, axis=1)
+    # Enforce minimum_iterations:
+    best_iteration = np.where(minimum_iterations > best_iteration,
+             minimum_iterations*np.ones(len(best_iteration), dtype=int),
+             best_iteration)
+    print(best_iteration)
+    return best_iteration
 
 
 def fluctuations(counts_matrix, Eg_array):
