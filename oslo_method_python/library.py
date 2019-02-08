@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+import time
 
 
 class Matrix():
@@ -399,41 +400,45 @@ def read_mama_2D(filename):
     return out
 
 
-def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
-    import time
-    outfile = open(filename, 'w')
-    # TODO update function to take Matrix object as input
+def write_mama_2D(mat, filename, comment=""):
+    # Calculate calibration coefficients.
+    cal = {"a0x": mat.E1_array[0],
+           "a1x": mat.E1_array[1]-mat.E1_array[0],
+           "a2x": 0,
+           "a0y": mat.E0_array[0],
+           "a1y": mat.E0_array[1]-mat.E0_array[0],
+           "a2y": 0}
+    # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
+    # format is supposed to have:
+    cal["a0x"] += cal["a1x"]/2
+    cal["a0y"] += cal["a1y"]/2
 
     # Write mandatory header:
-    # outfile.write('!FILE=Disk \n')
-    # outfile.write('!KIND=Spectrum \n')
-    # outfile.write('!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n')
-    # outfile.write('!EXPERIMENT=pyma \n')
-    # outfile.write('!COMMENT=none|RE:alfna-20FN:RN:UN:FN:RN: \n')
-    # outfile.write('!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n')
-    # outfile.write('!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(Egamma_range[0], (Egamma_range[1]-Egamma_range[0]), Ex_range[0], (Ex_range[1]-Ex_range[0])))
-    # outfile.write('!PRECISION=16 \n')
-    # outfile.write('!DIMENSION=2,0:%4d,0:%4d \n' %(len(matrix[:,0]), len(matrix[0,:])))
-    # outfile.write('!CHANNEL=(0:%4d,0:%4d) \n' %(len(matrix[:,0]), len(matrix[0,:])))
-    header_string ='!FILE=Disk \n'
-    header_string +='!KIND=Spectrum \n'
-    header_string +='!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
-    header_string +='!EXPERIMENT= pyma \n'
-    header_string +='!COMMENT={:s} \n'.format(comment)
-    header_string +='!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
-    header_string +='!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(x_array[0], (x_array[1]-x_array[0]), y_array[0], (y_array[1]-y_array[0]))
-    header_string +='!PRECISION=16 \n'
-    header_string +="!DIMENSION=2,0:{:4d},0:{:4d} \n".format(len(matrix[0,:])-1, len(matrix[:,0])-1)
-    header_string +='!CHANNEL=(0:%4d,0:%4d) ' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
+    header_string = '!FILE=Disk \n'
+    header_string += '!KIND=Spectrum \n'
+    header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
+    header_string += '!EXPERIMENT= pyma \n'
+    header_string += '!COMMENT={:s} \n'.format(comment)
+    header_string += '!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
+    header_string += ('!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
+                      % (cal["a0x"], cal["a1x"], cal["a2x"],
+                         cal["a0y"], cal["a1y"], cal["a2y"],
+                         )
+                      )
+    header_string += '!PRECISION=16 \n'
+    header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
+                        mat.matrix.shape[1]-1, mat.matrix.shape[0]-1)
+    header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (
+                        mat.matrix.shape[1]-1, mat.matrix.shape[0]-1)
 
     footer_string = "!IDEND=\n"
 
     # Write matrix:
-    # matrix.tofile(filename, sep='       ', format="{:14.8E}")
-    # matrix.tofile(filename, sep=' ', format="%-17.8E")
-    np.savetxt(filename, matrix, fmt="%-17.8E", delimiter=" ", newline="\n", header=header_string, footer=footer_string, comments="")
+    np.savetxt(filename, mat.matrix, fmt="%-17.8E", delimiter=" ",
+               newline="\n", header=header_string, footer=footer_string,
+               comments=""
+               )
 
-    outfile.close()
 
 
 def read_response(fname_resp_mat, fname_resp_dat):
