@@ -15,7 +15,8 @@ diag_cut = {"Ex1": 0, "Eg1": 800, "Ex2": 7300, "Eg2": 7500}
 # Call the unfolding algorithm:
 matrix_unfolded = om.unfold(matrix_raw,
                             fname_resp_dat=fname_resp_dat,
-                            fname_resp_mat=fname_resp_mat, diag_cut=diag_cut)
+                            fname_resp_mat=fname_resp_mat, diag_cut=diag_cut,
+                            verbose=True)
 
 
 # === Plot raw and unfolded ===
