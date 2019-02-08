@@ -439,7 +439,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
     return unfolded
 
 
-
 def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct,
             minimum_iterations):
     """
