@@ -42,10 +42,23 @@ class Matrix():
         it in an empty state. In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
+        # Sanity checks:
+        if matrix is not None and E0_array is not None:
+            if matrix.shape[0] != len(E0_array):
+                raise ValueError("Shape mismatch between matrix and E0_array.")
+        if matrix is not None and E1_array is not None:
+            if matrix.shape[1] != len(E1_array):
+                raise ValueError("Shape mismatch between matrix and E1_array.")
+        if matrix is not None and std is not None:
+            if matrix.shape != std.shape:
+                raise ValueError("Shape mismatch between matrix and std.")
+
+        # Fill class variables:
         self.matrix = matrix
         self.E0_array = E0_array
         self.E1_array = E1_array
         self.std = std  # slot for matrix of standard deviations
+
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
@@ -380,6 +393,7 @@ def read_mama_2D(filename):
     y_array = cal["a0y"] + cal["a1y"]*y_array + cal["a2y"]*y_array**2
     x_array = np.linspace(0, Nx-1, Nx)
     x_array = cal["a0x"] + cal["a1x"]*x_array + cal["a2x"]*x_array**2
+
     # x_array = np.linspace(cal["a0x"], cal["a0x"]+cal["a1x"]*Nx, Nx) # BIG TODO: This is probably center-bin calibration, 
     # x_array = np.linspace(a[2], a[2]+a[3]*(Ny), Ny) # and should be shifted down by half a bin?
                                                     # Update 20171024: Started changing everything to lower bin edge,
