@@ -362,7 +362,8 @@ def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array,
     # as well as a list containing the four calibration coefficients
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
-    # and 1-D arrays of calibrated x and y values for plotting and similar.
+    # and 1-D arrays of lower-bin-edge calibrated x and y values for plotting
+    # and similar.
     matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1)
     cal = {}
     with open(filename, 'r') as datafile:
@@ -372,19 +373,15 @@ def read_mama_2D(filename):
         # print("calibration_line =", calibration_line, flush=True)
         cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]), 
              "a0y":float(calibration_line[4]), "a1y":float(calibration_line[5]), "a2y":float(calibration_line[6])}
-    # TODO: INSERT CORRECTION FROM CENTER-BIN TO LOWER EDGE CALIBRATION HERE.
-    # MAKE SURE TO CHECK rebin_and_shift() WHICH MIGHT NOT LIKE NEGATIVE SHIFT COEFF.
-    # (alternatively consider using center-bin throughout, but then need to correct when plotting.)
     Ny, Nx = matrix.shape
     y_array = np.linspace(0, Ny-1, Ny)
-    y_array = cal["a0y"] + cal["a1y"]*y_array + cal["a2y"]*y_array**2
     x_array = np.linspace(0, Nx-1, Nx)
+    # Make arrays in center-bin calibration:
     x_array = cal["a0x"] + cal["a1x"]*x_array + cal["a2x"]*x_array**2
-    # x_array = np.linspace(cal["a0x"], cal["a0x"]+cal["a1x"]*Nx, Nx) # BIG TODO: This is probably center-bin calibration, 
-    # x_array = np.linspace(a[2], a[2]+a[3]*(Ny), Ny) # and should be shifted down by half a bin?
-                                                    # Update 20171024: Started changing everything to lower bin edge,
-                                                    # but started to hesitate. For now I'm inclined to keep it as
-                                                    # center-bin everywhere. 
+    y_array = cal["a0y"] + cal["a1y"]*y_array + cal["a2y"]*y_array**2
+    # Then correct them to lower-bin-edge:
+    y_array = y_array - cal["a1y"]/2
+    x_array = x_array - cal["a1x"]/2
     out = Matrix(matrix=matrix, E0_array=y_array, E1_array=x_array)
     return out
 
