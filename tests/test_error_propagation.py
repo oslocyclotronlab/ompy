@@ -56,7 +56,7 @@ assert(fg_verbose == ma.fg_verbose)
 # Instantiate the propagation class with MatrixAnalysis instance ma:
 ep = om.ErrorPropagation(ma,
                          folder="error_propagation_ensemble",
-                         seed=73)
+                         random_seed=73)
 
 N_ensemble_members = 5
 ep.generate_ensemble(N_ensemble_members=N_ensemble_members,
