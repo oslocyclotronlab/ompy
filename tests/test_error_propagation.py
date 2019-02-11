@@ -56,16 +56,16 @@ assert(fg_verbose == ma.fg_verbose)
 # Instantiate the propagation class with MatrixAnalysis instance ma:
 ep = om.ErrorPropagation(ma,
                          folder="error_propagation_ensemble",
-                         randomness="poisson",
                          seed=73)
 
-N_ensemble_members = 2
-ep.generate_ensemble(N_ensemble_members = N_ensemble_members,
-                     verbose=True,
-                     purge_files=True)
-
-import sys
-sys.exit(0)
+N_ensemble_members = 20
+var_firstgen = ep.generate_ensemble(N_ensemble_members = N_ensemble_members,
+                                    verbose=True,
+                                    randomness="gaussian",
+                                    purge_files=True)
+print(var_firstgen.matrix.min())
+# import sys
+# sys.exit(0)
 
 # === Plotting ===
 f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
@@ -77,5 +77,10 @@ cbar2 = ma.unfolded.plot(ax=ax2, title="unfolded")
 f.colorbar(cbar2, ax=ax2)
 # Firstgen:
 cbar3 = ma.firstgen.plot(ax=ax3, title="first generation")
+f.colorbar(cbar3, ax=ax3)
+# Variance of firstgen, error propagated:
+cbar4 = var_firstgen.plot(ax=ax4, title="var(first generation)",
+                          zscale="log")
+f.colorbar(cbar4, ax=ax4)
 
 plt.show()
