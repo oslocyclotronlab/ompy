@@ -231,48 +231,63 @@ class MatrixAnalysis():
                             " dE_gamma not specified")
 
         # Copy input parameters to class parameters:
-        # Ex_max:
+        # Ex_max (required argument):
         if Ex_max is not None:
             self.fg_Ex_max = Ex_max
         else:
-            if isinstance(self.fg_Ex_max, str):
+            if isinstance(self.fg_Ex_max, (float, int)):
                 Ex_max = self.fg_Ex_max
-        # dE_gamma:
+            else:
+                raise ValueError("Invalid Ex_max")
+        # dE_gamma (required argument):
         if dE_gamma is not None:
             self.fg_dE_gamma = dE_gamma
         else:
-            if isinstance(self.fg_dE_gamma, str):
+            if isinstance(self.fg_dE_gamma, (float, int)):
                 dE_gamma = self.fg_dE_gamma
+            else:
+                raise ValueError("Invalid dE_gamma")
+        # Begin optional arguments:
         # N_iterations:
         if N_iterations is not None:
             self.fg_N_iterations = N_iterations
-        else:
-            if isinstance(self.fg_N_iterations, str):
+        elif self.fg_N_iterations is not None:
+            if isinstance(self.fg_N_iterations, int):
                 N_iterations = self.fg_N_iterations
+            else:
+                raise ValueError("Invalid N_iterations")
         # multiplicity_estimation:
         if multiplicity_estimation is not None:
             self.fg_multiplicity_estimation = multiplicity_estimation
-        else:
+        elif self.fg_multiplicity_estimation is not None:
             if isinstance(self.fg_multiplicity_estimation, str):
                 multiplicity_estimation = self.fg_multiplicity_estimation
+            else:
+                raise ValueError("Invalid multiplicity_estimation")
         # apply_area_correction:
         if apply_area_correction is not None:
             self.fg_apply_area_correction = apply_area_correction
-        else:
-            if isinstance(self.fg_apply_area_correction, str):
+        elif self.fg_apply_area_correction is not None:
+            if isinstance(self.fg_apply_area_correction, bool):
                 apply_area_correction = self.fg_apply_area_correction
+            else:
+                raise ValueError("Invalid apply_area_correction")
         # verbose:
         if verbose is not None:
             self.fg_verbose = verbose
-        else:
-            if isinstance(self.fg_verbose, str):
+        elif self.fg_verbose is not None:
+            if isinstance(self.fg_verbose, bool):
                 verbose = self.fg_verbose
+            else:
+                raise ValueError("Invalid verbose")
         # fill_and_remove_negative:
         if fill_and_remove_negative is not None:
             self.fg_fill_and_remove_negative = fill_and_remove_negative
-        else:
-            if isinstance(self.fg_fill_and_remove_negative, str):
+        elif self.fg_fill_and_remove_negative is not None:
+            if isinstance(self.fg_fill_and_remove_negative, bool):
                 fill_and_remove_negative = self.fg_fill_and_remove_negative
+            else:
+                raise ValueError("Invalid fill_and_remove_negative")
 
         # Call first generation method:
         self.firstgen = first_generation_method(matrix_in=self.unfolded,
