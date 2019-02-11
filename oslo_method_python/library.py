@@ -238,14 +238,14 @@ class Matrix():
         """
         Save matrix to mama file
         """
-        write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
-                      comment="Made by pyma")
+        write_mama_2D(self, fname,
+                      comment="Made by oslo_method_python")
 
-    def load(self, fname):
+    def load(self, fname, suppress_warning=False):
         """
         Load matrix from mama file
         """
-        if self.matrix is not None:
+        if self.matrix is not None and not suppress_warning:
             print("Warning: load() called on non-empty matrix", flush=True)
 
         # Load matrix from file:
@@ -417,7 +417,7 @@ def write_mama_2D(mat, filename, comment=""):
     header_string = '!FILE=Disk \n'
     header_string += '!KIND=Spectrum \n'
     header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
-    header_string += '!EXPERIMENT= pyma \n'
+    header_string += '!EXPERIMENT= oslo_method_python \n'
     header_string += '!COMMENT={:s} \n'.format(comment)
     header_string += '!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
     header_string += ('!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
