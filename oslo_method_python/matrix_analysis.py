@@ -52,7 +52,7 @@ class MatrixAnalysis():
         self.firstgen = Matrix()
         # self.var_firstgen = Matrix() # variance matrix of first-generation
         # matrix
-        self.response = Matrix()  # response matrix
+        # self.response = Matrix()  # response matrix
 
         # Allocate variable names for parameters to be filled by class
         # functions. This is intended for the error_propagation module.
@@ -83,24 +83,90 @@ class MatrixAnalysis():
             raise Exception("Error: No raw matrix is loaded.")
 
         if fname_resp_mat is None or fname_resp_dat is None:
-            if self.response.matrix is None:
+            # if self.response.matrix is None:
+            if (self.unfold_fname_resp_mat is None
+                or self.unfold_fname_resp_dat is None):
+
                 raise Exception(
-                    ("fname_resp_mat and/or fname_resp_dat not given, and no"
-                     " response matrix is previously loaded.")
+                    ("fname_resp_mat and/or fname_resp_dat not given, and"
+                     # " no response matrix is previously loaded.")
+                     " they are not previously loaded.")
                     )
+            elif (isinstance(self.unfold_fname_resp_mat, str)
+                  and isinstance(self.unfold_fname_resp_mat, str)):
+                fname_resp_mat = self.unfold_fname_resp_mat
+                fname_resp_dat = self.unfold_fname_resp_dat
+            else:
+                raise Exception("Something is wrong with the response matrix")
+
 
         # Copy input parameters to class parameters:
-        self.unfold_fname_resp_mat = fname_resp_mat
-        self.unfold_fname_resp_dat = fname_resp_dat
-        self.unfold_Ex_min = Ex_min
-        self.unfold_Ex_max = Ex_max
-        self.unfold_Eg_min = Eg_min
-        self.unfold_Eg_max = Eg_max
-        self.unfold_diag_cut = diag_cut
-        self.unfold_verbose = verbose
-        self.unfold_plot = plot
-        self.unfold_use_comptonsubtraction = use_comptonsubtraction
-        self.unfold_fill_and_remove_negative = fill_and_remove_negative
+        # fname_resp_mat:
+        if fname_resp_mat is not None:
+            self.unfold_fname_resp_mat = fname_resp_mat
+        else:
+            if isinstance(self.unfold_fname_resp_mat, str):
+                fname_resp_mat = self.unfold_fname_resp_mat
+        # fname_resp_dat:
+        if fname_resp_dat is not None:
+            self.unfold_fname_resp_dat = fname_resp_dat
+        else:
+            if isinstance(self.unfold_fname_resp_dat, str):
+                fname_resp_dat = self.unfold_fname_resp_dat
+        # Ex_min:
+        if Ex_min is not None:
+            self.unfold_Ex_min = Ex_min
+        else:
+            if isinstance(self.unfold_Ex_min, str):
+                Ex_min = self.unfold_Ex_min
+        # Ex_max:
+        if Ex_max is not None:
+            self.unfold_Ex_max = Ex_max
+        else:
+            if isinstance(self.unfold_Ex_max, str):
+                Ex_max = self.unfold_Ex_max
+        # Eg_min:
+        if Eg_min is not None:
+            self.unfold_Eg_min = Eg_min
+        else:
+            if isinstance(self.unfold_Eg_min, str):
+                Eg_min = self.unfold_Eg_min
+        # Eg_max:
+        if Eg_max is not None:
+            self.unfold_Eg_max = Eg_max
+        else:
+            if isinstance(self.unfold_Eg_max, str):
+                Eg_max = self.unfold_Eg_max
+        # diag_cut:
+        if diag_cut is not None:
+            self.unfold_diag_cut = diag_cut
+        else:
+            if isinstance(self.unfold_diag_cut, str):
+                diag_cut = self.unfold_diag_cut
+        # verbose:
+        if verbose is not None:
+            self.unfold_verbose = verbose
+        else:
+            if isinstance(self.unfold_verbose, str):
+                verbose = self.unfold_verbose
+        # plot:
+        if plot is not None:
+            self.unfold_plot = plot
+        else:
+            if isinstance(self.unfold_plot, str):
+                plot = self.unfold_plot
+        # unfold_use_comptonsubtraction:
+        if use_comptonsubtraction is not None:
+            self.unfold_use_comptonsubtraction = use_comptonsubtraction
+        else:
+            if isinstance(self.unfold_use_comptonsubtraction, str):
+                use_comptonsubtraction = self.unfold_use_comptonsubtraction
+        # unfold_fill_and_remove_negative:
+        if fill_and_remove_negative is not None:
+            self.unfold_fill_and_remove_negative = fill_and_remove_negative
+        else:
+            if isinstance(self.unfold_fill_and_remove_negative, str):
+                fill_and_remove_negative = self.unfold_fill_and_remove_negative
 
         # Call unfolding function
         self.unfolded = unfold(
@@ -132,6 +198,7 @@ class MatrixAnalysis():
         # Copy input parameters to class parameters:
         self.fg_Ex_max = Ex_max
         self.fg_dE_gamma = dE_gamma
+        self.fg_N_iterations = N_iterations
         self.fg_multiplicity_estimation = multiplicity_estimation
         self.fg_apply_area_correction = apply_area_correction
         self.fg_verbose = verbose

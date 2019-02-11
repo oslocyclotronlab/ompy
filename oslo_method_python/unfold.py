@@ -458,7 +458,6 @@ def scoring(chisquare_matrix, fluctuations_matrix, weight_fluct,
     best_iteration = np.where(minimum_iterations > best_iteration,
              minimum_iterations*np.ones(len(best_iteration), dtype=int),
              best_iteration)
-    print(best_iteration)
     return best_iteration
 
 
