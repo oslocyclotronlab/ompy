@@ -85,7 +85,7 @@ class MatrixAnalysis():
         if fname_resp_mat is None or fname_resp_dat is None:
             # if self.response.matrix is None:
             if (self.unfold_fname_resp_mat is None
-                or self.unfold_fname_resp_dat is None):
+                    or self.unfold_fname_resp_dat is None):
 
                 raise Exception(
                     ("fname_resp_mat and/or fname_resp_dat not given, and"
@@ -94,79 +94,105 @@ class MatrixAnalysis():
                     )
             elif (isinstance(self.unfold_fname_resp_mat, str)
                   and isinstance(self.unfold_fname_resp_mat, str)):
-                fname_resp_mat = self.unfold_fname_resp_mat
-                fname_resp_dat = self.unfold_fname_resp_dat
+                # This case is OK and will be handled below
+                pass
             else:
                 raise Exception("Something is wrong with the response matrix")
 
-
-        # Copy input parameters to class parameters:
-        # fname_resp_mat:
+        # Copy input parameters to class parameters.
+        # The required arguments have a different check to ensure that they
+        # are provided. The optional arguments can be None. If the argument
+        # is not None, then it checks that it has the right type.
+        # fname_resp_mat (required argument):
         if fname_resp_mat is not None:
             self.unfold_fname_resp_mat = fname_resp_mat
         else:
             if isinstance(self.unfold_fname_resp_mat, str):
                 fname_resp_mat = self.unfold_fname_resp_mat
-        # fname_resp_dat:
+            else:
+                raise ValueError("Invalid fname_resp_mat")
+        # fname_resp_dat (required argument):
         if fname_resp_dat is not None:
             self.unfold_fname_resp_dat = fname_resp_dat
         else:
             if isinstance(self.unfold_fname_resp_dat, str):
                 fname_resp_dat = self.unfold_fname_resp_dat
+            else:
+                raise ValueError("Invalid fname_resp_dat")
+        # Begin optional arguments:
         # Ex_min:
         if Ex_min is not None:
             self.unfold_Ex_min = Ex_min
-        else:
-            if isinstance(self.unfold_Ex_min, str):
+        elif self.unfold_Ex_min is not None:
+            print("self.unfold_Ex_min =", self.unfold_Ex_min)
+            if isinstance(self.unfold_Ex_min, (float, int)):
                 Ex_min = self.unfold_Ex_min
+            else:
+                raise ValueError("Invalid Ex_min")
         # Ex_max:
         if Ex_max is not None:
             self.unfold_Ex_max = Ex_max
-        else:
-            if isinstance(self.unfold_Ex_max, str):
+        elif self.unfold_Ex_max is not None:
+            if isinstance(self.unfold_Ex_max, (float, int)):
                 Ex_max = self.unfold_Ex_max
+            else:
+                raise ValueError("Invalid Ex_max")
         # Eg_min:
         if Eg_min is not None:
             self.unfold_Eg_min = Eg_min
-        else:
-            if isinstance(self.unfold_Eg_min, str):
+        elif self.unfold_Eg_min is not None:
+            if isinstance(self.unfold_Eg_min, (float, int)):
                 Eg_min = self.unfold_Eg_min
+            else:
+                raise ValueError("Invalid Eg_min")
         # Eg_max:
         if Eg_max is not None:
             self.unfold_Eg_max = Eg_max
-        else:
-            if isinstance(self.unfold_Eg_max, str):
+        elif self.unfold_Eg_max is not None:
+            if isinstance(self.unfold_Eg_max, (float, int)):
                 Eg_max = self.unfold_Eg_max
+            else:
+                raise ValueError("Invalid Eg_max")
         # diag_cut:
         if diag_cut is not None:
             self.unfold_diag_cut = diag_cut
-        else:
-            if isinstance(self.unfold_diag_cut, str):
+        elif self.unfold_diag_cut is not None:
+            if isinstance(self.unfold_diag_cut, dict):
                 diag_cut = self.unfold_diag_cut
+            else:
+                raise ValueError("Invalid diag_cut")
         # verbose:
         if verbose is not None:
             self.unfold_verbose = verbose
-        else:
-            if isinstance(self.unfold_verbose, str):
+        elif self.unfold_verbose is not None:
+            if isinstance(self.unfold_verbose, bool):
                 verbose = self.unfold_verbose
+            else:
+                raise ValueError("Invalid verbose")
         # plot:
         if plot is not None:
             self.unfold_plot = plot
-        else:
-            if isinstance(self.unfold_plot, str):
+        elif self.unfold_plot is not None:
+            if isinstance(self.unfold_plot, bool):
                 plot = self.unfold_plot
+            else:
+                raise ValueError("Invalid plot")
         # unfold_use_comptonsubtraction:
         if use_comptonsubtraction is not None:
             self.unfold_use_comptonsubtraction = use_comptonsubtraction
-        else:
-            if isinstance(self.unfold_use_comptonsubtraction, str):
+        elif self.unfold_use_comptonsubtraction is not None:
+            if isinstance(self.unfold_use_comptonsubtraction, bool):
                 use_comptonsubtraction = self.unfold_use_comptonsubtraction
+            else:
+                raise ValueError("Invalid use_comptonsubtraction")
         # unfold_fill_and_remove_negative:
         if fill_and_remove_negative is not None:
             self.unfold_fill_and_remove_negative = fill_and_remove_negative
-        else:
-            if isinstance(self.unfold_fill_and_remove_negative, str):
+        elif self.unfold_fill_and_remove_negative is not None:
+            if isinstance(self.unfold_fill_and_remove_negative, bool):
                 fill_and_remove_negative = self.unfold_fill_and_remove_negative
+            else:
+                raise ValueError("Invalid fill_and_remove_negative")
 
         # Call unfolding function
         self.unfolded = unfold(
@@ -185,7 +211,7 @@ class MatrixAnalysis():
             self.unfolded.fill_negative(window_size=10)
             self.unfolded.remove_negative()
 
-    def first_generation_method(self, Ex_max, dE_gamma,
+    def first_generation_method(self, Ex_max=None, dE_gamma=None,
                                 N_iterations=10,
                                 multiplicity_estimation="statistical",
                                 apply_area_correction=False,
@@ -193,16 +219,60 @@ class MatrixAnalysis():
                                 fill_and_remove_negative=False):
         # = Check that unfolded matrix is present:
         if self.unfolded.matrix is None:
-            raise Exception("Error: No unfolded matrix is loaded.")
+            raise Exception("Error in first_generation_method:"
+                            " No unfolded matrix is loaded.")
+
+        # Check that Ex_max and dE_gamma are given or present in self:
+        if Ex_max is None and self.fg_Ex_max is None:
+            raise Exception("Error in first_generation_method:"
+                            " Ex_max not specified")
+        if dE_gamma is None and self.fg_dE_gamma is None:
+            raise Exception("Error in first_generation_method:"
+                            " dE_gamma not specified")
 
         # Copy input parameters to class parameters:
-        self.fg_Ex_max = Ex_max
-        self.fg_dE_gamma = dE_gamma
-        self.fg_N_iterations = N_iterations
-        self.fg_multiplicity_estimation = multiplicity_estimation
-        self.fg_apply_area_correction = apply_area_correction
-        self.fg_verbose = verbose
-        self.fg_fill_and_remove_negative = fill_and_remove_negative
+        # Ex_max:
+        if Ex_max is not None:
+            self.fg_Ex_max = Ex_max
+        else:
+            if isinstance(self.fg_Ex_max, str):
+                Ex_max = self.fg_Ex_max
+        # dE_gamma:
+        if dE_gamma is not None:
+            self.fg_dE_gamma = dE_gamma
+        else:
+            if isinstance(self.fg_dE_gamma, str):
+                dE_gamma = self.fg_dE_gamma
+        # N_iterations:
+        if N_iterations is not None:
+            self.fg_N_iterations = N_iterations
+        else:
+            if isinstance(self.fg_N_iterations, str):
+                N_iterations = self.fg_N_iterations
+        # multiplicity_estimation:
+        if multiplicity_estimation is not None:
+            self.fg_multiplicity_estimation = multiplicity_estimation
+        else:
+            if isinstance(self.fg_multiplicity_estimation, str):
+                multiplicity_estimation = self.fg_multiplicity_estimation
+        # apply_area_correction:
+        if apply_area_correction is not None:
+            self.fg_apply_area_correction = apply_area_correction
+        else:
+            if isinstance(self.fg_apply_area_correction, str):
+                apply_area_correction = self.fg_apply_area_correction
+        # verbose:
+        if verbose is not None:
+            self.fg_verbose = verbose
+        else:
+            if isinstance(self.fg_verbose, str):
+                verbose = self.fg_verbose
+        # fill_and_remove_negative:
+        if fill_and_remove_negative is not None:
+            self.fg_fill_and_remove_negative = fill_and_remove_negative
+        else:
+            if isinstance(self.fg_fill_and_remove_negative, str):
+                fill_and_remove_negative = self.fg_fill_and_remove_negative
 
         # Call first generation method:
         self.firstgen = first_generation_method(matrix_in=self.unfolded,
