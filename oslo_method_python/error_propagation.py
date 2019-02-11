@@ -37,8 +37,8 @@ import copy
 class ErrorPropagation:
     def __init__(self, matrix_analysis_instance,
                  folder="error_propagation_ensemble",
-                 randomness="gaussian",
-                 seed=None):
+                 randomness="poisson",
+                 random_seed=None):
 
         self.matrix_analysis = matrix_analysis_instance
         self.folder = folder
@@ -52,8 +52,8 @@ class ErrorPropagation:
             os.mkdir(folder)
 
         # Set random seed
-        if seed is not None:
-            np.random.seed(seed)
+        if random_seed is not None:
+            np.random.seed(random_seed)
 
         # Check if the passed matrix_analysis_instance contains
         # raw, unfolded and firstgen matrices.
@@ -317,9 +317,9 @@ class ErrorPropagation:
         # raw:
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         std_raw = Matrix(raw_ensemble_std,
-                              matrix_analysis.raw.E0_array,
-                              matrix_analysis.raw.E1_array
-                              )
+                         matrix_analysis.raw.E0_array,
+                         matrix_analysis.raw.E1_array
+                         )
         fname_raw_std = os.path.join(folder, "raw_std.m")
         std_raw.save(fname_raw_std)
         # firstgen:
