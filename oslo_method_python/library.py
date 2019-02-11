@@ -241,11 +241,11 @@ class Matrix():
         write_mama_2D(self, fname,
                       comment="Made by oslo_method_python")
 
-    def load(self, fname):
+    def load(self, fname, suppress_warning=False):
         """
         Load matrix from mama file
         """
-        if self.matrix is not None:
+        if self.matrix is not None and not suppress_warning:
             print("Warning: load() called on non-empty matrix", flush=True)
 
         # Load matrix from file:

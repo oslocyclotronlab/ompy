@@ -58,17 +58,19 @@ ep = om.ErrorPropagation(ma,
                          folder="error_propagation_ensemble",
                          seed=73)
 
-N_ensemble_members = 20
-var_firstgen = ep.generate_ensemble(N_ensemble_members = N_ensemble_members,
-                                    verbose=True,
-                                    randomness="gaussian",
-                                    purge_files=True)
-print(var_firstgen.matrix.min())
+N_ensemble_members = 5
+ep.generate_ensemble(N_ensemble_members=N_ensemble_members,
+                     verbose=True,
+                     randomness="poisson",
+                     purge_files=True)
+std_firstgen = ep.std_firstgen
+std_raw = ep.std_raw
+print(std_firstgen.matrix.max())
 # import sys
 # sys.exit(0)
 
 # === Plotting ===
-f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+f, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
 # Raw:
 cbar1 = ma.raw.plot(ax=ax1, title="raw")
 f.colorbar(cbar1, ax=ax1)
@@ -79,8 +81,12 @@ f.colorbar(cbar2, ax=ax2)
 cbar3 = ma.firstgen.plot(ax=ax3, title="first generation")
 f.colorbar(cbar3, ax=ax3)
 # Variance of firstgen, error propagated:
-cbar4 = var_firstgen.plot(ax=ax4, title="var(first generation)",
+cbar4 = std_firstgen.plot(ax=ax4, title="std(first generation)",
                           zscale="log")
 f.colorbar(cbar4, ax=ax4)
+# Variance of raw:
+cbar5 = std_raw.plot(ax=ax5, title="std(raw)",
+                     zscale="log")
+f.colorbar(cbar5, ax=ax5)
 
 plt.show()

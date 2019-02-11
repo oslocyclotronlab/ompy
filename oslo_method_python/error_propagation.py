@@ -31,6 +31,7 @@ import numpy as np
 import os
 from .library import *
 from .matrix_analysis import *
+import copy
 
 
 class ErrorPropagation:
@@ -42,6 +43,10 @@ class ErrorPropagation:
         self.matrix_analysis = matrix_analysis_instance
         self.folder = folder
         self.randomness = randomness
+        # Allocate variables to be filled by class methods later:
+        self.std_raw = None
+        self.std_unfolded = None
+        self.std_firstgen = None
         # Create folder
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -51,14 +56,14 @@ class ErrorPropagation:
             np.random.seed(seed)
 
         # Check if the passed matrix_analysis_instance contains
-        # raw, unfolded and firstgen matrices. 
+        # raw, unfolded and firstgen matrices.
         # If so, copy them to ensemble directory.
         # If not, run through and make them (except raw,
         # which must be there).
 
         # Raw:
         if self.matrix_analysis.raw.matrix is None:
-            raise Exception("Error: No raw matrix passed to pyma_mc. ")
+            raise Exception("Error: No raw matrix passed to ErrorPropagation.")
         else:
             self.matrix_analysis.raw.save(
                 os.path.join(folder, "raw-orig.m")
@@ -87,6 +92,19 @@ class ErrorPropagation:
         Function which generates an ensemble of raw spectra, unfolds and
         first-generation-methods them
 
+        Args:
+            N_ensemble_members (int): How many ensemble members to simulate
+            randomness (str): How to approximate the statistical distribution
+                              of counts in the raw matrix.
+                              Must be one of ("gaussian", "poisson")
+            verbose (bool): Whether to print information as the calculation
+                            proceeds.
+            purge_files (bool): If the ensemble directory is not empty, should
+                                existing files be overwritten?
+        Returns:
+            std_firstgen (Matrix): The variance in the ensemble of first-
+                                   generation matrices, taken independently
+                                   in each pixel.
         """
 
         folder = self.folder
@@ -169,13 +187,12 @@ class ErrorPropagation:
         # axs_fg[0,0].set_title("fg")
         # END TESTING
 
-
-
-
-
-
         # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
-        firstgen_ensemble = np.zeros((N_ensemble_members, 
+        raw_ensemble = np.zeros((N_ensemble_members,
+                                matrix_analysis.raw.matrix.shape[0],
+                                matrix_analysis.raw.matrix.shape[1])
+                                )
+        firstgen_ensemble = np.zeros((N_ensemble_members,
                                       matrix_analysis.firstgen.matrix.shape[0],
                                       matrix_analysis.firstgen.matrix.shape[1])
                                      )
@@ -188,12 +205,11 @@ class ErrorPropagation:
             fname_raw_current = os.path.join(folder, "raw-"+str(i)+".m")
 
             # Allocate matrix_analysis instance for current ensemble member:
-            import copy
             ma_curr = copy.deepcopy(matrix_analysis)
             # Check if the current ensemble member exists on file, create it if not:
             if os.path.isfile(fname_raw_current) and not purge_files:
                 # data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
-                ma_curr.raw.load(fname_raw_current)
+                ma_curr.raw.load(fname_raw_current, suppress_warning=True)
                 if verbose:
                     print("Read raw matrix from file", flush=True)
             else:
@@ -201,15 +217,18 @@ class ErrorPropagation:
                     print("Generating raw matrix", flush=True)
                 # matrix_ensemble_current = np.maximum(matrix + np.random.normal(size=matrix_shape)*np.sqrt(matrix), np.zeros(matrix_shape)) # Each bin of the matrix is perturbed with a gaussian centered on the bin count, with standard deviation sqrt(bin count). Also, no negative counts are accepted.
                 if randomness=="gaussian":
-                    matrix_perturbed = matrix_analysis.raw.matrix + np.random.normal(size=matrix_analysis.raw.matrix.shape, scale=np.sqrt(np.where(matrix_analysis.raw.matrix > 0, matrix_analysis.raw.matrix, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
+                    # Assuming sigma \approx sqrt(n) where n is number of
+                    # counts in bin.
+                    matrix_perturbed = np.random.normal(
+                            size=matrix_analysis.raw.matrix.shape,
+                            loc=matrix_analysis.raw.matrix,
+                            scale=np.sqrt(np.where(
+                                matrix_analysis.raw.matrix > 0,
+                                matrix_analysis.raw.matrix, 0)
+                                                   )
+                                                        )
                     matrix_perturbed[matrix_perturbed < 0] = 0
-                    # Update the "raw" member of ma_curr:
-                    ma_curr.raw = Matrix(matrix_perturbed,
-                                         matrix_analysis.raw.E0_array,
-                                         matrix_analysis.raw.E1_array)
-                    print("matrix_analysis.raw.matrix.shape =", matrix_analysis.raw.matrix.shape)
-                    print("ma_curr.raw.matrix.shape =", ma_curr.raw.matrix.shape, flush=True)
-                elif randomness=="poisson":
+                elif randomness == "poisson":
                     # Use the original number of counts as the estimator for lambda (expectation value) in the Poisson
                     # distribution at each bin, and draw a completely new matrix:
                     matrix_perturbed = np.random.poisson(
@@ -222,10 +241,16 @@ class ErrorPropagation:
                     raise ValueError(("Unknown value for randomness variable:",
                                       str(randomness))
                                      )
-                    
+
+                # Update the "raw" member of ma_curr:
+                ma_curr.raw = Matrix(matrix_perturbed,
+                                     matrix_analysis.raw.E0_array,
+                                     matrix_analysis.raw.E1_array)
                 # Save ensemble member to disk:
                 ma_curr.raw.save(fname_raw_current)
-                # data_raw_ensemble[:,:,i] = data_raw_ensemblemember
+
+            # Store raw ensemble member in memory:
+            raw_ensemble[i, :, :] = ma_curr.raw.matrix
 
                 # if verbose:
                     # print("data_raw_ensemblemember.shape =", data_raw_ensemblemember.shape, flush=True)
@@ -233,7 +258,8 @@ class ErrorPropagation:
             # === Unfold it ===:
             fname_unfolded_current = os.path.join(folder, "unfolded-"+str(i)+".m")
             if os.path.isfile(fname_unfolded_current) and not purge_files:
-                ma_curr.unfolded.load(fname_unfolded_current)
+                ma_curr.unfolded.load(fname_unfolded_current,
+                                      suppress_warning=True)
                 # unfolded_ensemblemember, tmp, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unfolded_current)
                 if verbose:
                     print("Read unfolded matrix from file", flush=True)
@@ -248,16 +274,15 @@ class ErrorPropagation:
                 # if verbose:
                     # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
 
-
-
-            # === Extract first generation spectrum ===: 
+            # === Extract first generation spectrum ===:
             # Ex_max = 12000 # keV - maximum excitation energy
             # dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
             # N_Exbins = 300
             # N_Exbins = len(Ex_array_unf)
             fname_firstgen_current = os.path.join(folder, "firstgen-"+str(i)+".m")
             if os.path.isfile(fname_firstgen_current) and not purge_files:
-                ma_curr.firstgen.load(fname_firstgen_current)
+                ma_curr.firstgen.load(fname_firstgen_current,
+                                      suppress_warning=True)
                 # firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_current)
                 if verbose:
                     print("Read first generation matrix from file", flush=True)
@@ -286,18 +311,32 @@ class ErrorPropagation:
             # End loop over perturbed ensemble
 
         # TODO consider if firstgen_ensemble should be kept as a class object
-        # -- would it be useful for anything?
+        # -- would it be useful for anything? Or does it just take up memory?
 
-        # === Calculate variance ===:
-        firstgen_ensemble_variance = np.var(firstgen_ensemble, axis=0)
-        var_firstgen = Matrix(firstgen_ensemble_variance,
+        # === Calculate standard deviation ===:
+        # raw:
+        raw_ensemble_std = np.std(raw_ensemble, axis=0)
+        std_raw = Matrix(raw_ensemble_std,
+                              matrix_analysis.raw.E0_array,
+                              matrix_analysis.raw.E1_array
+                              )
+        fname_raw_std = os.path.join(folder, "raw_std.m")
+        std_raw.save(fname_raw_std)
+        # firstgen:
+        firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
+        std_firstgen = Matrix(firstgen_ensemble_std,
                               matrix_analysis.firstgen.E0_array,
                               matrix_analysis.firstgen.E1_array
                               )
-        fname_firstgen_variance = os.path.join(folder, "firstgen_variance.m")
-        var_firstgen.save(fname_firstgen_variance)
-        # pml.write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, matrix_analysis.firstgen.Ex_array, matrix_analysis.firstgen.Eg_array, comment="variance of first generation matrix ensemble")
+        fname_firstgen_std = os.path.join(folder, "firstgen_std.m")
+        std_firstgen.save(fname_firstgen_std)
 
-        plt.show()
+        # TESTING:
+        # plt.show()
+        # END TESTING
 
-        return var_firstgen
+        self.std_firstgen = std_firstgen
+        self.std_raw = std_raw
+        # TODO add self.std_unfolded
+
+        # return std_firstgen
