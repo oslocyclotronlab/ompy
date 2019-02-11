@@ -70,8 +70,10 @@ def fit_rho_T(firstgen_in, bin_width_out,
             rho (Vector): Fit result for rho
             T (Vector): Fit result for T
     Todo:
-        If firstgen.std=None, it could call a function to estimate the standard
-        deviation using the rhosigchi techniques.
+        - Change input so firstgen_std is its own Matrix() instance + check
+          that calibrations are identical between the two
+        - If firstgen.std=None, it could call a function to estimate the standard
+          deviation using the rhosigchi techniques.
     """
     # Check that Ex_min >= Eg_min:
     if Ex_min < Eg_min:
