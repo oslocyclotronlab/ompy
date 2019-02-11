@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+import time
 
 
 class Matrix():
@@ -42,10 +43,23 @@ class Matrix():
         it in an empty state. In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
+        # Sanity checks:
+        if matrix is not None and E0_array is not None:
+            if matrix.shape[0] != len(E0_array):
+                raise ValueError("Shape mismatch between matrix and E0_array.")
+        if matrix is not None and E1_array is not None:
+            if matrix.shape[1] != len(E1_array):
+                raise ValueError("Shape mismatch between matrix and E1_array.")
+        if matrix is not None and std is not None:
+            if matrix.shape != std.shape:
+                raise ValueError("Shape mismatch between matrix and std.")
+
+        # Fill class variables:
         self.matrix = matrix
         self.E0_array = E0_array
         self.E1_array = E1_array
         self.std = std  # slot for matrix of standard deviations
+
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
@@ -224,14 +238,14 @@ class Matrix():
         """
         Save matrix to mama file
         """
-        write_mama_2D(self.matrix, fname, self.E0_array, self.E1_array,
-                      comment="Made by pyma")
+        write_mama_2D(self, fname,
+                      comment="Made by oslo_method_python")
 
-    def load(self, fname):
+    def load(self, fname, suppress_warning=False):
         """
         Load matrix from mama file
         """
-        if self.matrix is not None:
+        if self.matrix is not None and not suppress_warning:
             print("Warning: load() called on non-empty matrix", flush=True)
 
         # Load matrix from file:
@@ -362,7 +376,8 @@ def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array,
     # as well as a list containing the four calibration coefficients
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
-    # and 1-D arrays of calibrated x and y values for plotting and similar.
+    # and 1-D arrays of lower-bin-edge calibrated x and y values for plotting
+    # and similar.
     matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1)
     cal = {}
     with open(filename, 'r') as datafile:
@@ -372,58 +387,58 @@ def read_mama_2D(filename):
         # print("calibration_line =", calibration_line, flush=True)
         cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]), 
              "a0y":float(calibration_line[4]), "a1y":float(calibration_line[5]), "a2y":float(calibration_line[6])}
-    # TODO: INSERT CORRECTION FROM CENTER-BIN TO LOWER EDGE CALIBRATION HERE.
-    # MAKE SURE TO CHECK rebin_and_shift() WHICH MIGHT NOT LIKE NEGATIVE SHIFT COEFF.
-    # (alternatively consider using center-bin throughout, but then need to correct when plotting.)
     Ny, Nx = matrix.shape
     y_array = np.linspace(0, Ny-1, Ny)
-    y_array = cal["a0y"] + cal["a1y"]*y_array + cal["a2y"]*y_array**2
     x_array = np.linspace(0, Nx-1, Nx)
+    # Make arrays in center-bin calibration:
     x_array = cal["a0x"] + cal["a1x"]*x_array + cal["a2x"]*x_array**2
-    # x_array = np.linspace(cal["a0x"], cal["a0x"]+cal["a1x"]*Nx, Nx) # BIG TODO: This is probably center-bin calibration, 
-    # x_array = np.linspace(a[2], a[2]+a[3]*(Ny), Ny) # and should be shifted down by half a bin?
-                                                    # Update 20171024: Started changing everything to lower bin edge,
-                                                    # but started to hesitate. For now I'm inclined to keep it as
-                                                    # center-bin everywhere. 
+    y_array = cal["a0y"] + cal["a1y"]*y_array + cal["a2y"]*y_array**2
+    # Then correct them to lower-bin-edge:
+    y_array = y_array - cal["a1y"]/2
+    x_array = x_array - cal["a1x"]/2
     out = Matrix(matrix=matrix, E0_array=y_array, E1_array=x_array)
     return out
 
 
-def write_mama_2D(matrix, filename, y_array, x_array, comment=""):
-    import time
-    outfile = open(filename, 'w')
-    # TODO update function to take Matrix object as input
+def write_mama_2D(mat, filename, comment=""):
+    # Calculate calibration coefficients.
+    cal = {"a0x": mat.E1_array[0],
+           "a1x": mat.E1_array[1]-mat.E1_array[0],
+           "a2x": 0,
+           "a0y": mat.E0_array[0],
+           "a1y": mat.E0_array[1]-mat.E0_array[0],
+           "a2y": 0}
+    # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
+    # format is supposed to have:
+    cal["a0x"] += cal["a1x"]/2
+    cal["a0y"] += cal["a1y"]/2
 
     # Write mandatory header:
-    # outfile.write('!FILE=Disk \n')
-    # outfile.write('!KIND=Spectrum \n')
-    # outfile.write('!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n')
-    # outfile.write('!EXPERIMENT=pyma \n')
-    # outfile.write('!COMMENT=none|RE:alfna-20FN:RN:UN:FN:RN: \n')
-    # outfile.write('!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n')
-    # outfile.write('!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(Egamma_range[0], (Egamma_range[1]-Egamma_range[0]), Ex_range[0], (Ex_range[1]-Ex_range[0])))
-    # outfile.write('!PRECISION=16 \n')
-    # outfile.write('!DIMENSION=2,0:%4d,0:%4d \n' %(len(matrix[:,0]), len(matrix[0,:])))
-    # outfile.write('!CHANNEL=(0:%4d,0:%4d) \n' %(len(matrix[:,0]), len(matrix[0,:])))
-    header_string ='!FILE=Disk \n'
-    header_string +='!KIND=Spectrum \n'
-    header_string +='!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
-    header_string +='!EXPERIMENT= pyma \n'
-    header_string +='!COMMENT={:s} \n'.format(comment)
-    header_string +='!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
-    header_string +='!CALIBRATION EkeV=6, %12.6E, %12.6E, 0.000000E+00, %12.6E, %12.6E, 0.000000E+00 \n' %(x_array[0], (x_array[1]-x_array[0]), y_array[0], (y_array[1]-y_array[0]))
-    header_string +='!PRECISION=16 \n'
-    header_string +="!DIMENSION=2,0:{:4d},0:{:4d} \n".format(len(matrix[0,:])-1, len(matrix[:,0])-1)
-    header_string +='!CHANNEL=(0:%4d,0:%4d) ' %(len(matrix[0,:])-1, len(matrix[:,0])-1)
+    header_string = '!FILE=Disk \n'
+    header_string += '!KIND=Spectrum \n'
+    header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
+    header_string += '!EXPERIMENT= oslo_method_python \n'
+    header_string += '!COMMENT={:s} \n'.format(comment)
+    header_string += '!TIME=DATE:'+time.strftime("%d-%b-%y %H:%M:%S", time.localtime())+'   \n'
+    header_string += ('!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
+                      % (cal["a0x"], cal["a1x"], cal["a2x"],
+                         cal["a0y"], cal["a1y"], cal["a2y"],
+                         )
+                      )
+    header_string += '!PRECISION=16 \n'
+    header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
+                        mat.matrix.shape[1]-1, mat.matrix.shape[0]-1)
+    header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (
+                        mat.matrix.shape[1]-1, mat.matrix.shape[0]-1)
 
     footer_string = "!IDEND=\n"
 
     # Write matrix:
-    # matrix.tofile(filename, sep='       ', format="{:14.8E}")
-    # matrix.tofile(filename, sep=' ', format="%-17.8E")
-    np.savetxt(filename, matrix, fmt="%-17.8E", delimiter=" ", newline="\n", header=header_string, footer=footer_string, comments="")
+    np.savetxt(filename, mat.matrix, fmt="%-17.8E", delimiter=" ",
+               newline="\n", header=header_string, footer=footer_string,
+               comments=""
+               )
 
-    outfile.close()
 
 
 def read_response(fname_resp_mat, fname_resp_dat):
@@ -651,11 +666,12 @@ def fill_negative(matrix, window_size):
 
     Todo: Debug me!
     """
+    print("Hello from the fill_negative() function. Please debug me.")
     matrix_out = np.copy(matrix)
     # Loop over rows:
     for i_Ex in range(matrix.shape[0]):
         for i_Eg in np.where(matrix[i_Ex, :] < 0)[0]:
-            print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
+            # print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
             # window_size = 4  # Start with a constant window size.
             # TODO relate it to FWHM by energy arrays
             i_Eg_low = max(0, i_Eg - window_size)
@@ -663,7 +679,7 @@ def fill_negative(matrix, window_size):
             # Fill from the channel with the larges positive count
             # in the neighbourhood
             i_max = np.argmax(matrix[i_Ex, i_Eg_low:i_Eg_high])
-            print("i_max =", i_max)
+            # print("i_max =", i_max)
             if matrix[i_Ex, i_max] <= 0:
                 pass
             else:
@@ -671,7 +687,7 @@ def fill_negative(matrix, window_size):
                 negative = matrix[i_Ex, i_Eg]
                 fill = min(0, positive + negative)  # Don't fill more than to 0
                 rest = positive
-                print("fill =", fill, "rest =", rest)
+                # print("fill =", fill, "rest =", rest)
                 matrix_out[i_Ex, i_Eg] = fill
                 # matrix_out[i_Ex, i_max] = rest
     return matrix_out
