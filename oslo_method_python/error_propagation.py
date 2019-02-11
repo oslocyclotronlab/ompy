@@ -80,7 +80,8 @@ class ErrorPropagation:
 
     def generate_ensemble(self,
                           N_ensemble_members,
-                          verbose=False,
+                          randomness="poisson",
+                          verbose=True,
                           purge_files=False):
         """
         Function which generates an ensemble of raw spectra, unfolds and
@@ -90,7 +91,6 @@ class ErrorPropagation:
 
         folder = self.folder
         matrix_analysis = self.matrix_analysis
-        randomness = self.randomness
 
         # TODO copy things from generate_ensemble.py.
         # Set up the folder and file structure,
@@ -153,20 +153,21 @@ class ErrorPropagation:
         # firstgen_ensemble = np.empty(np.append(data_raw.shape,N_stat))
 
         # TESTING: Plot matrices to see effect of perturbations:
-        Nx, Ny = 2, 2
-        from matplotlib.colors import LogNorm
-        def map_iterator_to_grid(counter, Nx, Ny):
-          # Returns i, j coordinate pairs to map a single iterator onto a 2D grid for subplots.
-          # Counts along each row from left to right, then increments row number
-          i = counter // Nx
-          j = counter % Nx
-          return i, j
+        # Nx, Ny = 2, 2
+        # from matplotlib.colors import LogNorm
+        # def map_iterator_to_grid(counter, Nx, Ny):
+        #   # Returns i, j coordinate pairs to map a single iterator onto a 2D grid for subplots.
+        #   # Counts along each row from left to right, then increments row number
+        #   i = counter // Nx
+        #   j = counter % Nx
+        #   return i, j
         # f_raw, axs_raw = plt.subplots(Nx,Ny)
         # axs_raw[0,0].set_title("raw")
         # f_unf, axs_unf = plt.subplots(Nx,Ny)
         # axs_unf[0,0].set_title("unf")
         # f_fg, axs_fg = plt.subplots(Nx,Ny)
         # axs_fg[0,0].set_title("fg")
+        # END TESTING
 
 
 
@@ -174,12 +175,15 @@ class ErrorPropagation:
 
 
         # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
-        firstgen_ensemble = np.zeros((N_ensemble_members,matrix_analysis.firstgen.matrix.shape[0],matrix_analysis.firstgen.matrix.shape[1]))
+        firstgen_ensemble = np.zeros((N_ensemble_members, 
+                                      matrix_analysis.firstgen.matrix.shape[0],
+                                      matrix_analysis.firstgen.matrix.shape[1])
+                                     )
 
         # Loop over and generate the random perturbations, then unfold and first-generation-method them:
         for i in range(N_ensemble_members):
             if verbose:
-                print("Begin ensemble member ",i, flush=True)
+                print("=== Begin ensemble member ", i, " ===", flush=True)
             # === Perturb initial raw matrix ===:
             fname_raw_current = os.path.join(folder, "raw-"+str(i)+".m")
 
@@ -200,15 +204,24 @@ class ErrorPropagation:
                     matrix_perturbed = matrix_analysis.raw.matrix + np.random.normal(size=matrix_analysis.raw.matrix.shape, scale=np.sqrt(np.where(matrix_analysis.raw.matrix > 0, matrix_analysis.raw.matrix, 0))) # Assuming sigma \approx n^2 / N where n is current bin count and N is total count, according to sigma^2 = np(1-p) for normal approx. to binomial distribution.
                     matrix_perturbed[matrix_perturbed < 0] = 0
                     # Update the "raw" member of ma_curr:
-                    ma_curr.raw = pmmat.matrix(matrix_perturbed, matrix_analysis.raw.Ex_array, matrix_analysis.raw.Eg_array)
+                    ma_curr.raw = Matrix(matrix_perturbed,
+                                         matrix_analysis.raw.E0_array,
+                                         matrix_analysis.raw.E1_array)
                     print("matrix_analysis.raw.matrix.shape =", matrix_analysis.raw.matrix.shape)
                     print("ma_curr.raw.matrix.shape =", ma_curr.raw.matrix.shape, flush=True)
                 elif randomness=="poisson":
                     # Use the original number of counts as the estimator for lambda (expectation value) in the Poisson
                     # distribution at each bin, and draw a completely new matrix:
-                    matrix_perturbed = np.random.poisson(np.where(matrix_analysis.raw.matrix>0, matrix_analysis.raw.matrix, 0))
+                    matrix_perturbed = np.random.poisson(
+                                        np.where(
+                                            matrix_analysis.raw.matrix > 0,
+                                            matrix_analysis.raw.matrix, 0
+                                                )
+                                                        )
                 else:
-                    raise Exception("Unknown value for randomness variable: "+str(randomness))
+                    raise ValueError(("Unknown value for randomness variable:",
+                                      str(randomness))
+                                     )
                     
                 # Save ensemble member to disk:
                 ma_curr.raw.save(fname_raw_current)
@@ -258,32 +271,33 @@ class ErrorPropagation:
                 ma_curr.first_generation_method()
                 ma_curr.firstgen.save(fname_firstgen_current)
 
-
-            firstgen_ensemble[i,0:ma_curr.firstgen.matrix.shape[0],0:ma_curr.firstgen.matrix.shape[1]] = ma_curr.firstgen.matrix
+            firstgen_ensemble[i, :, :] = ma_curr.firstgen.matrix
 
 
             # TESTING: Plot ensemble of first-gen matrices:
-            # i_plt, j_plt = map_iterator_to_grid(i,Nx,Ny)
-            # axs_raw[i_plt, j_plt].pcolormesh(Eg_array, Ex_array, data_raw_ensemblemember, norm=LogNorm(vmin=1,vmax=1e3))
-            # axs_unf[i_plt, j_plt].pcolormesh(Eg_array_unf, Ex_array_unf, unfolded_ensemblemember, norm=LogNorm(vmin=1,vmax=1e3))
-            # axs_fg[i_plt, j_plt].pcolormesh(Eg_array_fg, Ex_array_fg, firstgen_ensemblemember, norm=LogNorm(vmin=1,vmax=1e3))
+            # i_plt, j_plt = map_iterator_to_grid(i, Nx, Ny)
+            # ma_curr.raw.plot(ax=axs_raw[i_plt, j_plt])
+            # ma_curr.unfolded.plot(ax=axs_unf[i_plt, j_plt])
+            # ma_curr.firstgen.plot(ax=axs_fg[i_plt, j_plt])
+            # END TESTING
 
 
 
             # End loop over perturbed ensemble
 
-
+        # TODO consider if firstgen_ensemble should be kept as a class object
+        # -- would it be useful for anything?
 
         # === Calculate variance ===:
         firstgen_ensemble_variance = np.var(firstgen_ensemble, axis=0)
-        var_firstgen = matrix(firstgen_ensemble_variance, matrix_analysis.firstgen.Ex_array, matrix_analysis.firstgen.Eg_array)
+        var_firstgen = Matrix(firstgen_ensemble_variance,
+                              matrix_analysis.firstgen.E0_array,
+                              matrix_analysis.firstgen.E1_array
+                              )
         fname_firstgen_variance = os.path.join(folder, "firstgen_variance.m")
         var_firstgen.save(fname_firstgen_variance)
         # pml.write_mama_2D(firstgen_ensemble_variance, fname_firstgen_variance, matrix_analysis.firstgen.Ex_array, matrix_analysis.firstgen.Eg_array, comment="variance of first generation matrix ensemble")
 
-
+        plt.show()
 
         return var_firstgen
-
-
-
