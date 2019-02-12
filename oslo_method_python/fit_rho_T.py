@@ -43,16 +43,18 @@ global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
 
-def fit_rho_T(firstgen_in, bin_width_out,
+def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
               Ex_min, Ex_max, Eg_min,
               method="Powell",
-              verbose=True):
+              verbose=True,
+              negatives_penalty=0,
+              regularizer=0):
     """Fits the firstgen spectrum to the product of transmission coeff T and
     level density rho
 
     Args:
-        firstgen (Matrix): The first-generation matrix. The variable
-                           firstgen.std must be filled with standard dev.
+        firstgen (Matrix): The first-generation matrix.
+        firstgen_std (Matrix): The standard deviations in the first-gen matrix
         calib_out (dict): Desired commoncalibration of output rho and T on the
                           form {"a0": a0, "a1": a1}
         Ex_min (float): Minimum excitation energy for the fit
@@ -75,6 +77,14 @@ def fit_rho_T(firstgen_in, bin_width_out,
         - If firstgen.std=None, it could call a function to estimate the standard
           deviation using the rhosigchi techniques.
     """
+    # Check that firstgen and firstgen_std match each other:
+    if not (firstgen_in.calibration() == firstgen_std_in.calibration()):
+        raise Exception("Calibration mismatch between firstgen_in and"
+                        " firstgen_std_in.")
+    if not (firstgen_in.matrix.shape == firstgen_std_in.matrix.shape):
+        raise Exception("Shape mismatch between firstgen_in and"
+                        " firstgen_std_in")
+
     # Check that Ex_min >= Eg_min:
     if Ex_min < Eg_min:
         raise ValueError("Ex_min must be >= Eg_min.")
@@ -107,26 +117,23 @@ def fit_rho_T(firstgen_in, bin_width_out,
     # axis 0:
     firstgen.matrix = rebin_matrix(firstgen_in.matrix, firstgen_in.E0_array,
                                    E_array, rebin_axis=0)
-    # TODO figure out how to properly "rebin" standard deviations.
-    # Should maybe just be interpolated instead.
-    # firstgen.std = rebin_matrix(firstgen_in.std, firstgen_in.E0_array,
-                                # E_array, rebin_axis=0)
     # axis 1:
     firstgen.matrix = rebin_matrix(firstgen.matrix, firstgen_in.E1_array,
                                    E_array, rebin_axis=1)
-    # firstgen.std = rebin_matrix(firstgen.std, firstgen_in.E1_array,
-                                # E_array, rebin_axis=1)
-
+    # Set energy axes accordingly
+    firstgen.E0_array = E_array
+    firstgen.E1_array = E_array
     # Update 20190212: Interpolate the std matrix instead of rebinning:
-    firstgen.std = interpolate_matrix_2D(firstgen_in.std,
-                                         firstgen_in.E0_array,
-                                         firstgen_in.E1_array,
+    firstgen_std = Matrix()
+    firstgen_std.matrix = interpolate_matrix_2D(firstgen_std_in.matrix,
+                                         firstgen_std_in.E0_array,
+                                         firstgen_std_in.E1_array,
                                          E_array,
                                          E_array
                                          )
     # Set energy axes accordingly
-    firstgen.E0_array = E_array
-    firstgen.E1_array = E_array
+    firstgen_std.E0_array = E_array
+    firstgen_std.E1_array = E_array
     # Verify that it got rebinned and assigned correctly:
     calib_firstgen = firstgen.calibration()
     assert (
@@ -134,11 +141,19 @@ def fit_rho_T(firstgen_in, bin_width_out,
             calib_firstgen["a01"] == calib_out["a1"] and
             calib_firstgen["a10"] == calib_out["a0"] and
             calib_firstgen["a11"] == calib_out["a1"]
-           ), "Matrix does not have correct calibration."
+           ), "firstgen does not have correct calibration."
+    calib_firstgen_std = firstgen_std.calibration()
+    assert (
+            calib_firstgen_std["a00"] == calib_out["a0"] and
+            calib_firstgen_std["a01"] == calib_out["a1"] and
+            calib_firstgen_std["a10"] == calib_out["a0"] and
+            calib_firstgen_std["a11"] == calib_out["a1"]
+           ), "firstgen_std does not have correct calibration."
+
 
     # Normalize the firstgen matrix for each Ex bin:
     P_exp = div0(firstgen.matrix, firstgen.matrix.sum(axis=1))
-    P_err = firstgen.std
+    P_err = firstgen_std.matrix
     # TODO should the std matrix be scaled accordingly? Check rhosigchi.f
 
     # DEBUG: Plot the cut and normalized version of firstgen_in
@@ -210,8 +225,10 @@ def fit_rho_T(firstgen_in, bin_width_out,
     # # END DEBUG
 
     res = minimize(chisquare_1D, x0=p0,
-                   args=(firstgen.matrix, firstgen.std,
-                         E_array, masking_array),
+                   args=(firstgen.matrix, firstgen_std.matrix,
+                         E_array, masking_array,
+                         regularizer,
+                         negatives_penalty),
                    method=method,
                    options={'disp': verbose})
 
@@ -258,7 +275,7 @@ def chisquare_1D(x, *args):
     
     """
 
-    P_exp, P_err, E_array, masking_array = args
+    P_exp, P_err, E_array, masking_array, regularizer, negatives_penalty = args
 
     # Split the x vector into rho and T:
     rho_array, T_array = x[0:int(len(x)/2)], x[int(len(x)/2):]
@@ -266,7 +283,8 @@ def chisquare_1D(x, *args):
     assert(len(rho_array) == int(len(x)/2))  # TODO remove after testing
 
     return chisquare(P_exp, P_err, E_array, masking_array, rho_array,
-                     T_array)
+                     T_array, regularizer=regularizer,
+                     negatives_penalty=negatives_penalty)
 
 
 def chisquare(P_exp, P_err, E_array,
