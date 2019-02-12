@@ -3,6 +3,7 @@
 from context import oslo_method_python as om
 import matplotlib.pyplot as plt
 import numpy as np
+import copy
 
 firstgen = om.Matrix()
 # TODO: Make a test matrix (could be random numbers)
@@ -13,16 +14,20 @@ firstgen = om.Matrix()
 # firstgen.load("../firstgen-28Si.m")
 # Testing with a proper firstgen for a heavy nucleus (development):
 firstgen.load("/home/jorgenem/MEGA/doktorgrad/oslometode_usikkerhetspropagering/Dy164/data/fg")
-firstgen.std = np.sqrt(firstgen.matrix)  # In lieu of something better
+
+# Set up firstgen_std:
+firstgen_std = copy.deepcopy(firstgen)
+firstgen_std.matrix = np.sqrt(firstgen.matrix)  # In lieu of something better
 # print("firstgen.std =", firstgen.std)
 
-bin_width_out = 120
+bin_width_out = 300
 Ex_min = 3000
-Ex_max = 8000
+Ex_max = 7000
 Eg_min = 1000
 
-rho, T = om.fit_rho_T(firstgen, bin_width_out,
-                      Ex_min, Ex_max, Eg_min)
+rho, T = om.fit_rho_T(firstgen, firstgen_std, bin_width_out,
+                      Ex_min, Ex_max, Eg_min,
+                      method="Powell")
 
 
 # Plot
