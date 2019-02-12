@@ -109,13 +109,21 @@ def fit_rho_T(firstgen_in, bin_width_out,
                                    E_array, rebin_axis=0)
     # TODO figure out how to properly "rebin" standard deviations.
     # Should maybe just be interpolated instead.
-    firstgen.std = rebin_matrix(firstgen_in.std, firstgen_in.E0_array,
-                                E_array, rebin_axis=0)
+    # firstgen.std = rebin_matrix(firstgen_in.std, firstgen_in.E0_array,
+                                # E_array, rebin_axis=0)
     # axis 1:
     firstgen.matrix = rebin_matrix(firstgen.matrix, firstgen_in.E1_array,
                                    E_array, rebin_axis=1)
-    firstgen.std = rebin_matrix(firstgen.std, firstgen_in.E1_array,
-                                E_array, rebin_axis=1)
+    # firstgen.std = rebin_matrix(firstgen.std, firstgen_in.E1_array,
+                                # E_array, rebin_axis=1)
+
+    # Update 20190212: Interpolate the std matrix instead of rebinning:
+    firstgen.std = interpolate_matrix_2D(firstgen_in.std,
+                                         firstgen_in.E0_array,
+                                         firstgen_in.E1_array,
+                                         E_array,
+                                         E_array
+                                         )
     # Set energy axes accordingly
     firstgen.E0_array = E_array
     firstgen.E1_array = E_array
