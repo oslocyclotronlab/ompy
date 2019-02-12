@@ -59,7 +59,6 @@ class Matrix():
         self.matrix = matrix
         self.E0_array = E0_array
         self.E1_array = E1_array
-        self.std = std  # slot for matrix of standard deviations
 
 
     def calibration(self):
@@ -147,6 +146,7 @@ class Matrix():
                                      )
         else:
             raise Exception("Unknown zscale type", zscale)
+        assert(cbar is not None)  # cbar should be filled at this point
         ax.set_title(title)
         if ax is None:
             f.colorbar(cbar, ax=ax)
@@ -765,5 +765,5 @@ def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
                           matrix_out,
                           0
                           )
-    
+
     return matrix_out
