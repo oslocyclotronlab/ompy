@@ -27,6 +27,7 @@ from uncertainties import unumpy
 cimport cython
 cimport numpy as np
 
+
 def decompose_matrix(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, method="Powell", options={'disp': True}, fill_value=0):
     """ routine for the decomposition of the first generations spectrum P_in
 
