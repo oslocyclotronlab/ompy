@@ -372,6 +372,20 @@ class Vector():
 
         return None
 
+    def transform(self, const=1, alpha=0, implicit=False):
+        """
+        Return a transformed version of the vector:
+        vector -> const * vector * exp(alpha*E_array)
+        """
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        vector_transformed = (const * self.vector
+                              * np.exp(alpha*E_array_midbin)
+                              )
+        if implicit:
+            self.vector = vector_transformed
+        else:
+            return vector_transformed
+
 
 def read_mama_2D(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array,
