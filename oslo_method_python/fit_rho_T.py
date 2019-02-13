@@ -55,7 +55,7 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
     Args:
         firstgen (Matrix): The first-generation matrix.
         firstgen_std (Matrix): The standard deviations in the first-gen matrix
-        calib_out (dict): Desired commoncalibration of output rho and T on the
+        calib_out (dict): Desired common calibration of output rho and T on the
                           form {"a0": a0, "a1": a1}
         Ex_min (float): Minimum excitation energy for the fit
         Ex_max (float): Maximum excitation energy for the fit
@@ -153,8 +153,8 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
 
     # Normalize the firstgen matrix for each Ex bin:
     P_exp = div0(firstgen.matrix, firstgen.matrix.sum(axis=1))
-    P_err = firstgen_std.matrix
-    # TODO should the std matrix be scaled accordingly? Check rhosigchi.f
+    # Normalize the error matrix the same:
+    P_err = div0(firstgen_std.matrix, firstgen.matrix.sum(axis=1))
 
     # DEBUG: Plot the cut and normalized version of firstgen_in
     # from matplotlib.colors import LogNorm
@@ -272,7 +272,7 @@ def chisquare_1D(x, *args):
     returns:
         The chi-squared value (not reduced chi-square), thorough a call
         to chisquare()
-    
+
     """
 
     P_exp, P_err, E_array, masking_array, regularizer, negatives_penalty = args
@@ -307,7 +307,7 @@ def chisquare(P_exp, P_err, E_array,
                                              and T values
     returns:
         The chi-squared value (not reduced chi-square).
-    
+
     """
 
     P_fit = construct_P(rho_array, T_array, E_array)
@@ -319,10 +319,10 @@ def chisquare(P_exp, P_err, E_array,
     chi2 = (np.sum(chi2_matrix[masking_array])
             # Penalty term to avoid negative rho & T, made to be smooth:
             # Is it needed?
-            + negatives_penalty*(np.sum(rho_array[rho_array < 0]**2)
-                                 + np.sum(T_array[T_array < 0]**2))
-            # + negatives_penalty*(np.sum(rho_array < 0)
-                                 # + np.sum(T_array < 0))
+            # + negatives_penalty*(np.sum(rho_array[rho_array < 0]**2)
+                                 # + np.sum(T_array[T_array < 0]**2))
+            + negatives_penalty*(np.sum(rho_array < 0)
+                                 + np.sum(T_array < 0))
             # Optional Tikhonov L2 regularization term:
             + regularizer*(np.sum(rho_array**2) + np.sum(T_array**2)))
     return chi2
@@ -345,6 +345,13 @@ def construct_P(rho_array, T_array, E_array):
             constructed as P(Ex, Eg) = N*rho(Ex-Eg)*T(Eg)
             with N such that sum_Eg(P) = 1 for each Ex bin.
     """
+    # DEBUG: Checking sensitivity of the fit to the last data point in rho and T:
+    rho_array = np.copy(rho_array)
+    rho_array[-1] = 0
+    # T_array = np.copy(T_array)
+    # T_array = 1e10
+    # END DEBUG
+
     Nbins = len(E_array)
     # We construct a "meshgrid" of T and rho, then multiply.
     # T_grid is just a repeat of T along each row:
@@ -352,7 +359,11 @@ def construct_P(rho_array, T_array, E_array):
     # rho_grid is basically a repeat of rho along each column, but
     # because of the (Ex-Eg) argument, rho(0) always starts on the diagonal
     rho_grid = np.zeros((Nbins, Nbins))
+    # print("From construct_P: Nbins =", Nbins)
+
+
     for j in range(Nbins):
+        # print("j =", j)
         rho_grid[j:Nbins, j] = rho_array[0:Nbins-j]
 
     P = rho_grid*T_grid
@@ -364,6 +375,8 @@ def construct_P(rho_array, T_array, E_array):
     # f, ax = plt.subplots(1, 1)
     # ax.pcolormesh(E_array, E_array, rho_grid*T_grid)
     # plt.show()
+
+    # print("", flush=True)
     # # END DEBUG
 
     return P
@@ -399,8 +412,9 @@ def make_masking_array(shape, Ex_min, Ex_max, Eg_min, E_array):
             continue
         # print("Ex =", Ex, "Eg_max =", Eg_max, flush=True)
         # print("i_Eg_max =", i_Eg_max)
-        masking_array[i_Ex, i_Eg_min:i_Eg_max] = 1
+        masking_array[i_Ex, i_Eg_min:i_Eg_max+1] = 1
 
     # print("masking_array.shape =", masking_array.shape)
+    print("masking_array =", masking_array)
 
     return masking_array
