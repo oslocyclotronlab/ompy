@@ -114,6 +114,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# global
+GGTAGS
+GPATH
+GRTAGS
 
-oslo_method_python/rebin.c
-oslo_method_python/rebin.html
+ompy/rebin.c
+ompy/rebin.html

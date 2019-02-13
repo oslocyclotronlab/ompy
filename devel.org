@@ -1,0 +1,6 @@
+* Notes
+** Fix plotting to be more flexible and uniform
+** Choosing points for cutting the diagonal is a pain. Automate it.
+
+* Mystifystiske ting
+** Hvorfor er raw squisha?

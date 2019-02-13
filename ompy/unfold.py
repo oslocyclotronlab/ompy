@@ -109,7 +109,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         print("Lowest Ex value =", Ex_array[0], flush=True)
 
     # Import response matrix
-    response = read_mama_2D(fname_resp_mat)
+    response = mama_read(fname_resp_mat)
     R = response.matrix
     Eg_array_R = response.E0_array
     cal_R = response.calibration()
