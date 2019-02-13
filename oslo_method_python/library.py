@@ -313,6 +313,12 @@ class Matrix():
 
 class Vector():
     def __init__(self, vector=None, E_array=None):
+        if not isinstance(vector, np.ndarray):
+            raise TypeError("vector must be numpy array")
+        if not isinstance(E_array, np.ndarray):
+            raise TypeError("E_array must be numpy array")
+        if len(vector) != len(E_array):
+            raise ValueError("shape mismatch between input arrays")
         self.vector = vector
         self.E_array = E_array
 
