@@ -28,18 +28,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import warnings
-from typing import Dict, Iterable
+from matplotlib.colors import LogNorm, Normalize
+from typing import Dict, Iterable, Any, Tuple
+from enum import Enum, unique
 from .library import (mama_read, mama_write, i_from_E,
                       div0, fill_negative)
 
 
-class Matrix():
-    """
-    The matrix class stores matrices along with calibration and energy axis
-    arrays.
+@unique
+class MatrixState(Enum):
+    """ Simple enumeration to keep track of matrix states """
+    RAW = 1
+    UNFOLDED = 2
+    FIRST_GENERATION = 3
 
+    def __str__(self):
+        return {1: 'Raw', 2: 'Unfolded', 3: 'First Generation'}[self.value]
+
+
+class Matrix():
+    """ Class for high level manipulation of counts and energy axes
+
+    Stores matrices along with calibration and energy axis arrays. Performs
+    several integrity checks to verify that the arrays makes sense in relation
+    to each other.
+
+    Attributes:
+        matrix: 2D matrix storing the counting data
+        E0_array: The gamma energy along the x-axis, Eγ
+        E1_array: The excitation energy along the y-axis, Ex
+        std: Array of standard deviations
+        state: An enum to keep track of what has been done to the matrix
     """
     def __init__(self, matrix: np.ndarray = None,
                  E0_array: np.ndarray = None,
@@ -47,8 +67,8 @@ class Matrix():
                  std: np.ndarray = None,
                  filename: str = None):
         """
-        Initialise the class. There is the option to initialise
-        it in an empty state. In that case, all class variables will be None.
+        There is the option to initialize it in an empty state.
+        In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
 
@@ -61,6 +81,8 @@ class Matrix():
         if filename is not None:
             self.load(filename)
         self.verify_integrity()
+
+        self.state = MatrixState.RAW
 
     def verify_integrity(self):
         """ Runs checks to verify internal structure
@@ -110,150 +132,95 @@ class Matrix():
         }
         return calibration
 
-    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None):
-        # TODO Way too much boilerplate code. Rewrite
-        cbar = None
-        if ax is None:
-            f, ax = plt.subplots(1, 1)
-        if zscale == "log":
-            if (zmin is not None and zmax is None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     norm=LogNorm(vmin=zmin)
-                                     )
-            elif (zmin is None and zmax is not None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     norm=LogNorm(vmax=zmax)
-                                     )
-            elif (zmin is not None and zmax is not None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     norm=LogNorm(vmin=zmin, vmax=zmax)
-                                     )
-            else:
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     norm=LogNorm()
-                                     )
-        elif zscale == "linear":
-            if (zmin is not None and zmax is None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     vmin=zmin
-                                     )
-            elif (zmin is None and zmax is not None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     vmax=zmax
-                                     )
-            elif (zmin is not None and zmax is not None):
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix,
-                                     vmin=zmin,
-                                     vmax=zmax
-                                     )
-            else:
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
-                                     self.matrix
-                                     )
-        else:
-            raise ValueError("Unknown zscale", zscale)
-        ax.set_title(title)
-        if ax is None:
-            f.colorbar(cbar, ax=ax)
-            plt.show()
-        return cbar  # Return the colorbar to allow it to be plotted outside
-
-    def plot_projection(self, E_limits, axis, ax=None, normalize=False,
-                        label=None):
-        """Plots the projection of the matrix along axis
+    def plot(self, ax: Any = None, title: str = None, zscale: str = "log",
+             zmin: float = None, zmax: float = None) -> Any:
+        """ Plots the matrix with the energy along the axis
 
         Args:
-            axis (int, 0 or 1): The axis to project onto.
-            E_limits (list of two floats): The energy limits for the
-                                           projection.
-            ax (matplotlib axes object, optional): The axes object to put
-                                                   the plot in.
+            ax: A matplotlib axis to plot onto
+            title: Defaults to the current matrix state
+            zscale: Scale along the z-axis. Defaults to logarithmic
+            vmin: Minimum value for coloring in scaling
+            vmax Maximum value for coloring in scaling
+        Returns:
+            The ax used for plotting
+        Raises:
+            ValueError: If zscale is unsupported
         """
         if ax is None:
-            f, ax = plt.subplots(1, 1)
+            fig, ax = plt.subplots()
+        if zscale == 'log':
+            norm = LogNorm(vmin=zmin, vmax=zmax)
+        elif zscale == 'linear':
+            norm = Normalize(vmin=zmin, vmax=zmax)
         else:
-            pass
+            raise ValueError("Unsupported zscale ", zscale)
 
-        if axis == 0:
-            i_E_low = i_from_E(E_limits[0], self.E1_array)
-            i_E_high = i_from_E(E_limits[1], self.E1_array)
-            if normalize:
-                projection = np.mean(  # TODO: Too Egyptian
-                                div0(
-                                    self.matrix[:, i_E_low:i_E_high],
-                                    np.sum(self.matrix[:, i_E_low:i_E_high],
-                                           axis=0
-                                           )
-                                    ),
-                                axis=1
-                                )
+        lines = ax.pcolormesh(self.E1_array, self.E0_array, self.matrix,
+                              norm=norm)
+        ax.set_title(title if title is not None else self.state)
+        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+        ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+        cbar = fig.colorbar(lines, ax=ax)
+        cbar.ax.set_ylabel("# counts")
+        plt.show()
+        return ax
+
+    def plot_projection(self, axis: int, Emin: float = None,
+                        Emax: float = None, ax: Any = None,
+                        normalize: bool = False) -> Any:
+        """ Plots the projection of the matrix along axis
+
+        Args:
+            axis: The axis to project onto. Can be 0 or 1.
+            Emin: The minimum energy to be summed over.
+            Emax: The maximum energy to be summed over.
+            ax: The axes object to plot onto.
+            normalize: Whether or not to normalize the counts.
+        Raises:
+            ValueError: If axis is not in [0, 1]
+        Returns:
+            The ax used for plotting
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+        if axis not in (0, 1):
+            raise ValueError(f"Axis must be 0 or 1, got {axis}.")
+
+        indexE = self.index_E0 if axis else self.index_E1
+        rangeE = self.range_E0 if axis else self.range_E1
+        imin = indexE(Emin) if Emin is not None else rangeE[0]
+        imax = indexE(Emax) if Emax is not None else rangeE[-1]
+        subset = slice(imin, imax)
+        selection = self.matrix[subset, :] if axis else self.matrix[:, subset]
+
+        naxis = 0 if axis else 1
+
+        projection = selection.sum(axis=naxis)
+        if normalize:
+            # Don't know what calibration does, so using specialized code here
+            if not axis:
+                projection = div0(selection, selection.sum(axis=axis))
+                projection = projection.mean(axis=naxis)
             else:
-                projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
-            if label is None:
-                ax.plot(self.E0_array,
-                        projection,
-                        )
-            elif isinstance(label, str):
-                ax.plot(self.E0_array,
-                        projection,
-                        label=label
-                        )
-            else:
-                raise ValueError("Keyword label should be str or None, but is",
-                                 label)
-        elif axis == 1:
-            i_E_low = i_from_E(E_limits[0], self.E0_array)
-            i_E_high = i_from_E(E_limits[1], self.E0_array)
-            if normalize:
-                projection = np.mean(
-                                div0(
-                                    self.matrix[i_E_low:i_E_high, :],
-                                    (np.sum(self.matrix[i_E_low:i_E_high, :],
-                                            axis=1)
-                                     * self.calibration()["a01"])[:, None]
-                                    ),
-                                axis=0
-                                )
-            else:
-                projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
-            if label is None:
-                ax.plot(self.E1_array,
-                        projection,
-                        )
-            elif isinstance(label, str):
-                ax.plot(self.E1_array,
-                        projection,
-                        label=label
-                        )
-            else:
-                raise ValueError("Keyword label should be str or None, but is",
-                                 label)
+                calibration = self.calibration()["a01"]
+                calibrated_sum = selection.sum(axis=axis)*calibration
+                calibrated = div0(selection, calibrated_sum[:, None])
+                projection = calibrated.mean(axis=naxis)
+
+        if axis:
+            ax.plot(self.E1_array, projection)
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         else:
-            raise Exception("Variable axis must be one of (0, 1) but is",
-                            axis)
-        if label is not None:
-            ax.legend()
+            ax.plot(self.E0_array, projection)
+            ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
 
-    def plot_projection_x(self, E_limits, ax=None, normalize=False,
-                          label=""):
-        """ Wrapper to call plot_projection(axis=1) to project on x axis"""
-        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
-                               normalize=normalize, label=label)
+        if normalize:
+            ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
+        else:
+            ax.set_ylabel(r"$ \# counts $")
+
+        return ax
 
     def save(self, fname):
         """ Save matrix to mama file
@@ -309,7 +276,7 @@ class Matrix():
         Cut away counts to the right of a diagonal line defined by indices
 
         Args:
-            E1: First point of intercept, ordered as Ex,Eg
+            E1: First point of intercept, ordered as Ex, Eg
             E2: Second point of intercept
         Returns:
             The matrix with counts above diagonal removed
@@ -319,6 +286,7 @@ class Matrix():
         Ex2, Ey2 = E2
         Ix = self.indices_E0([Ex1, Ex2])
         Iy = self.indices_E1([Ey1, Ey2])
+
         # Interpolate between the two points
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
         b = Iy[0] - a*Ix[0]
@@ -356,14 +324,18 @@ class Matrix():
         return np.array(indices)
 
     @property
-    def range_E0(self):
+    def range_E0(self) -> np.ndarray:
         """ Returns all indices of E0_array """
         return np.arange(0, len(self.E0_array), dtype=int)
 
     @property
-    def range_E1(self):
+    def range_E1(self) -> np.ndarray:
         """ Returns all indices of E1_array """
         return np.arange(0, len(self.E1_array), dtype=int)
+
+    @property
+    def counts(self) -> float:
+        return self.matrix.sum()
 
 
 class Vector():
@@ -382,7 +354,7 @@ class Vector():
                            "a1": self.E_array[1]-self.E_array[0],
                           }
         else:
-            raise Exception("calibration() called on empty Vector instance")
+            raise RuntimeError("calibration() called on empty Vector instance")
         return calibration
 
     def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
@@ -415,7 +387,7 @@ class Vector():
         """
         Save vector to mama file
         """
-        raise Exception("Not implemented yet")
+        raise NotImplementedError("Not implemented yet")
 
         return None
 
@@ -423,6 +395,6 @@ class Vector():
         """
         Load vector from mama file
         """
-        raise Exception("Not implemented yet")
+        raise NotImplementedError("Not implemented yet")
 
         return None

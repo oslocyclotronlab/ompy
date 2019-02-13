@@ -1,6 +1,9 @@
 * Notes
-** Fix plotting to be more flexible and uniform
-** Choosing points for cutting the diagonal is a pain. Automate it.
+** Matrix
+*** Fix plotting to be more flexible and uniform
+*** Choosing points for cutting the diagonal is a pain. Automate it.
 
+*** Implement automatic unit conversion
 * Mystifystiske ting
 ** Hvorfor er raw squisha?
+** Hvorfor er noen counts negative og mange float?

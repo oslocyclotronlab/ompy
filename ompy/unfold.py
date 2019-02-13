@@ -59,26 +59,26 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
     Returns:
         unfolded -- the unfolded matrix as an instance of the Matrix() class
 
-    Todo:
+    TODO:
         - Implement the Matrix() and Vector() classes throughout the function.
         - Fix the compton subtraction method implementation.
+        - Too long and complicated function. Split up.
     """
 
     if use_comptonsubtraction:
-        raise Exception(("The compton subtraction method does not currently"
-                        " work correctly."))
+        raise NotImplementedError(("The compton subtraction method does not currently"
+                                   " work correctly."))
 
     if fname_resp_mat is None or fname_resp_dat is None:
-        raise Exception(
+        raise RuntimeError(
             "fname_resp_mat and/or fname_resp_dat not given, and "
             "no response matrix is previously loaded."
-            )
+        )
 
     # Rename variables for local use:
     # data_raw = raw.matrix
     Ex_array = raw.E0_array
     Eg_array = raw.E1_array
-
 
     # = Import data and response matrix =
 
