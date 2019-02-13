@@ -48,7 +48,7 @@ def first_generation_method(matrix_in,
         matrix (Matrix): The matrix to apply the first eneration method to
         multiplicity_estimation (str): One of ["statistical", "total"]
 
-    Todo:
+    TODO:
         - Consider removing Ex_max keyword. Can't it just take the whole matrix?
           Compare with MAMA.
     """
