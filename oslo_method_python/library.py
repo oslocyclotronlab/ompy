@@ -270,7 +270,20 @@ class Matrix():
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        assert(E_limits[1] >= E_limits[0])  # Sanity check
+        if axis in (0, 1):
+            if not len(E_limits) == 2:
+                raise ValueError("E_limits must be a list of length 2")
+        elif axis == "both":
+            if not len(E_limits) == 4:
+                raise ValueError("E_limits must be a list of length 4")
+        else:
+            raise ValueError("axis must be 0, 1 or \"both\"")
+
+        if not (E_limits[1] >= E_limits[0]):  # Sanity check
+            raise ValueError("Upper limit must be >= lower limit")
+        if axis == "both":
+            if not (E_limits[1] >= E_limits[0] and E_limits[3] >= E_limits[2]):
+                raise ValueError("Upper limits must be >= lower limits")
         matrix_cut = None
         std_cut = None
         out = None
@@ -295,6 +308,20 @@ class Matrix():
                 self.E1_array = E1_array_cut
             else:
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
+        elif axis == "both":
+            i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
+            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
+            matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
+            E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
+            E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+                self.E1_array = E1_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array_cut)
         else:
             raise ValueError("Axis must be one of (0, 1), but is", axis)
 
