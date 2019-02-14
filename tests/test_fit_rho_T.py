@@ -69,37 +69,58 @@ firstgen_rebinned = om.Matrix(firstgen_rebinned_matrix, E_array_out, E_array_out
 firstgen_rebinned.plot_projection(E_limits=E_limits, axis=1,
                          ax=axdiw, label="exp", normalize=True)
 
-# # DEBUG
-# # i_E_low = om.i_from_E(E_limits[0], firstgen.E1_array)
-# # i_E_high = om.i_from_E(E_limits[1], firstgen.E1_array)
-# i_E_low = np.argmin(np.abs(E_limits[0] - firstgen.E0_array))
-# i_E_high = np.argmin(np.abs(E_limits[1] - firstgen.E0_array))
 
-# print(i_E_low, i_E_high)
-# axdiw.plot(firstgen.E1_array,
-#            firstgen.matrix[i_E_low:i_E_high, :].sum(axis=0),
-#            label="exp manual"
-#            )
-# print(firstgen.matrix[i_E_low:i_E_high, :])
-# END DEBUG
 
-P_fit = om.construct_P(rho.vector, T.vector, rho.E_array)
-P_fit = P_fit / P_fit.sum(axis=1)  # Normalize to unity
-P_fit = om.Matrix(P_fit, rho.E_array, rho.E_array)
-P_fit.plot_projection(E_limits=E_limits, axis=1,
-                      ax=axdiw, label="fit", normalize=True)
+# === Begin plotting ===
+
+f2D, ((ax_P_true, ax_P_fit), (ax_P_diff, ax2D_4)) = plt.subplots(2, 2)
+firstgen_cut = firstgen.cut_rect(
+                              axis="both",
+                              E_limits=[Ex_min, Ex_max, Eg_min, Ex_max],
+                              inplace=False
+                              )
+cbar = ax_P_true.pcolormesh(firstgen_cut.E1_array,
+                            firstgen_cut.E0_array,
+                            firstgen_cut.matrix,
+                            norm=LogNorm())
+ax_P_true.set_title("P_true")
+f2D.colorbar(cbar, ax=ax_P_true)
 
 
 
-# === And plot the P matrices of constructed and fitted ===
-f_P, ((axPexp, axPfit), (axPdiff, axP4)) = plt.subplots(2,2)
+f1D, (ax_rho, ax_T) = plt.subplots(1, 2)
+rho.plot(ax=ax_rho, label="fit")
+ax_rho.legend()
+ax_rho.set_yscale("log")
 
-P_exp = om.div0(firstgen_rebinned.matrix,
-                np.sum(firstgen_rebinned.matrix, axis=1)[:, None])
-axPexp.pcolormesh(E_array_out, E_array_out, P_exp, norm=LogNorm())
+T.plot(ax=ax_T, label="fit")
+# ax_T.plot(Emid_Eg, T.transform(const=2e2, alpha=0.002),
+          # label="fit, transformed")
+ax_T.legend()
+ax_T.set_yscale("log")
 
-axPfit.pcolormesh(E_array_out, E_array_out, P_fit.matrix, norm=LogNorm())
+# Run the cut again just to get energy arrays for plotting:
+pars_fg = {"Egmin" : Eg_min,
+           "Exmin" : Ex_min,
+           "Emax" : Ex_max}
+E_array_midbin = E_array_out + bin_width_out/2
+tmp, Emid_Eg, Emid_Ex, Emid_nld = om.fg_cut_matrix(firstgen.matrix,
+                                                        E_array_midbin, **pars_fg)
 
+P_fit = om.PfromRhoT(rho.vector, T.vector, len(Emid_Ex),
+                     Emid_Eg, Emid_nld, Emid_Ex)
+cbar = ax_P_fit.pcolormesh(Emid_Eg, Emid_Ex, P_fit, norm=LogNorm())
+ax_P_fit.set_title("P_fit")
+f2D.colorbar(cbar, ax=ax_P_fit)
+
+# P_diff = P_fit - P_true
+# cbar = ax_P_diff.pcolormesh(E_array, E_array, P_diff)
+# f2D.colorbar(cbar, ax=ax_P_diff)
+
+# Print some quantities
+# print("P_diff.max() =", P_diff.max())
+print("rho (fitted) =", rho.vector)
+print("T (fitted) =", T.vector)
 
 
 plt.show()

@@ -34,6 +34,8 @@ import numpy as np
 from .library import *
 from .rebin import *
 from .constants import *
+from .rhosig import *
+
 from scipy.optimize import minimize
 import copy
 
@@ -89,10 +91,15 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
     if Ex_min < Eg_min:
         raise ValueError("Ex_min must be >= Eg_min.")
 
+
+    assert(firstgen_in.matrix.min() >= 0, "no negative counts")
+    assert(firstgen_std_in.matrix.min() >= 0, "no negative stddevs")
+
     # Cut the firstgen.matrix and firstgen.std to shape [Ex_min:Ex_max,
     # Eg_min:Eg_max].
     # Protect the input matrix:
     firstgen_in = copy.deepcopy(firstgen_in)
+    firstgen_std_in = copy.deepcopy(firstgen_in)
     # TODO: Figure out what the bug in cut_rect is. If I only do axis=0,
     # it still seems to cut both axes with the same lower limit. axis=1
     # does nothing at all. But also, it might not be so important since
@@ -150,236 +157,27 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
             calib_firstgen_std["a11"] == calib_out["a1"]
            ), "firstgen_std does not have correct calibration."
 
+    # Make cuts to the matrices using Fabio's utility:
+    pars_fg = {"Egmin" : Eg_min,
+               "Exmin" : Ex_min,
+               "Emax" : Ex_max}
+    E_array_midbin = E_array + calib_out["a1"]/2
+    firstgen_matrix, Emid_Eg, Emid_Ex, Emid_nld = fg_cut_matrix(firstgen.matrix,
+                                                            E_array_midbin, **pars_fg)
+    firstgen_std_matrix, Emid_Eg, Emid_Ex, Emid_nld = fg_cut_matrix(firstgen_std.matrix,
+                                                            E_array_midbin, **pars_fg)
 
-    # Normalize the firstgen matrix for each Ex bin:
-    P_exp = div0(firstgen.matrix, firstgen.matrix.sum(axis=1))
-    # Normalize the error matrix the same:
-    P_err = div0(firstgen_std.matrix, firstgen.matrix.sum(axis=1))
+    rho_fit, T_fit = decompose_matrix(firstgen_matrix, firstgen_std_matrix,
+                                         Emid_Eg=Emid_Eg,
+                                         Emid_nld=Emid_nld,
+                                         Emid_Ex=Emid_Ex,
+                                         method="Powell")
 
-    # DEBUG: Plot the cut and normalized version of firstgen_in
-    # from matplotlib.colors import LogNorm
-    # f, (axdebug1, axdebug2, axdebug3) = plt.subplots(1, 3)
-    # axdebug1.pcolormesh(E_array, E_array, P_exp,
-                        # norm=LogNorm())
-    # axdebug1.set_title("P_exp")
-    # END DEBUG
-
-    # === Testing things borrowed from Fabio: ===
-
-    Nbins_Ex = Nbins
-    Nbins_T = Nbins
-    Nbins_rho = Nbins
-
-    # Starting vectors for rho, T minimization:
-    # initial guess for rho is a box:
-    rho0 = np.ones(Nbins_rho)
-    # initial guess for T following Eq. (6) in Schiller2000:
-    T0 = np.zeros(Nbins_T)
-    i_Ex_min = np.argmin(np.abs(Ex_min - E_array))
-    i_Ex_max = np.argmin(np.abs(Ex_max - E_array))
-    for i_Eg in range(Nbins_T):
-        T0[i_Eg] = np.sum(firstgen.matrix[i_Ex_min:i_Ex_max, i_Eg])
-    # DEBUG: Testing T0 as unit box. It makes a difference even on a smooth
-    # synthetic spectrum.
-    # T0 = np.ones(Nbins_T)
-    # END DEBUG
-
-    # # DEBUG: Plot P_fit constructed from initial guess
-    # from matplotlib.colors import LogNorm
-    # P_fit_0 = construct_P(rho0, T0, E_array)
-    # axdebug2.pcolormesh(E_array, E_array, P_fit_0, norm=LogNorm())
-    # axdebug2.set_title("P_fit_0")
-    # # END DEBUG
-
-    p0 = np.append(rho0, T0)  # create 1D array of the initial guesses
-
-    # minimization
-    # print("firstgen.std =", firstgen.std)
-    # res = chisquare_1D(p0, firstgen.matrix, firstgen.std, E_array)
-    # print("chisq(p0) = ", res)
-
-    # Set up the masking array which defines the area to include in the
-    # chisquare fit:
-    # TODO move out to its own function
-    masking_array = make_masking_array(shape=firstgen.matrix.shape,
-                                       Ex_min=Ex_min,
-                                       Ex_max=Ex_max,
-                                       Eg_min=Eg_min,
-                                       E_array=E_array
-                                       )
-    # # DEBUG:
-    # # masking_array = np.ones(firstgen.matrix.shape, dtype=bool)
-    # axdebug3.pcolormesh(E_array, E_array, masking_array)
-    # axdebug3.set_title("masking array")
-    # # END DEBUG
-
-    # # DEBUG
-    # from matplotlib.colors import LogNorm
-    # fdebug, axdebug = plt.subplots(1, 1)
-    # axdebug.pcolormesh(firstgen.E1_array, firstgen.E0_array,
-    #                    firstgen.matrix,
-    #                    norm=LogNorm())
-    # plt.show()
-    # import sys
-    # sys.exit(0)
-    # # END DEBUG
-
-    res = minimize(chisquare_1D, x0=p0,
-                   args=(firstgen.matrix, firstgen_std.matrix,
-                         E_array, masking_array,
-                         regularizer,
-                         negatives_penalty),
-                   method=method,
-                   options={'disp': verbose})
-
-    # Unpack the fit values:
-    print("res =", res)
-    x = res.x
-    rho_array, T_array = x[0:int(len(x)/2)], x[int(len(x)/2):]
-
-    # TODO:
-    # 1. Rebin firstgen to calib_out X
-    # 2. Normalize firstgen (and stddev?)
-    # 3. Write function that makes probability matrix from rho and T
-    # 4. Write chisquare function. Interface to standard minimizers.
-
-    # Dummy values to return for testing:
-    rho = Vector(rho_array, E_array)
-    T = Vector(T_array, E_array)
+    rho = Vector(rho_fit, Emid_nld-calib_out["a1"]/2)
+    T = Vector(T_fit, Emid_Eg-calib_out["a1"]/2)
 
     # - rho and T shall be Vector() instances
     return rho, T
-
-
-def chisquare_1D(x, *args):
-    """
-    Wrapper for chisquare() which can be called from a 1D minimizer.
-
-    Args:
-    ----------
-    x: ndarray
-        workaround: 1D representation of the parameters rho and T, concatenated
-        as x = np.concatenate(rho, T)
-    args: tuple
-        tuple of the fixed parameters needed to completely specify the problem:
-        args = (P_exp, P_err, E_array, masking_array)
-            P_exp (np.ndarray): The probability matrix to fit to
-            P_err (np.ndarray): The matrix of statistical errors on P_exp
-            E_array (np.ndarray): Array of lower-bin-edge energies calibrating
-                                  both axes of the P matrices as well as rho, T
-            masking_array (np.ndarray, dtype=bool): Array specifying the index
-                                                    range of fit
-    returns:
-        The chi-squared value (not reduced chi-square), thorough a call
-        to chisquare()
-
-    """
-
-    P_exp, P_err, E_array, masking_array, regularizer, negatives_penalty = args
-
-    # Split the x vector into rho and T:
-    rho_array, T_array = x[0:int(len(x)/2)], x[int(len(x)/2):]
-    assert(len(rho_array) == len(T_array))  # TODO remove after testing
-    assert(len(rho_array) == int(len(x)/2))  # TODO remove after testing
-
-    return chisquare(P_exp, P_err, E_array, masking_array, rho_array,
-                     T_array, regularizer=regularizer,
-                     negatives_penalty=negatives_penalty)
-
-
-def chisquare(P_exp, P_err, E_array,
-              masking_array, rho_array, T_array,
-              regularizer=0, negatives_penalty=0):
-    """ Chi-square of the difference between P_exp and P_err.
-
-
-    Args:
-        P_exp (np.ndarray): The probability matrix to fit to
-        P_err (np.ndarray): The matrix of statistical errors on P_exp
-        E_array (np.ndarray): Array of lower-bin-edge energies calibrating
-                              both axes of the P matrices as well as rho, T
-        masking_array (np.ndarray, dtype=bool): Array specifying the index
-                                                range of fit
-        regularizer (float, optional): A Tikhonov L2 regularization term
-            on rho and T which can be added to the chisquare sum. Does not
-            seem to help. Defaults to 0.
-        negatives_penalty (float, optional): A penalty term on negative rho
-                                             and T values
-    returns:
-        The chi-squared value (not reduced chi-square).
-
-    """
-
-    P_fit = construct_P(rho_array, T_array, E_array)
-
-    chi2_matrix = div0((P_exp - P_fit)**2, P_err**2)
-    # DEBUG: No division, just mean square error:
-    # chi2_matrix = (P_exp - P_fit)**2
-    # END DEBUG
-    chi2 = (np.sum(chi2_matrix[masking_array])
-            # Penalty term to avoid negative rho & T, made to be smooth:
-            # Is it needed?
-            # + negatives_penalty*(np.sum(rho_array[rho_array < 0]**2)
-                                 # + np.sum(T_array[T_array < 0]**2))
-            + negatives_penalty*(np.sum(rho_array < 0)
-                                 + np.sum(T_array < 0))
-            # Optional Tikhonov L2 regularization term:
-            + regularizer*(np.sum(rho_array**2) + np.sum(T_array**2)))
-    return chi2
-
-
-def construct_P(rho_array, T_array, E_array):
-    """
-    Constructs a "theoretical" first generation matrix P from rho and T
-
-    This function is called in each chisquare evaluation,
-    and must be as fast as possible.
-
-    Args:
-        rho_array (np.ndarray): The input level density rho
-        T_array (np.ndarray): The input transmission coefficient T
-        E_array (np.ndarray): The common lower-bin-edge energy calibration
-                              of rho and T
-    returns:
-        P (np.ndarray, two-dimensional): The product of rho and T,
-            constructed as P(Ex, Eg) = N*rho(Ex-Eg)*T(Eg)
-            with N such that sum_Eg(P) = 1 for each Ex bin.
-    """
-    # DEBUG: Checking sensitivity of the fit to the last data point in rho and T:
-    rho_array = np.copy(rho_array)
-    rho_array[-1] = 0
-    # T_array = np.copy(T_array)
-    # T_array = 1e10
-    # END DEBUG
-
-    Nbins = len(E_array)
-    # We construct a "meshgrid" of T and rho, then multiply.
-    # T_grid is just a repeat of T along each row:
-    T_grid = np.tile(T_array, (Nbins, 1))
-    # rho_grid is basically a repeat of rho along each column, but
-    # because of the (Ex-Eg) argument, rho(0) always starts on the diagonal
-    rho_grid = np.zeros((Nbins, Nbins))
-    # print("From construct_P: Nbins =", Nbins)
-
-
-    for j in range(Nbins):
-        # print("j =", j)
-        rho_grid[j:Nbins, j] = rho_array[0:Nbins-j]
-
-    P = rho_grid*T_grid
-    # Normalize each Ex bin:
-    P = div0(P, np.sum(P, axis=1)[:, None])
-    # # DEBUG
-    # # This is neat, it plots P_fit in every
-    # # iteration of the minimization. Gives valuable insight!
-    # f, ax = plt.subplots(1, 1)
-    # ax.pcolormesh(E_array, E_array, rho_grid*T_grid)
-    # plt.show()
-
-    # print("", flush=True)
-    # # END DEBUG
-
-    return P
 
 
 def make_masking_array(shape, Ex_min, Ex_max, Eg_min, E_array):
