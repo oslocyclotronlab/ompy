@@ -58,7 +58,7 @@ ep = om.ErrorPropagation(ma,
                          folder="error_propagation_ensemble",
                          random_seed=73)
 
-N_ensemble_members = 5
+N_ensemble_members = 10
 ep.generate_ensemble(N_ensemble_members=N_ensemble_members,
                      verbose=True,
                      randomness="poisson",

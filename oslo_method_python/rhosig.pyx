@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # cython: profile=True
 """
 Script to decompose the frist generations matrix P
@@ -11,6 +12,9 @@ gcc -shared -pthread -fPIC -fwrapv -O2 -Wall -fno-strict-aliasing -I/usr/include
 Copyright (C) 2018 Fabio Zeiser
 University of Oslo
 fabiobz [0] fys.uio.no
+
+Slightly modified by Jørgen Eriksson Midtbø and implemented into
+oslo_method_python.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +32,10 @@ cimport cython
 cimport numpy as np
 
 
-def decompose_matrix(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, method="Powell", options={'disp': True}, fill_value=0):
+def decompose_matrix(P_in, P_err,
+                     Emid_Eg, Emid_nld, Emid_Ex,
+                     method="Powell", options={'disp': True},
+                     fill_value=0):
     """ routine for the decomposition of the first generations spectrum P_in
 
     Parameters:
@@ -70,8 +77,7 @@ def decompose_matrix(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, method="Powell", o
     #   P_in = np.tril(P_in,k=Nbins_T - Nbins_rho) # set lower triangle to 0 -- due to array form <-> where Eg>Ex
 
     ##############
-    # approximate uncertainty my sqrt of number of counts
-    u_oslo_matrix = unumpy.uarray(P_in, np.sqrt(P_in))
+    u_oslo_matrix = unumpy.uarray(P_in, P_err)
 
     # normalize each Ex row to 1 (-> get decay probability)
     for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
