@@ -17,9 +17,9 @@ Nbins = len(E_array)
 
 # T_array = np.random.uniform(low=1.8, high=2, size=Nbins)
 # rho_array = np.random.normal(loc=E_array, size=Nbins, scale=0.1)
-# rho_array = np.exp(0.01*E_array)
-rho_array = np.zeros(Nbins)
-rho_array[0:3] = 1
+rho_array = np.exp(0.01*E_array)
+# rho_array = np.zeros(Nbins)
+# rho_array[0:3] = 1
 T_array = 0.001*E_array**2
 
 P_theo = om.construct_P(rho_array, T_array, E_array)

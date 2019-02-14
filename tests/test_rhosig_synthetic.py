@@ -46,10 +46,14 @@ cbar = ax_P_true.pcolormesh(E_array, E_array, P_true, norm=LogNorm())
 ax_P_true.set_title("P_true")
 f2D.colorbar(cbar, ax=ax_P_true)
 
+E_array_midbin = E_array + calib_out["a1"]/2
+rho_fit, T_fit = om.decompose_matrix(firstgen.matrix, firstgen_std.matrix,
+                    E_array_midbin, E_array_midbin, E_array_midbin,
+                    method="Powell")
 
-rho, T = om.fit_rho_T(firstgen, firstgen_std, bin_width_out,
-                      Ex_min, Ex_max, Eg_min,
-                      negatives_penalty=1e10)
+
+rho = om.Vector(rho_fit, E_array)
+T = om.Vector(T_fit, E_array)
 
 
 f1D, (ax_rho, ax_T) = plt.subplots(1, 2)
@@ -66,7 +70,8 @@ ax_T.legend()
 ax_T.set_yscale("log")
 
 
-P_fit = om.construct_P(rho.vector, T.vector, E_array)
+P_fit = om.PfromRhoT(rho.vector, T.vector, len(E_array),
+                     E_array_midbin, E_array_midbin, E_array_midbin)
 cbar = ax_P_fit.pcolormesh(E_array, E_array, P_fit, norm=LogNorm())
 ax_P_fit.set_title("P_fit")
 f2D.colorbar(cbar, ax=ax_P_fit)
