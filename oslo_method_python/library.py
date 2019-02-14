@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Library of utility classes and functions for the Oslo method.
 
