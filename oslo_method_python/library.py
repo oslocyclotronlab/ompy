@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Library of utility classes and functions for the Oslo method.
 
@@ -28,6 +29,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import time
+from scipy.interpolate import interp1d, RectBivariateSpline
 
 
 class Matrix():
@@ -58,7 +60,6 @@ class Matrix():
         self.matrix = matrix
         self.E0_array = E0_array
         self.E1_array = E1_array
-        self.std = std  # slot for matrix of standard deviations
 
 
     def calibration(self):
@@ -146,6 +147,7 @@ class Matrix():
                                      )
         else:
             raise Exception("Unknown zscale type", zscale)
+        assert(cbar is not None)  # cbar should be filled at this point
         ax.set_title(title)
         if ax is None:
             f.colorbar(cbar, ax=ax)
@@ -269,7 +271,20 @@ class Matrix():
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        assert(E_limits[1] >= E_limits[0])  # Sanity check
+        if axis in (0, 1):
+            if not len(E_limits) == 2:
+                raise ValueError("E_limits must be a list of length 2")
+        elif axis == "both":
+            if not len(E_limits) == 4:
+                raise ValueError("E_limits must be a list of length 4")
+        else:
+            raise ValueError("axis must be 0, 1 or \"both\"")
+
+        if not (E_limits[1] >= E_limits[0]):  # Sanity check
+            raise ValueError("Upper limit must be >= lower limit")
+        if axis == "both":
+            if not (E_limits[1] >= E_limits[0] and E_limits[3] >= E_limits[2]):
+                raise ValueError("Upper limits must be >= lower limits")
         matrix_cut = None
         std_cut = None
         out = None
@@ -294,6 +309,20 @@ class Matrix():
                 self.E1_array = E1_array_cut
             else:
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
+        elif axis == "both":
+            i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[2]))
+            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))
+            matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
+            E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
+            E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+                self.E1_array = E1_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array_cut)
         else:
             raise ValueError("Axis must be one of (0, 1), but is", axis)
 
@@ -312,6 +341,12 @@ class Matrix():
 
 class Vector():
     def __init__(self, vector=None, E_array=None):
+        if not isinstance(vector, np.ndarray):
+            raise TypeError("vector must be numpy array")
+        if not isinstance(E_array, np.ndarray):
+            raise TypeError("E_array must be numpy array")
+        if len(vector) != len(E_array):
+            raise ValueError("shape mismatch between input arrays")
         self.vector = vector
         self.E_array = E_array
 
@@ -370,6 +405,20 @@ class Vector():
         raise Exception("Not implemented yet")
 
         return None
+
+    def transform(self, const=1, alpha=0, implicit=False):
+        """
+        Return a transformed version of the vector:
+        vector -> const * vector * exp(alpha*E_array)
+        """
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        vector_transformed = (const * self.vector
+                              * np.exp(alpha*E_array_midbin)
+                              )
+        if implicit:
+            self.vector = vector_transformed
+        else:
+            return vector_transformed
 
 
 def read_mama_2D(filename):
@@ -711,3 +760,58 @@ def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
         mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
         matrix_out = np.where(mask, matrix, 0)
         return matrix_out
+
+
+def interpolate_matrix_1D(matrix_in, E_array_in, E_array_out, axis=1):
+    """ Does a one-dimensional interpolation of the given matrix_in along axis
+    """
+    if axis not in [0, 1]:
+        raise IndexError("Axis out of bounds. Must be 0 or 1.")
+    if not (matrix_in.shape[axis] == len(E_array_in)):
+        raise Exception("Shape mismatch between matrix_in and E_array_in")
+
+    if axis == 1:
+        N_otherax = matrix_in.shape[0]
+        matrix_out = np.zeros((N_otherax, len(E_array_out)))
+        f = interp1d(E_array_in, matrix_in, axis=1,
+                     kind="linear",
+                     bounds_error=False, fill_value=0)
+        matrix_out = f(E_array_out)
+    elif axis == 0:
+        N_otherax = matrix_in.shape[1]
+        matrix_out = np.zeros((N_otherax, len(E_array_out)))
+        f = interp1d(E_array_in, matrix_in, axis=0,
+                     kind="linear",
+                     bounds_error=False, fill_value=0)
+        matrix_out = f(E_array_out)
+    else:
+        raise IndexError("Axis out of bounds. Must be 0 or 1.")
+
+    return matrix_out
+
+def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
+                          E0_array_out, E1_array_out):
+    """Does a two-dimensional interpolation of the given matrix to the _out
+    axes
+    """
+    if not (matrix_in.shape[0] == len(E0_array_in)
+            and matrix_in.shape[1] == len(E1_array_in)):
+        raise Exception("Shape mismatch between matrix_in and energy arrays")
+
+    # Do the interpolation using splines of degree 1 (linear):
+    f = RectBivariateSpline(E0_array_in, E1_array_in, matrix_in,
+                            kx=1, ky=1)
+    matrix_out = f(E0_array_out, E1_array_out)
+
+    # Make a rectangular mask to set values outside original bounds to zero
+    mask = np.ones(matrix_out.shape, dtype=bool)
+    mask[E0_array_out <= E0_array_in[0], :] = 0
+    mask[E0_array_out >= E0_array_in[-1], :] = 0
+    mask[:, E1_array_out <= E1_array_in[0]] = 0
+    mask[:, E1_array_out >= E1_array_in[-1]] = 0
+    matrix_out = np.where(mask,
+                          matrix_out,
+                          0
+                          )
+
+    return matrix_out

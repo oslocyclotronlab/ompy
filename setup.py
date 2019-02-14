@@ -14,6 +14,6 @@ setup(name='oslo_method_python',
       ext_modules=cythonize(
                             [
                             "oslo_method_python/rebin.pyx",
-                            #"oslo_method_python/fit_rho_T.pyx"
+                            "oslo_method_python/rhosig.pyx"
                             ])
       )

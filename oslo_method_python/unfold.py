@@ -68,10 +68,15 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         raise Exception(("The compton subtraction method does not currently"
                         " work correctly."))
 
-    if fname_resp_mat is None or fname_resp_dat is None:
+    if fname_resp_mat is None:
         raise Exception(
-            "fname_resp_mat and/or fname_resp_dat not given, and "
+            "fname_resp_mat not given, and "
             "no response matrix is previously loaded."
+            )
+    if fname_resp_dat is None and use_comptonsubtraction is True:
+        raise Exception(
+            "fname_resp_dat not given, and "
+            "use_comptonsubtraction is True."
             )
 
     # Rename variables for local use:
