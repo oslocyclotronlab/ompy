@@ -78,7 +78,15 @@ firstgen_std_matrix, Emid_Eg, Emid_Ex, Emid_nld = om.fg_cut_matrix(firstgen_std.
 
 
 f2D, ((ax_P_true, ax_P_fit), (ax_P_diff, ax2D_4)) = plt.subplots(2, 2)
-cbar = ax_P_true.pcolormesh(E_array, E_array, firstgen.matrix, norm=LogNorm())
+firstgen_cut = firstgen.cut_rect(
+                              axis="both",
+                              E_limits=[Ex_min, Ex_max, Eg_min, Ex_max],
+                              inplace=False
+                              )
+cbar = ax_P_true.pcolormesh(firstgen_cut.E1_array,
+                            firstgen_cut.E0_array,
+                            firstgen_cut.matrix,
+                            norm=LogNorm())
 ax_P_true.set_title("P_true")
 f2D.colorbar(cbar, ax=ax_P_true)
 
@@ -101,8 +109,8 @@ ax_rho.legend()
 ax_rho.set_yscale("log")
 
 T.plot(ax=ax_T, label="fit")
-ax_T.plot(Emid_Eg, T.transform(const=2e2, alpha=0.002),
-          label="fit, transformed")
+# ax_T.plot(Emid_Eg, T.transform(const=2e2, alpha=0.002),
+          # label="fit, transformed")
 ax_T.legend()
 ax_T.set_yscale("log")
 
