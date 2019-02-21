@@ -92,8 +92,8 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
         raise ValueError("Ex_min must be >= Eg_min.")
 
 
-    assert(firstgen_in.matrix.min() >= 0, "no negative counts")
-    assert(firstgen_std_in.matrix.min() >= 0, "no negative stddevs")
+    assert firstgen_in.matrix.min() >= 0, "no negative counts"
+    assert firstgen_std_in.matrix.min() >= 0, "no negative stddevs"
 
     # Cut the firstgen.matrix and firstgen.std to shape [Ex_min:Ex_max,
     # Eg_min:Eg_max].
