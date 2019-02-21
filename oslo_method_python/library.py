@@ -147,7 +147,7 @@ class Matrix():
                                      )
         else:
             raise Exception("Unknown zscale type", zscale)
-        assert(cbar is not None)  # cbar should be filled at this point
+        assert cbar is not None  # cbar should be filled at this point
         ax.set_title(title)
         if ax is None:
             f.colorbar(cbar, ax=ax)
@@ -406,7 +406,7 @@ class Vector():
 
         return None
 
-    def transform(self, const=1, alpha=0, implicit=False):
+    def transform(self, const=1, alpha=0, inplace=False):
         """
         Return a transformed version of the vector:
         vector -> const * vector * exp(alpha*E_array)
@@ -415,7 +415,7 @@ class Vector():
         vector_transformed = (const * self.vector
                               * np.exp(alpha*E_array_midbin)
                               )
-        if implicit:
+        if inplace:
             self.vector = vector_transformed
         else:
             return vector_transformed
