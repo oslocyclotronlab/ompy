@@ -418,7 +418,7 @@ class Vector():
         if inplace:
             self.vector = vector_transformed
         else:
-            return vector_transformed
+            return Vector(E_array=self.E_array, vector=vector_transformed)
 
 
 def read_mama_2D(filename):
