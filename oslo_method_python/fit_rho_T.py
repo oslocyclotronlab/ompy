@@ -216,3 +216,43 @@ def make_masking_array(shape, Ex_min, Ex_max, Eg_min, E_array):
     print("masking_array =", masking_array)
 
     return masking_array
+
+def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):
+    """ Make the first generation cuts to the matrix
+    Parameters:
+    -----------
+    array : ndarray
+        2D Array that will be sliced
+    Emid : ndarray
+        Array of bin center energies [Note: up to here assumed symetrix for
+        both axes]
+    Egmin, Exmin, Emax : doubles
+        Lower and higher cuts for the gamma-ray and excitation energy axis
+    kwargs: optional
+        Will be ignored, just for compatibility;
+    Returns:
+    --------
+    array : ndarray
+        Sliced array
+    Emid_Eg : ndarray
+        Bin center energies of the gamma-ray axis
+    Emid_Ex : ndarray
+        Bin center energies of the excitation energy axis
+    Emid_nld : ndarray
+        Bin center energies of the nld once extracted
+    """
+
+    np.copy(array)
+
+    # Eg
+    i_Egmin = (np.abs(Emid-Egmin)).argmin()
+    i_Emax = (np.abs(Emid-Emax)).argmin()
+    # Ex
+    i_Exmin = (np.abs(Emid-Exmin)).argmin()
+
+    array = array[i_Exmin:i_Emax,i_Egmin:i_Emax]
+    Emid_Ex = Emid[i_Exmin:i_Emax]
+    Emid_Eg = Emid[i_Egmin:i_Emax]
+    Emid_nld = Emid[:i_Emax-i_Egmin]
+
+    return array, Emid_Eg, Emid_Ex, Emid_nld
