@@ -35,6 +35,7 @@ from .library import *
 from .rebin import *
 from .constants import *
 from .rhosig import *
+from .matrix import Matrix, Vector
 
 from scipy.optimize import minimize
 import copy

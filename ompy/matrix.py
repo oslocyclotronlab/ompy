@@ -34,6 +34,7 @@ from typing import Dict, Iterable, Any, Tuple
 from enum import Enum, unique
 from .library import (mama_read, mama_write, i_from_E,
                       div0, fill_negative)
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 
 
 @unique
@@ -266,20 +267,45 @@ class Matrix():
                 self.E1_array = E1_array_cut
             else:
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
+        elif axis == "both":
+            i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
+            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[2]))
+            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))
+            matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
+            E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
+            E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
+            if inplace:
+                self.matrix = matrix_cut
+                self.E0_array = E0_array_cut
+                self.E1_array = E1_array_cut
+            else:
+                out = Matrix(matrix_cut, E0_array_cut, E1_array_cut)
         else:
             raise ValueError("Axis must be one of (0, 1), but is", axis)
 
         return out
 
     def cut_diagonal(self, E1: Iterable, E2: Iterable):
-        """
-        Cut away counts to the right of a diagonal line defined by indices
+        """Cut away counts to the right of a diagonal line defined by indices
 
         Args:
             E1: First point of intercept, ordered as Ex, Eg
             E2: Second point of intercept
         Returns:
             The matrix with counts above diagonal removed
+        """
+        self.matrix[self.line_mask(E1, E2)] = 0
+
+    def line_mask(self, E1: Iterable, E2: Iterable) -> np.ndarray:
+        """Create a mask for above (True) and below (False) the line
+
+        Args:
+            E1: First point of intercept, ordered as Ex, Eg
+            E2: Second point of intercept
+        Returns:
+            The boolean array with counts below the line set to False
+        TODO: Write as a property with memonized output for unchanged matrix
         """
         # Transform from energy to index basis
         Ex1, Ey1 = E1
@@ -296,8 +322,41 @@ class Matrix():
         i_mesh, j_mesh = np.meshgrid(self.range_E0, self.range_E1,
                                      indexing='ij')
         mask = np.where(j_mesh > line(i_mesh), True, False)
+        return mask
 
-        self.matrix[mask] = 0
+    def diagonal_mask(self, Ex_min: float, Ex_max: float,
+                      Eg_min: float) -> np.ndarray:
+        """Create a trapezoidal mask delimited by the diagonal of the matrix
+
+        Args:
+            Ex_min: The bottom edge of the trapezoid
+            Ex_max: The top edge of the trapezoid
+            Eg_min: The left edge of the trapezoid
+        Returns:
+            The boolean array with counts below the line set to False
+        TODO: Doesn't work. Use Fabio's method
+        """
+        # Transform to index basis
+        iEx_min, iEx_max = self.indices_E0([Ex_min, Ex_max])
+        iEg_min = self.index_E1(Eg_min)
+
+        mask = np.zeros_like(self.matrix, dtype=bool)
+        for iEx in range(iEx_min, iEx_max+1):
+            # Loop over rows in array and fill with ones up to sliding Eg
+            # threshold
+            Ex = self.matrix[iEx]
+            # Assume constant particle resolution
+            dE_particle = DE_PARTICLE
+            dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
+                        * (Ex - 1000))
+            Eg_max = Ex + np.sqrt(dE_particle**2 + dE_gamma**2)
+            iEg_max = self.index_E0(Eg_max)
+            if iEg_max < iEg_min:
+                continue
+
+            mask[iEx, iEg_min:iEg_max+1] = True
+
+        return mask
 
     def fill_negative(self, window_size):
         self.matrix = fill_negative(self.matrix, window_size)

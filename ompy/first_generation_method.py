@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np
+from .matrix import Matrix
 from .library import *
 from .rebin import *
 
@@ -276,8 +277,11 @@ def first_generation_method(matrix_in,
         Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
     W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
 
-    mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
-                       0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
+    E1 = (Ex_array[0], Ex_array[0] + dE_gamma)
+    E2 = (Ex_array[-1], Ex_array[-1] + dE_gamma)
+    # mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
+    #                    0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
+    mask_W = matrix_in.line_mask(E1, E2)
 
     # Perform the iterative subtraction:
     for iteration in range(N_iterations):

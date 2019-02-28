@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import time
 from collections import namedtuple
+from scipy.interpolate import interp1d, RectBivariateSpline
 
 
 def mama_read(filename):
@@ -349,3 +350,57 @@ def fill_negative(matrix, window_size):
                 # matrix_out[i_Ex, i_max] = rest
     return matrix_out
 
+
+def interpolate_matrix_1D(matrix_in, E_array_in, E_array_out, axis=1):
+    """ Does a one-dimensional interpolation of the given matrix_in along axis
+    """
+    if axis not in [0, 1]:
+        raise IndexError("Axis out of bounds. Must be 0 or 1.")
+    if not (matrix_in.shape[axis] == len(E_array_in)):
+        raise Exception("Shape mismatch between matrix_in and E_array_in")
+
+    if axis == 1:
+        N_otherax = matrix_in.shape[0]
+        matrix_out = np.zeros((N_otherax, len(E_array_out)))
+        f = interp1d(E_array_in, matrix_in, axis=1,
+                     kind="linear",
+                     bounds_error=False, fill_value=0)
+        matrix_out = f(E_array_out)
+    elif axis == 0:
+        N_otherax = matrix_in.shape[1]
+        matrix_out = np.zeros((N_otherax, len(E_array_out)))
+        f = interp1d(E_array_in, matrix_in, axis=0,
+                     kind="linear",
+                     bounds_error=False, fill_value=0)
+        matrix_out = f(E_array_out)
+    else:
+        raise IndexError("Axis out of bounds. Must be 0 or 1.")
+
+    return matrix_out
+
+def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
+                          E0_array_out, E1_array_out):
+    """Does a two-dimensional interpolation of the given matrix to the _out
+    axes
+    """
+    if not (matrix_in.shape[0] == len(E0_array_in)
+            and matrix_in.shape[1] == len(E1_array_in)):
+        raise Exception("Shape mismatch between matrix_in and energy arrays")
+
+    # Do the interpolation using splines of degree 1 (linear):
+    f = RectBivariateSpline(E0_array_in, E1_array_in, matrix_in,
+                            kx=1, ky=1)
+    matrix_out = f(E0_array_out, E1_array_out)
+
+    # Make a rectangular mask to set values outside original bounds to zero
+    mask = np.ones(matrix_out.shape, dtype=bool)
+    mask[E0_array_out <= E0_array_in[0], :] = 0
+    mask[E0_array_out >= E0_array_in[-1], :] = 0
+    mask[:, E1_array_out <= E1_array_in[0]] = 0
+    mask[:, E1_array_out >= E1_array_in[-1]] = 0
+    matrix_out = np.where(mask,
+                          matrix_out,
+                          0
+                          )
+
+    return matrix_out
