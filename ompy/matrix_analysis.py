@@ -298,6 +298,12 @@ class MatrixAnalysis():
                                                 apply_area_correction=apply_area_correction,
                                                 verbose=verbose
                                                 )
+
+        # Cut away everything above Ex_max because it's zero anyway:
+        self.firstgen.cut_rect(axis=0,
+                               E_limits=[self.firstgen.E0_array[0], Ex_max]
+                               )
+
         # Fill and remove negative:
         if fill_and_remove_negative:
             # TODO fix fill_negative function, maybe remove window_size

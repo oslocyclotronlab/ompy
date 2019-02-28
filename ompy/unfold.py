@@ -73,7 +73,12 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         raise RuntimeError(
             "fname_resp_mat and/or fname_resp_dat not given, and "
             "no response matrix is previously loaded."
-        )
+            )
+    if fname_resp_dat is None and use_comptonsubtraction is True:
+        raise Exception(
+            "fname_resp_dat not given, and "
+            "use_comptonsubtraction is True."
+            )
 
     # Rename variables for local use:
     # data_raw = raw.matrix
