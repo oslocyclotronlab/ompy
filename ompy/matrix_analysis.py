@@ -33,6 +33,7 @@ from .library import *
 from .rebin import *
 from .unfold import unfold
 from .first_generation_method import first_generation_method
+from .matrix import Matrix
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
@@ -40,14 +41,15 @@ np.random.seed(1256770)
 
 class MatrixAnalysis():
 
-    def __init__(self, fname_raw=None):
-        # self.fname_raw = fname_raw # File name of raw spectrum
+    def __init__(self, filename: str = None, matrix: Matrix = None):
+        if filename is not None and matrix is not None:
+            raise ValueError("Specify either filename or matrix.")
+        if filename is not None:
+            self.raw = Matrix(filename=filename)
+        elif matrix is not None:
+            self.raw = matrix
 
         # Allocate matrices to be filled by functions in class later:
-        self.raw = Matrix()
-        # If fname_raw is specified, load the file into self.raw:
-        if fname_raw is not None:
-            self.raw.load(fname_raw)
         self.unfolded = Matrix()
         self.firstgen = Matrix()
         # self.var_firstgen = Matrix() # variance matrix of first-generation
@@ -72,6 +74,9 @@ class MatrixAnalysis():
         self.fg_statistical_or_total = None
         self.fg_area_correction = None
         self.fg_fill_and_remove_negative = None
+
+    def plot(self, *args, **kwargs):
+        return self.raw.plot(*args, **kwargs)
 
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,

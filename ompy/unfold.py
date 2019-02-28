@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from .library import *
 from .constants import *
+from .matrix import Matrix
 
 global DE_PARTICLE
 global DE_GAMMA_1MEV
@@ -115,6 +116,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
 
     # Import response matrix
     response = mama_read(fname_resp_mat)
+    response = Matrix(response.matrix, response.E0_array, response.E1_array)
     R = response.matrix
     Eg_array_R = response.E0_array
     cal_R = response.calibration()
@@ -185,9 +187,12 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
     mask = None
     if diag_cut is not None:
-        mask = make_mask(Ex_array, Eg_array,
-                         diag_cut["Ex1"], diag_cut["Eg1"],
-                         diag_cut["Ex2"], diag_cut["Eg2"])
+        Ex = (diag_cut['Ex1'], diag_cut['Eg1'])
+        Eg = (diag_cut['Ex2'], diag_cut['Eg2'])
+        mask = ~raw.line_mask(Ex, Eg)
+        # mask = make_mask(Ex_array, Eg_array,
+        #                  diag_cut["Ex1"], diag_cut["Eg1"],
+        #                  diag_cut["Ex2"], diag_cut["Eg2"])
     else:
         # If diag_cut is not given, use global uncertainty widths from
         # constants.py
@@ -223,7 +228,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
 
     # Calculate fluctuations of the raw spectrum to compare with the unfolded later
     fluctuations_vector_raw = fluctuations(rawmat, Eg_array_cut)
-    
     unfoldmat_cube = np.zeros((Nit, rawmat.shape[0], rawmat.shape[1]))
     # Run folding iterations:
     for iteration in range(Nit):
@@ -438,9 +442,6 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
             cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_min:iEg_max], Ex_array[iEx_min:iEx_max], unfolded, norm=LogNorm(vmin=1))
             f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
         plt.show()
-
-
-
 
     # Update global variables:
     unfolded = Matrix(unfolded, Ex_array[iEx_min:iEx_max], Eg_array[iEg_min:iEg_max])

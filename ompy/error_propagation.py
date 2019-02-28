@@ -31,6 +31,7 @@ import numpy as np
 import os
 from .library import *
 from .matrix_analysis import *
+from .matrix import Matrix
 import copy
 
 
