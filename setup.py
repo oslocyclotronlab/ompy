@@ -13,7 +13,7 @@ setup(name='Oslo Method',
       py_modules=['ompy'],
       ext_modules=cythonize(
                             [
-                            "ompy/rebin.pyx",
-                            #"oslo_method_python/fit_rho_T.pyx"
+                            "oslo_method_python/rebin.pyx",
+                            "oslo_method_python/rhosig.pyx"
                             ])
       )
