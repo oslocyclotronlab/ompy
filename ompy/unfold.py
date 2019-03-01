@@ -187,12 +187,21 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
     # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
     mask = None
     if diag_cut is not None:
-        Ex = (diag_cut['Ex1'], diag_cut['Eg1'])
-        Eg = (diag_cut['Ex2'], diag_cut['Eg2'])
-        mask = ~raw.line_mask(Ex, Eg)
-        # mask = make_mask(Ex_array, Eg_array,
-        #                  diag_cut["Ex1"], diag_cut["Eg1"],
-        #                  diag_cut["Ex2"], diag_cut["Eg2"])
+        E1 = (diag_cut['Eg1'], diag_cut['Ex1'])
+        E2 = (diag_cut['Eg2'], diag_cut['Ex2'])
+        mask = ~raw.line_mask(E1, E2)
+        mask1 = mask*1
+        mask = make_mask(Ex_array, Eg_array,
+                         diag_cut["Ex1"], diag_cut["Eg1"],
+                         diag_cut["Ex2"], diag_cut["Eg2"])
+        diff = mask1 == mask
+        print(mask1.shape, mask.shape)
+        import matplotlib.pyplot as plt
+        # plt.matshow(diff)
+        plt.subplots('211')
+        plt.matshow(mask1)
+        plt.subplots('')
+        plt.show()
     else:
         # If diag_cut is not given, use global uncertainty widths from
         # constants.py
