@@ -30,10 +30,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 from matplotlib.colors import LogNorm, Normalize
-from typing import Dict, Iterable, Any, Tuple
+from typing import Dict, Iterable, Any, Union
 from enum import Enum, unique
-from .library import (mama_read, mama_write, i_from_E,
-                      div0, fill_negative)
+from .library import (mama_read, mama_write, div0, fill_negative)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 
 
@@ -55,16 +54,39 @@ class Matrix():
     several integrity checks to verify that the arrays makes sense in relation
     to each other.
 
+
+    Note that since a matrix is numbered NxM where N is rows going in the
+    y-direction and M is columns going in the x-direction, the "x-dimension"
+    of the matrix has the same shape as the Ex array (Excitation axis)
+
+              Diagonal Ex=Eγ │
+                             v
+    a y E │██████▓▓██████▓▓▓█░   ░
+    x   x │██ █████▓████████░   ░░
+    i a   │█████████████▓▓░░░░░
+    s x i │███▓████▓████░░░░░ ░░░░
+      i n │███████████░░░░   ░░░░░
+    1 s d │███▓█████░░   ░░░░ ░░░░ <-- "Folded" counts
+        e │███████▓░░░░░░░░░░░░░░░
+        x │█████░     ░░░░ ░░  ░░
+          │███░░░░░░░░ ░░░░░░  ░░░
+        N │█▓░░  ░░░  ░░░░░  ░░░░░
+          └───────────────────────
+                Eγ, index M
+                x axis
+                axis 0
+
     Attributes:
         matrix: 2D matrix storing the counting data
-        E0_array: The gamma energy along the x-axis, Eγ
-        E1_array: The excitation energy along the y-axis, Ex
+        Eg_array: The gamma energy along the x-axis
+        Ex_array: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
+    TODO: Find a way to handle units
     """
     def __init__(self, matrix: np.ndarray = None,
-                 E0_array: np.ndarray = None,
-                 E1_array: np.ndarray = None,
+                 Eg_array: np.ndarray = None,
+                 Ex_array: np.ndarray = None,
                  std: np.ndarray = None,
                  filename: str = None):
         """
@@ -75,8 +97,8 @@ class Matrix():
 
         # Fill class variables:
         self.matrix: np.ndarray = matrix
-        self.E0_array: np.ndarray = E0_array
-        self.E1_array: np.ndarray = E1_array
+        self.Eg_array: np.ndarray = Eg_array
+        self.Ex_array: np.ndarray = Ex_array
         self.std: np.ndarray = std  # slot for matrix of standard deviations
 
         if filename is not None:
@@ -92,30 +114,30 @@ class Matrix():
             ValueError: If any check fails
         """
         # Check shapes:
-        if self.E0_array is not None:
-            if self.matrix.shape[0] != len(self.E0_array):
-                raise ValueError("Shape mismatch between matrix and E0_array.")
-        if self.E1_array is not None:
-            if self.matrix.shape[1] != len(self.E1_array):
-                raise ValueError("Shape mismatch between matrix and E1_array.")
+        if self.Ex_array is not None:
+            if self.matrix.shape[0] != len(self.Ex_array):
+                raise ValueError("Shape mismatch between matrix and Ex_array.")
+        if self.Eg_array is not None:
+            if self.matrix.shape[1] != len(self.Eg_array):
+                raise ValueError("Shape mismatch between matrix and Eg_array.")
         if self.std is not None:
             if self.matrix.shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.matrix and std.")
 
-    def load(self, fname: str):
+    def load(self, filename: str):
         """ Load matrix from mama file
 
         Args:
-            fname: Path to mama file
+            filename: Path to mama file
         """
         if self.matrix is not None:
             warnings.warn("load() called on non-empty matrix")
 
         # Load matrix from file:
-        matrix_object = mama_read(fname)
+        matrix_object = mama_read(filename)
         self.matrix = matrix_object.matrix
-        self.E0_array = matrix_object.E0_array
-        self.E1_array = matrix_object.E1_array
+        self.Eg_array = matrix_object.E1_array
+        self.Ex_array = matrix_object.E0_array
 
         self.verify_integrity()
 
@@ -126,10 +148,10 @@ class Matrix():
         """
         # Formatted as "a{axis}{power of E}"
         calibration = {
-            "a00": self.E0_array[0],
-            "a01": self.E0_array[1]-self.E0_array[0],
-            "a10": self.E1_array[0],
-            "a11": self.E1_array[1]-self.E1_array[0],
+            "a00": self.Ex_array[0],
+            "a01": self.Ex_array[1]-self.Ex_array[0],
+            "a10": self.Eg_array[0],
+            "a11": self.Eg_array[1]-self.Eg_array[0],
         }
         return calibration
 
@@ -147,6 +169,7 @@ class Matrix():
             The ax used for plotting
         Raises:
             ValueError: If zscale is unsupported
+        TODO: Add fancy 3D histogram
         """
         if ax is None:
             fig, ax = plt.subplots()
@@ -156,8 +179,7 @@ class Matrix():
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-
-        lines = ax.pcolormesh(self.E1_array, self.E0_array, self.matrix,
+        lines = ax.pcolormesh(self.Eg_array, self.Ex_array, self.matrix,
                               norm=norm)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
@@ -182,14 +204,18 @@ class Matrix():
             ValueError: If axis is not in [0, 1]
         Returns:
             The ax used for plotting
+        TODO: Make histogram and fix normalization
         """
         if ax is None:
             fig, ax = plt.subplots()
-        if axis not in (0, 1):
-            raise ValueError(f"Axis must be 0 or 1, got {axis}.")
 
-        indexE = self.index_E0 if axis else self.index_E1
-        rangeE = self.range_E0 if axis else self.range_E1
+        axis = self.axis_toint(axis)
+        if axis not in (0, 1):
+            raise ValueError(f"Axis must be 0 or 1, got: {axis}")
+
+        # Determine subset of the other axis to be summed
+        indexE = self.index_Eg if axis else self.index_Ex
+        rangeE = self.range_Eg if axis else self.range_Ex
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax)
@@ -200,7 +226,7 @@ class Matrix():
         projection = selection.sum(axis=naxis)
         if normalize:
             # Don't know what calibration does, so using specialized code here
-            if not axis:
+            if axis:
                 projection = div0(selection, selection.sum(axis=axis))
                 projection = projection.mean(axis=naxis)
             else:
@@ -209,13 +235,12 @@ class Matrix():
                 calibrated = div0(selection, calibrated_sum[:, None])
                 projection = calibrated.mean(axis=naxis)
 
-        if axis:
-            ax.plot(self.E1_array, projection)
+        if not axis:
+            ax.plot(self.Ex_array, projection)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         else:
-            ax.plot(self.E0_array, projection)
+            ax.plot(self.Eg_array, projection)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
-
         if normalize:
             ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
         else:
@@ -224,69 +249,66 @@ class Matrix():
         return ax
 
     def save(self, fname):
-        """ Save matrix to mama file
+        """Save matrix to mama file
         """
         mama_write(self, fname, comment="Made by Oslo Method Python")
 
-    def cut_rect(self, axis, E_limits, inplace=True):
-        """
-        Cuts the matrix (and std, if present) to the sub-interval E_limits.
+    def cut_rect(self, axis: Union[int, str],
+                 limits: Iterable[float],
+                 inplace: bool = True) -> Any:
+        """Cuts the matrix to the sub-interval limits along given axis.
 
         Args:
-            axis (int): Which axis to apply the cut to.
-            E_limits (list): [E_min, E_max], where
-                E_min, E_max (float): Upper and lower energy limits for cut
-            inplace (bool): Whether to make the cut in place or not
+            axis: Which axis to apply the cut to.
+                Can be 0, "Eg" or 1, "Ex", or "both".
+            limits: [E_min, E_max, (E_min, E_max)], where
+                E_min, E_max: Upper and lower energy limits for cut.
+                Supply 4 numbers if 'axis' is 'both'.
+            inplace: Whether to make the cut in place or not.
 
         Returns:
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        assert(E_limits[1] >= E_limits[0])  # Sanity check
-        matrix_cut = None
-        std_cut = None
+        assert(limits[1] >= limits[0])  # Sanity check
+        axis = self.axis_toint(axis)
         out = None
         if axis == 0:
-            i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
-            matrix_cut = self.matrix[i_E_min:i_E_max, :]
-            E0_array_cut = self.E0_array[i_E_min:i_E_max]
+            iE_min, iE_max = self.indices_Eg(limits)
+            matrix_cut = self.matrix[:, iE_min:iE_max]
+            E_cut = self.Eg_array[iE_min:iE_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.E0_array = E0_array_cut
+                self.Eg_array = E_cut
             else:
-                out = Matrix(matrix_cut, E0_array_cut, E1_array)
+                out = Matrix(matrix_cut, E_cut, self.Ex_array)
 
         elif axis == 1:
-            i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
-            matrix_cut = self.matrix[:, i_E_min:i_E_max]
-            E1_array_cut = self.E1_array[i_E_min:i_E_max]
+            iE_min, iE_max = self.indices_Ex(limits)
+            matrix_cut = self.matrix[iE_min:iE_max, :]
+            E_cut = self.Ex_array[iE_min:iE_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.E1_array = E1_array_cut
+                self.Ex_array = E_cut
             else:
-                out = Matrix(matrix_cut, E0_array, E1_array_cut)
-        elif axis == "both":
-            i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
-            i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[2]))
-            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))
-            matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
-            E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
-            E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
+                out = Matrix(matrix_cut, self.Eg_array, E_cut)
+        elif axis == 2:
+            iEg_min, iEg_max = self.indicies_Eg(limits[:2])
+            iEx_min, iEx_max = self.indicies_Ex(limits[2:])
+            matrix_cut = self.matrix[iEg_min:iEg_max, iEx_min:iEx_max]
+            Eg_cut = self.Eg_array[iEg_min:iEg_max]
+            Ex_cut = self.Ex_array[iEx_min:iEx_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.E0_array = E0_array_cut
-                self.E1_array = E1_array_cut
+                self.Eg_array = Eg_cut
+                self.Ex_array = Ex_cut
             else:
-                out = Matrix(matrix_cut, E0_array_cut, E1_array_cut)
-        else:
-            raise ValueError("Axis must be one of (0, 1), but is", axis)
+                out = Matrix(matrix_cut, Eg_cut, Ex_cut)
 
         return out
 
-    def cut_diagonal(self, E1: Iterable, E2: Iterable):
+    def cut_diagonal(self, E1: Iterable[float],
+                     E2: Iterable[float]):
         """Cut away counts to the right of a diagonal line defined by indices
 
         Args:
@@ -297,7 +319,8 @@ class Matrix():
         """
         self.matrix[self.line_mask(E1, E2)] = 0
 
-    def line_mask(self, E1: Iterable, E2: Iterable) -> np.ndarray:
+    def line_mask(self, E1: Iterable[float],
+                  E2: Iterable[float]) -> np.ndarray:
         """Create a mask for above (True) and below (False) the line
 
         Args:
@@ -308,20 +331,26 @@ class Matrix():
         TODO: Write as a property with memonized output for unchanged matrix
         """
         # Transform from energy to index basis
+        # Note: Ex and Ey refers to x- and y-direction
+        # not excitation and gamma
         Ex1, Ey1 = E1
         Ex2, Ey2 = E2
-        Ix = self.indices_E0([Ex1, Ex2])
-        Iy = self.indices_E1([Ey1, Ey2])
+        Ix = self.indices_Eg([Ex1, Ex2])
+        Iy = self.indices_Ex([Ey1, Ey2])
+        print(Ix, Iy)
 
         # Interpolate between the two points
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
+        print(a)
         b = Iy[0] - a*Ix[0]
+        print(b)
+        print(Iy[1] - a*Ix[1])
         line = lambda x: a*x + b
 
         # Mask all indices below this line to 0
-        i_mesh, j_mesh = np.meshgrid(self.range_E0, self.range_E1,
-                                     indexing='ij')
-        mask = np.where(j_mesh > line(i_mesh), True, False)
+        i_mesh, j_mesh = np.meshgrid(self.range_Eg, self.range_Ex)#,
+                                     # indexing='ij')
+        mask = np.where(j_mesh < line(i_mesh), True, False)
         return mask
 
     def diagonal_mask(self, Ex_min: float, Ex_max: float,
@@ -337,8 +366,8 @@ class Matrix():
         TODO: Doesn't work. Use Fabio's method
         """
         # Transform to index basis
-        iEx_min, iEx_max = self.indices_E0([Ex_min, Ex_max])
-        iEg_min = self.index_E1(Eg_min)
+        iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
+        iEg_min = self.index_Ex(Eg_min)
 
         mask = np.zeros_like(self.matrix, dtype=bool)
         for iEx in range(iEx_min, iEx_max+1):
@@ -350,7 +379,7 @@ class Matrix():
             dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
                         * (Ex - 1000))
             Eg_max = Ex + np.sqrt(dE_particle**2 + dE_gamma**2)
-            iEg_max = self.index_E0(Eg_max)
+            iEg_max = self.index_Eg(Eg_max)
             if iEg_max < iEg_min:
                 continue
 
@@ -364,37 +393,62 @@ class Matrix():
     def remove_negative(self):
         self.matrix = np.where(self.matrix > 0, self.matrix, 0)
 
-    def index_E0(self, E: float) -> int:
-        """ Returns the closest index corresponding to the E0 value """
-        return np.abs(self.E0_array - E).argmin()
+    def index_Eg(self, E: float) -> int:
+        """ Returns the closest index corresponding to the Eg value """
+        return np.abs(self.Eg_array - E).argmin()
 
-    def index_E1(self, E: float) -> int:
-        """ Returns the closest index corresponding to the E1 value """
-        return np.abs(self.E1_array - E).argmin()
+    def index_Ex(self, E: float) -> int:
+        """ Returns the closest index corresponding to the Ex value """
+        return np.abs(self.Ex_array - E).argmin()
 
-    def indices_E0(self, E: Iterable) -> np.ndarray:
-        """ Returns the closest indices corresponding to the E0 value"""
-        indices = [self.index_E0(e) for e in E]
+    def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
+        """ Returns the closest indices corresponding to the Eg value"""
+        indices = [self.index_Eg(e) for e in E]
         return np.array(indices)
 
-    def indices_E1(self, E: Iterable) -> np.ndarray:
-        """ Returns the closest indices corresponding to the E1 value"""
-        indices = [self.index_E1(e) for e in E]
+    def indices_Ex(self, E: Iterable[float]) -> np.ndarray:
+        """ Returns the closest indices corresponding to the Ex value"""
+        indices = [self.index_Ex(e) for e in E]
         return np.array(indices)
 
     @property
-    def range_E0(self) -> np.ndarray:
-        """ Returns all indices of E0_array """
-        return np.arange(0, len(self.E0_array), dtype=int)
+    def range_Eg(self) -> np.ndarray:
+        """ Returns all indices of Eg_array """
+        return np.arange(0, len(self.Eg_array), dtype=int)
 
     @property
-    def range_E1(self) -> np.ndarray:
-        """ Returns all indices of E1_array """
-        return np.arange(0, len(self.E1_array), dtype=int)
+    def range_Ex(self) -> np.ndarray:
+        """ Returns all indices of Ex_array """
+        return np.arange(0, len(self.Ex_array), dtype=int)
 
     @property
     def counts(self) -> float:
         return self.matrix.sum()
+
+    def axis_toint(self, axis: Any) -> int:
+        """Maps axis to 0, 1 or 2 according to which axis is specified
+
+        Args:
+            axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+        Returns:
+            An int describing the axis in the basis of the plot,
+            _not_ the matrix' dimension.
+        Raises:
+            AttributeError if the axis is not supported
+        """
+        try:
+            axis = axis.lower()
+        except AttributeError:
+            pass
+
+        if axis in (0, 'eg'):
+            return 0
+        elif axis in (1, 'ex'):
+            return 1
+        elif axis in (2, 'both', 'egex', 'exeg'):
+            return 2
+        else:
+            raise ValueError(f"Unrecognized axis: {axis}")
 
 
 class Vector():

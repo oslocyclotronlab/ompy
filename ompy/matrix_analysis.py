@@ -85,7 +85,7 @@ class MatrixAnalysis():
                fill_and_remove_negative=False):
         # = Check that raw matrix is present
         if self.raw.matrix is None:
-            raise Exception("Error: No raw matrix is loaded.")
+            raise RuntimeError("Error: No raw matrix is loaded.")
 
         if fname_resp_mat is None or fname_resp_dat is None:
             # if self.response.matrix is None:
@@ -109,6 +109,7 @@ class MatrixAnalysis():
         # are provided. The optional arguments can be None. If the argument
         # is not None, then it checks that it has the right type.
         # fname_resp_mat (required argument):
+        # TODO: Jesus f*cking Christ!
         if fname_resp_mat is not None:
             self.unfold_fname_resp_mat = fname_resp_mat
         else:

@@ -404,3 +404,24 @@ def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
                           )
 
     return matrix_out
+
+def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
+    # Make masking array to cut away noise below Eg=Ex+dEg diagonal
+    # Define cut   x1    y1    x2    y2
+    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array), 
+                  i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
+    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
+    i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
+    return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+
+
+def line(x, points):
+    """
+    Returns a line through coordinates [x1,y1,x2,y2]=points
+
+
+    """
+    a = (points[3]-points[1])/float(points[2]-points[0])
+    b = points[1] - a*points[0]
+    return a*x + b
