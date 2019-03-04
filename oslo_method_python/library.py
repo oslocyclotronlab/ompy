@@ -290,7 +290,7 @@ class Matrix():
         out = None
         if axis == 0:
             i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))+1
             matrix_cut = self.matrix[i_E_min:i_E_max, :]
             E0_array_cut = self.E0_array[i_E_min:i_E_max]
             if inplace:
@@ -301,7 +301,7 @@ class Matrix():
 
         elif axis == 1:
             i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
+            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))+1
             matrix_cut = self.matrix[:, i_E_min:i_E_max]
             E1_array_cut = self.E1_array[i_E_min:i_E_max]
             if inplace:
@@ -311,9 +311,9 @@ class Matrix():
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
         elif axis == "both":
             i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))+1
             i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[2]))
-            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))
+            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))+1
             matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
             E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
             E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
