@@ -79,7 +79,8 @@ class Matrix():
             raise Exception("calibration() called on empty Matrix instance")
         return calibration
 
-    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None):
+    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None,
+             **kwargs):
         cbar = None
         if ax is None:
             f, ax = plt.subplots(1, 1)
@@ -91,28 +92,32 @@ class Matrix():
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmin=zmin)
+                                     norm=LogNorm(vmin=zmin),
+                                     **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmax=zmax)
+                                     norm=LogNorm(vmax=zmax),
+                                     **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmin=zmin, vmax=zmax)
+                                     norm=LogNorm(vmin=zmin, vmax=zmax),
+                                     **kwargs
                                      )
             else:
                 # or finally, no limits:
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm()
+                                     norm=LogNorm(),
+                                     **kwargs
                                      )
         elif zscale == "linear":
             # z axis shall have linear scale
@@ -122,14 +127,16 @@ class Matrix():
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     vmin=zmin
+                                     vmin=zmin,
+                                     **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     vmax=zmax
+                                     vmax=zmax,
+                                     **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
@@ -137,13 +144,15 @@ class Matrix():
                                      self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
-                                     vmax=zmax
+                                     vmax=zmax,
+                                     **kwargs
                                      )
             else:
                 # or finally, no limits.
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
-                                     self.matrix
+                                     self.matrix,
+                                     **kwargs
                                      )
         else:
             raise Exception("Unknown zscale type", zscale)
