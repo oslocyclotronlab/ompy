@@ -206,7 +206,7 @@ class MatrixAnalysis():
             fname_resp_dat=fname_resp_dat,
             Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
             diag_cut=diag_cut,
-            Eg_max=Eg_max, verbose=verbose, plot=plot,
+            Eg_max=Eg_max, plot=plot,
             use_comptonsubtraction=use_comptonsubtraction
         )
 

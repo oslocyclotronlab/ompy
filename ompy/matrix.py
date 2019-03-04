@@ -213,7 +213,7 @@ class Matrix():
             ValueError: If axis is not in [0, 1]
         Returns:
             The ax used for plotting
-        TODO: Make histogram and fix normalization
+        TODO: Fix normalization
         """
         if ax is None:
             fig, ax = plt.subplots()
@@ -245,10 +245,10 @@ class Matrix():
                 projection = calibrated.mean(axis=naxis)
 
         if not axis:
-            ax.plot(self.Ex, projection)
+            ax.step(self.Ex, projection)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         else:
-            ax.plot(self.Eg, projection)
+            ax.step(self.Eg, projection)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         if normalize:
             ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
@@ -349,7 +349,6 @@ class Matrix():
         Ex2, Ey2 = E2
         Ix = self.indices_Eg([Ex1, Ex2])
         Iy = self.indices_Ex([Ey1, Ey2])
-        print(Ix, Iy)
 
         # Interpolate between the two points
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
@@ -357,8 +356,8 @@ class Matrix():
         line = lambda x: a*x + b
 
         # Mask all indices below this line to 0
-        i_mesh, j_mesh = np.meshgrid(self.range_Eg, self.range_Ex)#,
-                                     # indexing='ij')
+        i_mesh, j_mesh = np.meshgrid(self.range_Eg, self.range_Ex)
+        # indexing='ij')
         mask = np.where(j_mesh < line(i_mesh), True, False)
         return mask
 

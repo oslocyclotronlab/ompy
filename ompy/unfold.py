@@ -33,27 +33,23 @@ import time
 import psutil
 from matplotlib.colors import LogNorm
 from .library import mama_read, div0, EffExp, shift_and_smooth3D
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 from .matrix import Matrix
 
 
 LOG = logging.getLogger(__name__)
-LOG.setLevel(logging.DEBUG)
 
 
 def unfold(
-        raw,
-        fname_resp_mat=None,
-        fname_resp_dat=None,
-        # FWHM_factor=10,
-        Ex_min=None,
-        Ex_max=None,
-        Eg_min=None,
+        raw: Matrix,
+        fname_resp_mat: str = None,
+        fname_resp_dat: str = None,
+        Ex_min: float = None,
+        Ex_max: float = None,
+        Eg_min: float = None,
+        Eg_max: float = None,
         diag_cut=None,
-        Eg_max=None,
-        verbose=False,
-        plot=False,
-        use_comptonsubtraction=False):
+        plot: bool = False,
+        use_comptonsubtraction: bool = False):
     """Unfolds the gamma-detector response of a spectrum
 
     Args:
@@ -116,8 +112,8 @@ def unfold(
     cal_raw = raw.calibration()
     N_Ex, N_Eg = raw.matrix.shape
 
-    LOG.debug("Lowest Eg:{Eg[0]}\tEg_min:{Eg_min}")
-    LOG.debug("Lowest Ex:{Ex[0]}\tEx_min:{Ex_min}")
+    LOG.debug(f"Lowest Eg:{Eg[0]}\tEg_min:{Eg_min}")
+    LOG.debug(f"Lowest Ex:{Ex[0]}\tEx_min:{Ex_min}")
 
     # Import response matrix
     response = mama_read(fname_resp_mat)
@@ -172,6 +168,8 @@ def unfold(
     # Max number of iterations:
     num_iter = 33  # 12 # 8 # 27
 
+    # ==== END OF CHECKING ==== #
+
     # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     if diag_cut is not None:
         E1 = (diag_cut['Eg1'], diag_cut['Ex1'])
@@ -181,10 +179,6 @@ def unfold(
         raise NotImplementedError()
         # If diag_cut is not given, use global uncertainty widths from
         # constants.py
-        # Ex1 = 1000  # MeV
-        # Eg1 = 1000 + np.sqrt(DE_PARTICLE**2 + DE_GAMMA_1MEV**2)  # MeV
-        # Ex2 = 8000  # MeV
-        # Eg2 = 8000 + np.sqrt(DE_PARTICLE**2 + DE_GAMMA_8MEV**2)  # MeV
 
     Exslice = slice(iEx_min, iEx_max)
     Egslice = slice(iEg_min, iEg_max)
@@ -206,11 +200,17 @@ def unfold(
     # R = div0(R, R.sum(axis=1))
 
     Eg_cut = Eg[Egslice]
+    Ex_cut = Eg[Exslice]
+    # == Slices are not used beyond this point
 
     # Calculate fluctuations of the raw spectrum to compare with the unfolded later
     fluctuations_vector_raw = fluctuations(rawmat, Eg_cut)
     unfoldmat_cube = np.zeros((num_iter, *rawmat.shape))
 
+    # === ACTUAL ITERATION === #
+    # Needs:
+    # iteration, num_iter, unfoldmat, rawmat, unfoldmat_cube
+    # mask, chisquare_matrix, fluctuations_matrix
     # Run folding iterations:
     for iteration in range(num_iter):
         if iteration == 0:
@@ -227,23 +227,21 @@ def unfold(
             #     unfoldmat = unfoldmat * div0(rawmat, foldmat) # Ratio method (MAMA seems to use both alternatingly?)
         unfoldmat_cube[iteration, :, :] = unfoldmat
 
-        foldmat = np.dot(
-            R.T, unfoldmat.T
-        ).T  # Have to do some transposing to get the axis orderings right for matrix product
-        # 201810: Trying to debug by checking if it makes a difference to loop over rows as individual vectors (should not make a difference, and does not):
-        # for i_row in range(foldmat.shape[0]):
-        # foldmat[i_row,:] = np.dot(R.T, unfoldmat[i_row,:].T).T
-        foldmat[mask] = 0  # Apply mask for every iteration to suppress stuff below diag
-        # 20171110: Tried transposing R. Was it that simple? Immediately looks good.
-        #           Or at least much better. There is still something wrong giving negative counts left of peaks.
-        #           Seems to come from unfolding and not from compton subtraction
+        # This should be equivalent to the expression below, but has some
+        # difference in the 11th decimals
+        foldmat = unfoldmat@R
+        # foldmat2 = np.dot(R.T, unfoldmat.T).T
 
-        # Calculate reduced chisquare of the "fit" between folded-unfolded matrix and original raw
+        # Suppress stuff below diagonal
+        foldmat[mask] = 0
+
+        # Calculate reduced chisquare of the "fit" between
+        # folded-unfolded matrix and original raw
         # for each Ex bin separately
         # TODO reduced chisquare or normal?
         chisquare_matrix[:, iteration] = div0(
             np.power(foldmat - rawmat, 2),
-            np.where(rawmat > 0, rawmat, 0)).sum(axis=1)  #/ Ndof_vector
+            np.where(rawmat > 0, rawmat, 0)).sum(axis=1)
 
         # Also calculate fluctuations in each Ex bin
         fluctuations_matrix[:, iteration] = fluctuations(
@@ -251,11 +249,12 @@ def unfold(
 
         chisq = np.mean(chisquare_matrix[:, iteration])
         LOG.info((f"Folding iteration {iteration}."
-                  f" Avg reduced χ² {chisq}"))
+                  f"Avg χ²/ν {chisq}"))
 
     # Score the solutions based on chisquare value for each Ex bin
     # and select the best one:
-    fluctuations_matrix = fluctuations_matrix / fluctuations_vector_raw[:, None]  # TODO check that this broadcasts the vector over the right dimension
+    # TODO check that this broadcasts the vector over the right dimension
+    fluctuations_matrix /= fluctuations_vector_raw[:, None]
     # Get the vector indicating iteration index of best score for each Ex bin:
     weight_fluc = 0.2  # 0.6 # TODO make this an argument
     minimum_iterations = 3  # Minimum iteration number to accept from the scoring
@@ -264,15 +263,15 @@ def unfold(
         minimum_iterations = num_iter
     i_score_vector = scoring(chisquare_matrix, fluctuations_matrix,
                              weight_fluc, minimum_iterations)
-    unfoldmat = np.zeros(rawmat.shape)
+    unfoldmat = np.zeros_like(rawmat)
     # TODO Make all array in a matrix be reshaped simultaneously
     for i_Ex in range(rawmat.shape[0]):
         unfoldmat[i_Ex, :] = unfoldmat_cube[i_score_vector[i_Ex], i_Ex, :]
 
-    if verbose:
-        print("The iteration number with the best score for each Ex bin:")
+    if info:
+        LOG.info("The iteration number with the best score for each Ex bin:")
         for i_Ex in range(rawmat.shape[0]):
-            print("i_Ex = {:d}, Ex = {:f}, i_score_vector = {:d}".format(
+            LOG.info("i_Ex = {:d}, Ex = {:f}, i_score_vector = {:d}".format(
                 i_Ex, Ex[i_Ex], i_score_vector[i_Ex]))
 
     # Remove negative counts and trim:
@@ -282,13 +281,13 @@ def unfold(
     if plot:
         # Plot:
         cbar_fold = ax_fold.pcolormesh(
-            Eg[Egslice],
-            Ex[Exslice],
+            Eg_cut,
+            Ex_cut,
             foldmat,
             norm=LogNorm(vmin=1))
         f.colorbar(cbar_fold, ax=ax_fold)
 
-    if verbose:
+    if info:
         time_unfolding_end = time.process_time()
         time_compton_start = time.process_time()
 
@@ -299,15 +298,14 @@ def unfold(
     # Trim result:
     unfolded[mask] = 0
 
-    if verbose:
+    if info:
         time_compton_end = time.process_time()
         # Print timing results:
-        print(
+        LOG.info(
             "Time elapsed: \nFile import = {:f} s \nRebinning = {:f} s \nUnfolding = {:f} s"
             .format(time_readfiles_end - time_readfiles_start,
                     time_rebin_end - time_rebin_start,
-                    time_unfolding_end - time_unfolding_start),
-            flush=True)
+                    time_unfolding_end - time_unfolding_start))
         if use_comptonsubtraction:
             print(
                 "Compton subtraction = {:f} s".format(time_compton_end -
@@ -317,15 +315,15 @@ def unfold(
     if plot:
         # Plot unfolded and Compton subtracted matrices:
         cbar_unfold = ax_unfold.pcolormesh(
-            Eg[Egslice],
-            Ex[Exslice],
+            Eg_cut,
+            Ex_cut,
             unfoldmat,
             norm=LogNorm(vmin=1))
         f.colorbar(cbar_unfold, ax=ax_unfold)
         if use_comptonsubtraction:
             cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(
-                Eg[Egslice],
-                Ex[Exslice],
+                Eg_cut,
+                Ex_cut,
                 unfolded,
                 norm=LogNorm(vmin=1))
             f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
@@ -333,8 +331,8 @@ def unfold(
 
     # Update global variables:
     unfolded = Matrix(unfolded,
-                      Eg=Eg[Egslice],
-                      Ex=Ex[Exslice])
+                      Eg=Eg_cut,
+                      Ex=Ex_cut)
 
     return unfolded
 
