@@ -33,7 +33,7 @@ cimport numpy as np
 
 
 def decompose_matrix(P_in, P_err,
-                     Emid_Eg, Emid_nld, Emid_Ex,
+                     Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
                      method="Powell", options={'disp': True},
                      fill_value=0):
     """ routine for the decomposition of the first generations spectrum P_in
@@ -76,18 +76,7 @@ def decompose_matrix(P_in, P_err,
     #   P_in[np.where(P_in == 0)] = fill_value # fill holes with a really small number
     #   P_in = np.tril(P_in,k=Nbins_T - Nbins_rho) # set lower triangle to 0 -- due to array form <-> where Eg>Ex
 
-    ##############
-    u_oslo_matrix = unumpy.uarray(P_in, P_err)
-
-    # normalize each Ex row to 1 (-> get decay probability)
-    for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
-        try:
-            u_oslo_matrix[i,:] /= normalization
-        except ZeroDivisionError:
-            u_oslo_matrix[i,:]=0
-    P_in = unumpy.nominal_values(u_oslo_matrix)
-    P_err = unumpy.std_devs(u_oslo_matrix)
-    ##############
+    P_in, P_err = normalize(P_in, P_err)
 
     # initial guesses
     rho0 = np.ones(Nbins_rho)
@@ -99,8 +88,9 @@ def decompose_matrix(P_in, P_err,
     p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
-    res = minimize(objfun1D, x0=p0, args=(P_in,P_err,Emid_Eg,Emid_nld,Emid_Ex), method=method,
-         options=options)
+    res = minimize(objfun1D, x0=p0,
+                   args=(P_in,P_err,Emid_Eg,Emid_nld,Emid_Ex, dE_resolution),
+                   method=method, options=options)
     # further optimization: eg through higher tolderaced xtol and ftol
     # different other methods tried:
     # res = minimize(objfun1D, x0=p0, args=P_in,
@@ -117,6 +107,21 @@ def decompose_matrix(P_in, P_err,
 
     return rho_fit, T_fit
 
+def normalize(P_in, P_err=0):
+    ##############
+    u_oslo_matrix = unumpy.uarray(P_in, P_err)
+
+    # normalize each Ex row to 1 (-> get decay probability)
+    for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
+        try:
+            u_oslo_matrix[i,:] /= normalization
+        except ZeroDivisionError:
+            u_oslo_matrix[i,:]=0
+    P_in_norm = unumpy.nominal_values(u_oslo_matrix)
+    P_err_norm = unumpy.std_devs(u_oslo_matrix)
+
+    return P_in_norm, P_err_norm
+
 def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):
     """
     Routine for the decomposition of the first generations spectrum P_in
@@ -131,6 +136,8 @@ def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, met
         Array of middle-bin values
     Emid_Eg, Emid_nld, Emid_Ex : ndarray
         Array of middle-bin values for Eg, nld and Ex
+    dE_resolution : nparray
+        Detector resolution
     N_mc : int
         Number of iterations for the perturbation
     method : str
@@ -186,20 +193,21 @@ def objfun1D(x, *args):
 
     """
 
-    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex = args
+    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution = args
     Pexp = np.asarray(Pexp)
     Perr = np.asarray(Perr)
     Emid_Eg = np.asarray(Emid_Eg)
     Emid_nld = np.asarray(Emid_nld)
     Emid_Ex = np.asarray(Emid_Ex)
+    dE_resolution = np.asarray(dE_resolution)
     Pexp = Pexp.reshape(-1, Pexp.shape[-1])
     Nbins_Ex, Nbins_T = np.shape(Pexp)
     Nbins_rho = Nbins_T
     rho, T = rhoTfrom1D(x, Nbins_rho)
-    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex)
+    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution)
 
 
-def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex):
+def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex, np.ndarray dE_resolution):
     """ Chi^2 between experimental and fitted first genration matrix"""
     cdef float chi2
     cdef np.ndarray Pfit
@@ -207,7 +215,7 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
         chi2 = 1e20
     else:
         Nbins_Ex, Nbins_T = np.shape(Pexp)
-        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex)
+        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution)
         # chi^2 = (data - fit)^2 / unc.^2, where unc.^2 = #cnt for Poisson dist.
         chi2 = np.sum( div0((Pexp - Pfit)**2,Perr**2))
     return chi2
@@ -216,7 +224,7 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
 @cython.boundscheck(True) # turn off bounds-checking for entire function
 @cython.wraparound(True)  # turn off negative index wrapping for entire function
 def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
-              np.ndarray Emid_nld, np.ndarray Emid_Ex, type="transCoeff"):
+              np.ndarray Emid_nld, np.ndarray Emid_Ex, np.ndarray dE_resolution, type="transCoeff"):
     """ Generate a first gernation matrix P from given nld and T (or gsf)
 
     Parameters:
@@ -229,7 +237,7 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
         gamma-ray strength function; either this or gsf must be specified
     type: string, optional
         chosen by type= "transCoeff" /or/ "gsfL1"
-    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex:
+    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:
         bin number and bin center values
     Note: rho and T must have the same bin width
 
@@ -245,19 +253,19 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
     cdef double Eg
     global Emid_Eg
     cdef np.ndarray P = np.zeros((Nbins_Ex,Nbins_T))
-    # for i_Ex in range(Nbins_Ex):
-    #     for i_Eg in range(Nbins_T):
+
     for i_Ex in range(Nbins_Ex):
         Ex = Emid_Ex[i_Ex]
-        Nbins = (np.abs(Emid_Eg-Ex)).argmin() + 1
+        Eg_max = Ex + dE_resolution[i_Ex]
+        Nbins = (np.abs(Emid_Eg - Eg_max)).argmin() + 1
         for i_Eg in range(Nbins):
             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]
             i_Ef = (np.abs(Emid_nld-Ef)).argmin()
-            if i_Ef>=0: # no gamma's with higher energy then the excitation energy
-                P[i_Ex,i_Eg] = rho[i_Ef] * T[i_Eg]
-                if type=="gsfL1": # if input T was a gsf, not transmission coeff: * E^(2L+1)
-                    Eg = Emid_Eg[i_Eg]
-                    P[i_Ex,i_Eg] *= np.power(Eg,3.)
+            P[i_Ex,i_Eg] = rho[i_Ef] * T[i_Eg]
+            # if input T was a gsf, not transmission coeff: * E^(2L+1)
+            if type=="gsfL1":
+                Eg = Emid_Eg[i_Eg]
+                P[i_Ex,i_Eg] *= np.power(Eg,3.)
     # normalize each Ex row to 1 (-> get decay probability)
     for i, normalization in enumerate(np.sum(P,axis=1)):
         P[i,:] /= normalization
