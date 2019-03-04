@@ -3,6 +3,13 @@
 *** Fix plotting to be more flexible and uniform
 *** Choosing points for cutting the diagonal is a pain. Automate it.
 
+**** Set number of sigma out
+**** Eksitasjon høyst neutron separation energy (+ litt for spinn restriksjon)
+**** Nedre tilstanden er øyemål, men skal ikke innholde diskrete verdier
+***** Nedre grense er egentlig ikke viktig, fordi informasjonen ligger i de høyeste binnene
+**** Egamma min er også sketchy
+*** TODO Fix matrix cut diagonal
+
 *** Implement automatic unit conversion
 * Mystifystiske ting
 ** Hvorfor er raw squisha?
