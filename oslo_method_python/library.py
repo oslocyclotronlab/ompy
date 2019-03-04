@@ -365,19 +365,30 @@ class Vector():
         return calibration
 
     def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
-             title=None, label=None):
+             title=None, **kwargs):
+        """
+        Plot self.vector against self.E_array.
+
+        Args:
+            ax (matplotlib.axes.Axes, optional): The matplotlib Axes object to
+                plot into.
+            yscale (str): Scaling on y axis. One of {"linear", "log", "symlog",
+                "logit"}
+            ylim (list, optional): [min, max] limits on y axis
+            xlim (list, optional): [min, max] limits on x axis
+            title (str, optional): Title of the plot (passed to
+                ax.set_title(title))
+            **kwargs: Additional arguments, passed on to pyplot.plot(**kwargs)
+
+        Todo:
+            Consider if the function should return the ax.
+        """
         if ax is None:
             f, ax = plt.subplots(1, 1)
 
         # Plot with middle-bin energy values:
         E_array_midbin = self.E_array + self.calibration()["a1"]/2
-        if label is None:
-            ax.plot(E_array_midbin, self.vector)
-        elif isinstance(label, str):
-            ax.plot(E_array_midbin, self.vector, label=label)
-        else:
-            raise ValueError("Keyword label must be None or string, but is",
-                             label)
+        ax.plot(E_array_midbin, self.vector, **kwargs)
 
         ax.set_yscale(yscale)
         if ylim is not None:
@@ -388,7 +399,6 @@ class Vector():
             ax.set_title(title)
         if ax is None:
             plt.show()
-        return True
 
     def save(self, fname):
         """
