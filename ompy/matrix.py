@@ -74,19 +74,20 @@ class Matrix():
           └───────────────────────
                 Eγ, index M
                 x axis
-                axis 0
+                axis 0 of plot
+                axis 1 of matrix
 
     Attributes:
         matrix: 2D matrix storing the counting data
-        Eg_array: The gamma energy along the x-axis
-        Ex_array: The excitation energy along the y-axis
+        Eg: The gamma energy along the x-axis
+        Ex: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
     TODO: Find a way to handle units
     """
     def __init__(self, matrix: np.ndarray = None,
-                 Eg_array: np.ndarray = None,
-                 Ex_array: np.ndarray = None,
+                 Eg: np.ndarray = None,
+                 Ex: np.ndarray = None,
                  std: np.ndarray = None,
                  filename: str = None):
         """
@@ -97,8 +98,8 @@ class Matrix():
 
         # Fill class variables:
         self.matrix: np.ndarray = matrix
-        self.Eg_array: np.ndarray = Eg_array
-        self.Ex_array: np.ndarray = Ex_array
+        self.Eg: np.ndarray = Eg
+        self.Ex: np.ndarray = Ex
         self.std: np.ndarray = std  # slot for matrix of standard deviations
 
         if filename is not None:
@@ -113,15 +114,23 @@ class Matrix():
         Raises:
             ValueError: If any check fails
         """
+        if self.matrix is None:
+            return
+
         # Check shapes:
-        if self.Ex_array is not None:
-            if self.matrix.shape[0] != len(self.Ex_array):
-                raise ValueError("Shape mismatch between matrix and Ex_array.")
-        if self.Eg_array is not None:
-            if self.matrix.shape[1] != len(self.Eg_array):
-                raise ValueError("Shape mismatch between matrix and Eg_array.")
+        mshape = self.matrix.shape
+        if self.Ex is not None:
+            if mshape[0] != len(self.Ex):
+                raise ValueError(("Shape mismatch between matrix and Ex:"
+                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f"{len(self.Ex)}"))
+        if self.Eg is not None:
+            if mshape[1] != len(self.Eg):
+                raise ValueError(("Shape mismatch between matrix and Eg:"
+                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f"{len(self.Eg)}"))
         if self.std is not None:
-            if self.matrix.shape != self.std.shape:
+            if mshape != self.std.shape:
                 raise ValueError("Shape mismatch between self.matrix and std.")
 
     def load(self, filename: str):
@@ -136,8 +145,8 @@ class Matrix():
         # Load matrix from file:
         matrix_object = mama_read(filename)
         self.matrix = matrix_object.matrix
-        self.Eg_array = matrix_object.E1_array
-        self.Ex_array = matrix_object.E0_array
+        self.Eg = matrix_object.E1_array
+        self.Ex = matrix_object.E0_array
 
         self.verify_integrity()
 
@@ -148,10 +157,10 @@ class Matrix():
         """
         # Formatted as "a{axis}{power of E}"
         calibration = {
-            "a00": self.Ex_array[0],
-            "a01": self.Ex_array[1]-self.Ex_array[0],
-            "a10": self.Eg_array[0],
-            "a11": self.Eg_array[1]-self.Eg_array[0],
+            "a00": self.Ex[0],
+            "a01": self.Ex[1]-self.Ex[0],
+            "a10": self.Eg[0],
+            "a11": self.Eg[1]-self.Eg[0],
         }
         return calibration
 
@@ -179,7 +188,7 @@ class Matrix():
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-        lines = ax.pcolormesh(self.Eg_array, self.Ex_array, self.matrix,
+        lines = ax.pcolormesh(self.Eg, self.Ex, self.matrix,
                               norm=norm)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
@@ -236,10 +245,10 @@ class Matrix():
                 projection = calibrated.mean(axis=naxis)
 
         if not axis:
-            ax.plot(self.Ex_array, projection)
+            ax.plot(self.Ex, projection)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         else:
-            ax.plot(self.Eg_array, projection)
+            ax.plot(self.Eg, projection)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         if normalize:
             ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
@@ -276,32 +285,32 @@ class Matrix():
         if axis == 0:
             iE_min, iE_max = self.indices_Eg(limits)
             matrix_cut = self.matrix[:, iE_min:iE_max]
-            E_cut = self.Eg_array[iE_min:iE_max]
+            E_cut = self.Eg[iE_min:iE_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.Eg_array = E_cut
+                self.Eg = E_cut
             else:
-                out = Matrix(matrix_cut, E_cut, self.Ex_array)
+                out = Matrix(matrix_cut, E_cut, self.Ex)
 
         elif axis == 1:
             iE_min, iE_max = self.indices_Ex(limits)
             matrix_cut = self.matrix[iE_min:iE_max, :]
-            E_cut = self.Ex_array[iE_min:iE_max]
+            E_cut = self.Ex[iE_min:iE_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.Ex_array = E_cut
+                self.Ex = E_cut
             else:
-                out = Matrix(matrix_cut, self.Eg_array, E_cut)
+                out = Matrix(matrix_cut, self.Eg, E_cut)
         elif axis == 2:
             iEg_min, iEg_max = self.indicies_Eg(limits[:2])
             iEx_min, iEx_max = self.indicies_Ex(limits[2:])
             matrix_cut = self.matrix[iEg_min:iEg_max, iEx_min:iEx_max]
-            Eg_cut = self.Eg_array[iEg_min:iEg_max]
-            Ex_cut = self.Ex_array[iEx_min:iEx_max]
+            Eg_cut = self.Eg[iEg_min:iEg_max]
+            Ex_cut = self.Ex[iEx_min:iEx_max]
             if inplace:
                 self.matrix = matrix_cut
-                self.Eg_array = Eg_cut
-                self.Ex_array = Ex_cut
+                self.Eg = Eg_cut
+                self.Ex = Ex_cut
             else:
                 out = Matrix(matrix_cut, Eg_cut, Ex_cut)
 
@@ -329,9 +338,12 @@ class Matrix():
         Returns:
             The boolean array with counts below the line set to False
         TODO: Write as a property with memonized output for unchanged matrix
+
+        NOTE: My method and Jørgen's method give 2 pixels difference
+              Probably because of how the interpolated line is drawn
         """
         # Transform from energy to index basis
-        # Note: Ex and Ey refers to x- and y-direction
+        # NOTE: Ex and Ey refers to x- and y-direction
         # not excitation and gamma
         Ex1, Ey1 = E1
         Ex2, Ey2 = E2
@@ -341,10 +353,7 @@ class Matrix():
 
         # Interpolate between the two points
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
-        print(a)
         b = Iy[0] - a*Ix[0]
-        print(b)
-        print(Iy[1] - a*Ix[1])
         line = lambda x: a*x + b
 
         # Mask all indices below this line to 0
@@ -395,11 +404,11 @@ class Matrix():
 
     def index_Eg(self, E: float) -> int:
         """ Returns the closest index corresponding to the Eg value """
-        return np.abs(self.Eg_array - E).argmin()
+        return np.abs(self.Eg - E).argmin()
 
     def index_Ex(self, E: float) -> int:
         """ Returns the closest index corresponding to the Ex value """
-        return np.abs(self.Ex_array - E).argmin()
+        return np.abs(self.Ex - E).argmin()
 
     def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
         """ Returns the closest indices corresponding to the Eg value"""
@@ -413,13 +422,13 @@ class Matrix():
 
     @property
     def range_Eg(self) -> np.ndarray:
-        """ Returns all indices of Eg_array """
-        return np.arange(0, len(self.Eg_array), dtype=int)
+        """ Returns all indices of Eg """
+        return np.arange(0, len(self.Eg), dtype=int)
 
     @property
     def range_Ex(self) -> np.ndarray:
-        """ Returns all indices of Ex_array """
-        return np.arange(0, len(self.Ex_array), dtype=int)
+        """ Returns all indices of Ex """
+        return np.arange(0, len(self.Ex), dtype=int)
 
     @property
     def counts(self) -> float:
