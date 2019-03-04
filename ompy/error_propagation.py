@@ -31,6 +31,7 @@ import numpy as np
 import os
 from .library import *
 from .matrix_analysis import *
+from .matrix import Matrix
 import copy
 
 
@@ -338,5 +339,11 @@ class ErrorPropagation:
         self.std_firstgen = std_firstgen
         self.std_raw = std_raw
         # TODO add self.std_unfolded
+
+        # Also store a list containing all ensemble members of firstgen:
+        self.firstgen_ensemble = firstgen_ensemble
+        # self.firstgen_ensemble = []
+        # for i_ens in range(N_ensemble_members):
+
 
         # return std_firstgen
