@@ -50,7 +50,8 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
               method="Powell",
               verbose=True,
               negatives_penalty=0,
-              regularizer=0):
+              regularizer=0,
+              options={'disp': True}):
     """Fits the firstgen spectrum to the product of transmission coeff T and
     level density rho
 
@@ -68,6 +69,8 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
                       in scipy.optimize.minimize.
         verbose (bool): Whether to print information
                         from the fitting routine.
+        options (dict): Options to the minimization routine. See docs of
+                        scipy.optimize.minimize
 
     Returns:
         rho, T (tuple):
@@ -171,7 +174,8 @@ def fit_rho_T(firstgen_in, firstgen_std_in, bin_width_out,
                                          Emid_Eg=Emid_Eg,
                                          Emid_nld=Emid_nld,
                                          Emid_Ex=Emid_Ex,
-                                         method="Powell")
+                                         method="Powell",
+                                         options=options)
 
     rho = Vector(rho_fit, Emid_nld-calib_out["a1"]/2)
     T = Vector(T_fit, Emid_Eg-calib_out["a1"]/2)

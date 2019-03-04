@@ -99,8 +99,11 @@ def decompose_matrix(P_in, P_err,
     p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
-    res = minimize(objfun1D, x0=p0, args=(P_in,P_err,Emid_Eg,Emid_nld,Emid_Ex), method=method,
-         options=options)
+    res = minimize(objfun1D, x0=p0,
+                   args=(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex),
+                   method=method,
+                   options=options
+                   )
     # further optimization: eg through higher tolderaced xtol and ftol
     # different other methods tried:
     # res = minimize(objfun1D, x0=p0, args=P_in,
@@ -199,7 +202,8 @@ def objfun1D(x, *args):
     return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex)
 
 
-def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex):
+def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,
+         np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex):
     """ Chi^2 between experimental and fitted first genration matrix"""
     cdef float chi2
     cdef np.ndarray Pfit
