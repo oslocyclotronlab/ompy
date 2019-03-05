@@ -1,0 +1,50 @@
+Starting job 221196 on c24-2 at Fri Dec 7 10:47:49 CET 2018
+
+Resetting modules to system default
+
+Currently Loaded Modules:
+  1) StdEnv                                             (S)
+  2) GCCcore/6.4.0
+  3) binutils/2.28-GCCcore-6.4.0                        (H)
+  4) icc/2018.1.163-GCC-6.4.0-2.28
+  5) ifort/2018.1.163-GCC-6.4.0-2.28
+  6) iccifort/2018.1.163-GCC-6.4.0-2.28
+  7) impi/2018.1.163-iccifort-2018.1.163-GCC-6.4.0-2.28
+  8) iimpi/2018a
+  9) imkl/2018.1.163-iimpi-2018a
+ 10) intel/2018a
+ 11) GSL/2.4-GCCcore-6.4.0
+ 12) zlib/1.2.11-GCCcore-6.4.0                          (H)
+ 13) XZ/5.2.3-GCCcore-6.4.0                             (H)
+ 14) libxml2/2.9.7-GCCcore-6.4.0                        (H)
+ 15) bzip2/1.0.6-GCCcore-6.4.0                          (H)
+ 16) PCRE/8.41-GCCcore-6.4.0                            (H)
+ 17) CFITSIO/3.42-GCCcore-6.4.0                         (H)
+ 18) ncurses/6.0-GCCcore-6.4.0                          (H)
+ 19) libreadline/7.0-GCCcore-6.4.0                      (H)
+ 20) GMP/6.1.2-GCCcore-6.4.0                            (H)
+ 21) libffi/3.2.1-GCCcore-6.4.0                         (H)
+ 22) Python/2.7.14-intel-2018a
+ 23) LLVM/5.0.1-GCCcore-6.4.0                           (H)
+ 24) libGLU/9.0.0-intel-2018a                           (H)
+ 25) expat/2.2.5-GCCcore-6.4.0                          (H)
+ 26) freetype/2.9-GCCcore-6.4.0                         (H)
+ 27) fontconfig/2.12.6-GCCcore-6.4.0                    (H)
+ 28) nettle/3.4-intel-2018a                             (H)
+ 29) X11/20180131-GCCcore-6.4.0                         (H)
+ 30) libdrm/2.4.91-GCCcore-6.4.0                        (H)
+ 31) Mesa/17.3.6-intel-2018a                            (H)
+ 32) freeglut/3.0.0-intel-2018a                         (H)
+ 33) GL2PS/1.4.0-intel-2018a                            (H)
+ 34) FFTW/3.3.7-intel-2018a
+ 35) Tcl/8.6.7-GCCcore-6.4.0                            (H)
+ 36) SQLite/3.20.1-GCCcore-6.4.0                        (H)
+ 37) libpng/1.6.32-GCCcore-6.4.0                        (H)
+ 38) ROOT/6.12.06-intel-2018a-Python-2.7.14
+
+  Where:
+   H:  Hidden Module
+   S:  Module is Sticky, requires --force to unload or purge
+
+ 
+

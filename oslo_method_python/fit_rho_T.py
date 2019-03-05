@@ -54,7 +54,8 @@ class FitRhoT:
                  method="Powell",
                  verbose=True,
                  negatives_penalty=0,
-                 regularizer=0):
+                 regularizer=0,
+                 options={'disp': True}):
         """
         Class Wrapper for fit of the firstgen spectrum to the product of transmission coeff T and level density rho
 
@@ -71,8 +72,10 @@ class FitRhoT:
                           in scipy.optimize.minimize.
             verbose (bool): Whether to print information
                             from the fitting routine.
-            negatives_penalty : For Chi2
-            regularizer : For Chi2
+            negatives_penalty : For Chi2 # TODO: send to fit
+            regularizer : For Chi2 # TODO: send to fit
+            options (dict): Options to the minimization routine. See docs of
+                scipy.optimize.minimize
 
         TODO:
             - Implement negatives_penalty and regularizer
@@ -88,8 +91,9 @@ class FitRhoT:
         self.Eg_min = Eg_min
         self.method = method
         self.verbose = verbose
-        self.negatives_penalty = negatives_penalty
-        self.regularizer = regularizer
+        self.negatives_penalty = negatives_penalty # TODO: send to fit
+        self.regularizer = regularizer # TODO: send to fit
+        self.options = options
         self.check_input()
 
         # To be filled later
@@ -250,7 +254,7 @@ class FitRhoT:
                                           Emid_Ex=Ex_array+bin_width_out/2,
                                           dE_resolution = self.dE_resolution,
                                           method=self.method,
-                                          options={"disp": True})
+                                          options=self.options)
 
         rho = lib.Vector(rho_fit, Enld_array)
         T = lib.Vector(T_fit, Eg_array)
