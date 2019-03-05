@@ -29,11 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+from copy import copy
 from matplotlib.colors import LogNorm, Normalize
-from typing import Dict, Iterable, Any, Union
+from typing import Dict, Iterable, Any, Union, Tuple
 from enum import Enum, unique
 from .library import (mama_read, mama_write, div0, fill_negative)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 
 
 @unique
@@ -164,6 +166,13 @@ class Matrix():
         }
         return calibration
 
+    def calibration_array(self) -> np.ndarray:
+        """ Calculates the calibration coefficients of the energy axes
+
+        Returns: The calibration coefficients in an array.
+        """
+        return np.array(list(self.calibration().values()))
+
     def plot(self, ax: Any = None, title: str = None, zscale: str = "log",
              zmin: float = None, zmax: float = None) -> Any:
         """ Plots the matrix with the energy along the axis
@@ -172,8 +181,8 @@ class Matrix():
             ax: A matplotlib axis to plot onto
             title: Defaults to the current matrix state
             zscale: Scale along the z-axis. Defaults to logarithmic
-            vmin: Minimum value for coloring in scaling
-            vmax Maximum value for coloring in scaling
+            zmin: Minimum value for coloring in scaling
+            zmax Maximum value for coloring in scaling
         Returns:
             The ax used for plotting
         Raises:
@@ -195,6 +204,45 @@ class Matrix():
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
         cbar = fig.colorbar(lines, ax=ax)
         cbar.ax.set_ylabel("# counts")
+        plt.show()
+        return ax
+
+    def plot_3d(self, ax: Any = None, zscale: str = "log",
+                zmin: float = 1, zmax: float = None) -> Any:
+        """ Plots the matrix with the energy along the axis
+
+        Args:
+            ax: A matplotlib axis to plot onto
+            zscale: Scale along the z-axis. Defaults to logarithmic
+            zmin: Minimum value for coloring in scaling
+            zmax Maximum value for coloring in scaling
+        Returns:
+            The ax used for plotting
+        Raises:
+            ValueError: If zscale is unsupported
+
+        """
+        if zmax is None:
+            zmax = self.matrix.max()
+        if ax is None:
+            fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+        if zscale == 'log':
+            norm = LogNorm(vmin=zmin, vmax=zmax)
+        elif zscale == 'linear':
+            norm = Normalize(vmin=zmin, vmax=zmax)
+        else:
+            raise ValueError("Unsupported zscale ", zscale)
+        x, y = np.meshgrid(self.Eg, self.Ex)
+        z = np.where(self.matrix > 1, self.matrix, np.nan)
+        # palette = copy(plt.cm.viridis)
+        # palette.set_bad(color="white")
+        surf = ax.plot_surface(x, y, z,
+                               cmap=plt.cm.viridis, rstride=1, cstride=1, norm=norm)
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+        ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+        # cbar = fig.colorbar(lines, ax=ax)
+        # cbar.ax.set_ylabel("# counts")
         plt.show()
         return ax
 
@@ -432,6 +480,10 @@ class Matrix():
     @property
     def counts(self) -> float:
         return self.matrix.sum()
+
+    @property
+    def shape(self) -> Tuple[int]:
+        return self.matrix.shape
 
     def axis_toint(self, axis: Any) -> int:
         """Maps axis to 0, 1 or 2 according to which axis is specified

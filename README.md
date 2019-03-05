@@ -1,4 +1,4 @@
-# Oslo Method Python - ompy
+# Oslo Method Python - OMpy
 ![Travis CI](https://travis-ci.com/Caronthir/oslo_method_python.svg?token=oq37SFt93PBk5sCGgATJ&branch=master)
 
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>

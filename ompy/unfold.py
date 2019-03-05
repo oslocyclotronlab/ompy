@@ -183,6 +183,7 @@ def unfold(
     Exslice = slice(iEx_min, iEx_max)
     Egslice = slice(iEg_min, iEg_max)
     rawmat = raw.matrix[Exslice, Egslice]
+    LOG.debug(f"Exslice: {Exslice}\nEgslice: {Egslice}")
     LOG.debug(f"Cutting matrix from {raw.matrix.shape} to {rawmat.shape}")
 
     mask = mask[Exslice, Egslice]
@@ -200,7 +201,7 @@ def unfold(
     # R = div0(R, R.sum(axis=1))
 
     Eg_cut = Eg[Egslice]
-    Ex_cut = Eg[Exslice]
+    Ex_cut = Ex[Exslice]
     # == Slices are not used beyond this point
 
     # Calculate fluctuations of the raw spectrum to compare with the unfolded later
