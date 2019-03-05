@@ -89,8 +89,10 @@ def decompose_matrix(P_in, P_err,
 
     # minimization
     res = minimize(objfun1D, x0=p0,
-                   args=(P_in,P_err,Emid_Eg,Emid_nld,Emid_Ex, dE_resolution),
-                   method=method, options=options)
+                   args=(P_in, P_err,
+                         Emid_Eg, Emid_nld, Emid_Ex, dE_resolution),
+                   method=method,
+                   options=options)
     # further optimization: eg through higher tolderaced xtol and ftol
     # different other methods tried:
     # res = minimize(objfun1D, x0=p0, args=P_in,
