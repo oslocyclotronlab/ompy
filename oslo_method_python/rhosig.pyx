@@ -318,7 +318,7 @@ def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):
 
     # Eg
     i_Egmin = (np.abs(Emid-Egmin)).argmin()
-    i_Emax = (np.abs(Emid-Emax)).argmin()
+    i_Emax = (np.abs(Emid-Emax)).argmin()+1
     # Ex
     i_Exmin = (np.abs(Emid-Exmin)).argmin()
 
