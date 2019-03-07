@@ -10,3 +10,4 @@ from .error_propagation import *
 from .matrix import *
 from .rhosig import *
 from .unfolder import *
+from .examples import *

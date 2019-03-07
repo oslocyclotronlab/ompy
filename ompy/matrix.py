@@ -208,7 +208,7 @@ class Matrix():
         return ax
 
     def plot_3d(self, ax: Any = None, zscale: str = "log",
-                zmin: float = 1, zmax: float = None) -> Any:
+                zmin: float = 1, zmax: float = 2000) -> Any:
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -233,12 +233,16 @@ class Matrix():
         else:
             raise ValueError("Unsupported zscale ", zscale)
         x, y = np.meshgrid(self.Eg, self.Ex)
+        x = x.flatten()
+        y = y.flatten()
         z = np.where(self.matrix > 1, self.matrix, np.nan)
+        z = z.flatten()
         # palette = copy(plt.cm.viridis)
         # palette.set_bad(color="white")
-        surf = ax.plot_surface(x, y, z,
-                               cmap=plt.cm.viridis, rstride=1, cstride=1, norm=norm)
-        fig.colorbar(surf, shrink=0.5, aspect=5)
+        surf = ax.bar3d(x, y, np.zeros(len(z)), 1, 1, z)
+        # surf = ax.plot_surface(x, y, z,
+        #                        cmap=plt.cm.viridis, rstride=1, cstride=1, norm=norm)
+        # fig.colorbar(surf, shrink=0.5, aspect=5)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
         # cbar = fig.colorbar(lines, ax=ax)
@@ -350,9 +354,9 @@ class Matrix():
             else:
                 out = Matrix(matrix_cut, self.Eg, E_cut)
         elif axis == 2:
-            iEg_min, iEg_max = self.indicies_Eg(limits[:2])
-            iEx_min, iEx_max = self.indicies_Ex(limits[2:])
-            matrix_cut = self.matrix[iEg_min:iEg_max, iEx_min:iEx_max]
+            iEg_min, iEg_max = self.indices_Eg(limits[:2])
+            iEx_min, iEx_max = self.indices_Ex(limits[2:])
+            matrix_cut = self.matrix[iEx_min:iEx_max, iEg_min:iEg_max]
             Eg_cut = self.Eg[iEg_min:iEg_max]
             Ex_cut = self.Ex[iEx_min:iEx_max]
             if inplace:
