@@ -34,6 +34,7 @@ from .rebin import *
 from .unfold import unfold
 from .first_generation_method import first_generation_method
 from .matrix import Matrix
+from .unfolder import Unfolder
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
@@ -84,7 +85,7 @@ class MatrixAnalysis():
                verbose=False, plot=False, use_comptonsubtraction=False,
                fill_and_remove_negative=False):
         # = Check that raw matrix is present
-        if self.raw.matrix is None:
+        if self.raw.values is None:
             raise RuntimeError("Error: No raw matrix is loaded.")
 
         if fname_resp_mat is None or fname_resp_dat is None:
@@ -201,6 +202,11 @@ class MatrixAnalysis():
                 raise ValueError("Invalid fill_and_remove_negative")
 
         # Call unfolding function
+
+        # unfolder = Unfolder(self.raw)
+        # unfolder.load_response(fname_resp_mat)
+        # unfolder.make_mask()
+        # self.unfolded = unfolder.unfold()
         self.unfolded = unfold(
             raw=self.raw, fname_resp_mat=fname_resp_mat,
             fname_resp_dat=fname_resp_dat,
@@ -224,7 +230,7 @@ class MatrixAnalysis():
                                 verbose=False,
                                 fill_and_remove_negative=False):
         # = Check that unfolded matrix is present:
-        if self.unfolded.matrix is None:
+        if self.unfolded.values is None:
             raise Exception("Error in first_generation_method:"
                             " No unfolded matrix is loaded.")
 
@@ -307,7 +313,7 @@ class MatrixAnalysis():
 
         # Cut away everything above Ex_max because it's zero anyway:
         self.firstgen.cut_rect(axis=0,
-                               E_limits=[self.firstgen.E0_array[0], Ex_max]
+                               limits=[self.firstgen.Ex[0], Ex_max]
                                )
 
         # Fill and remove negative:

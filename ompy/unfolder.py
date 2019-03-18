@@ -26,19 +26,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-import matplotlib.pyplot as plt
 import numpy as np
 import logging
-import time
-import psutil
-from matplotlib.colors import LogNorm
-from typing import Dict, Iterable, Any, Union
-from .library import mama_read, div0, EffExp, shift_and_smooth3D
-from .matrix import Matrix
+import warnings
+from typing import Iterable
+from .library import div0
+from .matrix import Matrix, MatrixState
 from scipy.ndimage import gaussian_filter1d
 
 
 LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class Unfolder:
@@ -58,29 +56,29 @@ class Unfolder:
                       uⁱ = uⁱ⁻¹ + (r - fⁱ⁻¹)
     until fⁱ≈r.
 
+    Attributes:
+        raw Matrix: The Matrix to unfold
+        num_iter int: The number of iterations to perform
+        Ex_min float: The lower Ex limit on the energy trapezoidal cut
+        Ex_max float: The upper Ex limit on the energy trapezoidal cut
+        Eg_min float: The lower Eg limit on the energy trapezoidal cut
+        Eg_max float: The upper Eg limit on the energy trapezoidal cut
+        mask boolean ndarray: Masks everything below the diagonal to false
+        r Matrix: The trapezoidal cut raw Matrix
+        R Matrix: The response matrix
+        weight_fluctuation float:
+        minimum_iterations int:
+
     """
     def __init__(self, raw: Matrix):
         """Unfolds the gamma-detector response of a spectrum
 
         Args:
-            raw (Matrix): the raw matrix to unfold, an instance of Matrix()
-            fname_resp_mat (str): file name of the response matrix, in MAMA format
-            fname_resp_dat (str): file name of the resp.dat file made by MAMA
-            Ex_min (float): Lower limit for excitation energy
-            Ex_max (float): Upper limit for excitation energy
-            Eg_min (float): Lower limit for gamma-ray energy
-            Eg_max (float): Upper limit for gamma-ray energy
-            diag_cut (dict, optional): Points giving upper diagonal boundary on Eg
-            verbose (bool): Toggle verbose mode
-            plot (bool): Toggle plotting
-            use_comptonsubtraction (bool): Toggle whether to use the Compton
-                                            subtraction method
-
+            raw: the raw matrix to unfold, an instance of Matrix()
         Returns:
-            unfolded -- the unfolded matrix as an instance of the Matrix() class
+            unfolded -- the unfolded matrix as an instance of Matrix()
 
         TODO:
-            - Implement the Matrix() and Vector() classes throughout the function.
             - Fix the compton subtraction method implementation.
         """
         self.raw: Matrix = raw
@@ -90,18 +88,25 @@ class Unfolder:
         self.Eg_min = None
         self.Eg_max = None
 
+        # Ensure that the given matrix is in fact raw
+        if self.raw.state != MatrixState.RAW:
+            warnings.warn("Trying to unfold matrix that is not raw")
+
     def update_values(self):
         """Verify internal consistency and set default values
 
         """
         eps = 1e-3
-        print(self.raw.calibration_array())
-        print(self.R_calibration_array)
+        LOG.debug("Comparing calibration of raw against response:"
+                  f"\n{self.raw.calibration()}"
+                  f"\n{self.R_calibration_array}")
         calibration_diff = self.raw.calibration_array() -\
             self.R_calibration_array
         if not (np.abs(calibration_diff[2:]) < eps).all():
             raise AssertionError(("Calibration mismatch: "
-                                  f"{calibration_diff}"))
+                                  f"{calibration_diff}"
+                                  "Ensure that the raw matrix and"
+                                  " calibration matrix are cut equally."))
 
         # If energy limits are not provided, use extremal array values:
         if self.Ex_min is None:
@@ -132,19 +137,19 @@ class Unfolder:
         Egslice = slice(iEg_min, iEg_max)
         Exslice = slice(iEx_min, iEx_max)
 
-        self.r = self.raw.matrix[Exslice, Egslice]
+        self.r = self.raw.values[Exslice, Egslice]
         self.mask = self.mask[Exslice, Egslice]
         self.R = self.R[Egslice, Egslice]
         self.Eg = self.raw.Eg[Egslice]
         self.Ex = self.raw.Ex[Exslice]
 
         LOG.debug(f"Exslice: {Exslice}\nEgslice: {Egslice}")
-        LOG.debug((f"Cutting matrix from {self.raw.matrix.shape}"
+        LOG.debug((f"Cutting matrix from {self.raw.shape}"
                    f" to {self.r.shape}"))
 
     def load_response(self, filename: str):
         response = Matrix(filename=filename)
-        self.R = response.matrix
+        self.R = response.values
         self.R_calibration_array = response.calibration_array()
 
         self.weight_fluctuation = 0.2
@@ -158,12 +163,14 @@ class Unfolder:
 
         TODO: Use better criteria for terminating
         """
-        self.update_values()
 
+        # Set up the arrays
+        self.update_values()
         unfolded_cube = np.zeros((self.num_iter, *self.r.shape))
         chisquare = np.zeros((self.num_iter, self.r.shape[0]))
         fluctuations = np.zeros((self.num_iter, self.r.shape[0]))
         folded = np.zeros_like(self.r)
+
         # Use u⁰ = r as initial guess
         unfolded = self.r
         for i in range(self.num_iter):
@@ -172,8 +179,9 @@ class Unfolder:
             chisquare[i, :] = self.chi_square(folded)
             fluctuations[i, :] = self.fluctuations(unfolded)
 
-            chisq = np.mean(chisquare[i, :])
-            LOG.info(f"Iteration {i}: Avg χ²/ν {chisq}")
+            if LOG.level >= logging.DEBUG:
+                chisq = np.mean(chisquare[i, :])
+            LOG.debug(f"Iteration {i}: Avg χ²/ν {chisq}")
 
         # Score the solutions based on χ² value for each Ex bin
         # and select the best one.
@@ -184,7 +192,9 @@ class Unfolder:
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
 
         unfolded[self.mask] = 0
-        return Matrix(unfolded, Eg=self.Eg, Ex=self.Ex)
+        unfolded = Matrix(unfolded, Eg=self.Eg, Ex=self.Ex)
+        unfolded.state = MatrixState.UNFOLDED
+        return unfolded
 
     def unfold_step(self, unfolded, folded, step):
         """Perform a single step of Guttormsen unfolding
@@ -205,10 +215,15 @@ class Unfolder:
         return unfolded, folded
 
     def chi_square(self, folded: np.ndarray) -> np.ndarray:
+        """ Compute Χ² of the folded spectrum
+
+        Uses the familiar Χ² = Σᵢ (fᵢ-rᵢ)²/rᵢ
+        """
         return div0(np.power(folded - self.r, 2),
                     np.where(self.r > 0, self.r, 0)).sum(axis=1)
 
-    def fluctuations(self, counts: np.ndarray) -> np.ndarray:
+    def fluctuations(self, counts: np.ndarray,
+                     sigma: float = 0.12) -> np.ndarray:
         """
         Calculates fluctuations in each Ex bin gamma spectrum by summing
         the absolute diff between the spectrum and a smoothed version of it.
@@ -218,7 +233,7 @@ class Unfolder:
 
         a1 = self.Eg[1] - self.Eg[0]
         counts_matrix_smoothed = gaussian_filter1d(
-            counts, sigma=0.12 * a1, axis=1)
+            counts, sigma=sigma * a1, axis=1)
         fluctuations = np.sum(
             np.abs(counts_matrix_smoothed - counts), axis=1)
 

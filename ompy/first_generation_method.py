@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np
-from .matrix import Matrix
+from .matrix import Matrix, MatrixState
 from .library import *
 from .rebin import *
 
@@ -66,9 +66,9 @@ def first_generation_method(matrix_in,
     # # END DEBUG
 
     # Protect input arrays:
-    unfolded_matrix = np.copy(matrix_in.matrix)
-    Ex_array_mat = np.copy(matrix_in.E0_array)
-    Egamma_array = np.copy(matrix_in.E1_array)
+    unfolded_matrix = np.copy(matrix_in.values)
+    Ex_array_mat = np.copy(matrix_in.Ex)
+    Egamma_array = np.copy(matrix_in.Eg)
 
     # Cut the input matrix at or above Ex=0. This is implicitly
     # done in MAMA by the variable IyL.
@@ -400,8 +400,6 @@ def first_generation_method(matrix_in,
     # print("Egamma_array.shape =", Egamma_array.shape, flush=True)
     # END DEBUG
 
-    firstgen = Matrix(H,
-    # firstgen = Matrix(G,
-                      Ex_array,
-                      Egamma_array)
+    firstgen = Matrix(values=H, Eg=Egamma_array, Ex=Ex_array)
+    firstgen.state = MatrixState.FIRST_GENERATION
     return firstgen
