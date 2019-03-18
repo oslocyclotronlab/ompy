@@ -79,7 +79,8 @@ class Matrix():
             raise Exception("calibration() called on empty Matrix instance")
         return calibration
 
-    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None):
+    def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None,
+             **kwargs):
         cbar = None
         if ax is None:
             f, ax = plt.subplots(1, 1)
@@ -91,28 +92,32 @@ class Matrix():
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmin=zmin)
+                                     norm=LogNorm(vmin=zmin),
+                                     **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmax=zmax)
+                                     norm=LogNorm(vmax=zmax),
+                                     **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm(vmin=zmin, vmax=zmax)
+                                     norm=LogNorm(vmin=zmin, vmax=zmax),
+                                     **kwargs
                                      )
             else:
                 # or finally, no limits:
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     norm=LogNorm()
+                                     norm=LogNorm(),
+                                     **kwargs
                                      )
         elif zscale == "linear":
             # z axis shall have linear scale
@@ -122,14 +127,16 @@ class Matrix():
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     vmin=zmin
+                                     vmin=zmin,
+                                     **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
                                      self.matrix,
-                                     vmax=zmax
+                                     vmax=zmax,
+                                     **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
@@ -137,13 +144,15 @@ class Matrix():
                                      self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
-                                     vmax=zmax
+                                     vmax=zmax,
+                                     **kwargs
                                      )
             else:
                 # or finally, no limits.
                 cbar = ax.pcolormesh(self.E1_array,
                                      self.E0_array,
-                                     self.matrix
+                                     self.matrix,
+                                     **kwargs
                                      )
         else:
             raise Exception("Unknown zscale type", zscale)
@@ -290,7 +299,7 @@ class Matrix():
         out = None
         if axis == 0:
             i_E_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E_max = np.argmin(np.abs(self.E0_array-E_limits[1]))+1
             matrix_cut = self.matrix[i_E_min:i_E_max, :]
             E0_array_cut = self.E0_array[i_E_min:i_E_max]
             if inplace:
@@ -301,7 +310,7 @@ class Matrix():
 
         elif axis == 1:
             i_E_min = np.argmin(np.abs(self.E1_array-E_limits[0]))
-            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))
+            i_E_max = np.argmin(np.abs(self.E1_array-E_limits[1]))+1
             matrix_cut = self.matrix[:, i_E_min:i_E_max]
             E1_array_cut = self.E1_array[i_E_min:i_E_max]
             if inplace:
@@ -311,9 +320,9 @@ class Matrix():
                 out = Matrix(matrix_cut, E0_array, E1_array_cut)
         elif axis == "both":
             i_E0_min = np.argmin(np.abs(self.E0_array-E_limits[0]))
-            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))
+            i_E0_max = np.argmin(np.abs(self.E0_array-E_limits[1]))+1
             i_E1_min = np.argmin(np.abs(self.E1_array-E_limits[2]))
-            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))
+            i_E1_max = np.argmin(np.abs(self.E1_array-E_limits[3]))+1
             matrix_cut = self.matrix[i_E0_min:i_E0_max, i_E1_min:i_E1_max]
             E0_array_cut = self.E0_array[i_E0_min:i_E0_max]
             E1_array_cut = self.E1_array[i_E1_min:i_E1_max]
@@ -365,19 +374,30 @@ class Vector():
         return calibration
 
     def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
-             title=None, label=None):
+             title=None, **kwargs):
+        """
+        Plot self.vector against self.E_array.
+
+        Args:
+            ax (matplotlib.axes.Axes, optional): The matplotlib Axes object to
+                plot into.
+            yscale (str): Scaling on y axis. One of {"linear", "log", "symlog",
+                "logit"}
+            ylim (list, optional): [min, max] limits on y axis
+            xlim (list, optional): [min, max] limits on x axis
+            title (str, optional): Title of the plot (passed to
+                ax.set_title(title))
+            **kwargs: Additional arguments, passed on to pyplot.plot(**kwargs)
+
+        Todo:
+            Consider if the function should return the ax.
+        """
         if ax is None:
             f, ax = plt.subplots(1, 1)
 
         # Plot with middle-bin energy values:
         E_array_midbin = self.E_array + self.calibration()["a1"]/2
-        if label is None:
-            ax.plot(E_array_midbin, self.vector)
-        elif isinstance(label, str):
-            ax.plot(E_array_midbin, self.vector, label=label)
-        else:
-            raise ValueError("Keyword label must be None or string, but is",
-                             label)
+        ax.plot(E_array_midbin, self.vector, **kwargs)
 
         ax.set_yscale(yscale)
         if ylim is not None:
@@ -388,7 +408,6 @@ class Vector():
             ax.set_title(title)
         if ax is None:
             plt.show()
-        return True
 
     def save(self, fname):
         """
