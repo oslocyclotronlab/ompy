@@ -29,13 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-from copy import copy
 from matplotlib.colors import LogNorm, Normalize
 from typing import Dict, Iterable, Any, Union, Tuple
 from enum import Enum, unique
 from .library import (mama_read, mama_write, div0, fill_negative)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 
 
 @unique
@@ -44,9 +42,11 @@ class MatrixState(Enum):
     RAW = 1
     UNFOLDED = 2
     FIRST_GENERATION = 3
+    STD = 4
 
     def __str__(self):
-        return {1: 'Raw', 2: 'Unfolded', 3: 'First Generation'}[self.value]
+        return {1: 'Raw', 2: 'Unfolded', 3: 'First Generation',
+                4: 'Standard Deviation'}[self.value]
 
 
 class Matrix():
@@ -87,7 +87,7 @@ class Matrix():
         state: An enum to keep track of what has been done to the matrix
     TODO: Find a way to handle units
     """
-    def __init__(self, matrix: np.ndarray = None,
+    def __init__(self, values: np.ndarray = None,
                  Eg: np.ndarray = None,
                  Ex: np.ndarray = None,
                  std: np.ndarray = None,
@@ -99,7 +99,7 @@ class Matrix():
         """
 
         # Fill class variables:
-        self.matrix: np.ndarray = matrix
+        self.values: np.ndarray = values
         self.Eg: np.ndarray = Eg
         self.Ex: np.ndarray = Ex
         self.std: np.ndarray = std  # slot for matrix of standard deviations
@@ -116,11 +116,11 @@ class Matrix():
         Raises:
             ValueError: If any check fails
         """
-        if self.matrix is None:
+        if self.values is None:
             return
 
         # Check shapes:
-        mshape = self.matrix.shape
+        mshape = self.values.shape
         if self.Ex is not None:
             if mshape[0] != len(self.Ex):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
@@ -133,7 +133,7 @@ class Matrix():
                                   f"{len(self.Eg)}"))
         if self.std is not None:
             if mshape != self.std.shape:
-                raise ValueError("Shape mismatch between self.matrix and std.")
+                raise ValueError("Shape mismatch between self.values and std.")
 
     def load(self, filename: str):
         """ Load matrix from mama file
@@ -141,14 +141,14 @@ class Matrix():
         Args:
             filename: Path to mama file
         """
-        if self.matrix is not None:
+        if self.values is not None:
             warnings.warn("load() called on non-empty matrix")
 
         # Load matrix from file:
-        matrix_object = mama_read(filename)
-        self.matrix = matrix_object.matrix
-        self.Eg = matrix_object.E1_array
-        self.Ex = matrix_object.E0_array
+        matrix, Eg, Ex = mama_read(filename)
+        self.values = matrix
+        self.Eg = Eg
+        self.Ex = Ex
 
         self.verify_integrity()
 
@@ -197,56 +197,13 @@ class Matrix():
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-        lines = ax.pcolormesh(self.Eg, self.Ex, self.matrix,
+        lines = ax.pcolormesh(self.Eg, self.Ex, self.values,
                               norm=norm)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
         cbar = fig.colorbar(lines, ax=ax)
         cbar.ax.set_ylabel("# counts")
-        plt.show()
-        return ax
-
-    def plot_3d(self, ax: Any = None, zscale: str = "log",
-                zmin: float = 1, zmax: float = 2000) -> Any:
-        """ Plots the matrix with the energy along the axis
-
-        Args:
-            ax: A matplotlib axis to plot onto
-            zscale: Scale along the z-axis. Defaults to logarithmic
-            zmin: Minimum value for coloring in scaling
-            zmax Maximum value for coloring in scaling
-        Returns:
-            The ax used for plotting
-        Raises:
-            ValueError: If zscale is unsupported
-
-        """
-        if zmax is None:
-            zmax = self.matrix.max()
-        if ax is None:
-            fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
-        if zscale == 'log':
-            norm = LogNorm(vmin=zmin, vmax=zmax)
-        elif zscale == 'linear':
-            norm = Normalize(vmin=zmin, vmax=zmax)
-        else:
-            raise ValueError("Unsupported zscale ", zscale)
-        x, y = np.meshgrid(self.Eg, self.Ex)
-        x = x.flatten()
-        y = y.flatten()
-        z = np.where(self.matrix > 1, self.matrix, np.nan)
-        z = z.flatten()
-        # palette = copy(plt.cm.viridis)
-        # palette.set_bad(color="white")
-        surf = ax.bar3d(x, y, np.zeros(len(z)), 1, 1, z)
-        # surf = ax.plot_surface(x, y, z,
-        #                        cmap=plt.cm.viridis, rstride=1, cstride=1, norm=norm)
-        # fig.colorbar(surf, shrink=0.5, aspect=5)
-        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
-        # cbar = fig.colorbar(lines, ax=ax)
-        # cbar.ax.set_ylabel("# counts")
         plt.show()
         return ax
 
@@ -280,7 +237,7 @@ class Matrix():
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax)
-        selection = self.matrix[subset, :] if axis else self.matrix[:, subset]
+        selection = self.values[subset, :] if axis else self.values[:, subset]
 
         naxis = 0 if axis else 1
 
@@ -321,7 +278,7 @@ class Matrix():
 
         Args:
             axis: Which axis to apply the cut to.
-                Can be 0, "Eg" or 1, "Ex", or "both".
+                Can be 0, "Eg" or 1, "Ex", or 2, "both".
             limits: [E_min, E_max, (E_min, E_max)], where
                 E_min, E_max: Upper and lower energy limits for cut.
                 Supply 4 numbers if 'axis' is 'both'.
@@ -332,39 +289,39 @@ class Matrix():
             cut_matrix (Matrix): The cut version of the matrix
         """
         assert(limits[1] >= limits[0])  # Sanity check
-        axis = self.axis_toint(axis)
+        axis = axis_toint(axis)
         out = None
         if axis == 0:
             iE_min, iE_max = self.indices_Eg(limits)
-            matrix_cut = self.matrix[:, iE_min:iE_max]
+            values_cut = self.values[:, iE_min:iE_max]
             E_cut = self.Eg[iE_min:iE_max]
             if inplace:
-                self.matrix = matrix_cut
+                self.values = values_cut
                 self.Eg = E_cut
             else:
-                out = Matrix(matrix_cut, E_cut, self.Ex)
+                out = Matrix(values_cut, E_cut, self.Ex)
 
         elif axis == 1:
             iE_min, iE_max = self.indices_Ex(limits)
-            matrix_cut = self.matrix[iE_min:iE_max, :]
+            values_cut = self.values[iE_min:iE_max, :]
             E_cut = self.Ex[iE_min:iE_max]
             if inplace:
-                self.matrix = matrix_cut
+                self.values = values_cut
                 self.Ex = E_cut
             else:
-                out = Matrix(matrix_cut, self.Eg, E_cut)
+                out = Matrix(values_cut, self.Eg, E_cut)
         elif axis == 2:
             iEg_min, iEg_max = self.indices_Eg(limits[:2])
             iEx_min, iEx_max = self.indices_Ex(limits[2:])
-            matrix_cut = self.matrix[iEx_min:iEx_max, iEg_min:iEg_max]
+            values_cut = self.values[iEx_min:iEx_max, iEg_min:iEg_max]
             Eg_cut = self.Eg[iEg_min:iEg_max]
             Ex_cut = self.Ex[iEx_min:iEx_max]
             if inplace:
-                self.matrix = matrix_cut
+                self.values = values_cut
                 self.Eg = Eg_cut
                 self.Ex = Ex_cut
             else:
-                out = Matrix(matrix_cut, Eg_cut, Ex_cut)
+                out = Matrix(values_cut, Eg_cut, Ex_cut)
 
         return out
 
@@ -378,7 +335,7 @@ class Matrix():
         Returns:
             The matrix with counts above diagonal removed
         """
-        self.matrix[self.line_mask(E1, E2)] = 0
+        self.values[self.line_mask(E1, E2)] = 0
 
     def line_mask(self, E1: Iterable[float],
                   E2: Iterable[float]) -> np.ndarray:
@@ -405,11 +362,10 @@ class Matrix():
         # Interpolate between the two points
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
         b = Iy[0] - a*Ix[0]
-        line = lambda x: a*x + b
+        line = lambda x: a*x + b  # NOQA E731
 
         # Mask all indices below this line to 0
         i_mesh, j_mesh = np.meshgrid(self.range_Eg, self.range_Ex)
-        # indexing='ij')
         mask = np.where(j_mesh < line(i_mesh), True, False)
         return mask
 
@@ -429,11 +385,11 @@ class Matrix():
         iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
         iEg_min = self.index_Ex(Eg_min)
 
-        mask = np.zeros_like(self.matrix, dtype=bool)
+        mask = np.zeros_like(self.values, dtype=bool)
         for iEx in range(iEx_min, iEx_max+1):
             # Loop over rows in array and fill with ones up to sliding Eg
             # threshold
-            Ex = self.matrix[iEx]
+            Ex = self.values[iEx]
             # Assume constant particle resolution
             dE_particle = DE_PARTICLE
             dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
@@ -448,10 +404,10 @@ class Matrix():
         return mask
 
     def fill_negative(self, window_size):
-        self.matrix = fill_negative(self.matrix, window_size)
+        self.values = fill_negative(self.values, window_size)
 
     def remove_negative(self):
-        self.matrix = np.where(self.matrix > 0, self.matrix, 0)
+        self.values = np.where(self.values > 0, self.values, 0)
 
     def index_Eg(self, E: float) -> int:
         """ Returns the closest index corresponding to the Eg value """
@@ -483,36 +439,37 @@ class Matrix():
 
     @property
     def counts(self) -> float:
-        return self.matrix.sum()
+        return self.values.sum()
 
     @property
     def shape(self) -> Tuple[int]:
-        return self.matrix.shape
+        return self.values.shape
 
-    def axis_toint(self, axis: Any) -> int:
-        """Maps axis to 0, 1 or 2 according to which axis is specified
 
-        Args:
-            axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
-        Returns:
-            An int describing the axis in the basis of the plot,
-            _not_ the matrix' dimension.
-        Raises:
-            AttributeError if the axis is not supported
-        """
-        try:
-            axis = axis.lower()
-        except AttributeError:
-            pass
+def axis_toint(axis: Any) -> int:
+    """Maps axis to 0, 1 or 2 according to which axis is specified
 
-        if axis in (0, 'eg'):
-            return 0
-        elif axis in (1, 'ex'):
-            return 1
-        elif axis in (2, 'both', 'egex', 'exeg'):
-            return 2
-        else:
-            raise ValueError(f"Unrecognized axis: {axis}")
+    Args:
+        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+    Returns:
+        An int describing the axis in the basis of the plot,
+        _not_ the values' dimension.
+    Raises:
+        ValueError if the axis is not supported
+    """
+    try:
+        axis = axis.lower()
+    except AttributeError:
+        pass
+
+    if axis in (0, 'eg'):
+        return 0
+    elif axis in (1, 'ex'):
+        return 1
+    elif axis in (2, 'both', 'egex', 'exeg'):
+        return 2
+    else:
+        raise ValueError(f"Unrecognized axis: {axis}")
 
 
 class Vector():

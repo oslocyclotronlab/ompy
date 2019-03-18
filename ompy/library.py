@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 import time
-from collections import namedtuple
+import warnings
 from scipy.interpolate import interp1d, RectBivariateSpline
 
 
@@ -60,9 +60,8 @@ def mama_read(filename):
     # Then correct them to lower-bin-edge:
     y_array = y_array - cal["a1y"] / 2
     x_array = x_array - cal["a1x"] / 2
-    matrix_faux = namedtuple('matrixfaux', 'matrix E0_array E1_array')
-    out = matrix_faux(matrix, y_array, x_array)
-    return out
+    # Matrix, Eg array, Ex array
+    return matrix, x_array, y_array
 
 
 def mama_write(mat, filename, comment=""):
@@ -324,7 +323,7 @@ def fill_negative(matrix, window_size):
 
     Todo: Debug me!
     """
-    print("Hello from the fill_negative() function. Please debug me.")
+    warnings.warn("Hello from the fill_negative() function. Please debug me.")
     matrix_out = np.copy(matrix)
     # Loop over rows:
     for i_Ex in range(matrix.shape[0]):

@@ -110,15 +110,14 @@ def unfold(
     if info:
         time_readfiles_start = time.process_time()
     cal_raw = raw.calibration()
-    N_Ex, N_Eg = raw.matrix.shape
+    N_Ex, N_Eg = raw.values.shape
 
     LOG.debug(f"Lowest Eg:{Eg[0]}\tEg_min:{Eg_min}")
     LOG.debug(f"Lowest Ex:{Ex[0]}\tEx_min:{Ex_min}")
 
     # Import response matrix
-    response = mama_read(fname_resp_mat)
-    response = Matrix(response.matrix, response.E0_array, response.E1_array)
-    R = response.matrix
+    response = Matrix(filename=fname_resp_mat)
+    R = response.values
     cal_R = response.calibration()
 
     if info:
@@ -182,9 +181,9 @@ def unfold(
 
     Exslice = slice(iEx_min, iEx_max)
     Egslice = slice(iEg_min, iEg_max)
-    rawmat = raw.matrix[Exslice, Egslice]
+    rawmat = raw.values[Exslice, Egslice]
     LOG.debug(f"Exslice: {Exslice}\nEgslice: {Egslice}")
-    LOG.debug(f"Cutting matrix from {raw.matrix.shape} to {rawmat.shape}")
+    LOG.debug(f"Cutting matrix from {raw.values.shape} to {rawmat.shape}")
 
     mask = mask[Exslice, Egslice]
 
