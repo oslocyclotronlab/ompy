@@ -188,17 +188,22 @@ class ErrorPropagation:
         # axs_fg[0,0].set_title("fg")
         # END TESTING
 
-        # Allocate a cube array to store all firstgen ensemble members. We need them to make the firstgen variance matrix.
+        # Allocate a cube array to store all ensemble members. We need them to make the std matrix.
         raw_ensemble = np.zeros((N_ensemble_members,
                                 matrix_analysis.raw.matrix.shape[0],
                                 matrix_analysis.raw.matrix.shape[1])
                                 )
+        unfolded_ensemble = np.zeros((N_ensemble_members,
+                                      matrix_analysis.unfolded.matrix.shape[0],
+                                      matrix_analysis.unfolded.matrix.shape[1])
+                                     )
         firstgen_ensemble = np.zeros((N_ensemble_members,
                                       matrix_analysis.firstgen.matrix.shape[0],
                                       matrix_analysis.firstgen.matrix.shape[1])
                                      )
 
-        # Loop over and generate the random perturbations, then unfold and first-generation-method them:
+        # Loop over and generate the random perturbations, then unfold and
+        # first-generation-method them:
         for i in range(N_ensemble_members):
             if verbose:
                 print("=== Begin ensemble member ", i, " ===", flush=True)
@@ -207,9 +212,9 @@ class ErrorPropagation:
 
             # Allocate matrix_analysis instance for current ensemble member:
             ma_curr = copy.deepcopy(matrix_analysis)
-            # Check if the current ensemble member exists on file, create it if not:
+            # Check if the current ensemble member exists on file, create it if
+            # not:
             if os.path.isfile(fname_raw_current) and not purge_files:
-                # data_raw_ensemblemember, tmp, tmp, tmp = read_mama_2D(fname_raw_current)
                 ma_curr.raw.load(fname_raw_current, suppress_warning=True)
                 if verbose:
                     print("Read raw matrix from file", flush=True)
@@ -275,6 +280,9 @@ class ErrorPropagation:
                 # if verbose:
                     # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
 
+            # Store unfolded ensemble member in memory:
+            unfolded_ensemble[i, :, :] = ma_curr.unfolded.matrix
+
             # === Extract first generation spectrum ===:
             # Ex_max = 12000 # keV - maximum excitation energy
             # dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
@@ -323,6 +331,14 @@ class ErrorPropagation:
                          )
         fname_raw_std = os.path.join(folder, "raw_std.m")
         std_raw.save(fname_raw_std)
+        # unfolded:
+        unfolded_ensemble_std = np.std(unfolded_ensemble, axis=0)
+        std_unfolded = Matrix(unfolded_ensemble_std,
+                         matrix_analysis.unfolded.E0_array,
+                         matrix_analysis.unfolded.E1_array
+                         )
+        fname_unfolded_std = os.path.join(folder, "unfolded_std.m")
+        std_unfolded.save(fname_unfolded_std)
         # firstgen:
         firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
         std_firstgen = Matrix(firstgen_ensemble_std,
@@ -337,6 +353,7 @@ class ErrorPropagation:
         # END TESTING
 
         self.std_firstgen = std_firstgen
+        self.std_unfolded = std_unfolded
         self.std_raw = std_raw
         # TODO add self.std_unfolded
 
