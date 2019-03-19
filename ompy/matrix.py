@@ -48,6 +48,12 @@ class MatrixState(Enum):
         return {1: 'Raw', 2: 'Unfolded', 3: 'First Generation',
                 4: 'Standard Deviation'}[self.value]
 
+    @classmethod
+    def str_to_state(self, state):
+        return {'raw': self.RAW, 'unfolded': self.UNFOLDED,
+                'firstgen': self.FIRST_GENERATION,
+                'std': self.STD}[state.lower()]
+
 
 class Matrix():
     """ Class for high level manipulation of counts and energy axes
@@ -91,24 +97,24 @@ class Matrix():
                  Eg: np.ndarray = None,
                  Ex: np.ndarray = None,
                  std: np.ndarray = None,
-                 filename: str = None):
+                 filename: str = None,
+                 state: Union[str, MatrixState] = 'raw'):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
 
-        # Fill class variables:
         self.values: np.ndarray = values
         self.Eg: np.ndarray = Eg
         self.Ex: np.ndarray = Ex
-        self.std: np.ndarray = std  # slot for matrix of standard deviations
+        self.std: np.ndarray = std
 
         if filename is not None:
             self.load(filename)
         self.verify_integrity()
 
-        self.state = MatrixState.RAW
+        self.state = state
 
     def verify_integrity(self):
         """ Runs checks to verify internal structure
@@ -120,19 +126,19 @@ class Matrix():
             return
 
         # Check shapes:
-        mshape = self.values.shape
+        shape = self.values.shape
         if self.Ex is not None:
-            if mshape[0] != len(self.Ex):
+            if shape[0] != len(self.Ex):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
-                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Ex)}"))
         if self.Eg is not None:
-            if mshape[1] != len(self.Eg):
+            if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
-                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Eg)}"))
         if self.std is not None:
-            if mshape != self.std.shape:
+            if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
 
     def load(self, filename: str):
@@ -187,10 +193,8 @@ class Matrix():
             The ax used for plotting
         Raises:
             ValueError: If zscale is unsupported
-        TODO: Add fancy 3D histogram
         """
-        if ax is None:
-            fig, ax = plt.subplots()
+        fig, ax = plt.subplots if ax is None else None, ax
         if zscale == 'log':
             norm = LogNorm(vmin=zmin, vmax=zmax)
         elif zscale == 'linear':
@@ -202,9 +206,10 @@ class Matrix():
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
-        cbar = fig.colorbar(lines, ax=ax)
-        cbar.ax.set_ylabel("# counts")
-        plt.show()
+        if fig is not None:
+            cbar = fig.colorbar(lines, ax=ax)
+            cbar.ax.set_ylabel("# counts")
+            plt.show()
         return ax
 
     def plot_projection(self, axis: int, Emin: float = None,
@@ -444,6 +449,26 @@ class Matrix():
     @property
     def shape(self) -> Tuple[int]:
         return self.values.shape
+
+    @property
+    def state(self) -> MatrixState:
+        return self._state
+
+    @state.setter
+    def state(self, state: Union[str, MatrixState]) -> None:
+        if isinstance(state, str):
+            self._state = MatrixState.str_to_state(state)
+        elif isinstance(state, Enum):
+            self._state = state
+        else:
+            raise ValueError(f"state must be str or MatrixState"
+                             f". Got {type(state)}")
+
+    def __getitem__(self, key):
+        return self.values.__getitem__(key)
+
+    def __setitem__(self, key, item):
+        return self.values.__setitem__(key, item)
 
 
 def axis_toint(axis: Any) -> int:

@@ -66,12 +66,13 @@ def mama_read(filename):
 
 def mama_write(mat, filename, comment=""):
     # Calculate calibration coefficients.
+    calibration = mat.calibration()
     cal = {
-        "a0x": mat.E1_array[0],
-        "a1x": mat.E1_array[1] - mat.E1_array[0],
+        "a0x": calibration['a00'],
+        "a1x": calibration['a01'],
         "a2x": 0,
-        "a0y": mat.E0_array[0],
-        "a1y": mat.E0_array[1] - mat.E0_array[0],
+        "a0y": calibration['a10'],
+        "a1y": calibration['a11'],
         "a2y": 0
     }
     # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
@@ -99,16 +100,16 @@ def mama_write(mat, filename, comment=""):
         ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
-        mat.matrix.shape[1] - 1, mat.matrix.shape[0] - 1)
-    header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (mat.matrix.shape[1] - 1,
-                                                  mat.matrix.shape[0] - 1)
+        mat.shape[1] - 1, mat.shape[0] - 1)
+    header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (mat.shape[1] - 1,
+                                                  mat.shape[0] - 1)
 
     footer_string = "!IDEND=\n"
 
     # Write matrix:
     np.savetxt(
         filename,
-        mat.matrix,
+        mat.values,
         fmt="%-17.8E",
         delimiter=" ",
         newline="\n",
