@@ -31,22 +31,10 @@ import matplotlib.pyplot as plt
 import warnings
 from matplotlib.colors import LogNorm, Normalize
 from typing import Dict, Iterable, Any, Union, Tuple
-from enum import Enum, unique
+from enum import IntEnum
+from .matrixstate import MatrixState
 from .library import (mama_read, mama_write, div0, fill_negative)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
-
-
-@unique
-class MatrixState(Enum):
-    """ Simple enumeration to keep track of matrix states """
-    RAW = 1
-    UNFOLDED = 2
-    FIRST_GENERATION = 3
-    STD = 4
-
-    def __str__(self):
-        return {1: 'Raw', 2: 'Unfolded', 3: 'First Generation',
-                4: 'Standard Deviation'}[self.value]
 
 
 class Matrix():
@@ -85,30 +73,36 @@ class Matrix():
         Ex: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
-    TODO: Find a way to handle units
+        mask: A boolean array for cutting the array
+    TODO:
+        * Find a way to handle units
+        * Synchronize cuts. When a cut is made along one axis,
+          such as values[min:max, :] = 0, make cuts to the
+          other relevant variables
     """
     def __init__(self, values: np.ndarray = None,
                  Eg: np.ndarray = None,
                  Ex: np.ndarray = None,
                  std: np.ndarray = None,
-                 filename: str = None):
+                 filename: str = None,
+                 state: Union[str, MatrixState] = 'raw'):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
         It can be filled later using the load() method.
         """
 
-        # Fill class variables:
         self.values: np.ndarray = values
         self.Eg: np.ndarray = Eg
         self.Ex: np.ndarray = Ex
-        self.std: np.ndarray = std  # slot for matrix of standard deviations
+        self.std: np.ndarray = std
 
         if filename is not None:
             self.load(filename)
         self.verify_integrity()
 
-        self.state = MatrixState.RAW
+        self.state = state
+        self.mask = None
 
     def verify_integrity(self):
         """ Runs checks to verify internal structure
@@ -120,19 +114,19 @@ class Matrix():
             return
 
         # Check shapes:
-        mshape = self.values.shape
+        shape = self.values.shape
         if self.Ex is not None:
-            if mshape[0] != len(self.Ex):
+            if shape[0] != len(self.Ex):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
-                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Ex)}"))
         if self.Eg is not None:
-            if mshape[1] != len(self.Eg):
+            if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
-                                  f" (_{mshape[0]}_, {mshape[1]}) ≠ "
+                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Eg)}"))
         if self.std is not None:
-            if mshape != self.std.shape:
+            if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
 
     def load(self, filename: str):
@@ -187,24 +181,22 @@ class Matrix():
             The ax used for plotting
         Raises:
             ValueError: If zscale is unsupported
-        TODO: Add fancy 3D histogram
         """
-        if ax is None:
-            fig, ax = plt.subplots()
+        fig, ax = plt.subplots() if ax is None else (None, ax)
         if zscale == 'log':
             norm = LogNorm(vmin=zmin, vmax=zmax)
         elif zscale == 'linear':
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-        lines = ax.pcolormesh(self.Eg, self.Ex, self.values,
-                              norm=norm)
+        lines = ax.pcolormesh(self.Eg, self.Ex, self.values, norm=norm)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
-        cbar = fig.colorbar(lines, ax=ax)
-        cbar.ax.set_ylabel("# counts")
-        plt.show()
+        if fig is not None:
+            cbar = fig.colorbar(lines, ax=ax)
+            cbar.ax.set_ylabel("# counts")
+            plt.show()
         return ax
 
     def plot_projection(self, axis: int, Emin: float = None,
@@ -271,9 +263,8 @@ class Matrix():
         """
         mama_write(self, fname, comment="Made by Oslo Method Python")
 
-    def cut_rect(self, axis: Union[int, str],
-                 limits: Iterable[float],
-                 inplace: bool = True) -> Any:
+    def cut(self, axis: Union[int, str], limits: Iterable[float],
+            inplace: bool = True) -> Any:
         """Cuts the matrix to the sub-interval limits along given axis.
 
         Args:
@@ -295,38 +286,47 @@ class Matrix():
             iE_min, iE_max = self.indices_Eg(limits)
             values_cut = self.values[:, iE_min:iE_max]
             E_cut = self.Eg[iE_min:iE_max]
+            mask_cut = self.mask[:, iE_min:iE_max]
             if inplace:
                 self.values = values_cut
                 self.Eg = E_cut
+                self.mask = mask_cut
             else:
                 out = Matrix(values_cut, E_cut, self.Ex)
+                out.mask = mask_cut
 
         elif axis == 1:
             iE_min, iE_max = self.indices_Ex(limits)
             values_cut = self.values[iE_min:iE_max, :]
             E_cut = self.Ex[iE_min:iE_max]
+            mask_cut = self.mask[iE_min:iE_max, :]
             if inplace:
                 self.values = values_cut
                 self.Ex = E_cut
+                self.mask = mask_cut
             else:
                 out = Matrix(values_cut, self.Eg, E_cut)
+                out.mask = mask_cut
+
         elif axis == 2:
             iEg_min, iEg_max = self.indices_Eg(limits[:2])
             iEx_min, iEx_max = self.indices_Ex(limits[2:])
             values_cut = self.values[iEx_min:iEx_max, iEg_min:iEg_max]
             Eg_cut = self.Eg[iEg_min:iEg_max]
             Ex_cut = self.Ex[iEx_min:iEx_max]
+            mask_cut = self.mask[iEx_min:iEx_max, iEg_min:iEg_max]
             if inplace:
                 self.values = values_cut
                 self.Eg = Eg_cut
                 self.Ex = Ex_cut
+                self.mask = mask_cut
             else:
                 out = Matrix(values_cut, Eg_cut, Ex_cut)
+                out.mask = mask_cut
 
         return out
 
-    def cut_diagonal(self, E1: Iterable[float],
-                     E2: Iterable[float]):
+    def cut_diagonal(self, E1: Iterable[float], E2: Iterable[float]):
         """Cut away counts to the right of a diagonal line defined by indices
 
         Args:
@@ -335,7 +335,8 @@ class Matrix():
         Returns:
             The matrix with counts above diagonal removed
         """
-        self.values[self.line_mask(E1, E2)] = 0
+        self.mask = self.line_mask(E1, E2)
+        self.values[self.mask] = 0.0
 
     def line_mask(self, E1: Iterable[float],
                   E2: Iterable[float]) -> np.ndarray:
@@ -444,6 +445,27 @@ class Matrix():
     @property
     def shape(self) -> Tuple[int]:
         return self.values.shape
+
+    @property
+    def state(self) -> MatrixState:
+        return self._state
+
+    @state.setter
+    def state(self, state: Union[str, MatrixState]) -> None:
+        if isinstance(state, str):
+            self._state = MatrixState.str_to_state(state)
+        # Buggy. Impossible to compare type of Enum??
+        elif type(state) == type(MatrixState.RAW):
+            self._state = state
+        else:
+            raise ValueError(f"state must be str or MatrixState"
+                             f". Got {type(state)}")
+
+    def __getitem__(self, key):
+        return self.values.__getitem__(key)
+
+    def __setitem__(self, key, item):
+        return self.values.__setitem__(key, item)
 
 
 def axis_toint(axis: Any) -> int:

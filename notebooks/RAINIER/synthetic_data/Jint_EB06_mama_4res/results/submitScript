@@ -1,0 +1,44 @@
+#!/bin/bash
+#SBATCH --account=nn9464k
+#SBATCH --job-name=RAINIERiterations
+#SBATCH --time=10:00:0
+##SBATCH --mem-per-cpu=500 #Mb
+##-----#SBATCH --mail-type=END
+#SBATCH --mail-type=ALL
+#SBATCH --qos=preproc
+# Number of cores:
+#SBATCH --ntasks-per-node=1 --cpus-per-task=32
+##SBATCH --nodes=1
+
+## Set up job environment:
+#source /cluster/bin/jobsetup
+module restore system   # clear any inherited modules
+#source activate testenv
+#module load gcc/4.8.2
+#module load openmpi.gnu/1.8.3
+#module load gcc/4.9.2
+#export ATLAS_LOCAL_ROOT_BASE=/cvmfs/atlas.cern.ch/repo/ATLASLocalRootBase
+#alias setupATLAS='source ${ATLAS_LOCAL_ROOT_BASE}/user/atlasLocalSetup.sh'
+#setupATLAS
+#lsetup root
+#module load openmpi.gnu/2.1.0
+module load ROOT/6.12.06-intel-2018a-Python-2.7.14
+module list
+#RAINIER_PATH=/usit/abel/u1/fabiobz/RAINIER/
+export RAINIER_PATH=/cluster/home/fabiobz/RAINIER/
+
+
+set -o errexit # exit on errors
+
+#CODEDIR=$SUBMITDIR/
+#CODEDIRTOT=$RAINIER_PATH/$CODEDIR/
+
+cp -r $SUBMITDIR/* $SCRATCH/
+mkdir -p $SUBMITDIR/results
+
+cleanup "cp -r $SCRATCH/* $SUBMITDIR/results/"
+cd $SCRATCH
+bash $RAINIER_PATH/runParallelRAINIER.sh
+#bash $RAINIER_PATH/runRAINIER.sh
+
+
