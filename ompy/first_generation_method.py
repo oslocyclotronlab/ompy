@@ -401,5 +401,9 @@ def first_generation_method(matrix_in,
     # END DEBUG
 
     firstgen = Matrix(values=H, Eg=Egamma_array, Ex=Ex_array)
-    firstgen.state = MatrixState.FIRST_GENERATION
+    firstgen.state = "firstgen"
+
+    # These two lines feel out of place
+    firstgen.fill_negative(window_size=10)
+    firstgen.remove_negative()
     return firstgen

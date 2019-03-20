@@ -31,7 +31,8 @@ import logging
 import warnings
 from typing import Iterable
 from .library import div0
-from .matrix import Matrix, MatrixState
+from .matrix import Matrix
+from .matrixstate import MatrixState
 from scipy.ndimage import gaussian_filter1d
 from copy import copy
 
@@ -58,17 +59,20 @@ class Unfolder:
     until fⁱ≈r.
 
     Attributes:
-        raw Matrix: The Matrix to unfold
-        num_iter int: The number of iterations to perform
-        Ex_min float: The lower Ex limit on the energy trapezoidal cut
-        Ex_max float: The upper Ex limit on the energy trapezoidal cut
-        Eg_min float: The lower Eg limit on the energy trapezoidal cut
-        Eg_max float: The upper Eg limit on the energy trapezoidal cut
-        mask boolean ndarray: Masks everything below the diagonal to false
-        r Matrix: The trapezoidal cut raw Matrix
-        R Matrix: The response matrix
-        weight_fluctuation float:
-        minimum_iterations int:
+        raw (Matrix): The Matrix to unfold
+        num_iter (int): The number of iterations to perform
+        Ex_min (float): The lower Ex limit on the energy trapezoidal cut
+        Ex_max (float): The upper Ex limit on the energy trapezoidal cut
+        Eg_min (float): The lower Eg limit on the energy trapezoidal cut
+        Eg_max (float): The upper Eg limit on the energy trapezoidal cut
+        mask (boolean ndarray): Masks everything below the diagonal to false
+        r (Matrix): The trapezoidal cut raw Matrix
+        R (Matrix): The response matrix
+        weight_fluctuation (float):
+        minimum_iterations (int):
+        mask_points (Tuple[Tuple[Float, Float]]): Two points of form
+            (Eg, Ex) for cutting the diagonal of the matrix. Used for
+             creating self.mask.
 
     """
     def __init__(self):
@@ -83,6 +87,9 @@ class Unfolder:
             - Fix the compton subtraction method implementation.
         """
         self.num_iter: int = 33
+        self.weight_fluctuation = 0.2
+        self.minimum_iterations = 3
+        self.mask_points = None
 
         # Used by properties to update Ex and Eg
         self._Ex_min: float = None
@@ -93,6 +100,10 @@ class Unfolder:
     def update_values(self):
         """Verify internal consistency and set default values
 
+        Raises:
+            AssertionError: If the raw matrix and response matrix
+                have different calibration coefficients a10 and a11.
+            AttributeError: If no diagonal cut has been made.
         """
         # Ensure that the given matrix is in fact raw
         if self.raw.state != MatrixState.RAW:
@@ -109,10 +120,6 @@ class Unfolder:
                                   f"{calibration_diff}"
                                   "\nEnsure that the raw matrix and"
                                   " calibration matrix are cut equally."))
-
-        # If energy limits are not provided, use extremal array values:
-        if self.mask_E1 is None:
-            raise ValueError("Call cut_diagonal() before unfolding")
 
         LOG.debug(("Using energy values:"
                    f"\nEg_min: {self.Eg_min}"
@@ -132,7 +139,12 @@ class Unfolder:
         Egslice = slice(iEg_min, iEg_max+1)
         Exslice = slice(iEx_min, iEx_max+1)
 
-        self.mask = self.raw.line_mask(self.mask_E1, self.mask_E2)
+        if self.mask_points is not None:
+            self.mask = self.raw.line_mask(*self.mask_points)
+        elif self.raw.mask is not None:
+            self.mask = self.raw.mask
+        else:
+            raise AttributeError("Call cut_diagonal() before unfolding")
 
         self.r = self.raw.values[Exslice, Egslice]
         self.mask = self.mask[Exslice, Egslice]
@@ -144,17 +156,22 @@ class Unfolder:
         LOG.debug((f"Cutting matrix from {self.raw.shape}"
                    f" to {self.r.shape}"))
 
-    def load_response(self, filename: str):
+    def load_response(self, filename: str) -> None:
+        """Load the response matrix
+
+        Args:
+            filename: The path to the response matrix
+        """
         response = Matrix(filename=filename)
         self.R = response.values
         self.R_calibration_array = response.calibration_array()
 
-        self.weight_fluctuation = 0.2
-        self.minimum_iterations = 3
-
     def cut_diagonal(self, E1: Iterable[float], E2: Iterable[float]):
-        self.mask_E1 = E1
-        self.mask_E2 = E2
+        """Diagonal cut to be applied to the matrix
+
+        TODO: Copy the cut if pre-existent on the raw matrix.
+        """
+        self.mask_points = (E1, E2)
 
     def unfold(self, raw: Matrix) -> np.ndarray:
         """Run unfolding
@@ -192,7 +209,11 @@ class Unfolder:
 
         unfolded[self.mask] = 0
         unfolded = Matrix(unfolded, Eg=self.Eg, Ex=self.Ex)
-        unfolded.state = MatrixState.UNFOLDED
+        unfolded.state = "unfolded"
+
+        # These two lines feel out of place
+        unfolded.fill_negative(window_size=10)
+        unfolded.remove_negative()
         return unfolded
 
     def unfold_step(self, unfolded, folded, step):
