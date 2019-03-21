@@ -66,6 +66,8 @@ class Ensemble:
         self.save_path: str = save_path
         self.unfolder: Unfolder = None
         self.first_generation_method: Callable = None
+        if not os.path.exists(self.save_path):
+            os.mkdir(self.save_path)
 
     def save(self, matrix: Matrix, name: str):
         """Save the matrix to the save folder
@@ -74,9 +76,6 @@ class Ensemble:
             matrix: The matrix to save
             name: The name of the file relative to self.save_path
         """
-        if not os.path.exists(self.save_path):
-            os.mkdir(self.save_path)
-
         path = os.path.join(self.save_path, name)
         matrix.save(path)
 
