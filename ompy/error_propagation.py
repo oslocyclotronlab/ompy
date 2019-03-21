@@ -190,12 +190,12 @@ class ErrorPropagation:
 
         # Allocate a cube array to store all ensemble members. We need them to make the std matrix.
         raw_ensemble = np.zeros((N_ensemble_members,
-                                matrix_analysis.raw.values.shape[1])
-                                matrix_analysis.raw.values.shape[0],
+                                matrix_analysis.raw.values.shape[1],
+                                matrix_analysis.raw.values.shape[0])
                                 )
         unfolded_ensemble = np.zeros((N_ensemble_members,
-                                      matrix_analysis.unfolded.values.shape[1])
-                                      matrix_analysis.unfolded.values.shape[0],
+                                      matrix_analysis.unfolded.values.shape[1],
+                                      matrix_analysis.unfolded.values.shape[0])
                                      )
         firstgen_ensemble = np.zeros((N_ensemble_members,
                                       matrix_analysis.firstgen.values.shape[0],
@@ -326,7 +326,7 @@ class ErrorPropagation:
         # raw:
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         std_raw = Matrix(raw_ensemble_std,
-                         matrix_analysis.raw.Eg
+                         matrix_analysis.raw.Eg,
                          matrix_analysis.raw.Ex,
                          )
         fname_raw_std = os.path.join(folder, "raw_std.m")
@@ -334,7 +334,7 @@ class ErrorPropagation:
         # unfolded:
         unfolded_ensemble_std = np.std(unfolded_ensemble, axis=0)
         std_unfolded = Matrix(unfolded_ensemble_std,
-                         matrix_analysis.unfolded.Eg
+                         matrix_analysis.unfolded.Eg,
                          matrix_analysis.unfolded.Ex,
                          )
         fname_unfolded_std = os.path.join(folder, "unfolded_std.m")
@@ -342,7 +342,7 @@ class ErrorPropagation:
         # firstgen:
         firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
         std_firstgen = Matrix(firstgen_ensemble_std,
-                              matrix_analysis.firstgen.Eg
+                              matrix_analysis.firstgen.Eg,
                               matrix_analysis.firstgen.Ex,
                               )
         fname_firstgen_std = os.path.join(folder, "firstgen_std.m")
