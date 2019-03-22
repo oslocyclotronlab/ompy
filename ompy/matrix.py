@@ -500,15 +500,15 @@ def axis_toint(axis: Any) -> int:
 
 
 class Vector():
-    def __init__(self, vector=None, E_array=None):
-        self.vector = vector
+    def __init__(self, values=None, E_array=None):
+        self.values = values
         self.E_array = E_array
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
         """
         calibration = None
-        if (self.vector is not None and self.E_array is not None):
+        if (self.values is not None and self.E_array is not None):
             calibration = {
                            # Formatted as "a{axis}{power of E}"
                            "a0": self.E_array[0],
@@ -518,6 +518,20 @@ class Vector():
             raise RuntimeError("calibration() called on empty Vector instance")
         return calibration
 
+    def transform(self, const=1, alpha=0, inplace=False):
+        """
+        Return a transformed version of the vector:
+        vector -> const * vector * exp(alpha*E_array)
+        """
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        vector_transformed = (const * self.values
+                              * np.exp(alpha*E_array_midbin)
+                              )
+        if inplace:
+            self.values = vector_transformed
+        else:
+            return Vector(E_array=self.E_array, values=vector_transformed)
+
     def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
              title=None, label=None):
         if ax is None:
@@ -526,9 +540,9 @@ class Vector():
         # Plot with middle-bin energy values:
         E_array_midbin = self.E_array + self.calibration()["a1"]/2
         if label is None:
-            ax.plot(E_array_midbin, self.vector)
+            ax.plot(E_array_midbin, self.values)
         elif isinstance(label, str):
-            ax.plot(E_array_midbin, self.vector, label=label)
+            ax.plot(E_array_midbin, self.values, label=label)
         else:
             raise ValueError("Keyword label must be None or string, but is",
                              label)
@@ -559,17 +573,3 @@ class Vector():
         raise NotImplementedError("Not implemented yet")
 
         return None
-
-    def transform(self, const=1, alpha=0, implicit=False):
-        """
-        Return a transformed version of the vector:
-        vector -> const * vector * exp(alpha*E_array)
-        """
-        E_array_midbin = self.E_array + self.calibration()["a1"]/2
-        vector_transformed = (const * self.vector
-                              * np.exp(alpha*E_array_midbin)
-                              )
-        if implicit:
-            self.vector = vector_transformed
-        else:
-            return vector_transformed

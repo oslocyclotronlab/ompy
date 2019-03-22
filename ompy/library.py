@@ -425,3 +425,43 @@ def line(x, points):
     a = (points[3]-points[1])/float(points[2]-points[0])
     b = points[1] - a*points[0]
     return a*x + b
+
+
+def log_interp1d(xx, yy, **kwargs):
+    """ Interpolate a 1-D function.logarithmically """
+    logy = np.log(yy)
+    lin_interp = interp1d(xx, logy, kind='linear', **kwargs)
+    log_interp = lambda zz: np.exp(lin_interp(zz))
+    return log_interp
+
+
+def call_model(fun,pars,pars_req):
+    """ Call `fun` and check if all required parameters are provided """
+
+    # Check if required parameters are a subset of all pars given
+    if pars_req <= set(pars):
+        return fun(**pars)
+    else:
+        raise TypeError("Error: Need following arguments for this method: {0}".format(pars_req))
+
+
+def get_discretes(Emids, fname, resolution=0.1):
+    """ Get discrete levels, and smooth by some resolution [MeV]
+    and the bins centers [MeV]
+    For now: Assume linear binning """
+    energies = np.loadtxt(fname)
+    energies /= 1e3  # convert to MeV
+
+    # Emax = energies[-1]
+    # nbins = int(np.ceil(Emax/binsize))
+    # bins = np.linspace(0,Emax,nbins+1)
+    binsize = Emids[1] - Emids[0]
+    bin_edges = np.append(Emids, Emids[-1] + binsize)
+    bin_edges -= binsize / 2
+
+    hist, _ = np.histogram(energies, bins=bin_edges)
+    hist = hist.astype(float) / binsize  # convert to levels/MeV
+
+    from scipy.ndimage import gaussian_filter1d
+    hist_smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
+    return hist_smoothed, hist
