@@ -98,7 +98,7 @@ def first_generation_method(matrix_in,
     # Ex_max = 7500 # keV - maximum excitation energy
     # Ex_min = 300 # keV - minimal excitation energy, effectively moving
     # the ground-state energy up because we cannot resolve the low-energy
-    # yrast gamma lines. This is weighed up by also using an effective 
+    # yrast gamma lines. This is weighed up by also using an effective
     # multiplicity which is lower than the real one, again not considering
     # the low-energy yrast gammas.
     # dE_gamma = 500  # keV - allow gamma energy to exceed excitation energy
