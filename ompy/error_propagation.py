@@ -63,21 +63,21 @@ class ErrorPropagation:
         # which must be there).
 
         # Raw:
-        if self.matrix_analysis.raw.matrix is None:
+        if self.matrix_analysis.raw.values is None:
             raise Exception("Error: No raw matrix passed to ErrorPropagation.")
         else:
             self.matrix_analysis.raw.save(
                 os.path.join(folder, "raw-orig.m")
                 )
         # Unfolded:
-        if self.matrix_analysis.unfolded.matrix is None:
+        if self.matrix_analysis.unfolded.values is None:
             self.matrix_analysis.unfold()
         else:
             self.matrix_analysis.unfolded.save(
                 os.path.join(folder, "unfolded-orig.m")
                 )
         # First generation
-        if self.matrix_analysis.firstgen.matrix is None:
+        if self.matrix_analysis.firstgen.values is None:
             self.matrix_analysis.first_generation_method()
         else:
             self.matrix_analysis.firstgen.save(
@@ -140,7 +140,7 @@ class ErrorPropagation:
         #     if verbose:
         #         print("unfolded_orig.shape =", unfolded_orig.shape, flush=True)
 
-        # # === Extract first generation spectrum ===: 
+        # # === Extract first generation spectrum ===:
         # Ex_max = 12000 # keV - maximum excitation energy
         # dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
         # # N_Exbins = 300
@@ -190,16 +190,16 @@ class ErrorPropagation:
 
         # Allocate a cube array to store all ensemble members. We need them to make the std matrix.
         raw_ensemble = np.zeros((N_ensemble_members,
-                                matrix_analysis.raw.matrix.shape[0],
-                                matrix_analysis.raw.matrix.shape[1])
+                                matrix_analysis.raw.values.shape[1],
+                                matrix_analysis.raw.values.shape[0])
                                 )
         unfolded_ensemble = np.zeros((N_ensemble_members,
-                                      matrix_analysis.unfolded.matrix.shape[0],
-                                      matrix_analysis.unfolded.matrix.shape[1])
+                                      matrix_analysis.unfolded.values.shape[1],
+                                      matrix_analysis.unfolded.values.shape[0])
                                      )
         firstgen_ensemble = np.zeros((N_ensemble_members,
-                                      matrix_analysis.firstgen.matrix.shape[0],
-                                      matrix_analysis.firstgen.matrix.shape[1])
+                                      matrix_analysis.firstgen.values.shape[0],
+                                      matrix_analysis.firstgen.values.shape[1])
                                      )
 
         # Loop over and generate the random perturbations, then unfold and
@@ -226,11 +226,11 @@ class ErrorPropagation:
                     # Assuming sigma \approx sqrt(n) where n is number of
                     # counts in bin.
                     matrix_perturbed = np.random.normal(
-                            size=matrix_analysis.raw.matrix.shape,
-                            loc=matrix_analysis.raw.matrix,
+                            size=matrix_analysis.raw.values.shape,
+                            loc=matrix_analysis.raw.values,
                             scale=np.sqrt(np.where(
-                                matrix_analysis.raw.matrix > 0,
-                                matrix_analysis.raw.matrix, 0)
+                                matrix_analysis.raw.values > 0,
+                                matrix_analysis.raw.values, 0)
                                                    )
                                                         )
                     matrix_perturbed[matrix_perturbed < 0] = 0
@@ -239,8 +239,8 @@ class ErrorPropagation:
                     # distribution at each bin, and draw a completely new matrix:
                     matrix_perturbed = np.random.poisson(
                                         np.where(
-                                            matrix_analysis.raw.matrix > 0,
-                                            matrix_analysis.raw.matrix, 0
+                                            matrix_analysis.raw.values > 0,
+                                            matrix_analysis.raw.values, 0
                                                 )
                                                         )
                 else:
@@ -250,13 +250,13 @@ class ErrorPropagation:
 
                 # Update the "raw" member of ma_curr:
                 ma_curr.raw = Matrix(matrix_perturbed,
-                                     matrix_analysis.raw.E0_array,
-                                     matrix_analysis.raw.E1_array)
+                                     matrix_analysis.raw.Eg,
+                                     matrix_analysis.raw.Ex)
                 # Save ensemble member to disk:
                 ma_curr.raw.save(fname_raw_current)
 
             # Store raw ensemble member in memory:
-            raw_ensemble[i, :, :] = ma_curr.raw.matrix
+            raw_ensemble[i, :, :] = ma_curr.raw.values
 
                 # if verbose:
                     # print("data_raw_ensemblemember.shape =", data_raw_ensemblemember.shape, flush=True)
@@ -281,7 +281,7 @@ class ErrorPropagation:
                     # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
 
             # Store unfolded ensemble member in memory:
-            unfolded_ensemble[i, :, :] = ma_curr.unfolded.matrix
+            unfolded_ensemble[i, :, :] = ma_curr.unfolded.values
 
             # === Extract first generation spectrum ===:
             # Ex_max = 12000 # keV - maximum excitation energy
@@ -305,7 +305,7 @@ class ErrorPropagation:
                 ma_curr.first_generation_method()
                 ma_curr.firstgen.save(fname_firstgen_current)
 
-            firstgen_ensemble[i, :, :] = ma_curr.firstgen.matrix
+            firstgen_ensemble[i, :, :] = ma_curr.firstgen.values
 
 
             # TESTING: Plot ensemble of first-gen matrices:
@@ -326,24 +326,24 @@ class ErrorPropagation:
         # raw:
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         std_raw = Matrix(raw_ensemble_std,
-                         matrix_analysis.raw.E0_array,
-                         matrix_analysis.raw.E1_array
+                         matrix_analysis.raw.Eg,
+                         matrix_analysis.raw.Ex,
                          )
         fname_raw_std = os.path.join(folder, "raw_std.m")
         std_raw.save(fname_raw_std)
         # unfolded:
         unfolded_ensemble_std = np.std(unfolded_ensemble, axis=0)
         std_unfolded = Matrix(unfolded_ensemble_std,
-                         matrix_analysis.unfolded.E0_array,
-                         matrix_analysis.unfolded.E1_array
+                         matrix_analysis.unfolded.Eg,
+                         matrix_analysis.unfolded.Ex,
                          )
         fname_unfolded_std = os.path.join(folder, "unfolded_std.m")
         std_unfolded.save(fname_unfolded_std)
         # firstgen:
         firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
         std_firstgen = Matrix(firstgen_ensemble_std,
-                              matrix_analysis.firstgen.E0_array,
-                              matrix_analysis.firstgen.E1_array
+                              matrix_analysis.firstgen.Eg,
+                              matrix_analysis.firstgen.Ex,
                               )
         fname_firstgen_std = os.path.join(folder, "firstgen_std.m")
         std_firstgen.save(fname_firstgen_std)

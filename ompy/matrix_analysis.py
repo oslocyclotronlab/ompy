@@ -89,7 +89,7 @@ class MatrixAnalysis():
             raise RuntimeError("Error: No raw matrix is loaded.")
 
         if fname_resp_mat is None or fname_resp_dat is None:
-            # if self.response.matrix is None:
+            # if self.response.values is None:
             if (self.unfold_fname_resp_mat is None
                     or self.unfold_fname_resp_dat is None):
 
