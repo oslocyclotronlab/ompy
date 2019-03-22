@@ -31,7 +31,7 @@ from .matrix import Matrix
 import os
 import numpy as np
 import logging
-from typing import Callable, Union
+from typing import Callable, Union, List
 from .unfolder import Unfolder
 
 LOG = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ class Ensemble:
         self.save_path: str = save_path
         self.unfolder: Unfolder = None
         self.first_generation_method: Callable = None
+        self.size = 0
         if not os.path.exists(self.save_path):
             os.mkdir(self.save_path)
 
@@ -84,7 +85,7 @@ class Ensemble:
             regenerate: Whether to use already generated files (False) or
                 generate them all anew (True).
         """
-
+        self.size = number
         self.regenerate = regenerate
         raw_ensemble = np.zeros((number, *self.raw.shape))
         unfolded_ensemble = np.zeros_like(raw_ensemble)
@@ -124,6 +125,8 @@ class Ensemble:
         self.std_unfolded = unfolded_std
         self.std_firstgen = firstgen_std
 
+        self.raw_ensemble = raw_ensemble
+        self.unfolded_ensemble = unfolded_ensemble
         self.firstgen_ensemble = firstgen_ensemble
 
     def generate_raw(self, step: int, method: str) -> Matrix:
@@ -233,3 +236,71 @@ class Ensemble:
         if os.path.isfile(path) and not self.regenerate:
             LOG.debug(f"Loading {path}")
             return Matrix(filename=path)
+
+    def get_raw(self, index: Union[int, List[int]]) -> Union[Matrix,
+                                                             List[Matrix]]:
+        """Get the raw matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.raw_ensemble[i], self.raw.Eg,
+                                       self.raw.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.raw_ensemble[index], self.raw.Eg,
+                      self.raw.Ex)
+
+    def get_unfolded(self,
+                     index: Union[int, List[int]]) -> Union[Matrix,
+                                                            List[Matrix]]:
+        """Get the unfolded matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.unfolded_ensemble[i], self.raw.Eg,
+                                       self.raw.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.unfolded_ensemble[index], self.raw.Eg,
+                      self.raw.Ex, state='unfolded')
+
+    def get_firstgen(self,
+                     index: Union[int, List[int]]) -> Union[Matrix,
+                                                            List[Matrix]]:
+        """Get the first generation matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.firstgen_ensemble[i],
+                                       self.firstgen.Eg,
+                                       self.firstgen.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.firstgen_ensemble[index],
+                      self.firstgen.Eg,
+                      self.firstgen.Ex, state='firstgen')
