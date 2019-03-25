@@ -212,8 +212,8 @@ class Unfolder:
         unfolded.state = "unfolded"
 
         # These two lines feel out of place
-        unfolded.fill_negative(window_size=10)
-        unfolded.remove_negative()
+        # unfolded.fill_negative(window_size=10)
+        # unfolded.remove_negative()
         return unfolded
 
     def unfold_step(self, unfolded, folded, step):
