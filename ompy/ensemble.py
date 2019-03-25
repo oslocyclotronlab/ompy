@@ -92,7 +92,9 @@ class Ensemble:
         firstgen_ensemble = np.zeros_like(raw_ensemble)
 
         for step in range(number):
+            LOG.info(f"Generating {step}")
             raw = self.generate_raw(step, method)
+            # raw = self.raw
             unfolded = self.unfold(step, raw)
             firstgen = self.first_generation(step, unfolded)
 
@@ -140,7 +142,7 @@ class Ensemble:
         Returns:
             The generated matrix
         """
-        LOG.info(f"Generating raw ensemble {step}")
+        LOG.debug(f"Generating raw ensemble {step}")
         path = os.path.join(self.save_path, f"raw_{step}.m")
         raw = self.load(path)
         if raw is None:
@@ -165,7 +167,7 @@ class Ensemble:
         Returns:
             The unfolded matrix
         """
-        LOG.info(f"Unfolding raw {step}")
+        LOG.debug(f"Unfolding raw {step}")
         path = os.path.join(self.save_path, f"unfolded_{step}.m")
         unfolded = self.load(path)
         if unfolded is None:
@@ -184,7 +186,7 @@ class Ensemble:
         Returns:
             The resulting matrix
         """
-        LOG.info(f"Performing first generation on unfolded {step}")
+        LOG.debug(f"Performing first generation on unfolded {step}")
         path = os.path.join(self.save_path, f"firstgen_{step}.m")
         firstgen = self.load(path)
         if firstgen is None:
@@ -211,7 +213,7 @@ class Ensemble:
         Returns:
             The resulting array
         """
-        std = np.sqrt(np.where(self.raw.values > 0, self.raw.values, 0))
+        std = np.where(self.raw.values > 0, self.raw.values, 0)
         perturbed = np.random.poisson(std)
         return perturbed
 
