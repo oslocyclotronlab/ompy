@@ -410,6 +410,11 @@ class Matrix():
     def remove_negative(self):
         self.values = np.where(self.values > 0, self.values, 0)
 
+    def fill_and_remove_negative(self):
+        """Temporary function to remove boilerplate"""
+        self.fill_negative(window_size=10)
+        self.remove_negative()
+
     def index_Eg(self, E: float) -> int:
         """ Returns the closest index corresponding to the Eg value """
         return np.abs(self.Eg - E).argmin()
@@ -554,3 +559,17 @@ class Vector():
         raise NotImplementedError("Not implemented yet")
 
         return None
+
+    def transform(self, const=1, alpha=0, implicit=False):
+        """
+        Return a transformed version of the vector:
+        vector -> const * vector * exp(alpha*E_array)
+        """
+        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        vector_transformed = (const * self.vector
+                              * np.exp(alpha*E_array_midbin)
+                              )
+        if implicit:
+            self.vector = vector_transformed
+        else:
+            return vector_transformed
