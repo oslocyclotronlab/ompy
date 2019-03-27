@@ -414,7 +414,7 @@ class NormGSF:
         return norm
 
 
-    def normalizeGSF(self, makePlot, interactive, gsf_referece=None):
+    def normalize_fixGg(self, makePlot, interactive, gsf_referece=None):
         """
         # normalize the gsf extracted with the Oslo method
         # to the average total radiative width <Gg>

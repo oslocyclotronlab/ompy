@@ -53,7 +53,7 @@ class NormNLD:
             pars_req = {"nldE1", "nldE2"}
             nld_norm, A_norm, alpha_norm = lib.call_model(
                 self.norm_2points, pnorm, pars_req)
-            nld_ext = self.extrapolate()
+            nld_ext = self.extrapolate(self.nldModel, self.pext)
             levels_smoothed, _ = self.get_discretes(
                 Emids=nld[:, 0], resolution=0.1)
             # TODO: FIX THIS!
@@ -72,6 +72,7 @@ class NormNLD:
             self.A_norm = popt["A"][0]
             self.alpha_norm = popt["alpha"][0]
             self.T = popt["T"][0]
+            self.multinest_samples = samples
             self.normalize_scanning_samples(popt, samples)
 
         else:
@@ -106,11 +107,9 @@ class NormNLD:
         nld_norm = nld * A * np.exp(alpha * Ex)
         return nld_norm, A, alpha
 
-    def extrapolate(self):
+    @staticmethod
+    def extrapolate(model, pars):
         """ Get Extrapolation values """
-
-        model = self.nldModel
-        pars = self.pext
 
         # Earr for extrapolation
         Earr = np.linspace(pars["ext_range"][0], pars["ext_range"][1], num=50)
@@ -123,9 +122,9 @@ class NormNLD:
         if model == "CT":
             pars_req = {"T", "Eshift"}
             if ("nld_Sn" in pars) and ("Eshift" in pars == False):
-                pars["Eshift"] = self.EshiftFromT(pars["T"], pars["nld_Sn"])
+                pars["Eshift"] = NormNLD.EshiftFromT(pars["T"], pars["nld_Sn"])
             pars["Earr"] = Earr
-            values = lib.call_model(self.CT, pars, pars_req)
+            values = lib.call_model(NormNLD.CT, pars, pars_req)
         else:
             raise TypeError(
                 "\nError: NLD model not supported; check spelling\n")
@@ -229,10 +228,10 @@ class NormNLD:
 
         # set extrapolation as the median values used
         self.pext["T"] = popt["T"][0]
-        nld_Sn = self.nldSn_from_D0(popt["D0"][0], **pspin)
+        self.pext["nld_Sn"] = self.nldSn_from_D0(popt["D0"][0], **pspin)
         self.pext["Eshift"] = self.EshiftFromT(popt["T"][0],
-                                               nld_Sn)
-        self.nld_ext = self.extrapolate()
+                                               self.pext["nld_Sn"])
+        self.nld_ext = self.extrapolate(self.nldModel, self.pext)
 
         return popt, samples
 
