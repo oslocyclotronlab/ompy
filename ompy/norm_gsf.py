@@ -4,6 +4,7 @@ Normalization of GSF with the Oslo method
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
+import scipy.stats as stats
 
 from .spinfunctions import SpinFunctions
 from . import library as lib
@@ -56,8 +57,10 @@ class NormGSF:
         self.gsf_in = self.transform(
             gsf, B=1, alpha=alpha_norm)  # shape corrected
         self.gsf = np.copy(self.gsf_in)
+        self.alpha_norm = alpha_norm
         self.method = method
-        self.J_target, self.D0, self.Gg = J_target, D0, Gg
+        self.J_target, self.D0 = J_target, D0
+        self.Gg = np.atleast_1d(Gg)
         self.Sn = Sn
 
         # define defaults
@@ -74,10 +77,7 @@ class NormGSF:
         self.ext_range = ext_range
         self.spincutModel = spincutModel
         self.spincutPars = spincutPars
-        # if extModel = None:
-        #     self.extModel = {"low": "exp_gsf", "high": "exp_trans"}
-        self.nld = nld
-        #self.nld = nld
+        self.nld_in = nld
         self.nld_ext = nld_ext
 
         # initial extrapolation
@@ -85,6 +85,82 @@ class NormGSF:
         self.gsf_ext_low = gsf_ext_low
         self.gsf_ext_high = gsf_ext_high
 
+    def normalize_fixGg(self):
+        """
+        Normalize the gsf extracted with the Oslo method
+        to the average total radiative width <Gg>
+        """
+        transform = self.transform
+
+        # "shape" - correction  of the transformation
+        gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
+        self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
+        norm = self.GetNormFromGgD0()
+        gsf = transform(self.gsf_in, B=norm, alpha=0)
+        gsf_ext_low = transform(gsf_ext_low, B=norm, alpha=0)
+        gsf_ext_high = transform(gsf_ext_high, B=norm, alpha=0)
+
+        self.gsf = gsf
+        self.gsf_ext_low = gsf_ext_low
+        self.gsf_ext_high = gsf_ext_high
+
+    def normalize_Gg_chi2(self, nld_ens, gsf_ens):
+        """
+        Test different normalization
+        """
+        assert self.gsf_in.shape[1] == 3, "Need correct gsf shape: (E,val,unc)"
+        #assert type(gsf_samples[0]) == ompy.matrix.Vector
+
+        Gg = self.Gg
+        D0 = self.D0
+        assert Gg.shape[0] == 2, "Gg doesn't have correct format"
+        assert D0.shape[0] == 2, "D0 doesn't have correct format"
+
+        transform = self.transform
+        N_samples = len(nld_ens)
+
+        # "shape" - correction  of the transformation
+        # gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
+        # self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
+
+        # determine uncertainty of the integral
+        # Note: we change the input nld and gsf (`gsf_in`,...),
+        # so we need to change it back at the end!
+        gsf = np.copy(self.gsf_in)
+        nld = np.copy(self.nld_in)
+        integral_arr = np.zeros(N_samples)
+        for i in range(N_samples):
+            gsf[:, 1] = gsf_ens[i].transform(alpha=self.alpha_norm).values
+            nld[:, 1] = nld_ens[i].values
+            norm, integral_arr[i] = self.GetNormFromGgD0(getIntegral=True,
+                                                         nld=nld, gsf=gsf)
+        integral_unc_rel = integral_arr.std()/integral_arr.mean()
+        # print(integral_unc_rel)
+        norm, integral = self.GetNormFromGgD0(getIntegral=True,
+                              nld=self.nld_in, gsf=self.gsf_in)
+        gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
+
+        sigma2_rel = (Gg[1]/Gg[0])**2 + (D0[1]/D0[0])**2 + integral_unc_rel**2
+        sigma_norm = np.sqrt(sigma2_rel) * norm
+
+        # unc. calc the lazy way: another MC loop
+        gsf_samples = []
+        for i in range(N_samples):
+            gsf[:, 1] = gsf_ens[i].values
+            norm_tmp = stats.norm.rvs(norm, sigma_norm)
+            gsf_samples.append(gsf_ens[i].transform(alpha=self.alpha_norm,
+                                                    const=norm_tmp))
+
+        gsf = transform(self.gsf_in, B=norm, alpha=0)
+        gsf[:,2] = np.std([vec.values for vec in gsf_samples], axis=0)
+        gsf_ext_low = transform(gsf_ext_low, B=norm, alpha=0)
+        gsf_ext_high = transform(gsf_ext_high, B=norm, alpha=0)
+
+        self.gsf = gsf
+        self.gsf_ext_low = gsf_ext_low
+        self.gsf_ext_high = gsf_ext_high
+
+        return norm, integral_arr
 
     @staticmethod
     def transform(gsf, B, alpha):
@@ -148,13 +224,15 @@ class NormGSF:
 
         return gsf_ext_low, gsf_ext_high
 
-    def fnld(self, E):
+    def fnld(self, E, nld=None, nld_ext=None):
         """ compose nld of data & extrapolation
 
         TODO: Implement uncertainties
         """
-        nld = self.nld
-        nld_ext = self.nld_ext
+        if nld is None:
+            nld = self.nld_in
+        if nld_ext is None:
+            nld_ext = self.nld_ext
         Earr = nld[:, 0]
         nld = nld[:, 1]
 
@@ -165,14 +243,19 @@ class NormGSF:
         funcs = [fexp, fext]
         return np.piecewise(E, conds, funcs)
 
-    def fgsf(self, E, gsf, gsf_ext_low, gsf_ext_high):
+    def fgsf(self, E, gsf=None, gsf_ext_low=None, gsf_ext_high=None):
         """ compose gsf of data & extrapolation
 
         TODO: Implement uncertainties
         """
         # gsf = self.gsf
-        # gsf_ext_low = self.gsf_ext_low
-        # gsf_ext_high = self.gsf_ext_high
+        if gsf is None:
+            gsf = self.gsf_in
+        if gsf_ext_low is None:
+            gsf_ext_low = self.gsf_ext_low
+        if gsf_ext_high is None:
+            gsf_ext_high = self.gsf_ext_high
+
         Earr = gsf[:, 0]
         gsf = gsf[:, 1]
 
@@ -189,7 +272,9 @@ class NormGSF:
                              model=self.spincutModel,
                              pars=self.spincutPars).distibution()
 
-    def GetNormFromGgD0(self):
+    def GetNormFromGgD0(self, getIntegral=False,
+                        nld=None, gsf=None,
+                        gsf_ext_low=None, gsf_ext_high=None):
         """
         Get the normaliation, see eg. eq (26) in Larsen2011;
         Note however, that we use gsf instead of T
@@ -199,6 +284,17 @@ class NormGSF:
         norm : float
             Absolute normalization constant by which we need to scale
             the non-normalized gsf, such that we get the correct <Gg>
+        integral : (optional) float
+            If `getIntegral=True`, returns the integral
+        nld : (optional)
+            The input nld to the integral for the chosen method
+        gsf : (optional)
+            The input gsf to the integral for the chosen method
+        gsf_ext_low : (optional) np.array
+            lower gsf extrapolation
+        gsf_ext_high : (optional) np.array
+            higher extrapolation
+
         """
         # setup of the integral (by summation)
         Eint_min = 0
@@ -210,14 +306,21 @@ class NormGSF:
         Eintegral, stepSize = np.linspace(Eint_min, Eint_max,
                                           num=Nsteps, retstep=True)
 
+        args = [Eintegral, stepSize, nld, gsf, gsf_ext_low, gsf_ext_high]
         if(self.method == "standard"):
-            norm = self.Gg_Norm_standard(Eintegral, stepSize)
+            norm, integral = self.Gg_Norm_standard(*args)
         elif(self.method == "test"):
-            norm = self.Gg_Norm_test(Eintegral, stepSize)
+            norm, integral = self.Gg_Norm_test(*args)
 
-        return norm
+        if getIntegral:
+            return norm, integral
+        else:
+            return norm
 
-    def Gg_Norm_standard(self, Eintegral, stepSize):
+    def Gg_Norm_standard(self, Eintegral, stepSize,
+                         nld=None, gsf=None,
+                         gsf_ext_low=None, gsf_ext_high=None,
+                         D0=None):
         """ Compute normalization from Gg integral, the "standard" way
 
         Equals "old" (normalization.f) version in the Spin sum
@@ -230,22 +333,51 @@ class NormGSF:
             (Center)bin of Ex enegeries for the integration
         stepSize : ndarray
             Step size for integration by summation
+        nld : (optional)
+            The input nld to the integral
+        gsf : (optional)
+            The input gsf to the integral
+        D0 : (optional)
+            D0 for the Gg integral
+        gsf_ext_low : (optional) np.array
+            lower gsf extrapolation
+        gsf_ext_high : (optional) np.array
+            higher extrapolation
 
         Returns:
         --------
         norm : float
             Absolute normalization constant
+        integral : float
+            Value of the Integral
         """
+        if nld is None:
+            nld = self.nld_in
+        if gsf is None:
+            gsf = self.gsf_in
+        if D0 is None:
+            D0 = self.D0
+        if gsf_ext_low is None:
+            gsf_ext_low = self.gsf_ext_low
+        if gsf_ext_high is None:
+            gsf_ext_high = self.gsf_ext_high
 
-        Gg, D0, J_target = self.Gg, self.D0, self.J_target
-        fnld = self.fnld
+        J_target = self.J_target
 
+        Gg = self.Gg
+        if Gg.shape[0] == 2:
+            Gg = Gg[0]
+        if D0.shape[0] == 2:
+            D0 = D0[0]
+
+        def fnld(E):
+            return self.fnld(E, nld)
         def fgsf(E):
-            return self.fgsf(E, self.gsf_in, self.gsf_ext_low,
-                             self.gsf_ext_high)
+            return self.fgsf(E, gsf, gsf_ext_low, gsf_ext_high)
+
         spin_dist = self.spin_dist
         # lowest energy of experimental nld points
-        Enld_exp_min = self.nld[0,0]
+        Enld_exp_min = self.nld_in[0,0]
         Sn = self.Sn
 
         def SpinSum(Ex, J_target):
@@ -291,11 +423,14 @@ class NormGSF:
         # factor of 2 because of equi-parity (we use total nld in the
         # integral above, instead of the "correct" nld per parity)
         # Units: G / (D) = meV / (eV*1e3) = 1
-        norm = 2 * Gg / (integral * D0 * 1e3)
-        return norm
+        integral /= 2
+        norm = Gg / (integral * D0 * 1e3)
+        return norm, integral
 
 
-    def Gg_Norm_test(self, Eintegral, stepSize):
+    def Gg_Norm_test(self, Eintegral, stepSize,
+                     nld=None, gsf=None, D0=None,
+                     gsf_ext_low=None, gsf_ext_high=None):
         """ Compute normalization from Gg integral, "test approach"
 
         Experimental new version of the spin sum and integration
@@ -308,23 +443,53 @@ class NormGSF:
             (Center)bin of Ex enegeries for the integration
         stepSize : ndarray
             Step size for integration by summation
+        nld : (optional)
+            The input nld to the integral
+        gsf : (optional)
+            The input gsf to the integral
+        D0 : (optional)
+            D0 for the Gg integral
+        gsf_ext_low : (optional) np.array
+            lower gsf extrapolation
+        gsf_ext_high : (optional) np.array
+            higher extrapolation
 
         Returns:
         --------
         norm : float
             Absolute normalization constant
+        integral : float
+            Value of the Integral
         """
+        if nld is None:
+            nld = self.nld_in
+        if gsf is None:
+            gsf = self.gsf_in
+        if gsf_ext_low is None:
+            gsf_ext_low = self.gsf_ext_low
+        if gsf_ext_high is None:
+            gsf_ext_high = self.gsf_ext_high
 
-        Gg, D0, J_target = self.Gg, self.D0, self.J_target
-        fnld = self.fnld
+        if D0 is None:
+            D0 = self.D0
+        Gg = self.Gg
+
+        if Gg.shape[0] == 2:
+            Gg = Gg[0]
+        if D0.shape[0] == 2:
+            D0 = D0[0]
+
+        def fnld(E):
+            return self.fnld(E, nld)
+        def fgsf(E):
+            return self.fgsf(E, gsf, gsf_ext_low, gsf_ext_high)
+
+        J_target = self.J_target
+
         spin_dist = self.spin_dist
         # lowest energy of experimental nld points
-        Enld_exp_min = self.nld[0,0]
+        Enld_exp_min = self.nld_in[0,0]
         Sn = self.Sn
-
-        def fgsf(E):
-            return self.fgsf(E, self.gsf_in,
-                             self.gsf_ext_low, self.gsf_ext_high)
 
         # input checks
         rho01plus = 1/2 * fnld(Sn) \
@@ -410,65 +575,49 @@ class NormGSF:
         # factor of 2 because of equi-parity (we use total nld in the
         # integral above, instead of the "correct" nld per parity)
         # Units: G / (integral) = meV / (MeV*1e9) = 1
-        norm = 2 * Gg / (integral * 1e9)
-        return norm
+        integral /= 2
+        norm = Gg / (integral * 1e9)
+        return norm, integral
 
-
-    def normalize_fixGg(self, makePlot, interactive, gsf_referece=None):
+    def plot(self, fig, ax, interactive=False, gsf_referece=None):
         """
-        # normalize the gsf extracted with the Oslo method
-        # to the average total radiative width <Gg>
-        # returns normalized GSF (L=1) from an input gamma-ray strength function gsf
+        Plot gsf, optinally: interactive renormalization
 
-        makePlot: bool
-            Plot the normalized gsf
-        interactive : bool
-            Create interactive plot to change the extraploation parameters
+        Note:
+        - To be interactive, the reference must be kept alive
+        - If interactive, include something like
+          `plt.subplots_adjust(left=0.25, bottom=0.35)`
+        Parameters:
+        fig, ax :
+            Matplotlib figure and axes
+        interactive : (bool)
+            Enable interactive renormalization according to the chosen
+            extrapolations
         gsf_referece : ndarray
             Refernce for plotting and normalization during code debugging
         """
-        # check input
-        if interactive:
-            assert interactive == makePlot
+        gsf = self.gsf
+        gsf_ext_low = self.gsf_ext_low
+        gsf_ext_high = self.gsf_ext_high
 
-        transform = self.transform
+        # gsf
+        [gsf_plot] = ax.plot(gsf[:,0], gsf[:,1], "o")
+        [gsf_ext_high_plt] = ax.plot(gsf_ext_high[:,0], gsf_ext_high[:,1],
+                                     "r--", label="ext. high")
+        [gsf_ext_low_plt] = ax.plot(gsf_ext_low[:,0], gsf_ext_low[:,1],
+                                    "b--", label="ext. high")
 
-        # "shape" - correction  of the transformation
-        gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
-        self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
-        norm = self.GetNormFromGgD0()
-        gsf = transform(self.gsf_in, B=norm, alpha=0)
-        gsf_ext_low = transform(gsf_ext_low, B=norm, alpha=0)
-        gsf_ext_high = transform(gsf_ext_high, B=norm, alpha=0)
+        Emin_low, Emax_low, Emin_high, Emax_high = self.ext_range
+        ax.set_xlim([Emin_low, Emax_high])
+        ax.set_yscale('log')
+        ax.set_xlabel(r"$E_\gamma \, \mathrm{(MeV)}$")
+        ax.set_ylabel(r'$gsf [MeV^-1]$')
 
-        self.gsf = gsf
-        self.gsf_ext_low = gsf_ext_low
-        self.gsf_ext_high = gsf_ext_high
+        ax.legend()
 
-        if makePlot:
-            fig, ax = plt.subplots()
-            plt.subplots_adjust(left=0.25, bottom=0.35)
-
-            # gsf
-            [gsf_plot] = ax.plot(gsf[:,0], gsf[:,1], "o")
-            [gsf_ext_high_plt] = ax.plot(gsf_ext_high[:,0], gsf_ext_high[:,1],
-                                         "r--", label="ext. high")
-            [gsf_ext_low_plt] = ax.plot(gsf_ext_low[:,0], gsf_ext_low[:,1],
-                                        "b--", label="ext. high")
-
-            Emin_low, Emax_low, Emin_high, Emax_high = self.ext_range
-            ax.set_xlim([Emin_low, Emax_high])
-            ax.set_yscale('log')
-            ax.set_xlabel(r"$E_\gamma \, \mathrm{(MeV)}$")
-            ax.set_ylabel(r'$gsf [MeV^-1]$')
-
-            legend = ax.legend()
-
-            # load referece gsf
-            if gsf_referece is not None:
-                ax.plot(gsf_referece[:, 0], gsf_referece[:, 1])
-            if not interactive:
-                plt.show()
+        # load referece gsf
+        if gsf_referece is not None:
+            ax.plot(gsf_referece[:, 0], gsf_referece[:, 1])
 
         if interactive:
             # Define an axes area and draw a slider in it
@@ -502,9 +651,9 @@ class NormGSF:
                 gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
                 self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
                 norm = self.GetNormFromGgD0()
-                gsf = transform(self.gsf_in, B=norm, alpha=0)
-                gsf_ext_low = transform(gsf_ext_low, B=norm, alpha=0)
-                gsf_ext_high = transform(gsf_ext_high, B=norm, alpha=0)
+                gsf = self.transform(self.gsf_in, B=norm, alpha=0)
+                gsf_ext_low = self.transform(gsf_ext_low, B=norm, alpha=0)
+                gsf_ext_high = self.transform(gsf_ext_high, B=norm, alpha=0)
 
                 self.gsf = gsf
                 self.gsf_ext_low = gsf_ext_low
@@ -520,15 +669,15 @@ class NormGSF:
             sext_c.on_changed(slider_update)
             sext_d.on_changed(slider_update)
 
+            # make button an attribute, such that it survives for interactive
+            # plot
             reset_ax = plt.axes([0.8, 0.025, 0.1, 0.04])
-            button = Button(reset_ax, 'Reset', color=axis_color,
-                            hovercolor='0.975')
+            self.button = Button(reset_ax, 'Reset', color=axis_color,
+                                 hovercolor='0.975')
 
             def reset(event):
                 sext_a.reset()
                 sext_b.reset()
                 sext_c.reset()
                 sext_d.reset()
-            button.on_clicked(reset)
-
-            plt.show()
+            self.button.on_clicked(reset)
