@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import scipy.stats as stats
 
+from .norm_nld import NormNLD
 from .spinfunctions import SpinFunctions
 from . import library as lib
 
@@ -139,6 +140,7 @@ class NormGSF:
         norm, integral = self.GetNormFromGgD0(getIntegral=True,
                               nld=self.nld_in, gsf=self.gsf_in)
         gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
+        print("modelGg: ", norm * integral * D0 * 1e3)
 
         sigma2_rel = (Gg[1]/Gg[0])**2 + (D0[1]/D0[0])**2 + integral_unc_rel**2
         sigma_norm = np.sqrt(sigma2_rel) * norm
@@ -160,7 +162,7 @@ class NormGSF:
         self.gsf_ext_low = gsf_ext_low
         self.gsf_ext_high = gsf_ext_high
 
-        return norm, integral_arr
+        return norm, integral_arr, integral_unc_rel
 
     @staticmethod
     def transform(gsf, B, alpha):
@@ -273,8 +275,9 @@ class NormGSF:
                              pars=self.spincutPars).distibution()
 
     def GetNormFromGgD0(self, getIntegral=False,
-                        nld=None, gsf=None,
-                        gsf_ext_low=None, gsf_ext_high=None):
+                        nld=None, gsf=None, nld_ext=None,
+                        gsf_ext_low=None, gsf_ext_high=None,
+                        D0=None):
         """
         Get the normaliation, see eg. eq (26) in Larsen2011;
         Note however, that we use gsf instead of T
@@ -288,6 +291,8 @@ class NormGSF:
             If `getIntegral=True`, returns the integral
         nld : (optional)
             The input nld to the integral for the chosen method
+        nld : (optional) np.array
+            nld extrapolation
         gsf : (optional)
             The input gsf to the integral for the chosen method
         gsf_ext_low : (optional) np.array
@@ -306,7 +311,9 @@ class NormGSF:
         Eintegral, stepSize = np.linspace(Eint_min, Eint_max,
                                           num=Nsteps, retstep=True)
 
-        args = [Eintegral, stepSize, nld, gsf, gsf_ext_low, gsf_ext_high]
+        args = [Eintegral, stepSize, nld, gsf,
+                nld_ext, gsf_ext_low, gsf_ext_high,
+                D0]
         if(self.method == "standard"):
             norm, integral = self.Gg_Norm_standard(*args)
         elif(self.method == "test"):
@@ -318,7 +325,7 @@ class NormGSF:
             return norm
 
     def Gg_Norm_standard(self, Eintegral, stepSize,
-                         nld=None, gsf=None,
+                         nld=None, gsf=None, nld_ext=None,
                          gsf_ext_low=None, gsf_ext_high=None,
                          D0=None):
         """ Compute normalization from Gg integral, the "standard" way
@@ -357,6 +364,8 @@ class NormGSF:
             gsf = self.gsf_in
         if D0 is None:
             D0 = self.D0
+        if nld_ext is None:
+            nld_ext = self.nld_ext
         if gsf_ext_low is None:
             gsf_ext_low = self.gsf_ext_low
         if gsf_ext_high is None:
@@ -371,7 +380,7 @@ class NormGSF:
             D0 = D0[0]
 
         def fnld(E):
-            return self.fnld(E, nld)
+            return self.fnld(E, nld, nld_ext)
         def fgsf(E):
             return self.fgsf(E, gsf, gsf_ext_low, gsf_ext_high)
 
@@ -429,8 +438,9 @@ class NormGSF:
 
 
     def Gg_Norm_test(self, Eintegral, stepSize,
-                     nld=None, gsf=None, D0=None,
-                     gsf_ext_low=None, gsf_ext_high=None):
+                     nld=None, gsf=None, nld_ext=None,
+                     gsf_ext_low=None, gsf_ext_high=None,
+                     D0=None):
         """ Compute normalization from Gg integral, "test approach"
 
         Experimental new version of the spin sum and integration
@@ -465,6 +475,8 @@ class NormGSF:
             nld = self.nld_in
         if gsf is None:
             gsf = self.gsf_in
+        if nld_ext is None:
+            nld_ext = self.nld_ext
         if gsf_ext_low is None:
             gsf_ext_low = self.gsf_ext_low
         if gsf_ext_high is None:
@@ -480,7 +492,7 @@ class NormGSF:
             D0 = D0[0]
 
         def fnld(E):
-            return self.fnld(E, nld)
+            return self.fnld(E, nld, nld_ext)
         def fgsf(E):
             return self.fgsf(E, gsf, gsf_ext_low, gsf_ext_high)
 
@@ -681,3 +693,55 @@ class NormGSF:
                 sext_c.reset()
                 sext_d.reset()
             self.button.on_clicked(reset)
+
+    @staticmethod
+    def chi2_nld_gsf(x, obj, nld, chi2_args, pext_nld, nldModel,
+                     gsf, gsf_ext_low, gsf_ext_high,
+                     sigma_integral_rel, Gg):
+        """
+        NOTE: Currently this workes only with
+            `self.method == "standard"`; for the
+            other one we need to think about how to
+            adjust `D0`
+        """
+        A, alpha = x[:2]
+        T = x[2]
+        D0 = np.atleast_1d(x[3])
+        B = x[4]
+
+        gsf = np.copy(gsf)
+        nld = np.copy(nld)
+
+        sigma_Gg = Gg[1]
+        Gg = Gg[0]
+
+        # nld part
+        chi2_nld, args = NormNLD.chi2_disc_ext(x,
+                                             *chi2_args, returnPars=True)
+        pext_nld["nld_Sn"], pext_nld["Eshift"] = args
+        nld_ext = NormNLD.extrapolate(model=nldModel, pars=pext_nld)
+        nld = NormNLD.normalize(nld, A=A, alpha=alpha)
+
+        # gsf part
+        gsf = NormGSF.transform(gsf, B=B, alpha=alpha)
+        # if commented out: Assume the extrapolatio does not chage
+        gsf_ext_low = NormGSF.transform(gsf_ext_low, B=B, alpha=0)
+        gsf_ext_high = NormGSF.transform(gsf_ext_high, B=B, alpha=0)
+
+        _, integral = obj.GetNormFromGgD0(getIntegral=True,
+                                          nld=nld, gsf=gsf,
+                                          nld_ext=nld_ext,
+                                          gsf_ext_low=gsf_ext_low,
+                                          gsf_ext_high=gsf_ext_high,
+                                          D0=D0)
+        # print("chi2_nld: ", chi2_nld)
+        # TODO:
+        # following line is different for the two gsf normalization methods
+        modelGg = integral * D0 * 1e3
+        print("modelGg: ", modelGg)
+
+        sigma_integral = modelGg * sigma_integral_rel
+        sigma2 = sigma_integral**2 + sigma_Gg**2
+        chi2_Gg = (Gg - modelGg)**2/(sigma2)
+
+        return chi2_nld + chi2_Gg

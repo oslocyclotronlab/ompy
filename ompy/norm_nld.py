@@ -46,7 +46,7 @@ class NormNLD:
         self.nld_norm = None  # Normalized nld
         self.discretes = None
 
-        if np.max(self.nld[:,0]>1000):
+        if np.max(self.nld[:, 0] > 1000):
             warnings.warn("Are you sure that all input is in MeV, not keV?")
 
         if method is "2points":
@@ -147,9 +147,9 @@ class NormNLD:
         nld_norm : Normalized NLD
         """
         Ex = nld[:, 0]
-        nld_val = nld[:,1]
+        nld_val = nld[:, 1]
         if nld.shape[1] == 3:
-            rel_unc = nld[:,2] / nld[:,1]
+            rel_unc = nld[:, 2] / nld[:, 1]
         nld_norm = nld_val * A * np.exp(alpha * Ex)
         if nld.shape[1] == 3:
             nld_norm = np.c_[nld_norm, nld_norm * rel_unc]
@@ -193,17 +193,18 @@ class NormNLD:
         pspin = self.pspin
 
         # slice out comparison regions
-        idE1 = np.abs(nld[:,0] - E1_low).argmin()
-        idE2 = np.abs(nld[:,0] - E2_low).argmin()
+        idE1 = np.abs(nld[:, 0] - E1_low).argmin()
+        idE2 = np.abs(nld[:, 0] - E2_low).argmin()
         data_low = nld[idE1:idE2, :]
 
         # Get discretes (for the lower energies)
-        levels_smoothed, _ = self.get_discretes(Emids=nld[:,0], resolution=0.1)
+        levels_smoothed, _ = self.get_discretes(
+            Emids=nld[:, 0], resolution=0.1)
         levels_smoothed = levels_smoothed[idE1:idE2]
         self.discretes = np.c_[nld[idE1:idE2, 0], levels_smoothed]
 
-        idE1 = np.abs(nld[:,0] - E1_high).argmin()
-        idE2 = np.abs(nld[:,0] - E2_high).argmin()
+        idE1 = np.abs(nld[:, 0] - E1_high).argmin()
+        idE2 = np.abs(nld[:, 0] - E2_high).argmin()
         data_high = nld[idE1:idE2, :]
 
         if self.nldModel == "CT":
@@ -221,7 +222,7 @@ class NormNLD:
 
         from .multinest_setup import run_nld_2regions
         p0 = dict(zip(["A", "alpha", "T", "D0"], (res.x).T))
-        #overwrite result for D0, as we have a "correct" prior for it
+        # overwrite result for D0, as we have a "correct" prior for it
         p0["D0"] = self.D0
         popt, samples = run_nld_2regions(p0=p0,
                                          chi2_args=chi2_args)
@@ -233,6 +234,8 @@ class NormNLD:
                                                self.pext["nld_Sn"])
         self.nld_ext = self.extrapolate(self.nldModel, self.pext)
 
+        # Easier access in normGSF.chi2_nld_gsf()
+        self.chi2_args = chi2_args
         return popt, samples
 
     def get_discretes(self, Emids, fname=None, resolution=0.1):
@@ -243,7 +246,7 @@ class NormNLD:
     @staticmethod
     def chi2_disc_ext(x,
                       nldModel, data_low, data_high, levels_smoothed,
-                      pspin):
+                      pspin, returnPars=False):
         """
         Chi^2 between discrete levels at low energy and extrapolation at high energies
 
@@ -271,22 +274,25 @@ class NormNLD:
 
         data = NormNLD.normalize(data_low, A, alpha)
         # n_low = len(data)
-        chi2 = (data[:,1] - levels_smoothed)**2.
+        chi2 = (data[:, 1] - levels_smoothed)**2.
         if data.shape[1] == 3:  # weight with uncertainty, if existent
-            chi2 /= data[:,2]**2
+            chi2 /= data[:, 2]**2
         chi2_low = np.sum(chi2)
 
         data = NormNLD.normalize(data_high, A, alpha)
         # n_high = len(data)
         nld_Sn = NormNLD.nldSn_from_D0(D0, **pspin)
         Eshift = NormNLD.EshiftFromT(T, nld_Sn)
-        chi2 = (data[:,1] - nldModel(data[:,0], T, Eshift)) ** 2.
+        chi2 = (data[:, 1] - nldModel(data[:, 0], T, Eshift)) ** 2.
         if data.shape[1] == 3:  # weight with uncertainty, if existent
-            chi2 /= (data[:,2])**2
+            chi2 /= (data[:, 2])**2
         chi2_high = np.sum(chi2)
 
         chi2 = (chi2_low + chi2_high)
-        return chi2
+        if returnPars:
+            return chi2, (nld_Sn, Eshift)
+        else:
+            return chi2
 
     def normalize_scanning_samples(self, popt, samples):
         """
@@ -312,11 +318,11 @@ class NormNLD:
             N_loop = min(N_samples_max, len(samples["A"]))
             nld_samples = np.zeros((N_loop, len(Ex)))
             for i in range(N_loop):
-                nld_tmp = stats.norm.rvs(self.nld[:,1], self.nld[:,2])
+                nld_tmp = stats.norm.rvs(self.nld[:, 1], self.nld[:, 2])
                 nld_tmp = self.normalize(np.c_[Ex, nld_tmp],
                                          samples["A"][i],
                                          samples["alpha"][i])
-                nld_samples[i] = nld_tmp[:,1]
+                nld_samples[i] = nld_tmp[:, 1]
             median = np.median(nld_samples, axis=0)
             std = nld_samples.std(axis=0)
             self.nld_norm = np.c_[Ex, median, std]
@@ -357,9 +363,9 @@ class NormNLD:
                                  pars=spincutPars).distibution()
 
         if J_target == 0:
-            summe = g(J_target+1/2)
+            summe = g(J_target + 1 / 2)
         else:
-            summe = 1/2 * (g(J_target-1/2) + g(J_target+1/2))
+            summe = 1 / 2 * (g(J_target - 1 / 2) + g(J_target + 1 / 2))
 
-        nld = 1/(summe*D0*1e-6)
-        return [Sn,nld]
+        nld = 1 / (summe * D0 * 1e-6)
+        return [Sn, nld]
