@@ -27,15 +27,63 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from uncertainties import unumpy
+from spinfunctions import SpinFunctions
 
 cimport cython
 cimport numpy as np
+
+# TODO: Move this into the function call
+# normalization of the gsf
+# choose a spincut model and give it's parameters
+spincutModel = "EB05"
+spincutPars = {"mass": 164, "NLDa": 25.16, "Eshift": 0.12}  # some dummy values
+Jmax = 20
+cdef np.ndarray Js = np.linspace(0, Jmax, Jmax+1)
+# cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range
+
+def spin_dist(Ex, J):
+    return SpinFunctions(Ex=Ex, J=J,
+                         model=spincutModel,
+                         pars=spincutPars).distibution()
+
+
+def z(np.ndarray Exarr, np.ndarray Egarr):
+    cdef np.ndarray z
+    cdef float inner_sum
+    cdef list Jfs
+    cdef float g_pop
+    cdef int ji
+    cdef int jf
+    cdef int i_Ex, i_Eg
+    cdef float Ex, Eg
+
+    z = np.zeros((len(Exarr), len(Egarr)))
+
+    for i_Ex, Ex in enumerate(Exarr):
+        for i_Eg, Eg in enumerate(Egarr):
+            if Ex-Eg <= 0:
+                continue
+            for ji in Js:
+                if ji==0:
+                    Jfs = [1]
+                else:
+                    Jfs = [ji-1, ji, ji+1]
+                # assume g_pop propto g_int
+                # TODO: should the 1/2 be there?
+                g_pop = 1./2. * spin_dist(Ex, ji)
+                inner_sum = 0
+                for jf in Jfs:
+                    # TODO: should the 1/2 be there?
+                    inner_sum += 1./2. * spin_dist(Ex-Eg, jf)
+                    # print(spin_dist(Ex-Eg, jf))
+                z[i_Ex, i_Eg] += g_pop * inner_sum
+    return z
 
 
 def decompose_matrix(P_in, P_err,
                      Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
                      method="Powell", options={'disp': True},
-                     fill_value=0):
+                     fill_value=0, use_z_correction=False):
     """ routine for the decomposition of the first generations spectrum P_in
 
     Parameters:
@@ -78,6 +126,14 @@ def decompose_matrix(P_in, P_err,
 
     P_in, P_err = normalize(P_in, P_err)
 
+    # Addition 20190329 to add z factor:
+    z_array = None
+    if use_z_correction:
+        z_array = z(Emid_Ex,Emid_Eg)
+    else:
+        z_array = np.ones((Nbins_Ex, Nbins_T))
+    assert (z_array is not None), "z_array should be set"
+
     # initial guesses
     rho0 = np.ones(Nbins_rho)
 
@@ -90,7 +146,7 @@ def decompose_matrix(P_in, P_err,
     # minimization
     res = minimize(objfun1D, x0=p0,
                    args=(P_in, P_err,
-                         Emid_Eg, Emid_nld, Emid_Ex, dE_resolution),
+                         Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array),
                    method=method,
                    options=options)
     # further optimization: eg through higher tolderaced xtol and ftol
@@ -195,21 +251,25 @@ def objfun1D(x, *args):
 
     """
 
-    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution = args
+    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array = args
     Pexp = np.asarray(Pexp)
     Perr = np.asarray(Perr)
     Emid_Eg = np.asarray(Emid_Eg)
     Emid_nld = np.asarray(Emid_nld)
     Emid_Ex = np.asarray(Emid_Ex)
     dE_resolution = np.asarray(dE_resolution)
+    z_array = np.asarray(z_array)
     Pexp = Pexp.reshape(-1, Pexp.shape[-1])
     Nbins_Ex, Nbins_T = np.shape(Pexp)
     Nbins_rho = Nbins_T
     rho, T = rhoTfrom1D(x, Nbins_rho)
-    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution)
+    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
+                z_array)
 
 
-def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex, np.ndarray dE_resolution):
+def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,
+         np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex,
+         np.ndarray dE_resolution, np.ndarray z_array):
     """ Chi^2 between experimental and fitted first genration matrix"""
     cdef float chi2
     cdef np.ndarray Pfit
@@ -217,7 +277,8 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
         chi2 = 1e20
     else:
         Nbins_Ex, Nbins_T = np.shape(Pexp)
-        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution)
+        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex,
+                         dE_resolution, z_array_in=z_array)
         # chi^2 = (data - fit)^2 / unc.^2, where unc.^2 = #cnt for Poisson dist.
         chi2 = np.sum( div0((Pexp - Pfit)**2,Perr**2))
     return chi2
@@ -226,7 +287,9 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
 @cython.boundscheck(True) # turn off bounds-checking for entire function
 @cython.wraparound(True)  # turn off negative index wrapping for entire function
 def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
-              np.ndarray Emid_nld, np.ndarray Emid_Ex, np.ndarray dE_resolution, type="transCoeff"):
+              np.ndarray Emid_nld, np.ndarray Emid_Ex,
+              np.ndarray dE_resolution, type="transCoeff",
+              np.ndarray z_array_in=None):
     """ Generate a first gernation matrix P from given nld and T (or gsf)
 
     Parameters:
@@ -253,6 +316,13 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
     cdef int i_Ex, i_Eg, i_Ef, Nbins
     cdef double Ef ,Ex
     cdef double Eg
+    cdef np.ndarray z_array
+    if z_array_in is None:
+        # Don't use any z factor:
+        raise Exception("Something is wrong with the z array logic. This is hacky code.")
+    else:
+        z_array = z_array_in
+
     global Emid_Eg
     cdef np.ndarray P = np.zeros((Nbins_Ex,Nbins_T))
 
@@ -263,9 +333,9 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
         for i_Eg in range(Nbins):
             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]
             i_Ef = (np.abs(Emid_nld-Ef)).argmin()
-            P[i_Ex,i_Eg] = rho[i_Ef] * T[i_Eg]
+            P[i_Ex, i_Eg] = rho[i_Ef] * T[i_Eg] * z_array[i_Ex, i_Eg]
             # if input T was a gsf, not transmission coeff: * E^(2L+1)
-            if type=="gsfL1":
+            if type == "gsfL1":
                 Eg = Emid_Eg[i_Eg]
                 P[i_Ex,i_Eg] *= np.power(Eg,3.)
     # normalize each Ex row to 1 (-> get decay probability)
