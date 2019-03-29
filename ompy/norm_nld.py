@@ -176,8 +176,10 @@ class NormNLD:
 
         Returns:
         --------
-        res.x: ndarray
-            Best fit normalization parameters `[A, alpha, T]`
+        popt: dict of str : (float, float)
+            Mean and 1 sigma from multinest for `[A, alpha, T]`
+        samples : dict of ndarray
+            Equal weighted samples for each parameter
         """
 
         from scipy.optimize import curve_fit

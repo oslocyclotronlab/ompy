@@ -89,8 +89,8 @@ class NormGSF:
 
     def normalize_fixGg(self):
         """
-        Normalize the gsf extracted with the Oslo method
-        to the average total radiative width <Gg>
+        Normalize the gsf to the average total radiative width <Gg>.
+        Note: Uncertainty of <Gg> and D0 /not/ taken into account
         """
         transform = self.transform
 
@@ -108,7 +108,24 @@ class NormGSF:
 
     def normalize_Gg_chi2(self, nld_ens, gsf_ens):
         """
-        Test different normalization
+        Normalize gsf to the average total radiative width <Gg>
+        Note: Uncertainty of <Gg> and D0 taken into account
+
+        Parameters
+        ----------
+        nld_ens : List of Matrix
+            Ensemble of normalized NLDs
+        gsf_ens : List of Matrix
+            Ensemble of /non/-normalized gSFs
+
+        Returns
+        -------
+        norm : float
+            Best normalization parameter for gsf,
+        integral_arr : float
+            Integral for each of the elements in the ensemble
+        integral_unc_rel : float
+            Std. of the integral (for the given transformation parameters)
         """
         assert self.gsf_in.shape[1] == 3, "Need correct gsf shape: (E,val,unc)"
         #assert type(gsf_samples[0]) == ompy.matrix.Vector
@@ -139,7 +156,8 @@ class NormGSF:
         integral_unc_rel = integral_arr.std()/integral_arr.mean()
         # print(integral_unc_rel)
         norm, integral = self.GetNormFromGgD0(getIntegral=True,
-                              nld=self.nld_in, gsf=self.gsf_in)
+                                              nld=self.nld_in,
+                                              gsf=self.gsf_in)
         gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
         print("modelGg: ", norm * integral * D0 * 1e3)
 
@@ -163,7 +181,56 @@ class NormGSF:
         self.gsf_ext_low = gsf_ext_low
         self.gsf_ext_high = gsf_ext_high
 
-        return norm, integral_arr, integral_unc_rel
+        return integral_unc_rel, norm
+
+    def normalize_nld_gsf_simultan(self, args, diff_evo_bounds, D0):
+        """
+        Normalize nld and gsf simultaneously to
+        i) discrete levels (nld)
+        ii) D0 via a extrapolation model (nld)
+        iii) <Gg> (gsf)
+
+        Parameters
+        ----------
+        args : list
+            all arguments needed for `chi2_nld_gsf`
+        diff_evo_bounds : ndarray
+            2 dim, upper and lower bound for each parameter.
+            Order: `["A", "alpha", "T", "D0", "B"]`.
+        D0 : (float, float)
+            Mean and std of D0
+
+        Returns
+        -------
+        popt: dict of str : (float, float)
+            Mean and 1 sigma from multinest for each parameters
+        samples : dict of ndarray
+            Equal weighted samples for each parameter
+
+        TODO:
+        - Clean up args
+        - Check parameter order ...
+
+        """
+        from scipy.optimize import differential_evolution
+
+        object_fun = self.chi2_nld_gsf
+        res = differential_evolution(object_fun,
+                                     bounds=diff_evo_bounds,
+                                     args=args,
+                                     disp=False)
+
+        print("Result from find_norm / differential evolution:\n", res)
+
+        from .multinest_setup import run_nld_gsf_simultan
+        p0 = dict(zip(["A", "alpha", "T", "D0", "B"], (res.x).T))
+        # overwrite result for D0, as we have a "correct" prior for it
+        p0["D0"] = D0
+        popt, samples = run_nld_gsf_simultan(p0=p0,
+                                             chi2_args=args)
+
+        return popt, samples
+
 
     @staticmethod
     def transform(gsf, B, alpha):
@@ -712,13 +779,30 @@ class NormGSF:
                      gsf, gsf_ext_low, gsf_ext_high,
                      sigma_integral_rel, Gg):
         """
+        Chi2 function for simultaneous normalization of
+        nld and gsf, see `normalize_nld_gsf_simultan`
+
+        Parameters
+        ----------
+        x : ndarray
+            Parameters `["A", "alpha", "T", "D0", "B"]`
+        obj : NormGSF
+            Within the current implementation this is needed.
+            Maybe one could extract some more information from there?
+        TODO: Long list of parameters : need to reduce!
+
+        Returns
+        -------
+        chi2 : float
+            Sum of chi2 for nld and gsf
+
         NOTE: Currently this workes only with
             `self.method == "standard"`; for the
             other one we need to think about how to
             adjust `D0`
         """
         A, alpha = x[:2]
-        T = x[2]
+        T = x[2] # assinged here, but used only in `chi2_disc_ext`
         D0 = np.atleast_1d(x[3])
         B = x[4]
 
@@ -730,7 +814,7 @@ class NormGSF:
 
         # nld part
         chi2_nld, args = NormNLD.chi2_disc_ext(x,
-                                             *chi2_args, returnPars=True)
+                                               *chi2_args, returnPars=True)
         pext_nld["nld_Sn"], pext_nld["Eshift"] = args
         nld_ext = NormNLD.extrapolate(model=nldModel, pars=pext_nld)
         nld = NormNLD.normalize(nld, A=A, alpha=alpha)
@@ -747,7 +831,6 @@ class NormGSF:
                                           gsf_ext_low=gsf_ext_low,
                                           gsf_ext_high=gsf_ext_high,
                                           D0=D0)
-        # print("chi2_nld: ", chi2_nld)
         # TODO:
         # following line is different for the two gsf normalization methods
         modelGg = integral * D0 * 1e3
