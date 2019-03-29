@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import scipy.stats as stats
+import warnings
 
 from .norm_nld import NormNLD
 from .spinfunctions import SpinFunctions
@@ -416,18 +417,29 @@ class NormGSF:
 
         # perform integration by summation
         # TODO: Revise warnings: do they make sense?
-        integral = 0
-        for Eg in Eintegral:
+        # def integrate():
+        #     integral = 0
+        #     for Eg in Eintegral:
+        #         Ex = Sn - Eg
+        #         if Eg <= Enld_exp_min:
+        #             print("warning: Eg < {0}; check rho interpolate"
+        #                   .format(Enld_exp_min))
+        #         if Ex <= Enld_exp_min:
+        #             print("warning: at Eg = {0}: Ex < {1}; " +
+        #                   "check rho interpolate".format(Eg, Enld_exp_min))
+        #         integral += np.power(Eg, 3) * fgsf(Eg) * fnld(Ex) \
+        #             * SpinSum(Ex, J_target)
+        #     integral *= stepSize
+        #     return integral
+        def integrate():
+            Eg = Eintegral
             Ex = Sn - Eg
-            if Eg <= Enld_exp_min:
-                print("warning: Eg < {0}; check rho interpolate"
-                      .format(Enld_exp_min))
-            if Ex <= Enld_exp_min:
-                print("warning: at Eg = {0}: Ex < {1}; " +
-                      "check rho interpolate".format(Eg, Enld_exp_min))
-            integral += np.power(Eg, 3) * fgsf(Eg) * fnld(Ex) \
-                * SpinSum(Ex, J_target)
-        integral *= stepSize
+            integral = (np.power(Eg, 3) * fgsf(Eg) * fnld(Ex)
+                        * SpinSum(Ex, J_target))
+            integral = np.sum(integral) * stepSize
+            return integral
+
+        integral = integrate()
 
         # factor of 2 because of equi-parity (we use total nld in the
         # integral above, instead of the "correct" nld per parity)
@@ -560,6 +572,7 @@ class NormGSF:
 
         # perform integration by summation
         # TODO: Revise warnings: do they make sense?
+        warnings.warn("Need to integration time by replacing the loop!")
         integral0 = 0
         integral1 = 0
         for Eg in Eintegral:
@@ -738,7 +751,7 @@ class NormGSF:
         # TODO:
         # following line is different for the two gsf normalization methods
         modelGg = integral * D0 * 1e3
-        print("modelGg: ", modelGg)
+        # print("modelGg: ", modelGg)
 
         sigma_integral = modelGg * sigma_integral_rel
         sigma2 = sigma_integral**2 + sigma_Gg**2
