@@ -236,8 +236,8 @@ class FitRhoT:
         self.firstgen = firstgen
         self.firstgen_std = firstgen_std
 
-
     def send_to_fit(self, use_z_correction=False):
+
         """ Helper class just for now: sends FG to fit and get rho and T """
         Eg_min = self.Eg_min
         Ex_min = self.Ex_min
