@@ -39,7 +39,7 @@ spincutModel = "EB05"
 spincutPars = {"mass": 164, "NLDa": 25.16, "Eshift": 0.12}  # some dummy values
 Jmax = 20
 cdef np.ndarray Js = np.linspace(0, Jmax, Jmax+1)
-# cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range
+# cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
 
 def spin_dist(Ex, J):
     return SpinFunctions(Ex=Ex, J=J,
@@ -82,6 +82,7 @@ def z(np.ndarray Exarr, np.ndarray Egarr):
 
 def decompose_matrix(P_in, P_err,
                      Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
+                     p0=None,
                      method="Powell", options={'disp': True},
                      fill_value=0, use_z_correction=False):
     """ routine for the decomposition of the first generations spectrum P_in
@@ -137,11 +138,12 @@ def decompose_matrix(P_in, P_err,
     # initial guesses
     rho0 = np.ones(Nbins_rho)
 
-    T0 = np.zeros(Nbins_T)     # inigial guess for T  following
-    for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
-        T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
-
-    p0 = np.append(rho0,T0) # create 1D array of the initial guess
+    if p0 is None:
+        T0 = np.zeros(Nbins_T)     # inigial guess for T  following
+        for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
+            T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
+    
+        p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
     res = minimize(objfun1D, x0=p0,
