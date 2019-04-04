@@ -31,12 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import numpy as np
-import oslo_method_python.library as lib
-# from oslo_method_python.library import calibration
-import oslo_method_python.rebin as rebin
-from oslo_method_python.rebin import rebin_matrix
-from oslo_method_python.constants import *
-import oslo_method_python.rhosig as rsg
+# import oslo_method_python.library as lib
+# # from oslo_method_python.library import calibration
+# import oslo_method_python.rebin as rebin
+# from oslo_method_python.rebin import rebin_matrix
+# from oslo_method_python.constants import *
+# import oslo_method_python.rhosig as rsg
+
+from .library import *
+from .rebin import *
+from .constants import *
+from .rhosig import *
 
 from scipy.optimize import minimize
 import copy
