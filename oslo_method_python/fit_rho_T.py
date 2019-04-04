@@ -116,8 +116,8 @@ class FitRhoT:
         # resolution might change slightly after rebinning
         self.calc_resolution(Ex_array=self.firstgen.E0_array)
 
+    def fit(self):
         self.send_to_fit()
-
 
     def check_input(self):
         """Checks input
@@ -183,7 +183,7 @@ class FitRhoT:
         Eg_max = Ex_max + self.dE_max_res
         calib_fit = {"a0": E_min, "a1": bin_width_out}
         # Set up the energy arrays for recalibration of 1Gen matrix
-        Eg_array = lib.E_array_from_calibration(a0=calib_fit["a0"],
+        Eg_array = E_array_from_calibration(a0=calib_fit["a0"],
                                            a1=calib_fit["a1"],
                                            E_max=Eg_max)
         # Cut away the "top" of the Ex-array, which is too large
@@ -192,7 +192,7 @@ class FitRhoT:
         Ex_array = Eg_array[:i_Exmax]
 
         # Rebin firstgen to calib_fit along both axes and store it in a new Matrix:
-        firstgen = lib.Matrix()
+        firstgen = Matrix()
         firstgen.matrix = rebin_matrix(firstgen_in.matrix,
                                        firstgen_in.E0_array,
                                        Ex_array, rebin_axis=0)
@@ -204,8 +204,8 @@ class FitRhoT:
         firstgen.E1_array = Eg_array
         # Update 20190212: Interpolate the std matrix instead of rebinning:
         # TODO: Is this the propper way to get the uncertainties
-        firstgen_std = lib.Matrix()
-        firstgen_std.matrix = lib.interpolate_matrix_2D(firstgen_std_in.matrix,
+        firstgen_std = Matrix()
+        firstgen_std.matrix = interpolate_matrix_2D(firstgen_std_in.matrix,
                                              firstgen_std_in.E0_array,
                                              firstgen_std_in.E1_array,
                                              Ex_array,
@@ -245,14 +245,14 @@ class FitRhoT:
                    "Exmin" : Ex_min,
                    "Emax" : Ex_max}
 
-        Enld_array = lib.E_array_from_calibration(a0=-self.dE_max_res,
+        Enld_array = E_array_from_calibration(a0=-self.dE_max_res,
                                               a1=bin_width_out,
                                               E_max=Ex_max-Eg_min)
         Enld_array -= bin_width_out/2
         Ex_array = self.firstgen.E0_array
         Eg_array = self.firstgen.E1_array
 
-        rho_fit, T_fit = rsg.decompose_matrix(self.firstgen.matrix,
+        rho_fit, T_fit = decompose_matrix(self.firstgen.matrix,
                                           self.firstgen_std.matrix,
                                           Emid_Eg=Eg_array+bin_width_out/2,
                                           Emid_nld=Enld_array+bin_width_out/2,
@@ -261,21 +261,21 @@ class FitRhoT:
                                           method=self.method,
                                           options=self.options)
 
-        rho = lib.Vector(rho_fit, Enld_array)
-        T = lib.Vector(T_fit, Eg_array)
+        rho = Vector(rho_fit, Enld_array)
+        T = Vector(T_fit, Eg_array)
 
         # - rho and T shall be Vector() instances
         self.rho = rho
         self.T = T
 
         # save "bestfit"
-        Pfit = rsg.PfromRhoT(rho_fit, T_fit,
+        Pfit = PfromRhoT(rho_fit, T_fit,
                              len(Ex_array),
                              Emid_Eg=Eg_array+bin_width_out/2,
                              Emid_nld=Enld_array+bin_width_out/2,
                              Emid_Ex=Ex_array+bin_width_out/2,
                              dE_resolution = self.dE_resolution)
-        self.Pfit = lib.Matrix(Pfit, Ex_array, Eg_array)
+        self.Pfit = Matrix(Pfit, Ex_array, Eg_array)
 
 
     def calc_resolution(self, Ex_array):
