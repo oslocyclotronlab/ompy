@@ -276,6 +276,11 @@ def first_generation_method(matrix_in,
         Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
     W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
 
+    # Update 20190404: Tested using a box instead of Fermi gas, seems to work just as well.
+    # TODO: Should probably use this instead after double-checking it.
+    # W_old = np.ones_like(Eg_mesh)
+    # W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+
     mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
                        0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
 
