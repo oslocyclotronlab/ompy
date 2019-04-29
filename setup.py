@@ -14,7 +14,7 @@ setup(name='OMpy',
       py_modules=['ompy'],
       ext_modules=cythonize(
                             [
-                            "ompy/rebin.pyx",
-                            "ompy/rhosig.pyx"
+                             "ompy/rebin.pyx",
+                             "ompy/rhosig.pyx"
                             ])
       )
