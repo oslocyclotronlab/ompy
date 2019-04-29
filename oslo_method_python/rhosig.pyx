@@ -35,19 +35,17 @@ cimport numpy as np
 # TODO: Move this into the function call
 # normalization of the gsf
 # choose a spincut model and give it's parameters
-spincutModel = "EB05"
-spincutPars = {"mass": 164, "NLDa": 25.16, "Eshift": 0.12}  # some dummy values
-Jmax = 20
-cdef np.ndarray Js = np.linspace(0, Jmax, Jmax+1)
+
+
 # cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
 
-def spin_dist(Ex, J):
+def spin_dist(Ex, J, spincutModel, spincutPars):
     return SpinFunctions(Ex=Ex, J=J,
                          model=spincutModel,
                          pars=spincutPars).distibution()
 
 
-def z(np.ndarray Exarr, np.ndarray Egarr):
+def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):
     cdef np.ndarray z
     cdef float inner_sum
     cdef list Jfs
@@ -56,6 +54,19 @@ def z(np.ndarray Exarr, np.ndarray Egarr):
     cdef int jf
     cdef int i_Ex, i_Eg
     cdef float Ex, Eg
+
+    # If no spin distribution parameters are specified, use some defaults:
+    # (TODO: This could be made nicer, but let's get some use experience first)
+    if spin_dist_par is None:
+        spin_dist_par = {
+            # some dummy values:
+            "spincutModel": "EB05",
+            "spincutPars": {"mass": 164, "NLDa": 25.16, "Eshift": 0.12},
+            "Jmax": 20
+        }
+
+    cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],
+                                     spin_dist_par["Jmax"]+1)
 
     z = np.zeros((len(Exarr), len(Egarr)))
 
@@ -70,11 +81,17 @@ def z(np.ndarray Exarr, np.ndarray Egarr):
                     Jfs = [ji-1, ji, ji+1]
                 # assume g_pop propto g_int
                 # TODO: should the 1/2 be there?
-                g_pop = 1./2. * spin_dist(Ex, ji)
+                g_pop = 1./2. * spin_dist(Ex, ji,
+                                          spin_dist_par["spincutModel"],
+                                          spin_dist_par["spincutPars"]
+                                          )
                 inner_sum = 0
                 for jf in Jfs:
                     # TODO: should the 1/2 be there?
-                    inner_sum += 1./2. * spin_dist(Ex-Eg, jf)
+                    inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
+                                             spin_dist_par["spincutModel"],
+                                             spin_dist_par["spincutPars"]
+                                             )
                     # print(spin_dist(Ex-Eg, jf))
                 z[i_Ex, i_Eg] += g_pop * inner_sum
     return z
@@ -84,7 +101,8 @@ def decompose_matrix(P_in, P_err,
                      Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
                      p0=None,
                      method="Powell", options={'disp': True},
-                     fill_value=0, use_z_correction=False):
+                     fill_value=0,
+                     use_z_correction=False, spin_dist_par=None):
     """ routine for the decomposition of the first generations spectrum P_in
 
     Parameters:
@@ -130,7 +148,7 @@ def decompose_matrix(P_in, P_err,
     # Addition 20190329 to add z factor:
     z_array = None
     if use_z_correction:
-        z_array = z(Emid_Ex,Emid_Eg)
+        z_array = z(Emid_Ex, Emid_Eg, spin_dist_par=spin_dist_par)
     else:
         z_array = np.ones((Nbins_Ex, Nbins_T))
     assert (z_array is not None), "z_array should be set"
@@ -142,7 +160,7 @@ def decompose_matrix(P_in, P_err,
         T0 = np.zeros(Nbins_T)     # inigial guess for T  following
         for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
             T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
-    
+
         p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
