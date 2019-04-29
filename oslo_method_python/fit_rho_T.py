@@ -117,10 +117,6 @@ class FitRhoT:
         self.calc_resolution(Ex_array=self.firstgen.E0_array)
 
 
-    def fit(self, use_z_correction=False):
-        # Perform the actual fit
-        self.send_to_fit(use_z_correction=use_z_correction)
-
 
     def check_input(self):
         """Checks input
@@ -236,7 +232,7 @@ class FitRhoT:
         self.firstgen = firstgen
         self.firstgen_std = firstgen_std
 
-    def send_to_fit(self, use_z_correction=False):
+    def fit(self, p0=None, use_z_correction=False):
 
         """ Helper class just for now: sends FG to fit and get rho and T """
         Eg_min = self.Eg_min
@@ -261,6 +257,7 @@ class FitRhoT:
                                           Emid_nld=Enld_array+bin_width_out/2,
                                           Emid_Ex=Ex_array+bin_width_out/2,
                                           dE_resolution = self.dE_resolution,
+                                          p0=p0,
                                           method=self.method,
                                           options=self.options,
                                           use_z_correction=use_z_correction)
