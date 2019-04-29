@@ -116,9 +116,6 @@ class FitRhoT:
         # resolution might change slightly after rebinning
         self.calc_resolution(Ex_array=self.firstgen.E0_array)
 
-    def fit(self):
-        self.send_to_fit()
-
     def check_input(self):
         """Checks input
 
@@ -233,8 +230,8 @@ class FitRhoT:
         self.firstgen = firstgen
         self.firstgen_std = firstgen_std
 
+    def fit(self, p0=None, use_z_correction=False, spin_dist_par=None):
 
-    def send_to_fit(self):
         """ Helper class just for now: sends FG to fit and get rho and T """
         Eg_min = self.Eg_min
         Ex_min = self.Ex_min
@@ -258,8 +255,11 @@ class FitRhoT:
                                           Emid_nld=Enld_array+bin_width_out/2,
                                           Emid_Ex=Ex_array+bin_width_out/2,
                                           dE_resolution = self.dE_resolution,
+                                          p0=p0,
                                           method=self.method,
-                                          options=self.options)
+                                          options=self.options,
+                                          use_z_correction=use_z_correction,
+                                          spin_dist_par=spin_dist_par)
 
         rho = Vector(rho_fit, Enld_array)
         T = Vector(T_fit, Eg_array)
@@ -269,12 +269,21 @@ class FitRhoT:
         self.T = T
 
         # save "bestfit"
+        z_array = None
+        if use_z_correction:
+            z_array = z(Ex_array+bin_width_out/2, Eg_array+bin_width_out/2,
+                        # TODO implement custom spin_dist_par here:
+                        spin_dist_par=spin_dist_par)
+        else:
+            z_array = np.ones((len(Ex_array), len(Eg_array)))
         Pfit = PfromRhoT(rho_fit, T_fit,
                              len(Ex_array),
                              Emid_Eg=Eg_array+bin_width_out/2,
                              Emid_nld=Enld_array+bin_width_out/2,
                              Emid_Ex=Ex_array+bin_width_out/2,
-                             dE_resolution = self.dE_resolution)
+                             dE_resolution=self.dE_resolution,
+                             z_array_in=z_array
+                             )
         self.Pfit = Matrix(Pfit, Ex_array, Eg_array)
 
 
