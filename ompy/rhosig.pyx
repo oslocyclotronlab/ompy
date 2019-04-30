@@ -27,15 +27,82 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from uncertainties import unumpy
+from spinfunctions import SpinFunctions
 
 cimport cython
 cimport numpy as np
 
+# TODO: Move this into the function call
+# normalization of the gsf
+# choose a spincut model and give it's parameters
+
+
+# cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
+
+def spin_dist(Ex, J, spincutModel, spincutPars):
+    return SpinFunctions(Ex=Ex, J=J,
+                         model=spincutModel,
+                         pars=spincutPars).distibution()
+
+
+def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):
+    cdef np.ndarray z
+    cdef float inner_sum
+    cdef list Jfs
+    cdef float g_pop
+    cdef int ji
+    cdef int jf
+    cdef int i_Ex, i_Eg
+    cdef float Ex, Eg
+
+    # If no spin distribution parameters are specified, use some defaults:
+    # (TODO: This could be made nicer, but let's get some use experience first)
+    if spin_dist_par is None:
+        spin_dist_par = {
+            # some dummy values:
+            "spincutModel": "EB05",
+            "spincutPars": {"mass": 164, "NLDa": 25.16, "Eshift": 0.12},
+            "Jmax": 20
+        }
+
+    cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],
+                                     spin_dist_par["Jmax"]+1)
+
+    z = np.zeros((len(Exarr), len(Egarr)))
+
+    for i_Ex, Ex in enumerate(Exarr):
+        for i_Eg, Eg in enumerate(Egarr):
+            if Ex-Eg <= 0:
+                continue
+            for ji in Js:
+                if ji==0:
+                    Jfs = [1]
+                else:
+                    Jfs = [ji-1, ji, ji+1]
+                # assume g_pop propto g_int
+                # TODO: should the 1/2 be there?
+                g_pop = 1./2. * spin_dist(Ex, ji,
+                                          spin_dist_par["spincutModel"],
+                                          spin_dist_par["spincutPars"]
+                                          )
+                inner_sum = 0
+                for jf in Jfs:
+                    # TODO: should the 1/2 be there?
+                    inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
+                                             spin_dist_par["spincutModel"],
+                                             spin_dist_par["spincutPars"]
+                                             )
+                    # print(spin_dist(Ex-Eg, jf))
+                z[i_Ex, i_Eg] += g_pop * inner_sum
+    return z
+
 
 def decompose_matrix(P_in, P_err,
-                     Emid_Eg, Emid_nld, Emid_Ex,
+                     Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
+                     p0=None,
                      method="Powell", options={'disp': True},
-                     fill_value=0):
+                     fill_value=0,
+                     use_z_correction=False, spin_dist_par=None):
     """ routine for the decomposition of the first generations spectrum P_in
 
     Parameters:
@@ -76,31 +143,32 @@ def decompose_matrix(P_in, P_err,
     #   P_in[np.where(P_in == 0)] = fill_value # fill holes with a really small number
     #   P_in = np.tril(P_in,k=Nbins_T - Nbins_rho) # set lower triangle to 0 -- due to array form <-> where Eg>Ex
 
-    ##############
-    u_oslo_matrix = unumpy.uarray(P_in, P_err)
+    P_in, P_err = normalize(P_in, P_err)
 
-    # normalize each Ex row to 1 (-> get decay probability)
-    for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
-        try:
-            u_oslo_matrix[i,:] /= normalization
-        except ZeroDivisionError:
-            u_oslo_matrix[i,:]=0
-    P_in = unumpy.nominal_values(u_oslo_matrix)
-    P_err = unumpy.std_devs(u_oslo_matrix)
-    ##############
+    # Addition 20190329 to add z factor:
+    z_array = None
+    if use_z_correction:
+        z_array = z(Emid_Ex, Emid_Eg, spin_dist_par=spin_dist_par)
+    else:
+        z_array = np.ones((Nbins_Ex, Nbins_T))
+    assert (z_array is not None), "z_array should be set"
 
     # initial guesses
     rho0 = np.ones(Nbins_rho)
 
-    T0 = np.zeros(Nbins_T)     # inigial guess for T  following
-    for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
-        T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
+    if p0 is None:
+        T0 = np.zeros(Nbins_T)     # inigial guess for T  following
+        for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
+            T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
 
-    p0 = np.append(rho0,T0) # create 1D array of the initial guess
+        p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
-    res = minimize(objfun1D, x0=p0, args=(P_in,P_err,Emid_Eg,Emid_nld,Emid_Ex), method=method,
-         options=options)
+    res = minimize(objfun1D, x0=p0,
+                   args=(P_in, P_err,
+                         Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array),
+                   method=method,
+                   options=options)
     # further optimization: eg through higher tolderaced xtol and ftol
     # different other methods tried:
     # res = minimize(objfun1D, x0=p0, args=P_in,
@@ -117,6 +185,21 @@ def decompose_matrix(P_in, P_err,
 
     return rho_fit, T_fit
 
+def normalize(P_in, P_err=0):
+    ##############
+    u_oslo_matrix = unumpy.uarray(P_in, P_err)
+
+    # normalize each Ex row to 1 (-> get decay probability)
+    for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
+        try:
+            u_oslo_matrix[i,:] /= normalization
+        except ZeroDivisionError:
+            u_oslo_matrix[i,:]=0
+    P_in_norm = unumpy.nominal_values(u_oslo_matrix)
+    P_err_norm = unumpy.std_devs(u_oslo_matrix)
+
+    return P_in_norm, P_err_norm
+
 def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):
     """
     Routine for the decomposition of the first generations spectrum P_in
@@ -131,6 +214,8 @@ def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, met
         Array of middle-bin values
     Emid_Eg, Emid_nld, Emid_Ex : ndarray
         Array of middle-bin values for Eg, nld and Ex
+    dE_resolution : nparray
+        Detector resolution
     N_mc : int
         Number of iterations for the perturbation
     method : str
@@ -186,20 +271,25 @@ def objfun1D(x, *args):
 
     """
 
-    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex = args
+    Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array = args
     Pexp = np.asarray(Pexp)
     Perr = np.asarray(Perr)
     Emid_Eg = np.asarray(Emid_Eg)
     Emid_nld = np.asarray(Emid_nld)
     Emid_Ex = np.asarray(Emid_Ex)
+    dE_resolution = np.asarray(dE_resolution)
+    z_array = np.asarray(z_array)
     Pexp = Pexp.reshape(-1, Pexp.shape[-1])
     Nbins_Ex, Nbins_T = np.shape(Pexp)
     Nbins_rho = Nbins_T
     rho, T = rhoTfrom1D(x, Nbins_rho)
-    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex)
+    return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
+                z_array)
 
 
-def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex):
+def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,
+         np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex,
+         np.ndarray dE_resolution, np.ndarray z_array):
     """ Chi^2 between experimental and fitted first genration matrix"""
     cdef float chi2
     cdef np.ndarray Pfit
@@ -207,7 +297,8 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
         chi2 = 1e20
     else:
         Nbins_Ex, Nbins_T = np.shape(Pexp)
-        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex)
+        Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex,
+                         dE_resolution, z_array_in=z_array)
         # chi^2 = (data - fit)^2 / unc.^2, where unc.^2 = #cnt for Poisson dist.
         chi2 = np.sum( div0((Pexp - Pfit)**2,Perr**2))
     return chi2
@@ -216,7 +307,9 @@ def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr, np.ndar
 @cython.boundscheck(True) # turn off bounds-checking for entire function
 @cython.wraparound(True)  # turn off negative index wrapping for entire function
 def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
-              np.ndarray Emid_nld, np.ndarray Emid_Ex, type="transCoeff"):
+              np.ndarray Emid_nld, np.ndarray Emid_Ex,
+              np.ndarray dE_resolution, type="transCoeff",
+              np.ndarray z_array_in=None):
     """ Generate a first gernation matrix P from given nld and T (or gsf)
 
     Parameters:
@@ -229,7 +322,7 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
         gamma-ray strength function; either this or gsf must be specified
     type: string, optional
         chosen by type= "transCoeff" /or/ "gsfL1"
-    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex:
+    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:
         bin number and bin center values
     Note: rho and T must have the same bin width
 
@@ -243,21 +336,28 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
     cdef int i_Ex, i_Eg, i_Ef, Nbins
     cdef double Ef ,Ex
     cdef double Eg
+    cdef np.ndarray z_array
+    if z_array_in is None:
+        # Don't use any z factor:
+        raise Exception("Something is wrong with the z array logic. This is hacky code.")
+    else:
+        z_array = z_array_in
+
     global Emid_Eg
     cdef np.ndarray P = np.zeros((Nbins_Ex,Nbins_T))
-    # for i_Ex in range(Nbins_Ex):
-    #     for i_Eg in range(Nbins_T):
+
     for i_Ex in range(Nbins_Ex):
         Ex = Emid_Ex[i_Ex]
-        Nbins = (np.abs(Emid_Eg-Ex)).argmin() + 1
+        Eg_max = Ex + dE_resolution[i_Ex]
+        Nbins = (np.abs(Emid_Eg - Eg_max)).argmin() + 1
         for i_Eg in range(Nbins):
             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]
             i_Ef = (np.abs(Emid_nld-Ef)).argmin()
-            if i_Ef>=0: # no gamma's with higher energy then the excitation energy
-                P[i_Ex,i_Eg] = rho[i_Ef] * T[i_Eg]
-                if type=="gsfL1": # if input T was a gsf, not transmission coeff: * E^(2L+1)
-                    Eg = Emid_Eg[i_Eg]
-                    P[i_Ex,i_Eg] *= np.power(Eg,3.)
+            P[i_Ex, i_Eg] = rho[i_Ef] * T[i_Eg] * z_array[i_Ex, i_Eg]
+            # if input T was a gsf, not transmission coeff: * E^(2L+1)
+            if type == "gsfL1":
+                Eg = Emid_Eg[i_Eg]
+                P[i_Ex,i_Eg] *= np.power(Eg,3.)
     # normalize each Ex row to 1 (-> get decay probability)
     for i, normalization in enumerate(np.sum(P,axis=1)):
         P[i,:] /= normalization
@@ -310,7 +410,7 @@ def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):
 
     # Eg
     i_Egmin = (np.abs(Emid-Egmin)).argmin()
-    i_Emax = (np.abs(Emid-Emax)).argmin()
+    i_Emax = (np.abs(Emid-Emax)).argmin()+1
     # Ex
     i_Exmin = (np.abs(Emid-Exmin)).argmin()
 
