@@ -1,6 +1,11 @@
-# OMpy
+Concept DOI: [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
+
+If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above.
+
 
 NB! OMpy is currently in beta. Use at your own risk!
+
+# OMpy
 
 This is `ompy`, a python implementation of the Oslo method. The goal is that this will become a complete Oslo method ecosystem within Python, which can also be interfaced with other Python packages to do e.g. Bayesian inference.
 
