@@ -7,7 +7,7 @@ NB! OMpy is currently in beta. Use at your own risk!
 
 # OMpy
 
-This is `ompy`, a python implementation of the Oslo method. The goal is that this will become a complete Oslo method ecosystem within Python, which can also be interfaced with other Python packages to do e.g. Bayesian inference.
+This is `ompy`, the Oslo method in python. It contains all the functionality needed to go from a raw coincidence matrix, via unfolding and the first-generation method, to fitting a level density and gamma-ray strength function. It also supports uncertainty propagation by Monte Carlo.
 
 
 ## How to use this package
@@ -19,20 +19,20 @@ python setup.py build_ext --inplace
 All the functions and classes in the package are available in the main module. You get everything with the import
 
 ```
-import oslo_method_python as om
+import ompy
 ```
 
 The overarching philosophy is that the package shall be flexible and transparent to use and modify. I'd rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
 
 ## The Matrix() and Vector() classes
-The two most important utility classes in the package are `om.Matrix()` and `om.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
+The two most important utility classes in the package are `ompy.Matrix()` and `ompy.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
 ```
-mat = om.Matrix()
+mat = ompy.Matrix()
 mat.matrix # A 2D numpy array
 mat.E0_array # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
 mat.E1_array # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
 
-vec = om.Vector()
+vec = ompy.Vector()
 vec.vector # A 1D numpy array
 vec.E_array # Array of lower-bin-edge energy values for the single axis
 ```
