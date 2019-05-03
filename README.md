@@ -22,7 +22,7 @@ All the functions and classes in the package are available in the main module. Y
 import ompy
 ```
 
-The overarching philosophy is that the package shall be flexible and transparent to use and modify. I'd rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
+The overarching philosophy is that the package shall be flexible and transparent to use and modify. We would rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
 
 ## The Matrix() and Vector() classes
 The two most important utility classes in the package are `ompy.Matrix()` and `ompy.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
@@ -50,12 +50,12 @@ The core of the Oslo method involves working with two-dimensional spectra, the e
 ### The unfold() function
 An implementation of the unfolding method presented in Guttormsen et al., Nuclear Instruments and Methods in Physics Research A 374 (1996).
 
-It may contain bugs. Please report any bugs you encounter to the issue tracker, or if you like, fix them and make a pull request :)
+It may contain bugs. Please report any bugs you encounter to the issue tracker, or if you like, fix them and make a pull request.
 
-It also currently lacks some functionality. Notably, the compton subtraction method has some major issues somewhere. Also, it differs slightly from MAMA in the unfolded result, particularly on the lowest gamma-ray energies. I need to study the MAMA code carefully to figure out how they're treated.
+It also currently lacks some functionality. Notably, the Compton subtraction method has some issues that we are working on.
 
 #### How to make a response matrix
-At present, the module doesn't contain a method for interpolating response functions. I have written one, but it needs to be cythonized because it's very slow. 
+At present, the module doesn't contain a method for interpolating response functions. We have written one, but it needs to be cythonized because it's very slow. 
 
 Because of this, if you want to do unfolding then you need to specify one or two file paths in the keywords `fname_resp_mat` and `fname_resp_dat`, respectively. The first is the response matrix. It needs to have the same energy calibration as the gamma-energy axis of the spectrum you're unfolding, and therefore it must be interpolated by MAMA. The second is only needed if you want to use the Compton subtraction method (the keyword `use_comptonsubtraction = True`). It is a list of probabilities for full-energy, single escape, double escape, etc., for each gamma-ray energy.
 
@@ -70,7 +70,7 @@ which in the MAMA version I have is located at about line 1980. Then recompile M
 ### The first_generation_method() function
 An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987). 
 
-Like the unfolding function, please be on the lookout for bugs...
+Like the unfolding function, please be on the lookout for bugs.
 
 ### The MatrixAnalysis class
 The steps described above make up the core matrix manipulation routines of `OMpy`. We therefore provide a class which helps to streamline the process, called `MatrixAnalysis`.
