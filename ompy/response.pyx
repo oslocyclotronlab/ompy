@@ -1,63 +1,24 @@
-import sys, os
-if sys.version_info[0] < 3:
-    raise Exception("Must be using Python 3")
+# import sys, os
+# if sys.version_info[0] < 3:
+#     raise Exception("Must be using Python 3")
+import os
 import numpy as np
 # import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d#, interp2d
 
-from firstgen import *
-from unfold import *
+# from .firstgen import *
+# from .unfold import *
+from .rebin import *
+from .library import *
 
 
-TODO 20190527: I just merged master into this old branch to start fixing the
-response interpolation. I moved this file from oslo_method_python/ to ompy/.
-The next step is to cythonize it properly to hopefully make it fast,
-and implement it into the rest of the code structure, then test it.
+# TODO 20190527: I just merged master into this old branch to start fixing the
+# response interpolation. I moved this file from oslo_method_python/ to ompy/.
+# The next step is to cythonize it properly to hopefully make it fast,
+# and implement it into the rest of the code structure, then test it.
 
 # j_test = 50
 
-def rebin_by_arrays(counts_in, Ein_array, Eout_array):
-    """
-    Rebins, i.e. redistributes the numbers from vector counts 
-    (which is assumed to have calibration given by Ein_array) 
-    into a new vector, which is returned. 
-    The total number of counts is preserved.
-    In case of upsampling (smaller binsize out than in), 
-    the distribution of counts between bins is done by simple 
-    proportionality.
-    Inputs:
-    counts: Numpy array of counts in each bin
-    Ein_array: Numpy array of energies, assumed to be linearly spaced, 
-               corresponding to the middle-bin energies of counts
-    Eout_array: Numpy array of energies corresponding to the desired
-                rebinning of the output vector, also middle-bin
-    """
-
-    # Get calibration coefficients and number of elements from array:
-    Nin = len(Ein_array)
-    a0_in, a1_in = Ein_array[0], Ein_array[1]-Ein_array[0]
-    Nout = len(Eout_array)
-    a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
-
-    # Replace the arrays by bin-edge energy arrays of length N+1 
-    # (so that all bins are covered on both sides).
-    Ein_array = np.linspace(a0_in - a1_in/2, a0_in - a1_in/2 + a1_in*Nin, Nin+1)
-    Eout_array = np.linspace(a0_out - a1_out/2, a0_out - a1_out/2 + a1_out*Nout, Nout+1)
-
-
-
-
-    # Allocate vector to fill with rebinned counts
-    counts_out = np.zeros(Nout)
-    # Loop over all indices in both arrays. Maybe this can be speeded up?
-    for i in range(Nout):
-        for j in range(Nin):
-            # Calculate proportionality factor based on current overlap:
-            overlap = np.minimum(Eout_array[i+1], Ein_array[j+1]) - np.maximum(Eout_array[i], Ein_array[j])
-            overlap = overlap if overlap > 0 else 0
-            counts_out[i] += counts_in[j] * overlap / a1_in
-
-    return counts_out
 
 
 def E_compton(Eg, theta):
@@ -87,13 +48,13 @@ def corr(Eg, theta):
 
 def response(folderpath, Eout_array, FWHM):
     """
-    Function to make response matrix and related arrays from 
-    source files. 
+    Function to make response matrix and related arrays from
+    source files.
     Assumes the source files are in the folder "folderpath",
     and that they are formatted in a certain standard way.
     The function interpolates the data to give a response matrix with
     the desired energy binning specified by Eout_array.
-    Inputs: 
+    Inputs:
     folderpath: The path to the folder containing Compton spectra and resp.dat
     Eout_array: The desired energies of the output response matrix. 
     FWHM: The experimental relative full-width-half-max at 1.33 MeV.
@@ -113,6 +74,7 @@ def response(folderpath, Eout_array, FWHM):
             if not line: 
                 break
             if line[0:22] == "# Next: Numer of Lines":
+                # TODO: The above if test is hardly very robust. Find a better solution.
                 line = file.readline()
                 Nlines = int(line)
                 # print("Nlines =", Nlines)
@@ -128,13 +90,10 @@ def response(folderpath, Eout_array, FWHM):
             # print("line =", line)
             row = np.array(line.split(), dtype="double")
             resp.append(row)
-    
-    
 
-
+    # Unpack the resp matrix into its columns
     resp = np.array(resp)
-
-    Eg_sim_array, FWHM_rel, Eff_tot, FE, SE, DE, c511 = resp.T # Unpack the resp matrix into its columns
+    Eg_sim_array, FWHM_rel, Eff_tot, FE, SE, DE, c511 = resp.T
     a0_sim, a1_sim = Eg_sim_array[0], Eg_sim_array[1]-Eg_sim_array[0]
     # print("a0_sim, a1_sim =", a0_sim, a1_sim, flush=True)
     # "Eg_sim" means "gamma, simulated", and refers to the gamma energies where we have simulated Compton spectra.
@@ -258,8 +217,8 @@ def response(folderpath, Eout_array, FWHM):
         cmp_low = cmp_matrix[i_g_sim_low,:]
         cmp_high = cmp_matrix[i_g_sim_high,:]
         # These need to be recalibrated from Ecmp_array to Eout_array:
-        cmp_low = rebin_by_arrays(cmp_low, Ecmp_array, Eout_array)
-        cmp_high = rebin_by_arrays(cmp_high, Ecmp_array, Eout_array)
+        cmp_low = rebin(cmp_low, Ecmp_array, Eout_array)
+        cmp_high = rebin(cmp_high, Ecmp_array, Eout_array)
         # print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_sim_array[i_g_sim_low], "Eg_high =", Eg_sim_array[i_g_sim_high], flush=True)
 
         # Fetch corresponding values for full-energy, etc:
