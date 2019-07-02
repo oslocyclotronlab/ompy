@@ -11,6 +11,8 @@ from scipy.interpolate import interp1d#, interp2d
 from .rebin import *
 from .library import *
 
+DTYPE = np.float64
+
 
 # TODO 20190527: I just merged master into this old branch to start fixing the
 # response interpolation. I moved this file from oslo_method_python/ to ompy/.
@@ -46,7 +48,56 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
-def response(folderpath, Eout_array, FWHM):
+def gaussian(double[:] E_array, double mu, double sigma):
+    """
+    Returns a normalized Gaussian supported on E_array
+    """
+    gaussian_array = np.zeros(len(E_array), dtype=DTYPE)
+    cdef double[:] gaussian_array_view = gaussian_array
+    cdef double prefactor
+
+    prefactor = (1/(sigma*np.sqrt(2*np.pi)))
+    cdef int i
+    for i in range(len(E_array)):
+        gaussian_array_view[i] = (prefactor
+                                  * np.exp(
+                                    -(E_array[i]-mu)
+                                    * (E_array[i]-mu)/(2*sigma*sigma))
+                                  )
+
+    return gaussian_array
+
+
+def gauss_smoothing(double[:] vector_in, double[:] E_array, double FWHM):
+    """
+    Function which smooths an array of counts by a Gaussian
+    of full-width-half-maximum FWHM. Preserves number of counts.
+    Args:
+        vector_in (array, double): Array of inbound counts to be smoothed
+        E_array (array, double): Array with energy calibration of vector_in
+        FWHM (double): The full-width-half-maximum value to smooth by
+
+    Returns:
+        vector_out: Array of smoothed counts
+
+    """
+    if not len(vector_in) == len(E_array):
+        raise ValueError("Length mismatch between vector_in and E_array")
+
+    cdef double[:] vector_in_view = vector_in
+
+    vector_out = np.zeros(len(vector_in), dtype=DTYPE)
+    # cdef double[:] vector_out_view = vector_out
+
+    cdef int i
+    for i in range(len(vector_out)):
+        vector_out += (vector_in_view[i]
+                       * gaussian(E_array, mu=E_array[i], sigma=FWHM/2.355))
+
+    return vector_out
+
+
+def response(folderpath, double[:] Eout_array, FWHM):
     """
     Function to make response matrix and related arrays from
     source files.
@@ -63,6 +114,7 @@ def response(folderpath, Eout_array, FWHM):
     N_out = len(Eout_array)
     a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
     # print("a0_out, a1_out =", a0_out, a1_out)
+    cdef int i
 
     # Read resp.dat file, which gives information about the energy bins 
     # and discrete peaks
@@ -225,7 +277,6 @@ def response(folderpath, Eout_array, FWHM):
         pFE_low, pSE_low, pDE_low, p511_low = pFE[i_g_sim_low], pSE[i_g_sim_low], pDE[i_g_sim_low], p511[i_g_sim_low]
         pFE_high, pSE_high, pDE_high, p511_high = pFE[i_g_sim_high], pSE[i_g_sim_high], pDE[i_g_sim_high], p511[i_g_sim_high]
 
-        
 
         # The interpolation is split into energy regions.
         # Below the back-scattering energy Ebsc we interpolate linearly,
@@ -276,17 +327,22 @@ def response(folderpath, Eout_array, FWHM):
                 if theta > 0 and theta < np.pi:
                     # Determine interpolation indices in low and high arrays
                     # by Compton formula
-                    i_low_interp = max(int((E_compton(Eg_low,theta)-a0_out)/a1_out + 0.5), i_bsc_out)
-                    i_high_interp = min(int((E_compton(Eg_high,theta)-a0_out)/a1_out + 0.5), i_high_max)
+                    i_low_interp = max(int((E_compton(Eg_low, theta)
+                                            - a0_out)/a1_out + 0.5), i_bsc_out
+                                       )
+                    i_high_interp = min(int((E_compton(Eg_high, theta)
+                                            - a0_out)/a1_out + 0.5), i_high_max
+                                        )
                     # TODO For some reason the following line gives very negative numbers. Prime suspect is the corr() function
                     # May also need to add check to remove below-zero values.
                     # R[j,i] = cmp_low[i_low_interp]*corr(Eg_low,theta) + (E_j-Eg_low)/(Eg_high-Eg_low) \
                     # * (cmp_high[i_high_interp] * corr(Eg_high,theta) - cmp_low[i_low_interp] * corr(Eg_low,theta))
-                    FA = cmp_high[i_high_interp]*corr(Eg_high, theta) - cmp_low[i_low_interp]*corr(Eg_low,theta)
+                    FA = (cmp_high[i_high_interp]*corr(Eg_high, theta)
+                          - cmp_low[i_low_interp]*corr(Eg_low, theta))
                     # FA = cmp_high[i_high_interp] - cmp_low[i_low_interp]
-                    FB = cmp_low[i_low_interp]*corr(Eg_low,theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
+                    FB = cmp_low[i_low_interp]*corr(Eg_low, theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
                     # print("i =", i, flush=True)
-                    R[j,i] = FB/corr(E_j,theta)
+                    R[j, i] = FB/corr(E_j, theta)
                     # print("E_j = {:.2f}, Eg_low = {:.2f}, Eg_high = {:.2f}".format(E_j, Eg_low, Eg_high))
                     # R[j,i] = cmp_low[i_low_interp] + (cmp_high[i_high_interp]-cmp_low[i_low_interp])*(E_j-Eg_low)/(Eg_high-Eg_low)
                     # if R[j,i] < 0:
@@ -316,6 +372,13 @@ def response(folderpath, Eout_array, FWHM):
         # ax.plot(Eout_array, cmp_high, label="cmp_high")
 
 
+
+
+        # === 20190626 Add peak structures to the spectrum: ===
+        # R[j, :] += full_energy # check how this component is made in MAMA, including fwhm smoothing
+
+
+        # === Finally, normalise the row to unity (probability conservation): ===
 
 
 
