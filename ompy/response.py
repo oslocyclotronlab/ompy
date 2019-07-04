@@ -10,6 +10,7 @@ from scipy.interpolate import interp1d#, interp2d
 # from .unfold import *
 from .rebin import *
 from .library import *
+from .gauss_smoothing import *
 
 DTYPE = np.float64
 
@@ -48,56 +49,8 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
-def gaussian(double[:] E_array, double mu, double sigma):
-    """
-    Returns a normalized Gaussian supported on E_array
-    """
-    gaussian_array = np.zeros(len(E_array), dtype=DTYPE)
-    cdef double[:] gaussian_array_view = gaussian_array
-    cdef double prefactor
-
-    prefactor = (1/(sigma*np.sqrt(2*np.pi)))
-    cdef int i
-    for i in range(len(E_array)):
-        gaussian_array_view[i] = (prefactor
-                                  * np.exp(
-                                    -(E_array[i]-mu)
-                                    * (E_array[i]-mu)/(2*sigma*sigma))
-                                  )
-
-    return gaussian_array
-
-
-def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
-    """
-    Function which smooths an array of counts by a Gaussian
-    of full-width-half-maximum FWHM. Preserves number of counts.
-    Args:
-        vector_in (array, double): Array of inbound counts to be smoothed
-        E_array (array, double): Array with energy calibration of vector_in
-        fwhm (double): The full-width-half-maximum value to smooth by
-
-    Returns:
-        vector_out: Array of smoothed counts
-
-    """
-    if not len(vector_in) == len(E_array):
-        raise ValueError("Length mismatch between vector_in and E_array")
-
-    cdef double[:] vector_in_view = vector_in
-
-    vector_out = np.zeros(len(vector_in), dtype=DTYPE)
-    # cdef double[:] vector_out_view = vector_out
-
-    cdef int i
-    for i in range(len(vector_out)):
-        vector_out += (vector_in_view[i]
-                       * gaussian(E_array, mu=E_array[i], sigma=fwhm/2.355))
-
-    return vector_out
-
-
-def response(folderpath, double[:] Eout_array, fwhm_abs):
+# def response(folderpath, double[:] Eout_array, fwhm_abs):
+def response(folderpath, Eout_array, fwhm_abs):
     """
     Function to make response matrix and related arrays from
     source files.
@@ -114,7 +67,7 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
     N_out = len(Eout_array)
     a0_out, a1_out = Eout_array[0], Eout_array[1]-Eout_array[0]
     # print("a0_out, a1_out =", a0_out, a1_out)
-    cdef int i
+    # cdef int i
 
     # Read resp.dat file, which gives information about the energy bins 
     # and discrete peaks
@@ -199,6 +152,10 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
     f_Eff_tot = interp1d(Eg_sim_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
 
 
+
+    # DEBUG:
+    # print("p511 vector from resp.dat =", p511)
+    # END DEBUG
 
 
 
@@ -286,9 +243,9 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
 
         # Get maximal energy by taking 6*sigma above full-energy peak
         E_low_max = Eg_low + 6*fwhm_abs*f_fwhm_rel(Eg_low)/2.35 #FWHM_rel.max()/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
-        i_low_max = min(int((E_low_max - a0_out)/a1_out + 0.5), N_out)
+        i_low_max = min(int((E_low_max - a0_out)/a1_out + 0.5), N_out-1)
         E_high_max = Eg_high + 6*fwhm_abs*f_fwhm_rel(Eg_high)/2.35 #FWHM_rel.max()/2.35
-        i_high_max = min(int((E_high_max - a0_out)/a1_out + 0.5), N_out)
+        i_high_max = min(int((E_high_max - a0_out)/a1_out + 0.5), N_out-1)
         # print("E_low_max =", E_low_max, "E_high_max =", E_high_max, flush=True)
 
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
@@ -376,13 +333,15 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
 
 
         # === Add peak structures to the spectrum: ===
-        fwhm_current = fwhm_abs * f_fwhm_rel(Eout_array[j])
+        E_fe = Eout_array[j]
+
+        fwhm_current = fwhm_abs * f_fwhm_rel(E_fe)
 
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
-        E_fe = Eout_array[j]
         full_energy = np.zeros(N_out)  # Allocate with zeros everywhere
         full_energy[j] = f_pFE(E_fe)  # Full probability into sharp peak
+        # MAMA does not smoothe the full-energy peak, it seems.
         # full_energy = gauss_smoothing(full_energy, Eout_array, fwhm_current)  # Smoothe
         R[j, :] += full_energy
 
@@ -392,9 +351,9 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
             i_se = int((E_se - a0_out)/a1_out + 0.5)
             # print("Eout_array[i_se] =", Eout_array[i_se])
             single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
-            single_escape[i_se] = f_pSE(E_se)  # Full probability into sharp peak
-            # single_escape = gauss_smoothing(single_escape, Eout_array,
-            #                                 fwhm_current)  # Smoothe
+            single_escape[i_se] = f_pSE(E_fe)  # Full probability into sharp peak
+            single_escape = gauss_smoothing(single_escape, Eout_array,
+                                            fwhm_current)  # Smoothe
             R[j, :] += single_escape
 
         # Add double-escape peak, at index i_de
@@ -403,9 +362,9 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
             i_de = int((E_de - a0_out)/a1_out + 0.5)
             # print("Eout_array[i_de] =", Eout_array[i_de])
             double_escape = np.zeros(N_out)  # Allocate with zeros everywhere
-            double_escape[i_de] = f_pDE(E_de)  # Full probability into sharp peak
-            # double_escape = gauss_smoothing(double_escape, Eout_array,
-            #                                 fwhm_current)  # Smoothe
+            double_escape[i_de] = f_pDE(E_fe)  # Full probability into sharp peak
+            double_escape = gauss_smoothing(double_escape, Eout_array,
+                                            fwhm_current)  # Smoothe
             R[j, :] += double_escape
 
         # Add 511 annihilation peak, at index i_an
@@ -413,11 +372,12 @@ def response(folderpath, double[:] Eout_array, fwhm_abs):
             E_511 = 511
             i_511 = int((E_511 - a0_out)/a1_out + 0.5)
             # print("Eout_array[i_511] =", Eout_array[i_511])
-            annihilation = np.zeros(N_out)  # Allocate with zeros everywhere
-            annihilation[i_511] = f_p511(E_511)  # Full probability into sharp peak
-            annihilation = gauss_smoothing(annihilation, Eout_array,
+            fiveeleven = np.zeros(N_out)  # Allocate with zeros everywhere
+            fiveeleven[i_511] = f_p511(E_fe)  # Full probability into sharp peak
+            # print("i_511 =", i_511, "fiveeleven[i_511] =", fiveeleven[i_511])
+            fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
                                            fwhm_current)  # Smoothe
-            R[j, :] += annihilation
+            R[j, :] += fiveeleven
     
         # === Finally, normalise the row to unity (probability conservation): ===
         R[j, :] = div0(R[j, :], np.sum(R[j, :]))
