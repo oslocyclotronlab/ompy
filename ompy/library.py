@@ -164,7 +164,7 @@ class Matrix():
         return cbar  # Return the colorbar to allow it to be plotted outside
 
     def plot_projection(self, E_limits, axis, ax=None, normalize=False,
-                        label=None):
+                        **kwargs):
         """Plots the projection of the matrix along axis
 
         Args:
@@ -194,18 +194,10 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
-            if label is None:
-                ax.plot(self.E0_array,
-                        projection,
-                        )
-            elif isinstance(label, str):
-                ax.plot(self.E0_array,
-                        projection,
-                        label=label
-                        )
-            else:
-                raise ValueError("Keyword label should be str or None, but is",
-                                 label)
+            ax.plot(self.E0_array,
+                    projection,
+                    **kwargs
+                    )
         elif axis == 1:
             i_E_low = i_from_E(E_limits[0], self.E0_array)
             i_E_high = i_from_E(E_limits[1], self.E0_array)
@@ -221,29 +213,18 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
-            if label is None:
-                ax.plot(self.E1_array,
-                        projection,
-                        )
-            elif isinstance(label, str):
-                ax.plot(self.E1_array,
-                        projection,
-                        label=label
-                        )
-            else:
-                raise ValueError("Keyword label should be str or None, but is",
-                                 label)
+            ax.plot(self.E1_array,
+                    projection,
+                    **kwargs
+                    )
         else:
             raise Exception("Variable axis must be one of (0, 1) but is",
                             axis)
-        if label is not None:
-            ax.legend()
 
-    def plot_projection_x(self, E_limits, ax=None, normalize=False,
-                          label=""):
+    def plot_projection_x(self, E_limits, ax=None, normalize=False, **kwargs):
         """ Wrapper to call plot_projection(axis=1) to project on x axis"""
-        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
-                               normalize=normalize, label=label)
+        self.plot_projection(E_limits=E_limits, axis=1, ax=ax,
+                               normalize=normalize, **kwargs)
 
     def save(self, fname):
         """
@@ -568,8 +549,6 @@ def line(x, points):
     a = (points[3]-points[1])/float(points[2]-points[0])
     b = points[1] - a*points[0]
     return a*x + b
-
-
 
 
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
