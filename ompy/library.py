@@ -551,8 +551,6 @@ def line(x, points):
     return a*x + b
 
 
-
-
 def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     # Updated 201807: Trying to vectorize so all Ex bins are handled simultaneously.
     # Takes a 2D array of counts, shifts it (downward only!) with energy 'shift'

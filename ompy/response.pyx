@@ -68,14 +68,14 @@ def gaussian(double[:] E_array, double mu, double sigma):
     return gaussian_array
 
 
-def gauss_smoothing(double[:] vector_in, double[:] E_array, double FWHM):
+def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
     """
     Function which smooths an array of counts by a Gaussian
     of full-width-half-maximum FWHM. Preserves number of counts.
     Args:
         vector_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of vector_in
-        FWHM (double): The full-width-half-maximum value to smooth by
+        fwhm (double): The full-width-half-maximum value to smooth by
 
     Returns:
         vector_out: Array of smoothed counts
@@ -92,12 +92,12 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array, double FWHM):
     cdef int i
     for i in range(len(vector_out)):
         vector_out += (vector_in_view[i]
-                       * gaussian(E_array, mu=E_array[i], sigma=FWHM/2.355))
+                       * gaussian(E_array, mu=E_array[i], sigma=fwhm/2.355))
 
     return vector_out
 
 
-def response(folderpath, double[:] Eout_array, FWHM):
+def response(folderpath, double[:] Eout_array, fwhm_abs):
     """
     Function to make response matrix and related arrays from
     source files.
@@ -108,7 +108,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
     Inputs:
     folderpath: The path to the folder containing Compton spectra and resp.dat
     Eout_array: The desired energies of the output response matrix. 
-    FWHM: The experimental relative full-width-half-max at 1.33 MeV.
+    fwhm_abs: The experimental absolute full-width-half-max at 1.33 MeV.
     """
     # Define helping variables from input
     N_out = len(Eout_array)
@@ -145,7 +145,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
 
     # Unpack the resp matrix into its columns
     resp = np.array(resp)
-    Eg_sim_array, FWHM_rel, Eff_tot, FE, SE, DE, c511 = resp.T
+    Eg_sim_array, fwhm_rel, Eff_tot, FE, SE, DE, c511 = resp.T
     a0_sim, a1_sim = Eg_sim_array[0], Eg_sim_array[1]-Eg_sim_array[0]
     # print("a0_sim, a1_sim =", a0_sim, a1_sim, flush=True)
     # "Eg_sim" means "gamma, simulated", and refers to the gamma energies where we have simulated Compton spectra.
@@ -195,7 +195,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
     f_pSE = interp1d(Eg_sim_array, pSE, kind="linear", bounds_error=False, fill_value=0)
     f_pDE = interp1d(Eg_sim_array, pDE, kind="linear", bounds_error=False, fill_value=0)
     f_p511 = interp1d(Eg_sim_array, p511, kind="linear", bounds_error=False, fill_value=0)
-    f_FWHM_rel = interp1d(Eg_sim_array, FWHM_rel, kind="linear", bounds_error=False, fill_value=0)
+    f_fwhm_rel = interp1d(Eg_sim_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
     f_Eff_tot = interp1d(Eg_sim_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
 
 
@@ -223,6 +223,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
 
     # Allocate response matrix array:
     R = np.zeros((N_out, N_out))
+    # Loop over rows of the response matrix
     for j in range(N_out):#[j_test]: 
         E_j = Eout_array[j]
         # Skip if below lower threshold
@@ -231,7 +232,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
 
 
         # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
-        Egmax = E_j + 6*FWHM*f_FWHM_rel(E_j)/2.35 #FWHM_rel.max()/2.35 
+        Egmax = E_j + 6*fwhm_abs*f_fwhm_rel(E_j)/2.35 #FWHM_rel.max()/2.35 
         i_Egmax = min(int((Egmax - a0_out)/a1_out + 0.5), N_out)
         # print("i_Egmax =", i_Egmax)
         # TODO does the FWHM array need to be interpolated before it is used here? j is not the right index? A quick fix since this is just an upper limit is to safeguard with FWHM.max()
@@ -284,9 +285,9 @@ def response(folderpath, double[:] Eout_array, FWHM):
         # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
 
         # Get maximal energy by taking 6*sigma above full-energy peak
-        E_low_max = Eg_low + 6*FWHM*f_FWHM_rel(Eg_low)/2.35 #FWHM_rel.max()/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
+        E_low_max = Eg_low + 6*fwhm_abs*f_fwhm_rel(Eg_low)/2.35 #FWHM_rel.max()/2.35 # TODO double check that it's the right index on FWHM_rel, plus check calibration of FWHM, FWHM[i_low]
         i_low_max = min(int((E_low_max - a0_out)/a1_out + 0.5), N_out)
-        E_high_max = Eg_high + 6*FWHM*f_FWHM_rel(Eg_high)/2.35 #FWHM_rel.max()/2.35
+        E_high_max = Eg_high + 6*fwhm_abs*f_fwhm_rel(Eg_high)/2.35 #FWHM_rel.max()/2.35
         i_high_max = min(int((E_high_max - a0_out)/a1_out + 0.5), N_out)
         # print("E_low_max =", E_low_max, "E_high_max =", E_high_max, flush=True)
 
@@ -374,11 +375,52 @@ def response(folderpath, double[:] Eout_array, FWHM):
 
 
 
-        # === 20190626 Add peak structures to the spectrum: ===
-        # R[j, :] += full_energy # check how this component is made in MAMA, including fwhm smoothing
+        # === Add peak structures to the spectrum: ===
+        fwhm_current = fwhm_abs * f_fwhm_rel(Eout_array[j])
 
+        # Add full-energy peak, which should be at energy corresponding to
+        # index j:
+        E_fe = Eout_array[j]
+        full_energy = np.zeros(N_out)  # Allocate with zeros everywhere
+        full_energy[j] = f_pFE(E_fe)  # Full probability into sharp peak
+        # full_energy = gauss_smoothing(full_energy, Eout_array, fwhm_current)  # Smoothe
+        R[j, :] += full_energy
 
+        # Add single-escape peak, at index i_se
+        E_se = E_fe - 511
+        if E_se >= 0:
+            i_se = int((E_se - a0_out)/a1_out + 0.5)
+            # print("Eout_array[i_se] =", Eout_array[i_se])
+            single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
+            single_escape[i_se] = f_pSE(E_se)  # Full probability into sharp peak
+            # single_escape = gauss_smoothing(single_escape, Eout_array,
+            #                                 fwhm_current)  # Smoothe
+            R[j, :] += single_escape
+
+        # Add double-escape peak, at index i_de
+        E_de = E_fe - 2*511
+        if E_de >= 0:
+            i_de = int((E_de - a0_out)/a1_out + 0.5)
+            # print("Eout_array[i_de] =", Eout_array[i_de])
+            double_escape = np.zeros(N_out)  # Allocate with zeros everywhere
+            double_escape[i_de] = f_pDE(E_de)  # Full probability into sharp peak
+            # double_escape = gauss_smoothing(double_escape, Eout_array,
+            #                                 fwhm_current)  # Smoothe
+            R[j, :] += double_escape
+
+        # Add 511 annihilation peak, at index i_an
+        if E_fe > 511:
+            E_511 = 511
+            i_511 = int((E_511 - a0_out)/a1_out + 0.5)
+            # print("Eout_array[i_511] =", Eout_array[i_511])
+            annihilation = np.zeros(N_out)  # Allocate with zeros everywhere
+            annihilation[i_511] = f_p511(E_511)  # Full probability into sharp peak
+            annihilation = gauss_smoothing(annihilation, Eout_array,
+                                           fwhm_current)  # Smoothe
+            R[j, :] += annihilation
+    
         # === Finally, normalise the row to unity (probability conservation): ===
+        R[j, :] = div0(R[j, :], np.sum(R[j, :]))
 
 
 
@@ -419,7 +461,7 @@ def response(folderpath, double[:] Eout_array, FWHM):
 
     
     # Return the response matrix R, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
-    return R, f_FWHM_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
+    return R, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
 
 
 
