@@ -17,7 +17,8 @@ setup(name='OMpy',
                             [
                              "ompy/rebin.pyx",
                              "ompy/rhosig.pyx",
-                             "ompy/response.pyx",
+                             # "ompy/response.pyx",
+                             "ompy/gauss_smoothing.pyx",
                             ],
                             # Use Python 3:
                             compiler_directives={'language_level': "3"}),
