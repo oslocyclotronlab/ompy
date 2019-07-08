@@ -23,7 +23,6 @@ DTYPE = np.float64
 # j_test = 50
 
 
-
 def E_compton(Eg, theta):
     """
     Calculates the energy of an electron that is scattered an angle
@@ -40,6 +39,7 @@ def E_compton(Eg, theta):
     # print("From E_compton(): Eg =", Eg, ", theta =", theta, ", formula =", Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))))
     return np.where(Eg > 0.1, Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))), Eg)
 
+
 def corr(Eg, theta):
     """
     Function to correct number of counts due to delta(theta)
@@ -49,8 +49,7 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
-# def response(folderpath, double[:] Eout_array, fwhm_abs):
-def response(folderpath, Eout_array, fwhm_abs):
+def interpolate_response(folderpath, Eout_array, fwhm_abs):
     """
     Function to make response matrix and related arrays from
     source files.
@@ -60,7 +59,7 @@ def response(folderpath, Eout_array, fwhm_abs):
     the desired energy binning specified by Eout_array.
     Inputs:
     folderpath: The path to the folder containing Compton spectra and resp.dat
-    Eout_array: The desired energies of the output response matrix. 
+    Eout_array: The desired energies of the output response matrix.
     fwhm_abs: The experimental absolute full-width-half-max at 1.33 MeV.
     """
     # Define helping variables from input
@@ -69,14 +68,14 @@ def response(folderpath, Eout_array, fwhm_abs):
     # print("a0_out, a1_out =", a0_out, a1_out)
     # cdef int i
 
-    # Read resp.dat file, which gives information about the energy bins 
+    # Read resp.dat file, which gives information about the energy bins
     # and discrete peaks
     resp = []
     Nlines = -1
     with open(os.path.join(folderpath, "resp.dat")) as file:
         while True:
             line = file.readline()
-            if not line: 
+            if not line:
                 break
             if line[0:22] == "# Next: Numer of Lines":
                 # TODO: The above if test is hardly very robust. Find a better solution.
@@ -418,10 +417,11 @@ def response(folderpath, Eout_array, fwhm_abs):
     # ax.legend()
     # plt.show()
 
-
+    # Put R into Matrix object:
+    response = Matrix(matrix=R, E0_array=Eout_array, E1_array=Eout_array)
     
-    # Return the response matrix R, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
-    return R, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
+    # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
+    return response, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
 
 
 

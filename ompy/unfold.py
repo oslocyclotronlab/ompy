@@ -26,12 +26,83 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-from .library import *
-from .constants import *
+# External library imports:
+import numpy as np
+
+# OMpy imports:
+from .library import Matrix, E_array_from_calibration, i_from_E, make_mask, div0
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
+from .compton_subtraction_method import shift_matrix
+from .response import interpolate_response
 
 global DE_PARTICLE
 global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
+
+
+class Unfolder():
+    def __init__(self, folder_path_response, calibration=None,
+                 matrix=None, fwhm=6.8):
+        """
+        Instantiate the class and interpolate the response function
+        to match gamma energy calibration of spectrum "raw".
+
+        Args:
+            folder_path_response (str): Path to the folder containing response
+                                        function information.
+            calibration (dict, optional): Calibration to interpolate the
+                                          response function to.
+            matrix (Matrix, optional): matrix with spectrum. It is just used to
+                                       get the
+                                       calibration, and has to be input separately
+                                       to the unfold() func.
+            fwhm (float): Experimental full-width-half-max at E_gamma=1.33 MeV.
+        """
+
+        Eg_array = None
+        if calibration is None and matrix is None:
+            raise Exception("Either calibration or matrix spectrum must be provided")
+        elif calibration is not None and matrix is None:
+            Eg_array = E_array_from_calibration(a0=calibration["a10"], a1=calibration["a11"],
+                                                N=calibration["N1"])
+        elif calibration is None and matrix is not None:
+            Eg_array = matrix.E1_array
+        else:
+            raise Exception("Cannot specify both matrix and calibration.")
+
+
+        self.folder_path_response = folder_path_response
+        self.fwhm = fwhm
+
+        # Run the interpolation to get a response matrix of correct type
+        response_matrix, fwhm_rel, Eff_tot, pcmp, pFE, pSE, pDE, p511 =\
+            interpolate_response(folder_path_response, Eg_array, fwhm_abs=6.8)
+
+        self.response_matrix = response_matrix
+        self.fwhm_rel = fwhm_rel
+        self.Eff_tot = Eff_tot
+        self.pcmp = pcmp
+        self.pFE = pFE
+        self.pSE = pSE
+        self.pDE = pDE
+        self.p511 = p511
+
+    def unfold(self, raw, Ex_min=None, Ex_max=None, Eg_min=None,
+               diag_cut=None,
+               Eg_max=None, verbose=False, plot=False,
+               use_comptonsubtraction=False):
+
+        unfolded = unfold(raw, self.response_matrix, fname_resp_dat=fname_resp_dat,
+                          Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
+                          diag_cut=diag_cut,
+                          Eg_max=Eg_max, verbose=verbose, plot=plot,
+                          use_comptonsubtraction=use_comptonsubtraction)
+        self.unfolded = unfolded
+
+        return unfolded
+
+
+
 
 
 def unfold(raw, response, fname_resp_dat=None,
@@ -65,20 +136,24 @@ def unfold(raw, response, fname_resp_dat=None,
         - Fix the compton subtraction method implementation.
     """
 
-    if use_comptonsubtraction:
-        raise Exception(("The compton subtraction method does not currently"
-                        " work correctly."))
+    # if use_comptonsubtraction:
+    #     raise Exception(("The compton subtraction method does not currently"
+    #                     " work correctly."))
 
-    if (raw.calibration["a00"] != response.calibration["a00"]
-            and raw.calibration["a01"] != response.calibration["a01"]):
+    # Check that the response matrix has the same energy calibration as the
+    # raw matrix's gamma energy axis (axis 1 in matrix notation):
+    if (raw.calibration()["a10"] != response.calibration()["a00"]
+            and raw.calibration()["a11"] != response.calibration()["a01"]):
         raise Exception(
-            "Energy calibration mismatch between raw and response matrices"
+            "Energy calibration mismatch between raw and response matrices. Numbers:"
+            "raw.calibration() =", raw.calibration(),
+            "response.calibration() =", response.calibration()
             )
-    if fname_resp_dat is None and use_comptonsubtraction is True:
-        raise Exception(
-            "fname_resp_dat not given, and "
-            "use_comptonsubtraction is True."
-            )
+    # if fname_resp_dat is None and use_comptonsubtraction is True:
+    #     raise Exception(
+    #         "fname_resp_dat not given, and "
+    #         "use_comptonsubtraction is True."
+    #         )
 
     # Rename variables for local use:
     # data_raw = raw.matrix
@@ -307,6 +382,7 @@ def unfold(raw, response, fname_resp_dat=None,
     # = Step 2: Compton subtraction =
     if use_comptonsubtraction: # Check if compton subtraction is turned on
 
+        print("DEBUG: Running Compton subtraction method.")
         # We also need the resp.dat file for this.
         # TODO: Consider writing a function that makes the response matrix (R) from this file
         # (or other input), so we don't have to keep track of redundant info.
@@ -324,26 +400,46 @@ def unfold(raw, response, fname_resp_dat=None,
         
         resp = np.array(resp)
         # Name the columns for ease of reading
-        FWHM = resp[:,1]
-        eff = resp[:,2]
-        pf = resp[:,3]
-        pc = resp[:,4]
-        ps = resp[:,5]
-        pd = resp[:,6]
-        pa = resp[:,7]
-        
+        E_resp_array = resp[:, 0]
+        FWHM = resp[:, 1]
+        eff = resp[:, 2]
+        pFE = resp[:, 3]
+        pcmp = resp[:, 4]
+        pSE = resp[:, 5]
+        pDE = resp[:, 6]
+        p511 = resp[:, 7]
+
         # Correct efficiency by multiplying with EffExp(Eg):
         EffExp_array = EffExp(Eg_array)
         # eff_corr = np.append(0,eff)*EffExp_array
         print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
         eff_corr = eff*EffExp_array
-    
+
+        # 20190708: The resp.dat array is no longer rebinned to the right
+        # energy. Instead we interpolate:
+        f_pcmp = interp1d(E_resp_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
+        f_pFE = interp1d(E_resp_array, pFE, kind="linear", bounds_error=False, fill_value=0)
+        f_pSE = interp1d(E_resp_array, pSE, kind="linear", bounds_error=False, fill_value=0)
+        f_pDE = interp1d(E_resp_array, pDE, kind="linear", bounds_error=False, fill_value=0)
+        f_p511 = interp1d(E_resp_array, p511, kind="linear", bounds_error=False, fill_value=0)
+        f_fwhm_rel = interp1d(E_resp_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
+        f_Eff_tot = interp1d(E_resp_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
+
+
+        # Then get new arrays with interpolated values
+        FWHM = f_fwhm_rel(Eg_array)
+        eff = f_Eff_tot(Eg_array)
+        pf = f_pFE(Eg_array)
+        pc = f_pcmp(Eg_array)
+        ps = f_pSE(Eg_array)
+        pd = f_pDE(Eg_array)
+        pa = f_p511(Eg_array)
+
         # Debugging: Test normalization of response matrix and response pieces:
         # i_R = 50
         # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
         # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
-    
-    
+
         # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
         # u0 is the unfolded spectrum from above, r is the raw spectrum, 
         # w = us + ud + ua is the folding contributions from everything except Compton,
