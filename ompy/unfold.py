@@ -34,7 +34,7 @@ global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
 
-def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
+def unfold(raw, response, fname_resp_dat=None,
            # FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
@@ -44,7 +44,8 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
 
     Args:
         raw (Matrix): the raw matrix to unfold, an instance of Matrix()
-        fname_resp_mat (str): file name of the response matrix, in MAMA format
+        response (Matrix): the detector response matrix, an instance of
+                           Matrix()
         fname_resp_dat (str): file name of the resp.dat file made by MAMA
         Ex_min (float): Lower limit for excitation energy
         Ex_max (float): Upper limit for excitation energy
@@ -68,10 +69,10 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         raise Exception(("The compton subtraction method does not currently"
                         " work correctly."))
 
-    if fname_resp_mat is None:
+    if (raw.calibration["a00"] != response.calibration["a00"]
+            and raw.calibration["a01"] != response.calibration["a01"]):
         raise Exception(
-            "fname_resp_mat not given, and "
-            "no response matrix is previously loaded."
+            "Energy calibration mismatch between raw and response matrices"
             )
     if fname_resp_dat is None and use_comptonsubtraction is True:
         raise Exception(
@@ -114,7 +115,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         print("Lowest Ex value =", Ex_array[0], flush=True)
 
     # Import response matrix
-    response = read_mama_2D(fname_resp_mat)
+    # response = read_mama_2D(fname_resp_mat)
     R = response.matrix
     Eg_array_R = response.E0_array
     cal_R = response.calibration()
