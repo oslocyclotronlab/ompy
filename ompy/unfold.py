@@ -30,7 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 
 # OMpy imports:
-from .library import Matrix, E_array_from_calibration, i_from_E, make_mask, div0
+from .library import Matrix, E_array_from_calibration, i_from_E, make_mask,\
+                     div0, EffExp
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 from .compton_subtraction_method import shift_matrix
 from .response import interpolate_response
@@ -75,12 +76,12 @@ class Unfolder():
         self.fwhm = fwhm
 
         # Run the interpolation to get a response matrix of correct type
-        response_matrix, fwhm_rel, Eff_tot, pcmp, pFE, pSE, pDE, p511 =\
+        response_matrix, fwhm_rel, eff_tot, pcmp, pFE, pSE, pDE, p511 =\
             interpolate_response(folder_path_response, Eg_array, fwhm_abs=6.8)
 
         self.response_matrix = response_matrix
         self.fwhm_rel = fwhm_rel
-        self.Eff_tot = Eff_tot
+        self.eff_tot = eff_tot
         self.pcmp = pcmp
         self.pFE = pFE
         self.pSE = pSE
@@ -92,32 +93,31 @@ class Unfolder():
                Eg_max=None, verbose=False, plot=False,
                use_comptonsubtraction=False):
 
-        unfolded = unfold(raw, self.response_matrix, fname_resp_dat=fname_resp_dat,
+        unfolded = unfold(raw, self.response_matrix,
                           Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
                           diag_cut=diag_cut,
                           Eg_max=Eg_max, verbose=verbose, plot=plot,
-                          use_comptonsubtraction=use_comptonsubtraction)
+                          use_comptonsubtraction=use_comptonsubtraction,
+                          FWHM=self.fwhm_rel, eff=self.eff_tot, pf=self.pFE, 
+                          pc=self.pcmp, ps=self.pSE, pd=self.pDE, pa=self.p511)
         self.unfolded = unfolded
 
         return unfolded
 
 
-
-
-
-def unfold(raw, response, fname_resp_dat=None,
+def unfold(raw, response,
            # FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
            Eg_max=None, verbose=False, plot=False,
-           use_comptonsubtraction=False):
+           use_comptonsubtraction=False,
+           FWHM=None, eff=None, pf=None, pc=None, ps=None, pd=None, pa=None):
     """Unfolds the gamma-detector response of a spectrum
 
     Args:
         raw (Matrix): the raw matrix to unfold, an instance of Matrix()
         response (Matrix): the detector response matrix, an instance of
                            Matrix()
-        fname_resp_dat (str): file name of the resp.dat file made by MAMA
         Ex_min (float): Lower limit for excitation energy
         Ex_max (float): Upper limit for excitation energy
         Eg_min (float): Lower limit for gamma-ray energy
@@ -127,6 +127,9 @@ def unfold(raw, response, fname_resp_dat=None,
         plot (bool): Toggle plotting
         use_comptonsubtraction (bool): Toggle whether to use the Compton
                                         subtraction method
+        FWHM, eff, ... (np arrays): Arrays of data from resp.dat, interpolated
+                                    to correct calibration. Designed to be
+                                    input through class wrapper.
 
     Returns:
         unfolded -- the unfolded matrix as an instance of the Matrix() class
@@ -386,54 +389,52 @@ def unfold(raw, response, fname_resp_dat=None,
         # We also need the resp.dat file for this.
         # TODO: Consider writing a function that makes the response matrix (R) from this file
         # (or other input), so we don't have to keep track of redundant info.
-        resp = []
-        with open(fname_resp_dat) as file:
+        # resp = []
+        # with open(fname_resp_dat) as file:
             # Read line by line as there is crazyness in the file format
-            lines = file.readlines()
-            for i in range(4,len(lines)):
-                try:
-                    row = np.array(lines[i].split(), dtype="double")
-                    resp.append(row)
-                except:
-                    break
+            # lines = file.readlines()
+            # for i in range(4,len(lines)):
+                # try:
+                    # row = np.array(lines[i].split(), dtype="double")
+                    # resp.append(row)
+                # except:
+                    # break
         
         
-        resp = np.array(resp)
-        # Name the columns for ease of reading
-        E_resp_array = resp[:, 0]
-        FWHM = resp[:, 1]
-        eff = resp[:, 2]
-        pFE = resp[:, 3]
-        pcmp = resp[:, 4]
-        pSE = resp[:, 5]
-        pDE = resp[:, 6]
-        p511 = resp[:, 7]
+        # # resp = np.array(resp)
+        # # Name the columns for ease of reading
+        # E_resp_array = resp[:, 0]
+        # FWHM = resp[:, 1]
+        # eff = resp[:, 2]
+        # pFE = resp[:, 3]
+        # pcmp = resp[:, 4]
+        # pSE = resp[:, 5]
+        # pDE = resp[:, 6]
+        # p511 = resp[:, 7]
 
-        # Correct efficiency by multiplying with EffExp(Eg):
+        # # Correct efficiency by multiplying with EffExp(Eg):
         EffExp_array = EffExp(Eg_array)
-        # eff_corr = np.append(0,eff)*EffExp_array
-        print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
-        eff_corr = eff*EffExp_array
+        # # eff_corr = np.append(0,eff)*EffExp_array
+        # print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
+        eff_corr = eff*EffExp_array # TODO2019 figure out where this fits in
 
         # 20190708: The resp.dat array is no longer rebinned to the right
         # energy. Instead we interpolate:
-        f_pcmp = interp1d(E_resp_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
-        f_pFE = interp1d(E_resp_array, pFE, kind="linear", bounds_error=False, fill_value=0)
-        f_pSE = interp1d(E_resp_array, pSE, kind="linear", bounds_error=False, fill_value=0)
-        f_pDE = interp1d(E_resp_array, pDE, kind="linear", bounds_error=False, fill_value=0)
-        f_p511 = interp1d(E_resp_array, p511, kind="linear", bounds_error=False, fill_value=0)
-        f_fwhm_rel = interp1d(E_resp_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
-        f_Eff_tot = interp1d(E_resp_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
-
-
-        # Then get new arrays with interpolated values
-        FWHM = f_fwhm_rel(Eg_array)
-        eff = f_Eff_tot(Eg_array)
-        pf = f_pFE(Eg_array)
-        pc = f_pcmp(Eg_array)
-        ps = f_pSE(Eg_array)
-        pd = f_pDE(Eg_array)
-        pa = f_p511(Eg_array)
+        # f_pcmp = interp1d(E_resp_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
+        # f_pFE = interp1d(E_resp_array, pFE, kind="linear", bounds_error=False, fill_value=0)
+        # f_pSE = interp1d(E_resp_array, pSE, kind="linear", bounds_error=False, fill_value=0)
+        # f_pDE = interp1d(E_resp_array, pDE, kind="linear", bounds_error=False, fill_value=0)
+        # f_p511 = interp1d(E_resp_array, p511, kind="linear", bounds_error=False, fill_value=0)
+        # f_fwhm_rel = interp1d(E_resp_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
+        # f_Eff_tot = interp1d(E_resp_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
+        # # Then get new arrays with interpolated values
+        # FWHM = f_fwhm_rel(Eg_array)
+        # eff = f_Eff_tot(Eg_array)
+        # pf = f_pFE(Eg_array)
+        # pc = f_pcmp(Eg_array)
+        # ps = f_pSE(Eg_array)
+        # pd = f_pDE(Eg_array)
+        # pa = f_p511(Eg_array)
 
         # Debugging: Test normalization of response matrix and response pieces:
         # i_R = 50
