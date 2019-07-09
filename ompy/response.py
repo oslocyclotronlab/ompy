@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d#, interp2d
 # from .unfold import *
 from .rebin import *
 from .library import *
-from .gauss_smoothing import *
+from .gauss_smoothing import gauss_smoothing
 
 DTYPE = np.float64
 
@@ -150,6 +150,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
     f_fwhm_rel = interp1d(Eg_sim_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
     f_Eff_tot = interp1d(Eg_sim_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
 
+    fwhm_abs_array = fwhm_abs*f_fwhm_rel(Eout_array)
 
 
     # DEBUG:
@@ -334,7 +335,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         # === Add peak structures to the spectrum: ===
         E_fe = Eout_array[j]
 
-        fwhm_current = fwhm_abs * f_fwhm_rel(E_fe)
+        
 
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
@@ -352,7 +353,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
             single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
             single_escape[i_se] = f_pSE(E_fe)  # Full probability into sharp peak
             single_escape = gauss_smoothing(single_escape, Eout_array,
-                                            fwhm_current)  # Smoothe
+                                            fwhm_abs_array)  # Smoothe
             R[j, :] += single_escape
 
         # Add double-escape peak, at index i_de
@@ -363,7 +364,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
             double_escape = np.zeros(N_out)  # Allocate with zeros everywhere
             double_escape[i_de] = f_pDE(E_fe)  # Full probability into sharp peak
             double_escape = gauss_smoothing(double_escape, Eout_array,
-                                            fwhm_current)  # Smoothe
+                                            fwhm_abs_array)  # Smoothe
             R[j, :] += double_escape
 
         # Add 511 annihilation peak, at index i_an
@@ -375,7 +376,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
             fiveeleven[i_511] = f_p511(E_fe)  # Full probability into sharp peak
             # print("i_511 =", i_511, "fiveeleven[i_511] =", fiveeleven[i_511])
             fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
-                                           fwhm_current)  # Smoothe
+                                           fwhm_abs_array)  # Smoothe
             R[j, :] += fiveeleven
     
         # === Finally, normalise the row to unity (probability conservation): ===

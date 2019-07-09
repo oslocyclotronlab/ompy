@@ -16,7 +16,10 @@ def gaussian(double[:] E_array, double mu, double sigma):
     """
     gaussian_array = np.zeros(len(E_array), dtype=DTYPE)
     cdef double[:] gaussian_array_view = gaussian_array
-    cdef double prefactor
+    cdef double prefactor, eps
+
+    eps = 1e-6  # Avoid zero division
+    sigma += eps
 
     prefactor = (1/(sigma*np.sqrt(2*np.pi)))
     cdef int i
@@ -30,7 +33,8 @@ def gaussian(double[:] E_array, double mu, double sigma):
     return gaussian_array
 
 
-def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
+def gauss_smoothing(double[:] vector_in, double[:] E_array,
+                    double[:] fwhm_array):
     """
     Function which smooths an array of counts by a Gaussian
     of full-width-half-maximum FWHM. Preserves number of counts.
@@ -45,6 +49,8 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
     """
     if not len(vector_in) == len(E_array):
         raise ValueError("Length mismatch between vector_in and E_array")
+    if not len(vector_in) == len(fwhm_array):
+        raise ValueError("Length mismatch between vector_in and fwhm_array")
 
     cdef double[:] vector_in_view = vector_in
     cdef double delta_energy
@@ -56,7 +62,7 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
 
     cdef int i
     for i in range(len(vector_out)):
-        pdf = gaussian(E_array, mu=E_array[i], sigma=fwhm/2.355)
+        pdf = gaussian(E_array, mu=E_array[i], sigma=fwhm_array[i]/2.355)
         pdf = pdf / (np.sum(pdf))
         vector_out += (vector_in_view[i]
                        * pdf)
@@ -65,11 +71,12 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
 
 
 def gauss_smoothing_matrix(matrix_in, E_array,
-                           fwhm):
+                           fwhm_array):
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
 
     for i in range(matrix_in.shape[0]):
-        matrix_out[i, :] = gauss_smoothing(matrix_in[i, :], E_array, fwhm)
+        matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
+                                           E_array, fwhm_array)
 
     return matrix_out
