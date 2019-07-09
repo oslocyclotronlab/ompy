@@ -117,7 +117,7 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
                             loc=Eg_array[indices_shifted].reshape(N_Eg_sh,1),
                             scale=FWHM[indices_shifted].reshape(N_Eg_sh,1)/2.355
                         )
-                        
+
         # Remove eventual NaN values:
         pdfarray = np.nan_to_num(pdfarray, copy=False)
         # print("Eg_array[indices_shifted] =", Eg_array[indices_shifted], flush=True)

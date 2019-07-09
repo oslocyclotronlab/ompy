@@ -35,6 +35,7 @@ from .library import Matrix, E_array_from_calibration, i_from_E, make_mask,\
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 from .compton_subtraction_method import shift_matrix
 from .response import interpolate_response
+from .gauss_smoothing import gauss_smoothing_matrix
 
 global DE_PARTICLE
 global DE_GAMMA_1MEV
@@ -79,6 +80,7 @@ class Unfolder():
         response_matrix, fwhm_rel, eff_tot, pcmp, pFE, pSE, pDE, p511 =\
             interpolate_response(folder_path_response, Eg_array, fwhm_abs=6.8)
 
+        # Store the resulting arrays inside class:
         self.response_matrix = response_matrix
         self.fwhm_rel = fwhm_rel
         self.eff_tot = eff_tot
@@ -87,6 +89,9 @@ class Unfolder():
         self.pSE = pSE
         self.pDE = pDE
         self.p511 = p511
+
+        # Also make an array of absolute FWHM values, which is the one to use:
+        self.fwhm_abs = fwhm*fwhm_rel
 
     def unfold(self, raw, Ex_min=None, Ex_max=None, Eg_min=None,
                diag_cut=None,
@@ -98,7 +103,7 @@ class Unfolder():
                           diag_cut=diag_cut,
                           Eg_max=Eg_max, verbose=verbose, plot=plot,
                           use_comptonsubtraction=use_comptonsubtraction,
-                          FWHM=self.fwhm_rel, eff=self.eff_tot, pf=self.pFE, 
+                          FWHM=self.fwhm_abs, eff=self.eff_tot, pf=self.pFE, 
                           pc=self.pcmp, ps=self.pSE, pd=self.pDE, pa=self.p511)
         self.unfolded = unfolded
 
@@ -448,50 +453,105 @@ def unfold(raw, response,
         # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
         # c is the estimated Compton spectrum.
         
-        
     
     
         # Check that there is enough memory:
     
-        # Split this operation into Ex chunks to not exceed memory:
-        # Allocate matrix to fill with result:
-        unfolded = np.zeros(unfoldmat.shape)
+        # # Split this operation into Ex chunks to not exceed memory:
+        # # Allocate matrix to fill with result:
+        # unfolded = np.zeros(unfoldmat.shape)
     
-        N_Ex_portions = 1 # How many portions to chunk, initially try just 1
-        mem_avail = psutil.virtual_memory()[1]
-        mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
-        if verbose:
-            print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-        while mem_need > mem_avail: 
-            # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
-            N_Ex_portions += 1 # Double number of portions 
-            mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
-        if verbose:
-            print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        # N_Ex_portions = 1 # How many portions to chunk, initially try just 1
+        # mem_avail = psutil.virtual_memory()[1]
+        # mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
+        # if verbose:
+        #     print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        # while mem_need > mem_avail: 
+        #     # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+        #     N_Ex_portions += 1 # Double number of portions 
+        #     mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
+        # if verbose:
+        #     print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
     
-        N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-        for i in range(N_Ex_portions):
-            u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
-            r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        # N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+        # for i in range(N_Ex_portions):
+        #     u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        #     r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
             
-            # Apply smoothing to the different peak structures. 
-            # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
-            # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
-            uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
-            # print("uf smoothed, integral =", uf.sum())
-            # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
-            # print("uf unsmoothed, integral =", uf_unsm.sum())
-            us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
-            ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
-            ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-            w = us + ud + ua
-            v = uf + w
-            c = r - v    
-            # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-            c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
-            # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-            u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
-            unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+        #     # Apply smoothing to the different peak structures. 
+        #     # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
+        #     # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
+        #     uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
+        #     # print("uf smoothed, integral =", uf.sum())
+        #     # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
+        #     # print("uf unsmoothed, integral =", uf_unsm.sum())
+        #     us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
+        #     ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
+        #     ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+        #     w = us + ud + ua
+        #     v = uf + w
+        #     c = r - v    
+        #     # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+        #     c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
+        #     # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+        #     u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
+        #     unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+
+
+
+        # 20190709 rewrite:
+        # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
+        # u0 is the unfolded spectrum from above, r is the raw spectrum, 
+        # w = us + ud + ua is the folding contributions from everything except Compton,
+        # i.e. us = single escape, ua = double escape, ua = annihilation (511).
+        # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
+        # c is the estimated Compton spectrum.
+
+        # Rename variables to match notation:
+        r = rawmat
+        u0 = unfoldmat
+
+        # Full-energy, smoothing but no shift:
+        uf = pf[iEg_min:iEg_max] * np.copy(u0)
+        uf = gauss_smoothing_matrix(uf, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+
+        # Single escape, smoothing and shift:
+        us = ps[iEg_min:iEg_max] * np.copy(u0)
+        us = gauss_smoothing_matrix(us, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+        us = shift_matrix(us, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+ 
+        # Double escape, smoothing and shift:
+        ud = pd[iEg_min:iEg_max] * np.copy(u0)
+        ud = gauss_smoothing_matrix(ud, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+        ud = shift_matrix(ud, Eg_array[iEg_min:iEg_max], energy_shift=-1024)
+
+        # Single-escape, smoothing and shift:
+        # TODO this should have everything mapped on 511 peak, just write custom code:
+        ua = np.zeros(u0.shape)
+        i511 = i_from_E(511, Eg_array[iEg_min:iEg_max])
+        ua[i511, :] = np.sum(pa[iEg_min:iEg_max] * np.copy(u0), axis=1)
+        ua = gauss_smoothing_matrix(ua, Eg_array[iEg_min:iEg_max],
+                                                 1.0*FWHM[iEg_min:iEg_max])
+        # ua = shift_matrix(ua, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+
+
+
+        # TODO continue with the rest, and debug the put it all together below
+        # since that was just copied from old code
+
+
+        # Put it all together:
+        w = us + ud + ua
+        v = uf + w
+        c = r - v
+
+        u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
+        unfolded = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+
+
 
         # end if use_comptonsubtraction
     else:

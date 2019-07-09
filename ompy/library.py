@@ -208,7 +208,7 @@ class Matrix():
                                 div0(
                                     self.matrix[i_E_low:i_E_high, :],
                                     (np.sum(self.matrix[i_E_low:i_E_high, :],
-                                           axis=1)
+                                     axis=1)
                                      * self.calibration()["a01"])[:, None]
                                     ),
                                 axis=0
@@ -226,7 +226,7 @@ class Matrix():
     def plot_projection_x(self, E_limits, ax=None, normalize=False, **kwargs):
         """ Wrapper to call plot_projection(axis=1) to project on x axis"""
         self.plot_projection(E_limits=E_limits, axis=1, ax=ax,
-                               normalize=normalize, **kwargs)
+                             normalize=normalize, **kwargs)
 
     def save(self, fname):
         """
