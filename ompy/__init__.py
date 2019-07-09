@@ -10,3 +10,4 @@ from .error_propagation import *
 from .rhosig import *
 from .spinfunctions import *
 from .response import *
+from .compton_subtraction_method import *

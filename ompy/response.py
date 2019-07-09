@@ -10,7 +10,7 @@ from scipy.interpolate import interp1d#, interp2d
 # from .unfold import *
 from .rebin import *
 from .library import *
-from .gauss_smoothing import *
+from .gauss_smoothing import gauss_smoothing
 
 DTYPE = np.float64
 
@@ -21,7 +21,6 @@ DTYPE = np.float64
 # and implement it into the rest of the code structure, then test it.
 
 # j_test = 50
-
 
 
 def E_compton(Eg, theta):
@@ -40,6 +39,7 @@ def E_compton(Eg, theta):
     # print("From E_compton(): Eg =", Eg, ", theta =", theta, ", formula =", Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))))
     return np.where(Eg > 0.1, Eg*Eg/511*(1-np.cos(theta)) / (1+Eg/511 * (1-np.cos(theta))), Eg)
 
+
 def corr(Eg, theta):
     """
     Function to correct number of counts due to delta(theta)
@@ -49,8 +49,7 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
-# def response(folderpath, double[:] Eout_array, fwhm_abs):
-def response(folderpath, Eout_array, fwhm_abs):
+def interpolate_response(folderpath, Eout_array, fwhm_abs):
     """
     Function to make response matrix and related arrays from
     source files.
@@ -60,7 +59,7 @@ def response(folderpath, Eout_array, fwhm_abs):
     the desired energy binning specified by Eout_array.
     Inputs:
     folderpath: The path to the folder containing Compton spectra and resp.dat
-    Eout_array: The desired energies of the output response matrix. 
+    Eout_array: The desired energies of the output response matrix.
     fwhm_abs: The experimental absolute full-width-half-max at 1.33 MeV.
     """
     # Define helping variables from input
@@ -69,14 +68,14 @@ def response(folderpath, Eout_array, fwhm_abs):
     # print("a0_out, a1_out =", a0_out, a1_out)
     # cdef int i
 
-    # Read resp.dat file, which gives information about the energy bins 
+    # Read resp.dat file, which gives information about the energy bins
     # and discrete peaks
     resp = []
     Nlines = -1
     with open(os.path.join(folderpath, "resp.dat")) as file:
         while True:
             line = file.readline()
-            if not line: 
+            if not line:
                 break
             if line[0:22] == "# Next: Numer of Lines":
                 # TODO: The above if test is hardly very robust. Find a better solution.
@@ -151,6 +150,7 @@ def response(folderpath, Eout_array, fwhm_abs):
     f_fwhm_rel = interp1d(Eg_sim_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
     f_Eff_tot = interp1d(Eg_sim_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
 
+    fwhm_abs_array = fwhm_abs*f_fwhm_rel(Eout_array)
 
 
     # DEBUG:
@@ -335,7 +335,7 @@ def response(folderpath, Eout_array, fwhm_abs):
         # === Add peak structures to the spectrum: ===
         E_fe = Eout_array[j]
 
-        fwhm_current = fwhm_abs * f_fwhm_rel(E_fe)
+        
 
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
@@ -353,7 +353,7 @@ def response(folderpath, Eout_array, fwhm_abs):
             single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
             single_escape[i_se] = f_pSE(E_fe)  # Full probability into sharp peak
             single_escape = gauss_smoothing(single_escape, Eout_array,
-                                            fwhm_current)  # Smoothe
+                                            fwhm_abs_array)  # Smoothe
             R[j, :] += single_escape
 
         # Add double-escape peak, at index i_de
@@ -364,7 +364,7 @@ def response(folderpath, Eout_array, fwhm_abs):
             double_escape = np.zeros(N_out)  # Allocate with zeros everywhere
             double_escape[i_de] = f_pDE(E_fe)  # Full probability into sharp peak
             double_escape = gauss_smoothing(double_escape, Eout_array,
-                                            fwhm_current)  # Smoothe
+                                            fwhm_abs_array)  # Smoothe
             R[j, :] += double_escape
 
         # Add 511 annihilation peak, at index i_an
@@ -376,7 +376,7 @@ def response(folderpath, Eout_array, fwhm_abs):
             fiveeleven[i_511] = f_p511(E_fe)  # Full probability into sharp peak
             # print("i_511 =", i_511, "fiveeleven[i_511] =", fiveeleven[i_511])
             fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
-                                           fwhm_current)  # Smoothe
+                                           fwhm_abs_array)  # Smoothe
             R[j, :] += fiveeleven
     
         # === Finally, normalise the row to unity (probability conservation): ===
@@ -418,10 +418,11 @@ def response(folderpath, Eout_array, fwhm_abs):
     # ax.legend()
     # plt.show()
 
-
+    # Put R into Matrix object:
+    response = Matrix(matrix=R, E0_array=Eout_array, E1_array=Eout_array)
     
-    # Return the response matrix R, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
-    return R, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
+    # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
+    return response, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
 
 
 

@@ -26,26 +26,103 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-from .library import *
-from .constants import *
+# External library imports:
+import numpy as np
+
+# OMpy imports:
+from .library import Matrix, E_array_from_calibration, i_from_E, make_mask,\
+                     div0, EffExp
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
+from .compton_subtraction_method import shift_matrix
+from .response import interpolate_response
+from .gauss_smoothing import gauss_smoothing_matrix
 
 global DE_PARTICLE
 global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
 
-def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
+class Unfolder():
+    def __init__(self, folder_path_response, calibration=None,
+                 matrix=None, fwhm=6.8):
+        """
+        Instantiate the class and interpolate the response function
+        to match gamma energy calibration of spectrum "raw".
+
+        Args:
+            folder_path_response (str): Path to the folder containing response
+                                        function information.
+            calibration (dict, optional): Calibration to interpolate the
+                                          response function to.
+            matrix (Matrix, optional): matrix with spectrum. It is just used to
+                                       get the
+                                       calibration, and has to be input separately
+                                       to the unfold() func.
+            fwhm (float): Experimental full-width-half-max at E_gamma=1.33 MeV.
+        """
+
+        Eg_array = None
+        if calibration is None and matrix is None:
+            raise Exception("Either calibration or matrix spectrum must be provided")
+        elif calibration is not None and matrix is None:
+            Eg_array = E_array_from_calibration(a0=calibration["a10"], a1=calibration["a11"],
+                                                N=calibration["N1"])
+        elif calibration is None and matrix is not None:
+            Eg_array = matrix.E1_array
+        else:
+            raise Exception("Cannot specify both matrix and calibration.")
+
+
+        self.folder_path_response = folder_path_response
+        self.fwhm = fwhm
+
+        # Run the interpolation to get a response matrix of correct type
+        response_matrix, fwhm_rel, eff_tot, pcmp, pFE, pSE, pDE, p511 =\
+            interpolate_response(folder_path_response, Eg_array, fwhm_abs=6.8)
+
+        # Store the resulting arrays inside class:
+        self.response_matrix = response_matrix
+        self.fwhm_rel = fwhm_rel
+        self.eff_tot = eff_tot
+        self.pcmp = pcmp
+        self.pFE = pFE
+        self.pSE = pSE
+        self.pDE = pDE
+        self.p511 = p511
+
+        # Also make an array of absolute FWHM values, which is the one to use:
+        self.fwhm_abs = fwhm*fwhm_rel
+
+    def unfold(self, raw, Ex_min=None, Ex_max=None, Eg_min=None,
+               diag_cut=None,
+               Eg_max=None, verbose=False, plot=False,
+               use_comptonsubtraction=False):
+
+        unfolded = unfold(raw, self.response_matrix,
+                          Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
+                          diag_cut=diag_cut,
+                          Eg_max=Eg_max, verbose=verbose, plot=plot,
+                          use_comptonsubtraction=use_comptonsubtraction,
+                          FWHM=self.fwhm_abs, eff=self.eff_tot, pf=self.pFE, 
+                          pc=self.pcmp, ps=self.pSE, pd=self.pDE, pa=self.p511)
+        self.unfolded = unfolded
+
+        return unfolded
+
+
+def unfold(raw, response,
            # FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
            Eg_max=None, verbose=False, plot=False,
-           use_comptonsubtraction=False):
+           use_comptonsubtraction=False,
+           FWHM=None, eff=None, pf=None, pc=None, ps=None, pd=None, pa=None):
     """Unfolds the gamma-detector response of a spectrum
 
     Args:
         raw (Matrix): the raw matrix to unfold, an instance of Matrix()
-        fname_resp_mat (str): file name of the response matrix, in MAMA format
-        fname_resp_dat (str): file name of the resp.dat file made by MAMA
+        response (Matrix): the detector response matrix, an instance of
+                           Matrix()
         Ex_min (float): Lower limit for excitation energy
         Ex_max (float): Upper limit for excitation energy
         Eg_min (float): Lower limit for gamma-ray energy
@@ -55,6 +132,9 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         plot (bool): Toggle plotting
         use_comptonsubtraction (bool): Toggle whether to use the Compton
                                         subtraction method
+        FWHM, eff, ... (np arrays): Arrays of data from resp.dat, interpolated
+                                    to correct calibration. Designed to be
+                                    input through class wrapper.
 
     Returns:
         unfolded -- the unfolded matrix as an instance of the Matrix() class
@@ -64,20 +144,24 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         - Fix the compton subtraction method implementation.
     """
 
-    if use_comptonsubtraction:
-        raise Exception(("The compton subtraction method does not currently"
-                        " work correctly."))
+    # if use_comptonsubtraction:
+    #     raise Exception(("The compton subtraction method does not currently"
+    #                     " work correctly."))
 
-    if fname_resp_mat is None:
+    # Check that the response matrix has the same energy calibration as the
+    # raw matrix's gamma energy axis (axis 1 in matrix notation):
+    if (raw.calibration()["a10"] != response.calibration()["a00"]
+            and raw.calibration()["a11"] != response.calibration()["a01"]):
         raise Exception(
-            "fname_resp_mat not given, and "
-            "no response matrix is previously loaded."
+            "Energy calibration mismatch between raw and response matrices. Numbers:"
+            "raw.calibration() =", raw.calibration(),
+            "response.calibration() =", response.calibration()
             )
-    if fname_resp_dat is None and use_comptonsubtraction is True:
-        raise Exception(
-            "fname_resp_dat not given, and "
-            "use_comptonsubtraction is True."
-            )
+    # if fname_resp_dat is None and use_comptonsubtraction is True:
+    #     raise Exception(
+    #         "fname_resp_dat not given, and "
+    #         "use_comptonsubtraction is True."
+    #         )
 
     # Rename variables for local use:
     # data_raw = raw.matrix
@@ -114,7 +198,7 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         print("Lowest Ex value =", Ex_array[0], flush=True)
 
     # Import response matrix
-    response = read_mama_2D(fname_resp_mat)
+    # response = read_mama_2D(fname_resp_mat)
     R = response.matrix
     Eg_array_R = response.E0_array
     cal_R = response.calibration()
@@ -306,43 +390,62 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
     # = Step 2: Compton subtraction =
     if use_comptonsubtraction: # Check if compton subtraction is turned on
 
+        print("DEBUG: Running Compton subtraction method.")
         # We also need the resp.dat file for this.
         # TODO: Consider writing a function that makes the response matrix (R) from this file
         # (or other input), so we don't have to keep track of redundant info.
-        resp = []
-        with open(fname_resp_dat) as file:
+        # resp = []
+        # with open(fname_resp_dat) as file:
             # Read line by line as there is crazyness in the file format
-            lines = file.readlines()
-            for i in range(4,len(lines)):
-                try:
-                    row = np.array(lines[i].split(), dtype="double")
-                    resp.append(row)
-                except:
-                    break
+            # lines = file.readlines()
+            # for i in range(4,len(lines)):
+                # try:
+                    # row = np.array(lines[i].split(), dtype="double")
+                    # resp.append(row)
+                # except:
+                    # break
         
         
-        resp = np.array(resp)
-        # Name the columns for ease of reading
-        FWHM = resp[:,1]
-        eff = resp[:,2]
-        pf = resp[:,3]
-        pc = resp[:,4]
-        ps = resp[:,5]
-        pd = resp[:,6]
-        pa = resp[:,7]
-        
-        # Correct efficiency by multiplying with EffExp(Eg):
+        # # resp = np.array(resp)
+        # # Name the columns for ease of reading
+        # E_resp_array = resp[:, 0]
+        # FWHM = resp[:, 1]
+        # eff = resp[:, 2]
+        # pFE = resp[:, 3]
+        # pcmp = resp[:, 4]
+        # pSE = resp[:, 5]
+        # pDE = resp[:, 6]
+        # p511 = resp[:, 7]
+
+        # # Correct efficiency by multiplying with EffExp(Eg):
         EffExp_array = EffExp(Eg_array)
-        # eff_corr = np.append(0,eff)*EffExp_array
-        print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
-        eff_corr = eff*EffExp_array
-    
+        # # eff_corr = np.append(0,eff)*EffExp_array
+        # print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
+        eff_corr = eff*EffExp_array # TODO2019 figure out where this fits in
+
+        # 20190708: The resp.dat array is no longer rebinned to the right
+        # energy. Instead we interpolate:
+        # f_pcmp = interp1d(E_resp_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
+        # f_pFE = interp1d(E_resp_array, pFE, kind="linear", bounds_error=False, fill_value=0)
+        # f_pSE = interp1d(E_resp_array, pSE, kind="linear", bounds_error=False, fill_value=0)
+        # f_pDE = interp1d(E_resp_array, pDE, kind="linear", bounds_error=False, fill_value=0)
+        # f_p511 = interp1d(E_resp_array, p511, kind="linear", bounds_error=False, fill_value=0)
+        # f_fwhm_rel = interp1d(E_resp_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
+        # f_Eff_tot = interp1d(E_resp_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
+        # # Then get new arrays with interpolated values
+        # FWHM = f_fwhm_rel(Eg_array)
+        # eff = f_Eff_tot(Eg_array)
+        # pf = f_pFE(Eg_array)
+        # pc = f_pcmp(Eg_array)
+        # ps = f_pSE(Eg_array)
+        # pd = f_pDE(Eg_array)
+        # pa = f_p511(Eg_array)
+
         # Debugging: Test normalization of response matrix and response pieces:
         # i_R = 50
         # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
         # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
-    
-    
+
         # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
         # u0 is the unfolded spectrum from above, r is the raw spectrum, 
         # w = us + ud + ua is the folding contributions from everything except Compton,
@@ -350,50 +453,105 @@ def unfold(raw, fname_resp_mat=None, fname_resp_dat=None,
         # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
         # c is the estimated Compton spectrum.
         
-        
     
     
         # Check that there is enough memory:
     
-        # Split this operation into Ex chunks to not exceed memory:
-        # Allocate matrix to fill with result:
-        unfolded = np.zeros(unfoldmat.shape)
+        # # Split this operation into Ex chunks to not exceed memory:
+        # # Allocate matrix to fill with result:
+        # unfolded = np.zeros(unfoldmat.shape)
     
-        N_Ex_portions = 1 # How many portions to chunk, initially try just 1
-        mem_avail = psutil.virtual_memory()[1]
-        mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
-        if verbose:
-            print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-        while mem_need > mem_avail: 
-            # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
-            N_Ex_portions += 1 # Double number of portions 
-            mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
-        if verbose:
-            print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        # N_Ex_portions = 1 # How many portions to chunk, initially try just 1
+        # mem_avail = psutil.virtual_memory()[1]
+        # mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
+        # if verbose:
+        #     print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
+        # while mem_need > mem_avail: 
+        #     # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
+        #     N_Ex_portions += 1 # Double number of portions 
+        #     mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
+        # if verbose:
+        #     print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
     
-        N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-        for i in range(N_Ex_portions):
-            u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
-            r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        # N_Ex_per_portion = int(N_Ex/N_Ex_portions)
+        # for i in range(N_Ex_portions):
+        #     u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
+        #     r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
             
-            # Apply smoothing to the different peak structures. 
-            # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
-            # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
-            uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
-            # print("uf smoothed, integral =", uf.sum())
-            # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
-            # print("uf unsmoothed, integral =", uf_unsm.sum())
-            us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
-            ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
-            ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-            w = us + ud + ua
-            v = uf + w
-            c = r - v    
-            # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-            c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
-            # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-            u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
-            unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+        #     # Apply smoothing to the different peak structures. 
+        #     # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
+        #     # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
+        #     uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
+        #     # print("uf smoothed, integral =", uf.sum())
+        #     # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
+        #     # print("uf unsmoothed, integral =", uf_unsm.sum())
+        #     us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
+        #     ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
+        #     ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
+        #     w = us + ud + ua
+        #     v = uf + w
+        #     c = r - v    
+        #     # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+        #     c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
+        #     # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
+        #     u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
+        #     unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+
+
+
+        # 20190709 rewrite:
+        # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
+        # u0 is the unfolded spectrum from above, r is the raw spectrum, 
+        # w = us + ud + ua is the folding contributions from everything except Compton,
+        # i.e. us = single escape, ua = double escape, ua = annihilation (511).
+        # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
+        # c is the estimated Compton spectrum.
+
+        # Rename variables to match notation:
+        r = rawmat
+        u0 = unfoldmat
+
+        # Full-energy, smoothing but no shift:
+        uf = pf[iEg_min:iEg_max] * np.copy(u0)
+        uf = gauss_smoothing_matrix(uf, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+
+        # Single escape, smoothing and shift:
+        us = ps[iEg_min:iEg_max] * np.copy(u0)
+        us = gauss_smoothing_matrix(us, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+        us = shift_matrix(us, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+ 
+        # Double escape, smoothing and shift:
+        ud = pd[iEg_min:iEg_max] * np.copy(u0)
+        ud = gauss_smoothing_matrix(ud, Eg_array[iEg_min:iEg_max],
+                                                 0.5*FWHM[iEg_min:iEg_max])
+        ud = shift_matrix(ud, Eg_array[iEg_min:iEg_max], energy_shift=-1024)
+
+        # Single-escape, smoothing and shift:
+        # TODO this should have everything mapped on 511 peak, just write custom code:
+        ua = np.zeros(u0.shape)
+        i511 = i_from_E(511, Eg_array[iEg_min:iEg_max])
+        ua[i511, :] = np.sum(pa[iEg_min:iEg_max] * np.copy(u0), axis=1)
+        ua = gauss_smoothing_matrix(ua, Eg_array[iEg_min:iEg_max],
+                                                 1.0*FWHM[iEg_min:iEg_max])
+        # ua = shift_matrix(ua, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+
+
+
+        # TODO continue with the rest, and debug the put it all together below
+        # since that was just copied from old code
+
+
+        # Put it all together:
+        w = us + ud + ua
+        v = uf + w
+        c = r - v
+
+        u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
+        unfolded = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
+
+
 
         # end if use_comptonsubtraction
     else:
