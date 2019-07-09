@@ -47,13 +47,29 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array, double fwhm):
         raise ValueError("Length mismatch between vector_in and E_array")
 
     cdef double[:] vector_in_view = vector_in
+    cdef double delta_energy
+
+    delta_energy = E_array[1] - E_array[0]
 
     vector_out = np.zeros(len(vector_in), dtype=DTYPE)
     # cdef double[:] vector_out_view = vector_out
 
     cdef int i
     for i in range(len(vector_out)):
+        pdf = gaussian(E_array, mu=E_array[i], sigma=fwhm/2.355)
+        pdf = pdf / (np.sum(pdf))
         vector_out += (vector_in_view[i]
-                       * gaussian(E_array, mu=E_array[i], sigma=fwhm/2.355))
+                       * pdf)
 
     return vector_out
+
+
+def gauss_smoothing_matrix(matrix_in, E_array,
+                           fwhm):
+    cdef int i
+    matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
+
+    for i in range(matrix_in.shape[0]):
+        matrix_out[i, :] = gauss_smoothing(matrix_in[i, :], E_array, fwhm)
+
+    return matrix_out
