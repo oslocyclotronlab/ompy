@@ -52,7 +52,8 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     Args:
         vector_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of vector_in
-        fwhm (double): The full-width-half-maximum value to smooth by
+        fwhm (double): The full-width-half-maximum value to smooth by, in
+                       percent.
 
     Returns:
         vector_out: Array of smoothed counts
@@ -74,7 +75,7 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     cdef int i
     for i in range(len(vector_out)):
         pdf = gaussian(E_array, mu=E_array[i],
-                       sigma=fwhm_array[i]/(2.355)
+                       sigma=fwhm_array[i]/(2.355*100)*E_array[i]
                        )
         pdf = pdf / (np.sum(pdf))
         vector_out += (vector_in_view[i]
