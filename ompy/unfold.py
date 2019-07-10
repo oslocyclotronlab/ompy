@@ -409,11 +409,17 @@ def unfold(raw, response,
 
         # Single escape, smoothing and shift:
         us = ps[iEg_min:iEg_max] * np.copy(u0)
-        FWHM_factor_se = FWHM_factor/1.1 if
+        FWHM_factor_se = 1
+        # Tweak from Mama for FWHM_factor below is commented out
+        # -> we don't understand why it should be there
+        # if FWHM_factor == 1:
+        #     FWHM_factor_se = 1
+        # else:
+        #     FWHM_factor_se = FWHM_factor/1.1
         us = gauss_smoothing_matrix(us, Eg_array_cut,
                                     0.5*FWHM[iEg_min:iEg_max]/FWHM_factor_se)
         us = shift_matrix(us, Eg_array_cut, energy_shift=-511)
- 
+
         # Double escape, smoothing and shift:
         ud = pd[iEg_min:iEg_max] * np.copy(u0)
         ud = gauss_smoothing_matrix(ud, Eg_array_cut,

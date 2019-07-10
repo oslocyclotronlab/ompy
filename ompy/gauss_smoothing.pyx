@@ -75,12 +75,13 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
 
     cdef int i
     for i in range(len(vector_out)):
-        pdf = gaussian(E_array, mu=E_array[i],
-                       sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
-                       )
-        pdf = pdf / (np.sum(pdf))
-        vector_out += (vector_in_view[i]
-                       * pdf)
+        counts = vector_in_view[i]
+        if counts > 0:
+            pdf = gaussian(E_array, mu=E_array[i],
+                           sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
+                           )
+            pdf = pdf / np.sum(pdf)
+            vector_out += counts * pdf
 
     return vector_out
 
