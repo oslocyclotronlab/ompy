@@ -12,7 +12,18 @@ DTYPE = np.float64
 
 def gaussian(double[:] E_array, double mu, double sigma):
     """
-    Returns a normalized Gaussian supported on E_array
+    Returns a normalized Gaussian supported on E_array.
+
+    NB! All arguments (E_array, mu and sigma) must have the
+    same units. In OMpy the default unit is keV.
+
+    Args:
+        E_array (array, double): Array of energies to evaluate
+        mu (double): Centroid
+        sigma (double): Standard deviation
+    Returns:
+        gaussian_array (array, double): Array of gaussian
+            distribution values matching E_array.
     """
     gaussian_array = np.zeros(len(E_array), dtype=DTYPE)
     cdef double[:] gaussian_array_view = gaussian_array
@@ -53,16 +64,18 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
         raise ValueError("Length mismatch between vector_in and fwhm_array")
 
     cdef double[:] vector_in_view = vector_in
-    cdef double delta_energy
+    cdef double bin_width
 
-    delta_energy = E_array[1] - E_array[0]
+    bin_width = E_array[1] - E_array[0]
 
     vector_out = np.zeros(len(vector_in), dtype=DTYPE)
     # cdef double[:] vector_out_view = vector_out
 
     cdef int i
     for i in range(len(vector_out)):
-        pdf = gaussian(E_array, mu=E_array[i], sigma=fwhm_array[i]/2.355)
+        pdf = gaussian(E_array, mu=E_array[i],
+                       sigma=fwhm_array[i]/(2.355)
+                       )
         pdf = pdf / (np.sum(pdf))
         vector_out += (vector_in_view[i]
                        * pdf)
