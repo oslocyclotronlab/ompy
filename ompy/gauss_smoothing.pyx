@@ -2,8 +2,6 @@ import os
 import numpy as np
 from scipy.interpolate import interp1d#, interp2d
 
-# from .firstgen import *
-# from .unfold import *
 from .rebin import *
 from .library import *
 
@@ -45,15 +43,18 @@ def gaussian(double[:] E_array, double mu, double sigma):
 
 
 def gauss_smoothing(double[:] vector_in, double[:] E_array,
-                    double[:] fwhm_array):
+                    double[:] fwhm_divE_array):
     """
     Function which smooths an array of counts by a Gaussian
     of full-width-half-maximum FWHM. Preserves number of counts.
     Args:
         vector_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of vector_in
-        fwhm (double): The full-width-half-maximum value to smooth by, in
-                       percent.
+        fwhm_divE_array (double): The full-width-half-maximum value to smooth
+                                  by, in percent of the energy. Note well that
+                                  this means that
+                                  fwhm = fwhm_divE/100 * E_array
+                                  gives you the absolute FWHM.
 
     Returns:
         vector_out: Array of smoothed counts
@@ -61,8 +62,8 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     """
     if not len(vector_in) == len(E_array):
         raise ValueError("Length mismatch between vector_in and E_array")
-    if not len(vector_in) == len(fwhm_array):
-        raise ValueError("Length mismatch between vector_in and fwhm_array")
+    if not len(vector_in) == len(fwhm_divE_array):
+        raise ValueError("Length mismatch between vector_in and fwhm_divE_array")
 
     cdef double[:] vector_in_view = vector_in
     cdef double bin_width
@@ -75,7 +76,7 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     cdef int i
     for i in range(len(vector_out)):
         pdf = gaussian(E_array, mu=E_array[i],
-                       sigma=fwhm_array[i]/(2.355*100)*E_array[i]
+                       sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
                        )
         pdf = pdf / (np.sum(pdf))
         vector_out += (vector_in_view[i]

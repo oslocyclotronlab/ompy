@@ -34,7 +34,7 @@ import os
 from .library import (Matrix, E_array_from_calibration, i_from_E, make_mask,
                       div0, EffExp)
 from .constants import (DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV,
-                        FWHM_1330KEV_OSCAR, FOLDER_PATH_RESPONSE_OSCAR)
+                        FWHM_1332KEV_OSCAR, FOLDER_PATH_RESPONSE_OSCAR)
 from .compton_subtraction_method import shift_matrix
 from .response import interpolate_response
 from .gauss_smoothing import gauss_smoothing_matrix
@@ -81,7 +81,7 @@ class Unfolder():
                                                 FOLDER_PATH_RESPONSE_OSCAR)
         if fwhm is None:
             # Using default fwhm value
-            fwhm = FWHM_1330KEV_OSCAR
+            fwhm = FWHM_1332KEV_OSCAR
 
 
         self.folder_path_response = folder_path_response
@@ -250,37 +250,19 @@ def unfold(raw, response,
     if not (np.abs(cal_raw["a10"]-cal_R["a10"]) < eps
             and np.abs(cal_raw["a11"]-cal_R["a11"]) < eps):
         raise Exception("Calibration mismatch between data and response matrices")
-
-    
     
     # = Step 1: Run iterative unfolding =
     if verbose:
         time_unfolding_start = time.process_time()
-    
-    
-    # Set limits for excitation and gamma energy bins to be considered for unfolding
-    # Ex_max = 14000 # keV
-    # Use index 0 of array as lower limit instead of energy because it can be negative!
-    # print("Ex_max =", Ex_max)
+
+    # Set limits for excitation and gamma energy bins to be considered for
+    # unfolding. Use index 0 of array as lower limit instead of energy because
+    # it can be negative!
     iEx_min, iEx_max = 0, i_from_E(Ex_max, Ex_array)
-    Eg_min = 0 # keV - minimum
-    # Eg_min = 500 # keV 
-    # Eg_max = 14000 # keV
     iEg_min, iEg_max = 0, i_from_E(Eg_max, Eg_array)
     # Max number of iterations:
     Nit = 33 #12 # 8 # 27
-    
-    # # Make masking array to cut away noise below Eg=Ex+dEg diagonal
-    # # Define cut   x1    y1    x2    y2
-    # cut_points = [i_from_E(Eg_min + dEg, Eg_array), i_from_E(Ex_min, Ex_array), 
-    #               i_from_E(Eg_max+dEg, Eg_array), i_from_E(Ex_max, Ex_array)]
-    # # cut_points = [ 72,   5,  1050,  257]
-    # # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
-    # # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-    # i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
-    # j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
-    # i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
-    # mask = np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
+
     mask = None
     if diag_cut is not None:
         mask = make_mask(Ex_array, Eg_array,
@@ -385,145 +367,33 @@ def unfold(raw, response,
             print("i_Ex = {:d}, Ex = {:f}, i_score_vector = {:d}".format(i_Ex,
                   Ex_array[i_Ex], i_score_vector[i_Ex]))
 
-    # Remove negative counts and trim:
-    # Update 20190130: Keep unfolding as simple as possible, do these
-    # operations manually.
-    # unfoldmat[unfoldmat<=0] = 0
-    # unfoldmat = mask_cut*unfoldmat
-
     if plot:
         # Plot:
-        cbar_fold = ax_fold.pcolormesh(Eg_array[iEg_min:iEg_max], Ex_array[iEx_min:iEx_max], foldmat, norm=LogNorm(vmin=1))
+        cbar_fold = ax_fold.pcolormesh(Eg_array_cut, Ex_array[iEx_min:iEx_max], foldmat, norm=LogNorm(vmin=1))
         f.colorbar(cbar_fold, ax=ax_fold)
-    
+
     if verbose:
         time_unfolding_end = time.process_time()
         time_compton_start = time.process_time()
-    
-    
+
     # = Step 2: Compton subtraction =
-    if use_comptonsubtraction: # Check if compton subtraction is turned on
-
-        print("DEBUG: Running Compton subtraction method.")
-        # We also need the resp.dat file for this.
-        # TODO: Consider writing a function that makes the response matrix (R) from this file
-        # (or other input), so we don't have to keep track of redundant info.
-        # resp = []
-        # with open(fname_resp_dat) as file:
-            # Read line by line as there is crazyness in the file format
-            # lines = file.readlines()
-            # for i in range(4,len(lines)):
-                # try:
-                    # row = np.array(lines[i].split(), dtype="double")
-                    # resp.append(row)
-                # except:
-                    # break
-        
-        
-        # # resp = np.array(resp)
-        # # Name the columns for ease of reading
-        # E_resp_array = resp[:, 0]
-        # FWHM = resp[:, 1]
-        # eff = resp[:, 2]
-        # pFE = resp[:, 3]
-        # pcmp = resp[:, 4]
-        # pSE = resp[:, 5]
-        # pDE = resp[:, 6]
-        # p511 = resp[:, 7]
-
+    if use_comptonsubtraction:  # Check if compton subtraction is turned on
         # # Correct efficiency by multiplying with EffExp(Eg):
         EffExp_array = EffExp(Eg_array)
-        # # eff_corr = np.append(0,eff)*EffExp_array
-        # print("From unfold(): eff.shape =", eff.shape, "EffExp_array.shape =", EffExp_array.shape, flush=True)
-        eff_corr = eff*EffExp_array # TODO2019 figure out where this fits in
-
-        # 20190708: The resp.dat array is no longer rebinned to the right
-        # energy. Instead we interpolate:
-        # f_pcmp = interp1d(E_resp_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
-        # f_pFE = interp1d(E_resp_array, pFE, kind="linear", bounds_error=False, fill_value=0)
-        # f_pSE = interp1d(E_resp_array, pSE, kind="linear", bounds_error=False, fill_value=0)
-        # f_pDE = interp1d(E_resp_array, pDE, kind="linear", bounds_error=False, fill_value=0)
-        # f_p511 = interp1d(E_resp_array, p511, kind="linear", bounds_error=False, fill_value=0)
-        # f_fwhm_rel = interp1d(E_resp_array, fwhm_rel, kind="linear", bounds_error=False, fill_value=0)
-        # f_Eff_tot = interp1d(E_resp_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
-        # # Then get new arrays with interpolated values
-        # FWHM = f_fwhm_rel(Eg_array)
-        # eff = f_Eff_tot(Eg_array)
-        # pf = f_pFE(Eg_array)
-        # pc = f_pcmp(Eg_array)
-        # ps = f_pSE(Eg_array)
-        # pd = f_pDE(Eg_array)
-        # pa = f_p511(Eg_array)
-
-        # Debugging: Test normalization of response matrix and response pieces:
-        # i_R = 50
-        # print("R[{:d},:].sum() =".format(i_R), R[i_R,:].sum())
-        # print("(pf+pc+ps+pd+pa)[{:d}] =".format(i_R), pf[i_R]+pc[i_R]+ps[i_R]+pd[i_R]+pa[i_R])
-
-        # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
-        # u0 is the unfolded spectrum from above, r is the raw spectrum, 
-        # w = us + ud + ua is the folding contributions from everything except Compton,
-        # i.e. us = single escape, ua = double escape, ua = annihilation (511).
-        # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
-        # c is the estimated Compton spectrum.
-        
-    
-    
-        # Check that there is enough memory:
-    
-        # # Split this operation into Ex chunks to not exceed memory:
-        # # Allocate matrix to fill with result:
-        # unfolded = np.zeros(unfoldmat.shape)
-    
-        # N_Ex_portions = 1 # How many portions to chunk, initially try just 1
-        # mem_avail = psutil.virtual_memory()[1]
-        # mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1] # The factor 2 is needed to not crash my system. Possibly numpy copies an array somewhere, doubling required memory?
-        # if verbose:
-        #     print("Compton subtraction: \nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-        # while mem_need > mem_avail: 
-        #     # raise Exception("Not enough memory to construct smoothing arrays. Please try rebinning the data.")
-        #     N_Ex_portions += 1 # Double number of portions 
-        #     mem_need = 2 * 8 * N_Ex/N_Ex_portions * unfoldmat.shape[1] * unfoldmat.shape[1]
-        # if verbose:
-        #     print("Adjusted to N_Ex_portions =", N_Ex_portions, "\nmem_avail =", mem_avail, ", mem_need =", mem_need, ", ratio =", mem_need/mem_avail, flush=True)
-    
-        # N_Ex_per_portion = int(N_Ex/N_Ex_portions)
-        # for i in range(N_Ex_portions):
-        #     u0 = unfoldmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
-        #     r = rawmat[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:]
-            
-        #     # Apply smoothing to the different peak structures. 
-        #     # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
-        #     # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
-        #     uf = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=True)
-        #     # print("uf smoothed, integral =", uf.sum())
-        #     # uf_unsm = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pf, shift=0, smoothing=False)
-        #     # print("uf unsmoothed, integral =", uf_unsm.sum())
-        #     us = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor*1.1, ps, shift=511, smoothing=True)
-        #     ud = shift_and_smooth3D(u0, Eg_array, 0.5*FWHM/FWHM_factor, pd, shift=1022, smoothing=True)
-        #     ua = shift_and_smooth3D(u0, Eg_array, 1.0*FWHM, pa, shift="annihilation", smoothing=True)
-        #     w = us + ud + ua
-        #     v = uf + w
-        #     c = r - v    
-        #     # Smoothe the Compton spectrum (using an array of 1's for the probability to only get smoothing):
-        #     c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
-        #     # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
-        #     u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
-        #     unfolded[i*N_Ex_per_portion:(i+1)*N_Ex_per_portion,:] = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
-
-
-
-        # 20190709 rewrite:
-        # We follow the notation of Guttormsen et al (NIM 1996) in what follows.
-        # u0 is the unfolded spectrum from above, r is the raw spectrum, 
-        # w = us + ud + ua is the folding contributions from everything except Compton,
-        # i.e. us = single escape, ua = double escape, ua = annihilation (511).
+        eff_corr = eff*EffExp_array
+        # We follow the notation of Guttormsen et al (NIM 1996) in what
+        # follows.
+        # u0 is the unfolded spectrum from above, r is the raw spectrum,
+        # w = us + ud + ua is the folding contributions from everything except
+        # Compton,i.e. us = single escape, ua = double escape, ua = annihilation
+        # (511).
         # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
         # c is the estimated Compton spectrum.
         #
-        # We apply smoothing to the different peak structures. 
-        # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
-        # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
+        # We apply smoothing to the different peak structures.
+        # FWHM/FWHM_factor (usually FWHM/10) is used for all except
+        # single escape (FWHM*1.1/FWHM_factor) if FWHM_factor!=1) and annihilation (FWHM*1.0).
+        # This is like MAMA.
 
         # TODO: Change the variable Eg_array to be the iEg_min:iEg_max
         # cut version, to avoid having to index it all the time?
@@ -534,28 +404,29 @@ def unfold(raw, response,
 
         # Full-energy, smoothing but no shift:
         uf = pf[iEg_min:iEg_max] * np.copy(u0)
-        uf = gauss_smoothing_matrix(uf, Eg_array[iEg_min:iEg_max],
+        uf = gauss_smoothing_matrix(uf, Eg_array_cut,
                                     0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
 
         # Single escape, smoothing and shift:
         us = ps[iEg_min:iEg_max] * np.copy(u0)
-        us = gauss_smoothing_matrix(us, Eg_array[iEg_min:iEg_max],
-                                    0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
-        us = shift_matrix(us, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+        FWHM_factor_se = FWHM_factor/1.1 if
+        us = gauss_smoothing_matrix(us, Eg_array_cut,
+                                    0.5*FWHM[iEg_min:iEg_max]/FWHM_factor_se)
+        us = shift_matrix(us, Eg_array_cut, energy_shift=-511)
  
         # Double escape, smoothing and shift:
         ud = pd[iEg_min:iEg_max] * np.copy(u0)
-        ud = gauss_smoothing_matrix(ud, Eg_array[iEg_min:iEg_max],
+        ud = gauss_smoothing_matrix(ud, Eg_array_cut,
                                     0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
-        ud = shift_matrix(ud, Eg_array[iEg_min:iEg_max], energy_shift=-1024)
+        ud = shift_matrix(ud, Eg_array_cut, energy_shift=-1024)
 
         # Single-escape, smoothing and shift:
         ua = np.zeros(u0.shape)
-        i511 = i_from_E(511, Eg_array[iEg_min:iEg_max])
+        i511 = i_from_E(511, Eg_array_cut)
         ua[i511, :] = np.sum(pa[iEg_min:iEg_max] * np.copy(u0), axis=1)
-        ua = gauss_smoothing_matrix(ua, Eg_array[iEg_min:iEg_max],
+        ua = gauss_smoothing_matrix(ua, Eg_array_cut,
                                     1.0*FWHM[iEg_min:iEg_max])
-        # ua = shift_matrix(ua, Eg_array[iEg_min:iEg_max], energy_shift=-511)
+        # ua = shift_matrix(ua, Eg_array_cut, energy_shift=-511)
 
 
         # TODO insert FWHMfactor throughout?
@@ -567,7 +438,7 @@ def unfold(raw, response,
         c = r - v
 
         # Smoothe the Compton part, which is the main trick:
-        c = gauss_smoothing_matrix(c, Eg_array[iEg_min:iEg_max],
+        c = gauss_smoothing_matrix(c, Eg_array_cut,
                                    1.0*FWHM[iEg_min:iEg_max]/FWHM_factor)
 
         u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
@@ -582,18 +453,18 @@ def unfold(raw, response,
 
     # Diagnostic plotting:
     # f_compt, ax_compt = plt.subplots(1,1)
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], r[0,:], label="r")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], u0[0,:], label="u0")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], uf[0,:], label="uf")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], uf_unsm[0,:], label="uf unsmoothed")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], us[0,:], label="us")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], ud[0,:], label="ud")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], ua[0,:], label="ua")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], w[0,:], label="w")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], v[0,:], label="v")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], c[0,:], label="c")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], c_s[0,:], label="c_s")
-    # ax_compt.plot(Eg_array[iEg_min:iEg_max], u[0,:], label="u")
+    # ax_compt.plot(Eg_array_cut, r[0,:], label="r")
+    # ax_compt.plot(Eg_array_cut, u0[0,:], label="u0")
+    # ax_compt.plot(Eg_array_cut, uf[0,:], label="uf")
+    # ax_compt.plot(Eg_array_cut, uf_unsm[0,:], label="uf unsmoothed")
+    # ax_compt.plot(Eg_array_cut, us[0,:], label="us")
+    # ax_compt.plot(Eg_array_cut, ud[0,:], label="ud")
+    # ax_compt.plot(Eg_array_cut, ua[0,:], label="ua")
+    # ax_compt.plot(Eg_array_cut, w[0,:], label="w")
+    # ax_compt.plot(Eg_array_cut, v[0,:], label="v")
+    # ax_compt.plot(Eg_array_cut, c[0,:], label="c")
+    # ax_compt.plot(Eg_array_cut, c_s[0,:], label="c_s")
+    # ax_compt.plot(Eg_array_cut, u[0,:], label="u")
     # ax_compt.legend()
            
 
@@ -612,10 +483,10 @@ def unfold(raw, response,
 
     if plot:
         # Plot unfolded and Compton subtracted matrices:
-        cbar_unfold = ax_unfold.pcolormesh(Eg_array[iEg_min:iEg_max], Ex_array[iEx_min:iEx_max], unfoldmat, norm=LogNorm(vmin=1))
+        cbar_unfold = ax_unfold.pcolormesh(Eg_array_cut, Ex_array[iEx_min:iEx_max], unfoldmat, norm=LogNorm(vmin=1))
         f.colorbar(cbar_unfold, ax=ax_unfold)
         if use_comptonsubtraction:
-            cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array[iEg_min:iEg_max], Ex_array[iEx_min:iEx_max], unfolded, norm=LogNorm(vmin=1))
+            cbar_unfold_smooth = ax_unfold_smooth.pcolormesh(Eg_array_cut, Ex_array[iEx_min:iEx_max], unfolded, norm=LogNorm(vmin=1))
             f.colorbar(cbar_unfold_smooth, ax=ax_unfold_smooth)
         plt.show()
 
@@ -623,7 +494,7 @@ def unfold(raw, response,
 
 
     # Update global variables:
-    unfolded = Matrix(unfolded, Ex_array[iEx_min:iEx_max], Eg_array[iEg_min:iEg_max])
+    unfolded = Matrix(unfolded, Ex_array[iEx_min:iEx_max], Eg_array_cut)
 
     return unfolded
 

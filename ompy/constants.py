@@ -41,5 +41,5 @@ DE_GAMMA_8MEV = 300  # keV - Gamma energy resolution at 8 MeV
 # Default folder paths and absolute full-width-half-max at 1.33
 # MeV for different detector setups:
 # OSCAR:
-FWHM_1330KEV_OSCAR = 8.59  # percent
+FWHM_1332KEV_OSCAR = 2.277  # percent of the energy
 FOLDER_PATH_RESPONSE_OSCAR = "oscar2017_scale1.15"
