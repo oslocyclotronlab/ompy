@@ -28,11 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 # External library imports:
 import numpy as np
+import os
 
 # OMpy imports:
-from .library import Matrix, E_array_from_calibration, i_from_E, make_mask,\
-                     div0, EffExp
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
+from .library import (Matrix, E_array_from_calibration, i_from_E, make_mask,
+                      div0, EffExp)
+from .constants import (DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV,
+                        FWHM_1330KEV_OSCAR, FOLDER_PATH_RESPONSE_OSCAR)
 from .compton_subtraction_method import shift_matrix
 from .response import interpolate_response
 from .gauss_smoothing import gauss_smoothing_matrix
@@ -43,8 +45,9 @@ global DE_GAMMA_8MEV
 
 
 class Unfolder():
-    def __init__(self, folder_path_response, calibration=None,
-                 matrix=None, fwhm=6.8):
+    def __init__(self, folder_path_response=None,
+                 calibration=None, matrix=None,
+                 fwhm=None):
         """
         Instantiate the class and interpolate the response function
         to match gamma energy calibration of spectrum "raw".
@@ -71,6 +74,14 @@ class Unfolder():
             Eg_array = matrix.E1_array
         else:
             raise Exception("Cannot specify both matrix and calibration.")
+        if folder_path_response is None:
+            # Using default response:
+            dirname = os.path.dirname(__file__)
+            folder_path_response = os.path.join(dirname, "../",
+                                                FOLDER_PATH_RESPONSE_OSCAR)
+        if fwhm is None:
+            # Using default fwhm value
+            fwhm = FWHM_1330KEV_OSCAR
 
 
         self.folder_path_response = folder_path_response
@@ -93,17 +104,20 @@ class Unfolder():
         # Also make an array of absolute FWHM values, which is the one to use:
         self.fwhm_abs = fwhm*fwhm_rel
 
-    def unfold(self, raw, Ex_min=None, Ex_max=None, Eg_min=None,
+    def unfold(self, raw,
+               FWHM_factor=10,
+               Ex_min=None, Ex_max=None, Eg_min=None,
                diag_cut=None,
                Eg_max=None, verbose=False, plot=False,
                use_comptonsubtraction=False):
 
         unfolded = unfold(raw, self.response_matrix,
+                          FWHM_factor=FWHM_factor,
                           Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
                           diag_cut=diag_cut,
                           Eg_max=Eg_max, verbose=verbose, plot=plot,
                           use_comptonsubtraction=use_comptonsubtraction,
-                          FWHM=self.fwhm_abs, eff=self.eff_tot, pf=self.pFE, 
+                          FWHM=self.fwhm_abs, eff=self.eff_tot, pf=self.pFE,
                           pc=self.pcmp, ps=self.pSE, pd=self.pDE, pa=self.p511)
         self.unfolded = unfolded
 
@@ -111,7 +125,7 @@ class Unfolder():
 
 
 def unfold(raw, response,
-           # FWHM_factor=10,
+           FWHM_factor=10,
            Ex_min=None, Ex_max=None, Eg_min=None,
            diag_cut=None,
            Eg_max=None, verbose=False, plot=False,
@@ -506,6 +520,10 @@ def unfold(raw, response,
         # i.e. us = single escape, ua = double escape, ua = annihilation (511).
         # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
         # c is the estimated Compton spectrum.
+        #
+        # We apply smoothing to the different peak structures. 
+        # FWHM/FWHM_factor (usually FWHM/10) is used for all except 
+        # single escape (FWHM*1.1/FWHM_factor)) and annihilation (FWHM*1.0). This is like MAMA.
 
         # TODO: Change the variable Eg_array to be the iEg_min:iEg_max
         # cut version, to avoid having to index it all the time?
@@ -517,18 +535,18 @@ def unfold(raw, response,
         # Full-energy, smoothing but no shift:
         uf = pf[iEg_min:iEg_max] * np.copy(u0)
         uf = gauss_smoothing_matrix(uf, Eg_array[iEg_min:iEg_max],
-                                                 0.5*FWHM[iEg_min:iEg_max])
+                                    0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
 
         # Single escape, smoothing and shift:
         us = ps[iEg_min:iEg_max] * np.copy(u0)
         us = gauss_smoothing_matrix(us, Eg_array[iEg_min:iEg_max],
-                                                 0.5*FWHM[iEg_min:iEg_max])
+                                    0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
         us = shift_matrix(us, Eg_array[iEg_min:iEg_max], energy_shift=-511)
  
         # Double escape, smoothing and shift:
         ud = pd[iEg_min:iEg_max] * np.copy(u0)
         ud = gauss_smoothing_matrix(ud, Eg_array[iEg_min:iEg_max],
-                                                 0.5*FWHM[iEg_min:iEg_max])
+                                    0.5*FWHM[iEg_min:iEg_max]/FWHM_factor)
         ud = shift_matrix(ud, Eg_array[iEg_min:iEg_max], energy_shift=-1024)
 
         # Single-escape, smoothing and shift:
@@ -536,13 +554,9 @@ def unfold(raw, response,
         i511 = i_from_E(511, Eg_array[iEg_min:iEg_max])
         ua[i511, :] = np.sum(pa[iEg_min:iEg_max] * np.copy(u0), axis=1)
         ua = gauss_smoothing_matrix(ua, Eg_array[iEg_min:iEg_max],
-                                                 1.0*FWHM[iEg_min:iEg_max])
+                                    1.0*FWHM[iEg_min:iEg_max])
         # ua = shift_matrix(ua, Eg_array[iEg_min:iEg_max], energy_shift=-511)
 
-
-
-        # TODO continue with the rest, and debug the put it all together below
-        # since that was just copied from old code
 
         # TODO insert FWHMfactor throughout?
 
@@ -554,7 +568,7 @@ def unfold(raw, response,
 
         # Smoothe the Compton part, which is the main trick:
         c = gauss_smoothing_matrix(c, Eg_array[iEg_min:iEg_max],
-                                   1.0*FWHM[iEg_min:iEg_max])
+                                   1.0*FWHM[iEg_min:iEg_max]/FWHM_factor)
 
         u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
         unfolded = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
