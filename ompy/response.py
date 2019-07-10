@@ -49,6 +49,28 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
+def two_channel_split(E_centroid, E_array):
+    """
+    When E_centroid is between two bins in E_array, this function
+    returns the indices of the two nearest bins and the distance to
+    the lower bin. The distance to the higher bin is 1-floor_distance
+
+    Args:
+        E_centroid (double): The energy of the centroid
+        E_array (np.array, double): The energy grid to distribute on
+    """
+
+    a0 = E_array[0]
+    a1 = E_array[1]-E_array[0]
+
+    i_exact = (E_centroid - a0)/a1 + 0.5
+    i_floor = int(np.floor((E_centroid - a0)/a1 + 0.5))
+    i_ceil = int(np.ceil((E_centroid - a0)/a1 + 0.5))
+    floor_distance = (i_exact - i_floor)
+
+    return i_floor, i_ceil, floor_distance
+
+
 def interpolate_response(folderpath, Eout_array, fwhm_abs):
     """
     Function to make response matrix and related arrays from
@@ -181,7 +203,10 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
     # Allocate response matrix array:
     R = np.zeros((N_out, N_out))
     # Loop over rows of the response matrix
-    for j in range(N_out):#[j_test]: 
+    # TODO for speedup: Change this to a cython .pyx, declare the j variable.
+    #                   + run a Cython profiler, probably use memory views and
+    #                   other tweaks to speedup (see rebin.pyx for examples).
+    for j in range(N_out):
         E_j = Eout_array[j]
         # Skip if below lower threshold
         if E_j < Egmin:
@@ -275,6 +300,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         i_last = i_bsc_out # Keep track of how far up the fan method goes
         i_low_last = i_bsc_out
         i_high_last = i_bsc_out
+        # TODO declare i variable for speedup
         for i in range(i_bsc_out, i_ce_out):
             E_i = Eout_array[i] # Energy of current point in interpolated spectrum
             if E_i > 0.1 and E_i < Ece:
@@ -348,21 +374,25 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         # Add single-escape peak, at index i_se
         E_se = E_fe - 511
         if E_se >= 0:
-            i_se = int((E_se - a0_out)/a1_out + 0.5)
-            # print("Eout_array[i_se] =", Eout_array[i_se])
+            i_floor, i_ceil, floor_distance\
+                = two_channel_split(E_se, Eout_array)
             single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
-            single_escape[i_se] = f_pSE(E_fe)  # Full probability into sharp peak
+            # Put a portion of the counts into floor bin - the further away,the
+            # less counts:
+            single_escape[i_floor] = (1-floor_distance) * f_pSE(E_fe)
+            single_escape[i_ceil] = floor_distance * f_pSE(E_fe)
             single_escape = gauss_smoothing(single_escape, Eout_array,
                                             fwhm_abs_array)  # Smoothe
             R[j, :] += single_escape
 
-        # Add double-escape peak, at index i_de
+        # Repeat for double-escape peak, at index i_de
         E_de = E_fe - 2*511
         if E_de >= 0:
-            i_de = int((E_de - a0_out)/a1_out + 0.5)
-            # print("Eout_array[i_de] =", Eout_array[i_de])
-            double_escape = np.zeros(N_out)  # Allocate with zeros everywhere
-            double_escape[i_de] = f_pDE(E_fe)  # Full probability into sharp peak
+            i_floor, i_ceil, floor_distance\
+                = two_channel_split(E_de, Eout_array)
+            double_escape = np.zeros(N_out)
+            double_escape[i_floor] = (1-floor_distance) * f_pDE(E_fe)
+            double_escape[i_ceil] = floor_distance * f_pDE(E_fe)
             double_escape = gauss_smoothing(double_escape, Eout_array,
                                             fwhm_abs_array)  # Smoothe
             R[j, :] += double_escape
@@ -370,25 +400,22 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         # Add 511 annihilation peak, at index i_an
         if E_fe > 511:
             E_511 = 511
-            i_511 = int((E_511 - a0_out)/a1_out + 0.5)
-            # print("Eout_array[i_511] =", Eout_array[i_511])
-            fiveeleven = np.zeros(N_out)  # Allocate with zeros everywhere
-            fiveeleven[i_511] = f_p511(E_fe)  # Full probability into sharp peak
-            # print("i_511 =", i_511, "fiveeleven[i_511] =", fiveeleven[i_511])
+            i_floor, i_ceil, floor_distance\
+                = two_channel_split(E_511, Eout_array)
+            fiveeleven = np.zeros(N_out)
+            fiveeleven[i_floor] = (1-floor_distance) * f_p511(E_fe)
+            fiveeleven[i_ceil] = floor_distance * f_p511(E_fe)
             fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
-                                           fwhm_abs_array)  # Smoothe
+                                         fwhm_abs_array)  # Smoothe
             R[j, :] += fiveeleven
-    
+
         # === Finally, normalise the row to unity (probability conservation): ===
         R[j, :] = div0(R[j, :], np.sum(R[j, :]))
-
-
-
 
     # END loop over Eout energies Ej
 
     # Remove any negative elements from response matrix:
-    R[R<0] = 0
+    R[R < 0] = 0
 
 
 

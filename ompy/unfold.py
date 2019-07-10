@@ -491,7 +491,7 @@ def unfold(raw, response,
         #     w = us + ud + ua
         #     v = uf + w
         #     c = r - v    
-        #     # Smooth the Compton spectrum (using an array of 1's for the probability to only get smoothing):
+        #     # Smoothe the Compton spectrum (using an array of 1's for the probability to only get smoothing):
         #     c_s = shift_and_smooth3D(c, Eg_array, 1.0*FWHM/FWHM_factor, np.ones(len(FWHM)), shift=0, smoothing=True)    
         #     # Subtract smoothed Compton and other structures from raw spectrum and correct for full-energy prob:
         #     u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
@@ -506,6 +506,9 @@ def unfold(raw, response,
         # i.e. us = single escape, ua = double escape, ua = annihilation (511).
         # v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum
         # c is the estimated Compton spectrum.
+
+        # TODO: Change the variable Eg_array to be the iEg_min:iEg_max
+        # cut version, to avoid having to index it all the time?
 
         # Rename variables to match notation:
         r = rawmat
@@ -529,7 +532,6 @@ def unfold(raw, response,
         ud = shift_matrix(ud, Eg_array[iEg_min:iEg_max], energy_shift=-1024)
 
         # Single-escape, smoothing and shift:
-        # TODO this should have everything mapped on 511 peak, just write custom code:
         ua = np.zeros(u0.shape)
         i511 = i_from_E(511, Eg_array[iEg_min:iEg_max])
         ua[i511, :] = np.sum(pa[iEg_min:iEg_max] * np.copy(u0), axis=1)
@@ -542,11 +544,17 @@ def unfold(raw, response,
         # TODO continue with the rest, and debug the put it all together below
         # since that was just copied from old code
 
+        # TODO insert FWHMfactor throughout?
+
 
         # Put it all together:
         w = us + ud + ua
         v = uf + w
         c = r - v
+
+        # Smoothe the Compton part, which is the main trick:
+        c = gauss_smoothing_matrix(c, Eg_array[iEg_min:iEg_max],
+                                   1.0*FWHM[iEg_min:iEg_max])
 
         u = div0((r - c - w), np.append(0,pf)[iEg_min:iEg_max]) # Channel 0 is missing from resp.dat    
         unfolded = div0(u,eff_corr[iEg_min:iEg_max]) # Add Ex channel to array, also correcting for efficiency. Now we're done!
