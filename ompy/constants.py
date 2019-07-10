@@ -34,3 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 DE_PARTICLE = 150  # keV - Particle energy resolution
 DE_GAMMA_1MEV = 60  # keV - Gamma energy resolution at 1 MeV
 DE_GAMMA_8MEV = 300  # keV - Gamma energy resolution at 8 MeV
+
+
+# === response / unfolding ===
+
+# Default folder paths and absolute full-width-half-max at 1.33
+# MeV for different detector setups:
+# OSCAR:
+FWHM_1330KEV_OSCAR = 8.59  # percent
+FOLDER_PATH_RESPONSE_OSCAR = "oscar2017_scale1.15"
