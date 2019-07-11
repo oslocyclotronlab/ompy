@@ -1313,6 +1313,22 @@ static CYTHON_INLINE void __Pyx_ErrFetchInState(PyThreadState *tstate, PyObject 
 /* RaiseException.proto */
 static void __Pyx_Raise(PyObject *type, PyObject *value, PyObject *tb, PyObject *cause);
 
+/* PyIntBinop.proto */
+#if !CYTHON_COMPILING_IN_PYPY
+static PyObject* __Pyx_PyInt_AddObjC(PyObject *op1, PyObject *op2, long intval, int inplace, int zerodivision_check);
+#else
+#define __Pyx_PyInt_AddObjC(op1, op2, intval, inplace, zerodivision_check)\
+    (inplace ? PyNumber_InPlaceAdd(op1, op2) : PyNumber_Add(op1, op2))
+#endif
+
+/* SliceObject.proto */
+#define __Pyx_PyObject_DelSlice(obj, cstart, cstop, py_start, py_stop, py_slice, has_cstart, has_cstop, wraparound)\
+    __Pyx_PyObject_SetSlice(obj, (PyObject*)NULL, cstart, cstop, py_start, py_stop, py_slice, has_cstart, has_cstop, wraparound)
+static CYTHON_INLINE int __Pyx_PyObject_SetSlice(
+        PyObject* obj, PyObject* value, Py_ssize_t cstart, Py_ssize_t cstop,
+        PyObject** py_start, PyObject** py_stop, PyObject** py_slice,
+        int has_cstart, int has_cstop, int wraparound);
+
 /* GetItemInt.proto */
 #define __Pyx_GetItemInt(o, i, type, is_signed, to_py_func, is_list, wraparound, boundscheck)\
     (__Pyx_fits_Py_ssize_t(i, type, is_signed) ?\
@@ -1483,14 +1499,6 @@ static CYTHON_INLINE int __Pyx_ListComp_Append(PyObject* list, PyObject* x) {
 }
 #else
 #define __Pyx_ListComp_Append(L,x) PyList_Append(L,x)
-#endif
-
-/* PyIntBinop.proto */
-#if !CYTHON_COMPILING_IN_PYPY
-static PyObject* __Pyx_PyInt_AddObjC(PyObject *op1, PyObject *op2, long intval, int inplace, int zerodivision_check);
-#else
-#define __Pyx_PyInt_AddObjC(op1, op2, intval, inplace, zerodivision_check)\
-    (inplace ? PyNumber_InPlaceAdd(op1, op2) : PyNumber_Add(op1, op2))
 #endif
 
 /* ListExtend.proto */
@@ -1754,6 +1762,8 @@ static PyObject *__pyx_builtin_IndexError;
 static const char __pyx_k_O[] = "O";
 static const char __pyx_k_c[] = "c";
 static const char __pyx_k_i[] = "i";
+static const char __pyx_k_a0[] = "a0";
+static const char __pyx_k_a1[] = "a1";
 static const char __pyx_k_id[] = "id";
 static const char __pyx_k_mu[] = "mu";
 static const char __pyx_k_np[] = "np";
@@ -1813,17 +1823,21 @@ static const char __pyx_k_interp1d[] = "interp1d";
 static const char __pyx_k_itemsize[] = "itemsize";
 static const char __pyx_k_pyx_type[] = "__pyx_type";
 static const char __pyx_k_setstate[] = "__setstate__";
+static const char __pyx_k_E_cut_low[] = "E_cut_low";
 static const char __pyx_k_TypeError[] = "TypeError";
-static const char __pyx_k_bin_width[] = "bin_width";
+static const char __pyx_k_cut_width[] = "cut_width";
 static const char __pyx_k_enumerate[] = "enumerate";
+static const char __pyx_k_i_cut_low[] = "i_cut_low";
 static const char __pyx_k_matrix_in[] = "matrix_in";
 static const char __pyx_k_prefactor[] = "prefactor";
 static const char __pyx_k_pyx_state[] = "__pyx_state";
 static const char __pyx_k_reduce_ex[] = "__reduce_ex__";
 static const char __pyx_k_vector_in[] = "vector_in";
+static const char __pyx_k_E_cut_high[] = "E_cut_high";
 static const char __pyx_k_IndexError[] = "IndexError";
 static const char __pyx_k_ValueError[] = "ValueError";
 static const char __pyx_k_fwhm_array[] = "fwhm_array";
+static const char __pyx_k_i_cut_high[] = "i_cut_high";
 static const char __pyx_k_matrix_out[] = "matrix_out";
 static const char __pyx_k_pyx_result[] = "__pyx_result";
 static const char __pyx_k_pyx_vtable[] = "__pyx_vtable__";
@@ -1834,6 +1848,7 @@ static const char __pyx_k_pyx_checksum[] = "__pyx_checksum";
 static const char __pyx_k_stringsource[] = "stringsource";
 static const char __pyx_k_pyx_getbuffer[] = "__pyx_getbuffer";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
+static const char __pyx_k_sigma_current[] = "sigma_current";
 static const char __pyx_k_gaussian_array[] = "gaussian_array";
 static const char __pyx_k_vector_in_view[] = "vector_in_view";
 static const char __pyx_k_View_MemoryView[] = "View.MemoryView";
@@ -1845,6 +1860,7 @@ static const char __pyx_k_pyx_PickleError[] = "__pyx_PickleError";
 static const char __pyx_k_setstate_cython[] = "__setstate_cython__";
 static const char __pyx_k_pyx_unpickle_Enum[] = "__pyx_unpickle_Enum";
 static const char __pyx_k_scipy_interpolate[] = "scipy.interpolate";
+static const char __pyx_k_E_centroid_current[] = "E_centroid_current";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_strided_and_direct[] = "<strided and direct>";
 static const char __pyx_k_gaussian_array_view[] = "gaussian_array_view";
@@ -1884,6 +1900,9 @@ static PyObject *__pyx_kp_s_Cannot_create_writable_memory_vi;
 static PyObject *__pyx_kp_s_Cannot_index_with_type_s;
 static PyObject *__pyx_n_s_DTYPE;
 static PyObject *__pyx_n_s_E_array;
+static PyObject *__pyx_n_s_E_centroid_current;
+static PyObject *__pyx_n_s_E_cut_high;
+static PyObject *__pyx_n_s_E_cut_low;
 static PyObject *__pyx_n_s_Ellipsis;
 static PyObject *__pyx_kp_s_Empty_shape_tuple_for_cython_arr;
 static PyObject *__pyx_kp_s_Incompatible_checksums_s_vs_0xb0;
@@ -1904,9 +1923,10 @@ static PyObject *__pyx_kp_s_Unable_to_convert_item_to_object;
 static PyObject *__pyx_n_s_ValueError;
 static PyObject *__pyx_n_s_View_MemoryView;
 static PyObject *__pyx_n_s__21;
+static PyObject *__pyx_n_s_a0;
+static PyObject *__pyx_n_s_a1;
 static PyObject *__pyx_n_s_allocate_buffer;
 static PyObject *__pyx_n_s_base;
-static PyObject *__pyx_n_s_bin_width;
 static PyObject *__pyx_n_s_c;
 static PyObject *__pyx_n_u_c;
 static PyObject *__pyx_n_s_class;
@@ -1914,6 +1934,7 @@ static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_kp_s_contiguous_and_direct;
 static PyObject *__pyx_kp_s_contiguous_and_indirect;
 static PyObject *__pyx_n_s_counts;
+static PyObject *__pyx_n_s_cut_width;
 static PyObject *__pyx_n_s_dict;
 static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_dtype_is_object;
@@ -1937,6 +1958,8 @@ static PyObject *__pyx_n_s_gaussian_array_view;
 static PyObject *__pyx_n_s_getstate;
 static PyObject *__pyx_kp_s_got_differing_extents_in_dimensi;
 static PyObject *__pyx_n_s_i;
+static PyObject *__pyx_n_s_i_cut_high;
+static PyObject *__pyx_n_s_i_cut_low;
 static PyObject *__pyx_n_s_id;
 static PyObject *__pyx_n_s_import;
 static PyObject *__pyx_n_s_interp1d;
@@ -1983,6 +2006,7 @@ static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_shape;
 static PyObject *__pyx_n_s_sigma;
+static PyObject *__pyx_n_s_sigma_current;
 static PyObject *__pyx_n_s_size;
 static PyObject *__pyx_n_s_sqrt;
 static PyObject *__pyx_n_s_start;
@@ -2004,7 +2028,7 @@ static PyObject *__pyx_n_s_vector_in_view;
 static PyObject *__pyx_n_s_vector_out;
 static PyObject *__pyx_n_s_zeros;
 static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_E_array, double __pyx_v_mu, double __pyx_v_sigma); /* proto */
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, __Pyx_memviewslice __pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array); /* proto */
+static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, __Pyx_memviewslice __pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array, double __pyx_v_cut_width); /* proto */
 static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix_in, PyObject *__pyx_v_E_array, PyObject *__pyx_v_fwhm_array); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
@@ -2484,28 +2508,31 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObjec
  * 
  * 
  * def gauss_smoothing(double[:] vector_in, double[:] E_array,             # <<<<<<<<<<<<<<
- *                     double[:] fwhm_divE_array):
- *     """
+ *                     double[:] fwhm_divE_array,
+ *                     double cut_width=3):
  */
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_15gauss_smoothing_2gauss_smoothing[] = "\n    Function which smooths an array of counts by a Gaussian\n    of full-width-half-maximum FWHM. Preserves number of counts.\n    Args:\n        vector_in (array, double): Array of inbound counts to be smoothed\n        E_array (array, double): Array with energy calibration of vector_in\n        fwhm_divE_array (double): The full-width-half-maximum value to smooth\n                                  by, in percent of the energy. Note well that\n                                  this means that\n                                  fwhm = fwhm_divE/100 * E_array\n                                  gives you the absolute FWHM.\n\n    Returns:\n        vector_out: Array of smoothed counts\n\n    ";
+static char __pyx_doc_4ompy_15gauss_smoothing_2gauss_smoothing[] = "\n    Function which smooths an array of counts by a Gaussian\n    of full-width-half-maximum FWHM. Preserves number of counts.\n    Args:\n        vector_in (array, double): Array of inbound counts to be smoothed\n        E_array (array, double): Array with energy calibration of vector_in\n        fwhm_divE_array (array, double): The full-width-half-maximum value to smooth\n                                  by, in percent of the energy. Note well that\n                                  this means that\n                                  fwhm = fwhm_divE/100 * E_array\n                                  gives you the absolute FWHM.\n        cut_width (double, optional): The window width of the Gaussian that is used to\n                            smoothe, in units of sigma. Defaults to 3.\n\n    Returns:\n        vector_out: Array of smoothed counts\n\n    ";
 static PyMethodDef __pyx_mdef_4ompy_15gauss_smoothing_3gauss_smoothing = {"gauss_smoothing", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_15gauss_smoothing_2gauss_smoothing};
 static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_vector_in = { 0, 0, { 0 }, { 0 }, { 0 } };
   __Pyx_memviewslice __pyx_v_E_array = { 0, 0, { 0 }, { 0 }, { 0 } };
   __Pyx_memviewslice __pyx_v_fwhm_divE_array = { 0, 0, { 0 }, { 0 }, { 0 } };
+  double __pyx_v_cut_width;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("gauss_smoothing (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_vector_in,&__pyx_n_s_E_array,&__pyx_n_s_fwhm_divE_array,0};
-    PyObject* values[3] = {0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_vector_in,&__pyx_n_s_E_array,&__pyx_n_s_fwhm_divE_array,&__pyx_n_s_cut_width,0};
+    PyObject* values[4] = {0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         CYTHON_FALLTHROUGH;
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
@@ -2524,50 +2551,72 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__p
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 1, 3, 3, 1); __PYX_ERR(0, 45, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 0, 3, 4, 1); __PYX_ERR(0, 45, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_fwhm_divE_array)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 1, 3, 3, 2); __PYX_ERR(0, 45, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 0, 3, 4, 2); __PYX_ERR(0, 45, __pyx_L3_error)
+        }
+        CYTHON_FALLTHROUGH;
+        case  3:
+        if (kw_args > 0) {
+          PyObject* value = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_cut_width);
+          if (value) { values[3] = value; kw_args--; }
         }
       }
       if (unlikely(kw_args > 0)) {
         if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "gauss_smoothing") < 0)) __PYX_ERR(0, 45, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
-      goto __pyx_L5_argtuple_error;
     } else {
-      values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
-      values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
-      values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      switch (PyTuple_GET_SIZE(__pyx_args)) {
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+        CYTHON_FALLTHROUGH;
+        case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+        values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
+        values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
+        break;
+        default: goto __pyx_L5_argtuple_error;
+      }
     }
     __pyx_v_vector_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_vector_in.memview)) __PYX_ERR(0, 45, __pyx_L3_error)
     __pyx_v_E_array = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_E_array.memview)) __PYX_ERR(0, 45, __pyx_L3_error)
     __pyx_v_fwhm_divE_array = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_fwhm_divE_array.memview)) __PYX_ERR(0, 46, __pyx_L3_error)
+    if (values[3]) {
+      __pyx_v_cut_width = __pyx_PyFloat_AsDouble(values[3]); if (unlikely((__pyx_v_cut_width == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    } else {
+      __pyx_v_cut_width = ((double)3.0);
+    }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 45, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("gauss_smoothing", 0, 3, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 45, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("ompy.gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(__pyx_self, __pyx_v_vector_in, __pyx_v_E_array, __pyx_v_fwhm_divE_array);
+  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(__pyx_self, __pyx_v_vector_in, __pyx_v_E_array, __pyx_v_fwhm_divE_array, __pyx_v_cut_width);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, __Pyx_memviewslice __pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array) {
+static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, __Pyx_memviewslice __pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array, double __pyx_v_cut_width) {
   __Pyx_memviewslice __pyx_v_vector_in_view = { 0, 0, { 0 }, { 0 }, { 0 } };
-  CYTHON_UNUSED double __pyx_v_bin_width;
+  double __pyx_v_a0;
+  double __pyx_v_a1;
   PyObject *__pyx_v_vector_out = NULL;
   int __pyx_v_i;
   PyObject *__pyx_v_counts = NULL;
+  PyObject *__pyx_v_E_centroid_current = NULL;
+  PyObject *__pyx_v_sigma_current = NULL;
+  PyObject *__pyx_v_E_cut_low = NULL;
+  PyObject *__pyx_v_i_cut_low = NULL;
+  PyObject *__pyx_v_E_cut_high = NULL;
+  PyObject *__pyx_v_i_cut_high = NULL;
   PyObject *__pyx_v_pdf = NULL;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
@@ -2578,19 +2627,25 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   Py_ssize_t __pyx_t_5;
   int __pyx_t_6;
   Py_ssize_t __pyx_t_7;
-  PyObject *__pyx_t_8 = NULL;
+  Py_ssize_t __pyx_t_8;
   PyObject *__pyx_t_9 = NULL;
   PyObject *__pyx_t_10 = NULL;
-  Py_ssize_t __pyx_t_11;
+  PyObject *__pyx_t_11 = NULL;
   Py_ssize_t __pyx_t_12;
   Py_ssize_t __pyx_t_13;
-  int __pyx_t_14;
-  Py_ssize_t __pyx_t_15;
+  Py_ssize_t __pyx_t_14;
+  int __pyx_t_15;
   Py_ssize_t __pyx_t_16;
   Py_ssize_t __pyx_t_17;
+  Py_ssize_t __pyx_t_18;
+  long __pyx_t_19;
+  PyObject *__pyx_t_20 = NULL;
+  Py_ssize_t __pyx_t_21;
+  Py_ssize_t __pyx_t_22;
+  __Pyx_memviewslice __pyx_t_23 = { 0, 0, { 0 }, { 0 }, { 0 } };
   __Pyx_RefNannySetupContext("gauss_smoothing", 0);
 
-  /* "ompy/gauss_smoothing.pyx":63
+  /* "ompy/gauss_smoothing.pyx":66
  * 
  *     """
  *     if not len(vector_in) == len(E_array):             # <<<<<<<<<<<<<<
@@ -2602,20 +2657,20 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   __pyx_t_3 = ((!((__pyx_t_1 == __pyx_t_2) != 0)) != 0);
   if (unlikely(__pyx_t_3)) {
 
-    /* "ompy/gauss_smoothing.pyx":64
+    /* "ompy/gauss_smoothing.pyx":67
  *     """
  *     if not len(vector_in) == len(E_array):
  *         raise ValueError("Length mismatch between vector_in and E_array")             # <<<<<<<<<<<<<<
  *     if not len(vector_in) == len(fwhm_divE_array):
  *         raise ValueError("Length mismatch between vector_in and fwhm_divE_array")
  */
-    __pyx_t_4 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 64, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple_, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 67, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_Raise(__pyx_t_4, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    __PYX_ERR(0, 64, __pyx_L1_error)
+    __PYX_ERR(0, 67, __pyx_L1_error)
 
-    /* "ompy/gauss_smoothing.pyx":63
+    /* "ompy/gauss_smoothing.pyx":66
  * 
  *     """
  *     if not len(vector_in) == len(E_array):             # <<<<<<<<<<<<<<
@@ -2624,7 +2679,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
  */
   }
 
-  /* "ompy/gauss_smoothing.pyx":65
+  /* "ompy/gauss_smoothing.pyx":68
  *     if not len(vector_in) == len(E_array):
  *         raise ValueError("Length mismatch between vector_in and E_array")
  *     if not len(vector_in) == len(fwhm_divE_array):             # <<<<<<<<<<<<<<
@@ -2636,20 +2691,20 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   __pyx_t_3 = ((!((__pyx_t_2 == __pyx_t_1) != 0)) != 0);
   if (unlikely(__pyx_t_3)) {
 
-    /* "ompy/gauss_smoothing.pyx":66
+    /* "ompy/gauss_smoothing.pyx":69
  *         raise ValueError("Length mismatch between vector_in and E_array")
  *     if not len(vector_in) == len(fwhm_divE_array):
  *         raise ValueError("Length mismatch between vector_in and fwhm_divE_array")             # <<<<<<<<<<<<<<
  * 
  *     cdef double[:] vector_in_view = vector_in
  */
-    __pyx_t_4 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 66, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyObject_Call(__pyx_builtin_ValueError, __pyx_tuple__2, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 69, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_Raise(__pyx_t_4, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    __PYX_ERR(0, 66, __pyx_L1_error)
+    __PYX_ERR(0, 69, __pyx_L1_error)
 
-    /* "ompy/gauss_smoothing.pyx":65
+    /* "ompy/gauss_smoothing.pyx":68
  *     if not len(vector_in) == len(E_array):
  *         raise ValueError("Length mismatch between vector_in and E_array")
  *     if not len(vector_in) == len(fwhm_divE_array):             # <<<<<<<<<<<<<<
@@ -2658,24 +2713,24 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
  */
   }
 
-  /* "ompy/gauss_smoothing.pyx":68
+  /* "ompy/gauss_smoothing.pyx":71
  *         raise ValueError("Length mismatch between vector_in and fwhm_divE_array")
  * 
  *     cdef double[:] vector_in_view = vector_in             # <<<<<<<<<<<<<<
- *     cdef double bin_width
+ *     cdef double a0, a1
  * 
  */
   __PYX_INC_MEMVIEW(&__pyx_v_vector_in, 0);
   __pyx_v_vector_in_view = __pyx_v_vector_in;
 
-  /* "ompy/gauss_smoothing.pyx":71
- *     cdef double bin_width
+  /* "ompy/gauss_smoothing.pyx":74
+ *     cdef double a0, a1
  * 
- *     bin_width = E_array[1] - E_array[0]             # <<<<<<<<<<<<<<
+ *     a0 = E_array[0]             # <<<<<<<<<<<<<<
+ *     a1 = E_array[1] - E_array[0]
  * 
- *     vector_out = np.zeros(len(vector_in), dtype=DTYPE)
  */
-  __pyx_t_5 = 1;
+  __pyx_t_5 = 0;
   __pyx_t_6 = -1;
   if (__pyx_t_5 < 0) {
     __pyx_t_5 += __pyx_v_E_array.shape[0];
@@ -2683,9 +2738,18 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   } else if (unlikely(__pyx_t_5 >= __pyx_v_E_array.shape[0])) __pyx_t_6 = 0;
   if (unlikely(__pyx_t_6 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_6);
-    __PYX_ERR(0, 71, __pyx_L1_error)
+    __PYX_ERR(0, 74, __pyx_L1_error)
   }
-  __pyx_t_7 = 0;
+  __pyx_v_a0 = (*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_5 * __pyx_v_E_array.strides[0]) )));
+
+  /* "ompy/gauss_smoothing.pyx":75
+ * 
+ *     a0 = E_array[0]
+ *     a1 = E_array[1] - E_array[0]             # <<<<<<<<<<<<<<
+ * 
+ *     vector_out = np.zeros(len(vector_in), dtype=DTYPE)
+ */
+  __pyx_t_7 = 1;
   __pyx_t_6 = -1;
   if (__pyx_t_7 < 0) {
     __pyx_t_7 += __pyx_v_E_array.shape[0];
@@ -2693,229 +2757,498 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   } else if (unlikely(__pyx_t_7 >= __pyx_v_E_array.shape[0])) __pyx_t_6 = 0;
   if (unlikely(__pyx_t_6 != -1)) {
     __Pyx_RaiseBufferIndexError(__pyx_t_6);
-    __PYX_ERR(0, 71, __pyx_L1_error)
+    __PYX_ERR(0, 75, __pyx_L1_error)
   }
-  __pyx_v_bin_width = ((*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_5 * __pyx_v_E_array.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_7 * __pyx_v_E_array.strides[0]) ))));
+  __pyx_t_8 = 0;
+  __pyx_t_6 = -1;
+  if (__pyx_t_8 < 0) {
+    __pyx_t_8 += __pyx_v_E_array.shape[0];
+    if (unlikely(__pyx_t_8 < 0)) __pyx_t_6 = 0;
+  } else if (unlikely(__pyx_t_8 >= __pyx_v_E_array.shape[0])) __pyx_t_6 = 0;
+  if (unlikely(__pyx_t_6 != -1)) {
+    __Pyx_RaiseBufferIndexError(__pyx_t_6);
+    __PYX_ERR(0, 75, __pyx_L1_error)
+  }
+  __pyx_v_a1 = ((*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_7 * __pyx_v_E_array.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_8 * __pyx_v_E_array.strides[0]) ))));
 
-  /* "ompy/gauss_smoothing.pyx":73
- *     bin_width = E_array[1] - E_array[0]
+  /* "ompy/gauss_smoothing.pyx":77
+ *     a1 = E_array[1] - E_array[0]
  * 
  *     vector_out = np.zeros(len(vector_in), dtype=DTYPE)             # <<<<<<<<<<<<<<
  *     # cdef double[:] vector_out_view = vector_out
  * 
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 73, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_8 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_zeros); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 73, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_8);
+  __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_zeros); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 77, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_9);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __pyx_t_1 = __Pyx_MemoryView_Len(__pyx_v_vector_in); 
-  __pyx_t_4 = __Pyx_PyInt_FromSize_t(__pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 73, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyInt_FromSize_t(__pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_9 = PyTuple_New(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 73, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_9);
+  __pyx_t_10 = PyTuple_New(1); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 77, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_10);
   __Pyx_GIVEREF(__pyx_t_4);
-  PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_4);
+  PyTuple_SET_ITEM(__pyx_t_10, 0, __pyx_t_4);
   __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 73, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 73, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_10);
-  if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_dtype, __pyx_t_10) < 0) __PYX_ERR(0, 73, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-  __pyx_t_10 = __Pyx_PyObject_Call(__pyx_t_8, __pyx_t_9, __pyx_t_4); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 73, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_10);
-  __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+  __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 77, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_11);
+  if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_dtype, __pyx_t_11) < 0) __PYX_ERR(0, 77, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+  __pyx_t_11 = __Pyx_PyObject_Call(__pyx_t_9, __pyx_t_10, __pyx_t_4); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 77, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_11);
   __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+  __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_v_vector_out = __pyx_t_10;
-  __pyx_t_10 = 0;
+  __pyx_v_vector_out = __pyx_t_11;
+  __pyx_t_11 = 0;
 
-  /* "ompy/gauss_smoothing.pyx":77
+  /* "ompy/gauss_smoothing.pyx":81
  * 
  *     cdef int i
  *     for i in range(len(vector_out)):             # <<<<<<<<<<<<<<
  *         counts = vector_in_view[i]
  *         if counts > 0:
  */
-  __pyx_t_11 = PyObject_Length(__pyx_v_vector_out); if (unlikely(__pyx_t_11 == ((Py_ssize_t)-1))) __PYX_ERR(0, 77, __pyx_L1_error)
-  __pyx_t_12 = __pyx_t_11;
-  for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_12; __pyx_t_6+=1) {
+  __pyx_t_12 = PyObject_Length(__pyx_v_vector_out); if (unlikely(__pyx_t_12 == ((Py_ssize_t)-1))) __PYX_ERR(0, 81, __pyx_L1_error)
+  __pyx_t_13 = __pyx_t_12;
+  for (__pyx_t_6 = 0; __pyx_t_6 < __pyx_t_13; __pyx_t_6+=1) {
     __pyx_v_i = __pyx_t_6;
 
-    /* "ompy/gauss_smoothing.pyx":78
+    /* "ompy/gauss_smoothing.pyx":82
  *     cdef int i
  *     for i in range(len(vector_out)):
  *         counts = vector_in_view[i]             # <<<<<<<<<<<<<<
  *         if counts > 0:
- *             pdf = gaussian(E_array, mu=E_array[i],
+ *             E_centroid_current = E_array[i]
  */
-    __pyx_t_13 = __pyx_v_i;
-    __pyx_t_14 = -1;
-    if (__pyx_t_13 < 0) {
-      __pyx_t_13 += __pyx_v_vector_in_view.shape[0];
-      if (unlikely(__pyx_t_13 < 0)) __pyx_t_14 = 0;
-    } else if (unlikely(__pyx_t_13 >= __pyx_v_vector_in_view.shape[0])) __pyx_t_14 = 0;
-    if (unlikely(__pyx_t_14 != -1)) {
-      __Pyx_RaiseBufferIndexError(__pyx_t_14);
-      __PYX_ERR(0, 78, __pyx_L1_error)
+    __pyx_t_14 = __pyx_v_i;
+    __pyx_t_15 = -1;
+    if (__pyx_t_14 < 0) {
+      __pyx_t_14 += __pyx_v_vector_in_view.shape[0];
+      if (unlikely(__pyx_t_14 < 0)) __pyx_t_15 = 0;
+    } else if (unlikely(__pyx_t_14 >= __pyx_v_vector_in_view.shape[0])) __pyx_t_15 = 0;
+    if (unlikely(__pyx_t_15 != -1)) {
+      __Pyx_RaiseBufferIndexError(__pyx_t_15);
+      __PYX_ERR(0, 82, __pyx_L1_error)
     }
-    __pyx_t_10 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_vector_in_view.data + __pyx_t_13 * __pyx_v_vector_in_view.strides[0]) )))); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 78, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_10);
-    __Pyx_XDECREF_SET(__pyx_v_counts, __pyx_t_10);
-    __pyx_t_10 = 0;
+    __pyx_t_11 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_vector_in_view.data + __pyx_t_14 * __pyx_v_vector_in_view.strides[0]) )))); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 82, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_11);
+    __Pyx_XDECREF_SET(__pyx_v_counts, __pyx_t_11);
+    __pyx_t_11 = 0;
 
-    /* "ompy/gauss_smoothing.pyx":79
+    /* "ompy/gauss_smoothing.pyx":83
  *     for i in range(len(vector_out)):
  *         counts = vector_in_view[i]
  *         if counts > 0:             # <<<<<<<<<<<<<<
- *             pdf = gaussian(E_array, mu=E_array[i],
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
+ *             E_centroid_current = E_array[i]
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
  */
-    __pyx_t_10 = PyObject_RichCompare(__pyx_v_counts, __pyx_int_0, Py_GT); __Pyx_XGOTREF(__pyx_t_10); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 79, __pyx_L1_error)
-    __pyx_t_3 = __Pyx_PyObject_IsTrue(__pyx_t_10); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 79, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+    __pyx_t_11 = PyObject_RichCompare(__pyx_v_counts, __pyx_int_0, Py_GT); __Pyx_XGOTREF(__pyx_t_11); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 83, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_IsTrue(__pyx_t_11); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 83, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
     if (__pyx_t_3) {
 
-      /* "ompy/gauss_smoothing.pyx":80
+      /* "ompy/gauss_smoothing.pyx":84
  *         counts = vector_in_view[i]
  *         if counts > 0:
- *             pdf = gaussian(E_array, mu=E_array[i],             # <<<<<<<<<<<<<<
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
- *                            )
- */
-      __Pyx_GetModuleGlobalName(__pyx_t_10, __pyx_n_s_gaussian); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_10);
-      __pyx_t_4 = __pyx_memoryview_fromslice(__pyx_v_E_array, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_9 = PyTuple_New(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_GIVEREF(__pyx_t_4);
-      PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_4);
-      __pyx_t_4 = 0;
-      __pyx_t_4 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_15 = __pyx_v_i;
-      __pyx_t_14 = -1;
-      if (__pyx_t_15 < 0) {
-        __pyx_t_15 += __pyx_v_E_array.shape[0];
-        if (unlikely(__pyx_t_15 < 0)) __pyx_t_14 = 0;
-      } else if (unlikely(__pyx_t_15 >= __pyx_v_E_array.shape[0])) __pyx_t_14 = 0;
-      if (unlikely(__pyx_t_14 != -1)) {
-        __Pyx_RaiseBufferIndexError(__pyx_t_14);
-        __PYX_ERR(0, 80, __pyx_L1_error)
-      }
-      __pyx_t_8 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_15 * __pyx_v_E_array.strides[0]) )))); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
-      if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_mu, __pyx_t_8) < 0) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
-
-      /* "ompy/gauss_smoothing.pyx":81
- *         if counts > 0:
- *             pdf = gaussian(E_array, mu=E_array[i],
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]             # <<<<<<<<<<<<<<
- *                            )
- *             pdf = pdf / np.sum(pdf)
+ *             E_centroid_current = E_array[i]             # <<<<<<<<<<<<<<
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
+ *             E_cut_low = E_centroid_current - cut_width * sigma_current
  */
       __pyx_t_16 = __pyx_v_i;
-      __pyx_t_14 = -1;
+      __pyx_t_15 = -1;
       if (__pyx_t_16 < 0) {
-        __pyx_t_16 += __pyx_v_fwhm_divE_array.shape[0];
-        if (unlikely(__pyx_t_16 < 0)) __pyx_t_14 = 0;
-      } else if (unlikely(__pyx_t_16 >= __pyx_v_fwhm_divE_array.shape[0])) __pyx_t_14 = 0;
-      if (unlikely(__pyx_t_14 != -1)) {
-        __Pyx_RaiseBufferIndexError(__pyx_t_14);
-        __PYX_ERR(0, 81, __pyx_L1_error)
+        __pyx_t_16 += __pyx_v_E_array.shape[0];
+        if (unlikely(__pyx_t_16 < 0)) __pyx_t_15 = 0;
+      } else if (unlikely(__pyx_t_16 >= __pyx_v_E_array.shape[0])) __pyx_t_15 = 0;
+      if (unlikely(__pyx_t_15 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_15);
+        __PYX_ERR(0, 84, __pyx_L1_error)
       }
-      __pyx_t_17 = __pyx_v_i;
-      __pyx_t_14 = -1;
-      if (__pyx_t_17 < 0) {
-        __pyx_t_17 += __pyx_v_E_array.shape[0];
-        if (unlikely(__pyx_t_17 < 0)) __pyx_t_14 = 0;
-      } else if (unlikely(__pyx_t_17 >= __pyx_v_E_array.shape[0])) __pyx_t_14 = 0;
-      if (unlikely(__pyx_t_14 != -1)) {
-        __Pyx_RaiseBufferIndexError(__pyx_t_14);
-        __PYX_ERR(0, 81, __pyx_L1_error)
-      }
-      __pyx_t_8 = PyFloat_FromDouble((((*((double *) ( /* dim=0 */ (__pyx_v_fwhm_divE_array.data + __pyx_t_16 * __pyx_v_fwhm_divE_array.strides[0]) ))) / (2.355 * 100.0)) * (*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_17 * __pyx_v_E_array.strides[0]) ))))); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 81, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
-      if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_sigma, __pyx_t_8) < 0) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+      __pyx_t_11 = PyFloat_FromDouble((*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_16 * __pyx_v_E_array.strides[0]) )))); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 84, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_XDECREF_SET(__pyx_v_E_centroid_current, __pyx_t_11);
+      __pyx_t_11 = 0;
 
-      /* "ompy/gauss_smoothing.pyx":80
- *         counts = vector_in_view[i]
+      /* "ompy/gauss_smoothing.pyx":85
  *         if counts > 0:
- *             pdf = gaussian(E_array, mu=E_array[i],             # <<<<<<<<<<<<<<
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
- *                            )
+ *             E_centroid_current = E_array[i]
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]             # <<<<<<<<<<<<<<
+ *             E_cut_low = E_centroid_current - cut_width * sigma_current
+ *             i_cut_low = int((E_cut_low - a0) / a1)
  */
-      __pyx_t_8 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_9, __pyx_t_4); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 80, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
+      __pyx_t_17 = __pyx_v_i;
+      __pyx_t_15 = -1;
+      if (__pyx_t_17 < 0) {
+        __pyx_t_17 += __pyx_v_fwhm_divE_array.shape[0];
+        if (unlikely(__pyx_t_17 < 0)) __pyx_t_15 = 0;
+      } else if (unlikely(__pyx_t_17 >= __pyx_v_fwhm_divE_array.shape[0])) __pyx_t_15 = 0;
+      if (unlikely(__pyx_t_15 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_15);
+        __PYX_ERR(0, 85, __pyx_L1_error)
+      }
+      __pyx_t_18 = __pyx_v_i;
+      __pyx_t_15 = -1;
+      if (__pyx_t_18 < 0) {
+        __pyx_t_18 += __pyx_v_E_array.shape[0];
+        if (unlikely(__pyx_t_18 < 0)) __pyx_t_15 = 0;
+      } else if (unlikely(__pyx_t_18 >= __pyx_v_E_array.shape[0])) __pyx_t_15 = 0;
+      if (unlikely(__pyx_t_15 != -1)) {
+        __Pyx_RaiseBufferIndexError(__pyx_t_15);
+        __PYX_ERR(0, 85, __pyx_L1_error)
+      }
+      __pyx_t_11 = PyFloat_FromDouble((((*((double *) ( /* dim=0 */ (__pyx_v_fwhm_divE_array.data + __pyx_t_17 * __pyx_v_fwhm_divE_array.strides[0]) ))) / (2.355 * 100.0)) * (*((double *) ( /* dim=0 */ (__pyx_v_E_array.data + __pyx_t_18 * __pyx_v_E_array.strides[0]) ))))); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 85, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_XDECREF_SET(__pyx_v_sigma_current, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":86
+ *             E_centroid_current = E_array[i]
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
+ *             E_cut_low = E_centroid_current - cut_width * sigma_current             # <<<<<<<<<<<<<<
+ *             i_cut_low = int((E_cut_low - a0) / a1)
+ *             i_cut_low = max(0, i_cut_low)
+ */
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_cut_width); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 86, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_4 = PyNumber_Multiply(__pyx_t_11, __pyx_v_sigma_current); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 86, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = PyNumber_Subtract(__pyx_v_E_centroid_current, __pyx_t_4); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 86, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+      __Pyx_XDECREF_SET(__pyx_v_E_cut_low, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":87
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
+ *             E_cut_low = E_centroid_current - cut_width * sigma_current
+ *             i_cut_low = int((E_cut_low - a0) / a1)             # <<<<<<<<<<<<<<
+ *             i_cut_low = max(0, i_cut_low)
+ *             E_cut_high = E_centroid_current + cut_width * sigma_current
+ */
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_a0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 87, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_4 = PyNumber_Subtract(__pyx_v_E_cut_low, __pyx_t_11); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 87, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_a1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 87, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_10 = __Pyx_PyNumber_Divide(__pyx_t_4, __pyx_t_11); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 87, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = __Pyx_PyNumber_Int(__pyx_t_10); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 87, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __Pyx_XDECREF_SET(__pyx_v_i_cut_low, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":88
+ *             E_cut_low = E_centroid_current - cut_width * sigma_current
+ *             i_cut_low = int((E_cut_low - a0) / a1)
+ *             i_cut_low = max(0, i_cut_low)             # <<<<<<<<<<<<<<
+ *             E_cut_high = E_centroid_current + cut_width * sigma_current
+ *             i_cut_high = int((E_cut_high - a0) / a1)
+ */
+      __Pyx_INCREF(__pyx_v_i_cut_low);
+      __pyx_t_11 = __pyx_v_i_cut_low;
+      __pyx_t_19 = 0;
+      __pyx_t_4 = __Pyx_PyInt_From_long(__pyx_t_19); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 88, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __pyx_t_9 = PyObject_RichCompare(__pyx_t_11, __pyx_t_4, Py_GT); __Pyx_XGOTREF(__pyx_t_9); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 88, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+      __pyx_t_3 = __Pyx_PyObject_IsTrue(__pyx_t_9); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 88, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      if (__pyx_t_3) {
+        __Pyx_INCREF(__pyx_t_11);
+        __pyx_t_10 = __pyx_t_11;
+      } else {
+        __pyx_t_9 = __Pyx_PyInt_From_long(__pyx_t_19); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 88, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_9);
+        __pyx_t_10 = __pyx_t_9;
+        __pyx_t_9 = 0;
+      }
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = __pyx_t_10;
+      __Pyx_INCREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __Pyx_DECREF_SET(__pyx_v_i_cut_low, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":89
+ *             i_cut_low = int((E_cut_low - a0) / a1)
+ *             i_cut_low = max(0, i_cut_low)
+ *             E_cut_high = E_centroid_current + cut_width * sigma_current             # <<<<<<<<<<<<<<
+ *             i_cut_high = int((E_cut_high - a0) / a1)
+ *             i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)
+ */
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_cut_width); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 89, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_10 = PyNumber_Multiply(__pyx_t_11, __pyx_v_sigma_current); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 89, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = PyNumber_Add(__pyx_v_E_centroid_current, __pyx_t_10); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 89, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __Pyx_XDECREF_SET(__pyx_v_E_cut_high, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":90
+ *             i_cut_low = max(0, i_cut_low)
+ *             E_cut_high = E_centroid_current + cut_width * sigma_current
+ *             i_cut_high = int((E_cut_high - a0) / a1)             # <<<<<<<<<<<<<<
+ *             i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)
+ */
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_a0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 90, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_10 = PyNumber_Subtract(__pyx_v_E_cut_high, __pyx_t_11); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 90, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = PyFloat_FromDouble(__pyx_v_a1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 90, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_9 = __Pyx_PyNumber_Divide(__pyx_t_10, __pyx_t_11); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 90, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_9);
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = __Pyx_PyNumber_Int(__pyx_t_9); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 90, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __Pyx_XDECREF_SET(__pyx_v_i_cut_high, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":91
+ *             E_cut_high = E_centroid_current + cut_width * sigma_current
+ *             i_cut_high = int((E_cut_high - a0) / a1)
+ *             i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)             # <<<<<<<<<<<<<<
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)
+ *             pdf[i_cut_low:i_cut_high] =\
+ */
+      __pyx_t_11 = __Pyx_PyInt_AddObjC(__pyx_v_i_cut_low, __pyx_int_1, 1, 0, 0); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_INCREF(__pyx_v_i_cut_high);
+      __pyx_t_9 = __pyx_v_i_cut_high;
+      __pyx_t_1 = __Pyx_MemoryView_Len(__pyx_v_vector_in); 
+      __pyx_t_4 = PyInt_FromSsize_t(__pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_4);
+      __pyx_t_20 = PyObject_RichCompare(__pyx_t_9, __pyx_t_4, Py_LT); __Pyx_XGOTREF(__pyx_t_20); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+      __pyx_t_3 = __Pyx_PyObject_IsTrue(__pyx_t_20); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
+      if (__pyx_t_3) {
+        __Pyx_INCREF(__pyx_t_9);
+        __pyx_t_10 = __pyx_t_9;
+      } else {
+        __pyx_t_20 = PyInt_FromSsize_t(__pyx_t_1); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 91, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_20);
+        __pyx_t_10 = __pyx_t_20;
+        __pyx_t_20 = 0;
+      }
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __Pyx_INCREF(__pyx_t_10);
+      __pyx_t_9 = __pyx_t_10;
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __pyx_t_20 = PyObject_RichCompare(__pyx_t_11, __pyx_t_9, Py_GT); __Pyx_XGOTREF(__pyx_t_20); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __pyx_t_3 = __Pyx_PyObject_IsTrue(__pyx_t_20); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 91, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
+      if (__pyx_t_3) {
+        __Pyx_INCREF(__pyx_t_11);
+        __pyx_t_10 = __pyx_t_11;
+      } else {
+        __Pyx_INCREF(__pyx_t_9);
+        __pyx_t_10 = __pyx_t_9;
+      }
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = __pyx_t_10;
+      __Pyx_INCREF(__pyx_t_11);
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+      __Pyx_DECREF_SET(__pyx_v_i_cut_high, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":92
+ *             i_cut_high = int((E_cut_high - a0) / a1)
+ *             i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)             # <<<<<<<<<<<<<<
+ *             pdf[i_cut_low:i_cut_high] =\
+ *                 gaussian(E_array[i_cut_low:i_cut_high],
+ */
+      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_n_s_np); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_t_11, __pyx_n_s_zeros); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_1 = __Pyx_MemoryView_Len(__pyx_v_vector_in); 
+      __pyx_t_11 = __Pyx_PyInt_FromSize_t(__pyx_t_1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_9 = PyTuple_New(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_9);
+      __Pyx_GIVEREF(__pyx_t_11);
+      PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_11);
+      __pyx_t_11 = 0;
+      __pyx_t_11 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __Pyx_GetModuleGlobalName(__pyx_t_20, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_20);
+      if (PyDict_SetItem(__pyx_t_11, __pyx_n_s_dtype, __pyx_t_20) < 0) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
+      __pyx_t_20 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_9, __pyx_t_11); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 92, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_20);
       __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-      __Pyx_XDECREF_SET(__pyx_v_pdf, __pyx_t_8);
-      __pyx_t_8 = 0;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __Pyx_XDECREF_SET(__pyx_v_pdf, __pyx_t_20);
+      __pyx_t_20 = 0;
 
-      /* "ompy/gauss_smoothing.pyx":83
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
- *                            )
+      /* "ompy/gauss_smoothing.pyx":94
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)
+ *             pdf[i_cut_low:i_cut_high] =\
+ *                 gaussian(E_array[i_cut_low:i_cut_high],             # <<<<<<<<<<<<<<
+ *                          mu=E_centroid_current,
+ *                          sigma=sigma_current
+ */
+      __Pyx_GetModuleGlobalName(__pyx_t_20, __pyx_n_s_gaussian); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 94, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_20);
+      __pyx_t_21 = __Pyx_PyIndex_AsSsize_t(__pyx_v_i_cut_low); if (unlikely((__pyx_t_21 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 94, __pyx_L1_error)
+      __pyx_t_22 = __Pyx_PyIndex_AsSsize_t(__pyx_v_i_cut_high); if (unlikely((__pyx_t_22 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(0, 94, __pyx_L1_error)
+      __pyx_t_23.data = __pyx_v_E_array.data;
+      __pyx_t_23.memview = __pyx_v_E_array.memview;
+      __PYX_INC_MEMVIEW(&__pyx_t_23, 0);
+      __pyx_t_15 = -1;
+      if (unlikely(__pyx_memoryview_slice_memviewslice(
+    &__pyx_t_23,
+    __pyx_v_E_array.shape[0], __pyx_v_E_array.strides[0], __pyx_v_E_array.suboffsets[0],
+    0,
+    0,
+    &__pyx_t_15,
+    __pyx_t_21,
+    __pyx_t_22,
+    0,
+    1,
+    1,
+    0,
+    1) < 0))
+{
+    __PYX_ERR(0, 94, __pyx_L1_error)
+}
+
+__pyx_t_11 = __pyx_memoryview_fromslice(__pyx_t_23, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 94, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __PYX_XDEC_MEMVIEW(&__pyx_t_23, 1);
+      __pyx_t_23.memview = NULL;
+      __pyx_t_23.data = NULL;
+      __pyx_t_9 = PyTuple_New(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 94, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_9);
+      __Pyx_GIVEREF(__pyx_t_11);
+      PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_11);
+      __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":95
+ *             pdf[i_cut_low:i_cut_high] =\
+ *                 gaussian(E_array[i_cut_low:i_cut_high],
+ *                          mu=E_centroid_current,             # <<<<<<<<<<<<<<
+ *                          sigma=sigma_current
+ *                          )
+ */
+      __pyx_t_11 = __Pyx_PyDict_NewPresized(2); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      if (PyDict_SetItem(__pyx_t_11, __pyx_n_s_mu, __pyx_v_E_centroid_current) < 0) __PYX_ERR(0, 95, __pyx_L1_error)
+
+      /* "ompy/gauss_smoothing.pyx":96
+ *                 gaussian(E_array[i_cut_low:i_cut_high],
+ *                          mu=E_centroid_current,
+ *                          sigma=sigma_current             # <<<<<<<<<<<<<<
+ *                          )
+ *             pdf = pdf / np.sum(pdf)
+ */
+      if (PyDict_SetItem(__pyx_t_11, __pyx_n_s_sigma, __pyx_v_sigma_current) < 0) __PYX_ERR(0, 95, __pyx_L1_error)
+
+      /* "ompy/gauss_smoothing.pyx":94
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)
+ *             pdf[i_cut_low:i_cut_high] =\
+ *                 gaussian(E_array[i_cut_low:i_cut_high],             # <<<<<<<<<<<<<<
+ *                          mu=E_centroid_current,
+ *                          sigma=sigma_current
+ */
+      __pyx_t_10 = __Pyx_PyObject_Call(__pyx_t_20, __pyx_t_9, __pyx_t_11); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 94, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
+      __Pyx_DECREF(__pyx_t_20); __pyx_t_20 = 0;
+      __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":93
+ *             i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)
+ *             pdf = np.zeros(len(vector_in), dtype=DTYPE)
+ *             pdf[i_cut_low:i_cut_high] =\             # <<<<<<<<<<<<<<
+ *                 gaussian(E_array[i_cut_low:i_cut_high],
+ *                          mu=E_centroid_current,
+ */
+      if (__Pyx_PyObject_SetSlice(__pyx_v_pdf, __pyx_t_10, 0, 0, &__pyx_v_i_cut_low, &__pyx_v_i_cut_high, NULL, 0, 0, 1) < 0) __PYX_ERR(0, 93, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
+
+      /* "ompy/gauss_smoothing.pyx":98
+ *                          sigma=sigma_current
+ *                          )
  *             pdf = pdf / np.sum(pdf)             # <<<<<<<<<<<<<<
  *             vector_out += counts * pdf
  * 
  */
-      __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 83, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_n_s_sum); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_11, __pyx_n_s_np); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 98, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_11);
+      __pyx_t_9 = __Pyx_PyObject_GetAttrStr(__pyx_t_11, __pyx_n_s_sum); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 98, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-      __pyx_t_4 = NULL;
+      __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
+      __pyx_t_11 = NULL;
       if (CYTHON_UNPACK_METHODS && unlikely(PyMethod_Check(__pyx_t_9))) {
-        __pyx_t_4 = PyMethod_GET_SELF(__pyx_t_9);
-        if (likely(__pyx_t_4)) {
+        __pyx_t_11 = PyMethod_GET_SELF(__pyx_t_9);
+        if (likely(__pyx_t_11)) {
           PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_9);
-          __Pyx_INCREF(__pyx_t_4);
+          __Pyx_INCREF(__pyx_t_11);
           __Pyx_INCREF(function);
           __Pyx_DECREF_SET(__pyx_t_9, function);
         }
       }
-      __pyx_t_8 = (__pyx_t_4) ? __Pyx_PyObject_Call2Args(__pyx_t_9, __pyx_t_4, __pyx_v_pdf) : __Pyx_PyObject_CallOneArg(__pyx_t_9, __pyx_v_pdf);
-      __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
-      if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 83, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
+      __pyx_t_10 = (__pyx_t_11) ? __Pyx_PyObject_Call2Args(__pyx_t_9, __pyx_t_11, __pyx_v_pdf) : __Pyx_PyObject_CallOneArg(__pyx_t_9, __pyx_v_pdf);
+      __Pyx_XDECREF(__pyx_t_11); __pyx_t_11 = 0;
+      if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 98, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __pyx_t_9 = __Pyx_PyNumber_Divide(__pyx_v_pdf, __pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 83, __pyx_L1_error)
+      __pyx_t_9 = __Pyx_PyNumber_Divide(__pyx_v_pdf, __pyx_t_10); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 98, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
-      __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+      __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
       __Pyx_DECREF_SET(__pyx_v_pdf, __pyx_t_9);
       __pyx_t_9 = 0;
 
-      /* "ompy/gauss_smoothing.pyx":84
- *                            )
+      /* "ompy/gauss_smoothing.pyx":99
+ *                          )
  *             pdf = pdf / np.sum(pdf)
  *             vector_out += counts * pdf             # <<<<<<<<<<<<<<
  * 
  *     return vector_out
  */
-      __pyx_t_9 = PyNumber_Multiply(__pyx_v_counts, __pyx_v_pdf); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 84, __pyx_L1_error)
+      __pyx_t_9 = PyNumber_Multiply(__pyx_v_counts, __pyx_v_pdf); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 99, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
-      __pyx_t_8 = PyNumber_InPlaceAdd(__pyx_v_vector_out, __pyx_t_9); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 84, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_8);
+      __pyx_t_10 = PyNumber_InPlaceAdd(__pyx_v_vector_out, __pyx_t_9); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 99, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_10);
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __Pyx_DECREF_SET(__pyx_v_vector_out, __pyx_t_8);
-      __pyx_t_8 = 0;
+      __Pyx_DECREF_SET(__pyx_v_vector_out, __pyx_t_10);
+      __pyx_t_10 = 0;
 
-      /* "ompy/gauss_smoothing.pyx":79
+      /* "ompy/gauss_smoothing.pyx":83
  *     for i in range(len(vector_out)):
  *         counts = vector_in_view[i]
  *         if counts > 0:             # <<<<<<<<<<<<<<
- *             pdf = gaussian(E_array, mu=E_array[i],
- *                            sigma=fwhm_divE_array[i]/(2.355*100)*E_array[i]
+ *             E_centroid_current = E_array[i]
+ *             sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
  */
     }
   }
 
-  /* "ompy/gauss_smoothing.pyx":86
+  /* "ompy/gauss_smoothing.pyx":101
  *             vector_out += counts * pdf
  * 
  *     return vector_out             # <<<<<<<<<<<<<<
@@ -2931,22 +3264,30 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
  * 
  * 
  * def gauss_smoothing(double[:] vector_in, double[:] E_array,             # <<<<<<<<<<<<<<
- *                     double[:] fwhm_divE_array):
- *     """
+ *                     double[:] fwhm_divE_array,
+ *                     double cut_width=3):
  */
 
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_4);
-  __Pyx_XDECREF(__pyx_t_8);
   __Pyx_XDECREF(__pyx_t_9);
   __Pyx_XDECREF(__pyx_t_10);
+  __Pyx_XDECREF(__pyx_t_11);
+  __Pyx_XDECREF(__pyx_t_20);
+  __PYX_XDEC_MEMVIEW(&__pyx_t_23, 1);
   __Pyx_AddTraceback("ompy.gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __PYX_XDEC_MEMVIEW(&__pyx_v_vector_in_view, 1);
   __Pyx_XDECREF(__pyx_v_vector_out);
   __Pyx_XDECREF(__pyx_v_counts);
+  __Pyx_XDECREF(__pyx_v_E_centroid_current);
+  __Pyx_XDECREF(__pyx_v_sigma_current);
+  __Pyx_XDECREF(__pyx_v_E_cut_low);
+  __Pyx_XDECREF(__pyx_v_i_cut_low);
+  __Pyx_XDECREF(__pyx_v_E_cut_high);
+  __Pyx_XDECREF(__pyx_v_i_cut_high);
   __Pyx_XDECREF(__pyx_v_pdf);
   __PYX_XDEC_MEMVIEW(&__pyx_v_vector_in, 1);
   __PYX_XDEC_MEMVIEW(&__pyx_v_E_array, 1);
@@ -2956,7 +3297,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   return __pyx_r;
 }
 
-/* "ompy/gauss_smoothing.pyx":89
+/* "ompy/gauss_smoothing.pyx":104
  * 
  * 
  * def gauss_smoothing_matrix(matrix_in, E_array,             # <<<<<<<<<<<<<<
@@ -2999,17 +3340,17 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix(PyObje
         case  1:
         if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, 1); __PYX_ERR(0, 89, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, 1); __PYX_ERR(0, 104, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
         if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_fwhm_array)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, 2); __PYX_ERR(0, 89, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, 2); __PYX_ERR(0, 104, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "gauss_smoothing_matrix") < 0)) __PYX_ERR(0, 89, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "gauss_smoothing_matrix") < 0)) __PYX_ERR(0, 104, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -3024,7 +3365,7 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix(PyObje
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 89, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("gauss_smoothing_matrix", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 104, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("ompy.gauss_smoothing.gauss_smoothing_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
@@ -3053,32 +3394,32 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
   PyObject *__pyx_t_9 = NULL;
   __Pyx_RefNannySetupContext("gauss_smoothing_matrix", 0);
 
-  /* "ompy/gauss_smoothing.pyx":92
+  /* "ompy/gauss_smoothing.pyx":107
  *                            fwhm_array):
  *     cdef int i
  *     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)             # <<<<<<<<<<<<<<
  * 
  *     for i in range(matrix_in.shape[0]):
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_matrix_in, __pyx_n_s_shape); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_matrix_in, __pyx_n_s_shape); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 92, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 92, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 107, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -3086,36 +3427,36 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
   __pyx_v_matrix_out = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "ompy/gauss_smoothing.pyx":94
+  /* "ompy/gauss_smoothing.pyx":109
  *     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
  * 
  *     for i in range(matrix_in.shape[0]):             # <<<<<<<<<<<<<<
  *         matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
  *                                            E_array, fwhm_array)
  */
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_v_matrix_in, __pyx_n_s_shape); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_v_matrix_in, __pyx_n_s_shape); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_1 = __Pyx_GetItemInt(__pyx_t_4, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_GetItemInt(__pyx_t_4, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_5 = __Pyx_PyInt_As_long(__pyx_t_1); if (unlikely((__pyx_t_5 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 94, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyInt_As_long(__pyx_t_1); if (unlikely((__pyx_t_5 == (long)-1) && PyErr_Occurred())) __PYX_ERR(0, 109, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_t_6 = __pyx_t_5;
   for (__pyx_t_7 = 0; __pyx_t_7 < __pyx_t_6; __pyx_t_7+=1) {
     __pyx_v_i = __pyx_t_7;
 
-    /* "ompy/gauss_smoothing.pyx":95
+    /* "ompy/gauss_smoothing.pyx":110
  * 
  *     for i in range(matrix_in.shape[0]):
  *         matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],             # <<<<<<<<<<<<<<
  *                                            E_array, fwhm_array)
  * 
  */
-    __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_gauss_smoothing); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_gauss_smoothing); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __pyx_t_2 = PyTuple_New(2); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_GIVEREF(__pyx_t_3);
     PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_t_3);
@@ -3123,11 +3464,11 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
     __Pyx_GIVEREF(__pyx_slice__3);
     PyTuple_SET_ITEM(__pyx_t_2, 1, __pyx_slice__3);
     __pyx_t_3 = 0;
-    __pyx_t_3 = __Pyx_PyObject_GetItem(__pyx_v_matrix_in, __pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_GetItem(__pyx_v_matrix_in, __pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "ompy/gauss_smoothing.pyx":96
+    /* "ompy/gauss_smoothing.pyx":111
  *     for i in range(matrix_in.shape[0]):
  *         matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
  *                                            E_array, fwhm_array)             # <<<<<<<<<<<<<<
@@ -3149,7 +3490,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
     #if CYTHON_FAST_PYCALL
     if (PyFunction_Check(__pyx_t_4)) {
       PyObject *__pyx_temp[4] = {__pyx_t_2, __pyx_t_3, __pyx_v_E_array, __pyx_v_fwhm_array};
-      __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_4, __pyx_temp+1-__pyx_t_8, 3+__pyx_t_8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyFunction_FastCall(__pyx_t_4, __pyx_temp+1-__pyx_t_8, 3+__pyx_t_8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 110, __pyx_L1_error)
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_GOTREF(__pyx_t_1);
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -3158,14 +3499,14 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
     #if CYTHON_FAST_PYCCALL
     if (__Pyx_PyFastCFunction_Check(__pyx_t_4)) {
       PyObject *__pyx_temp[4] = {__pyx_t_2, __pyx_t_3, __pyx_v_E_array, __pyx_v_fwhm_array};
-      __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_4, __pyx_temp+1-__pyx_t_8, 3+__pyx_t_8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyCFunction_FastCall(__pyx_t_4, __pyx_temp+1-__pyx_t_8, 3+__pyx_t_8); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 110, __pyx_L1_error)
       __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
       __Pyx_GOTREF(__pyx_t_1);
       __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     } else
     #endif
     {
-      __pyx_t_9 = PyTuple_New(3+__pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_9 = PyTuple_New(3+__pyx_t_8); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 110, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_9);
       if (__pyx_t_2) {
         __Pyx_GIVEREF(__pyx_t_2); PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_2); __pyx_t_2 = NULL;
@@ -3179,22 +3520,22 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
       __Pyx_GIVEREF(__pyx_v_fwhm_array);
       PyTuple_SET_ITEM(__pyx_t_9, 2+__pyx_t_8, __pyx_v_fwhm_array);
       __pyx_t_3 = 0;
-      __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_9, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
+      __pyx_t_1 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_9, NULL); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 110, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_1);
       __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     }
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-    /* "ompy/gauss_smoothing.pyx":95
+    /* "ompy/gauss_smoothing.pyx":110
  * 
  *     for i in range(matrix_in.shape[0]):
  *         matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],             # <<<<<<<<<<<<<<
  *                                            E_array, fwhm_array)
  * 
  */
-    __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    __pyx_t_9 = PyTuple_New(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 95, __pyx_L1_error)
+    __pyx_t_9 = PyTuple_New(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
     __Pyx_GIVEREF(__pyx_t_4);
     PyTuple_SET_ITEM(__pyx_t_9, 0, __pyx_t_4);
@@ -3202,12 +3543,12 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
     __Pyx_GIVEREF(__pyx_slice__3);
     PyTuple_SET_ITEM(__pyx_t_9, 1, __pyx_slice__3);
     __pyx_t_4 = 0;
-    if (unlikely(PyObject_SetItem(__pyx_v_matrix_out, __pyx_t_9, __pyx_t_1) < 0)) __PYX_ERR(0, 95, __pyx_L1_error)
+    if (unlikely(PyObject_SetItem(__pyx_v_matrix_out, __pyx_t_9, __pyx_t_1) < 0)) __PYX_ERR(0, 110, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   }
 
-  /* "ompy/gauss_smoothing.pyx":98
+  /* "ompy/gauss_smoothing.pyx":113
  *                                            E_array, fwhm_array)
  * 
  *     return matrix_out             # <<<<<<<<<<<<<<
@@ -3217,7 +3558,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
   __pyx_r = __pyx_v_matrix_out;
   goto __pyx_L0;
 
-  /* "ompy/gauss_smoothing.pyx":89
+  /* "ompy/gauss_smoothing.pyx":104
  * 
  * 
  * def gauss_smoothing_matrix(matrix_in, E_array,             # <<<<<<<<<<<<<<
@@ -16946,6 +17287,9 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_s_Cannot_index_with_type_s, __pyx_k_Cannot_index_with_type_s, sizeof(__pyx_k_Cannot_index_with_type_s), 0, 0, 1, 0},
   {&__pyx_n_s_DTYPE, __pyx_k_DTYPE, sizeof(__pyx_k_DTYPE), 0, 0, 1, 1},
   {&__pyx_n_s_E_array, __pyx_k_E_array, sizeof(__pyx_k_E_array), 0, 0, 1, 1},
+  {&__pyx_n_s_E_centroid_current, __pyx_k_E_centroid_current, sizeof(__pyx_k_E_centroid_current), 0, 0, 1, 1},
+  {&__pyx_n_s_E_cut_high, __pyx_k_E_cut_high, sizeof(__pyx_k_E_cut_high), 0, 0, 1, 1},
+  {&__pyx_n_s_E_cut_low, __pyx_k_E_cut_low, sizeof(__pyx_k_E_cut_low), 0, 0, 1, 1},
   {&__pyx_n_s_Ellipsis, __pyx_k_Ellipsis, sizeof(__pyx_k_Ellipsis), 0, 0, 1, 1},
   {&__pyx_kp_s_Empty_shape_tuple_for_cython_arr, __pyx_k_Empty_shape_tuple_for_cython_arr, sizeof(__pyx_k_Empty_shape_tuple_for_cython_arr), 0, 0, 1, 0},
   {&__pyx_kp_s_Incompatible_checksums_s_vs_0xb0, __pyx_k_Incompatible_checksums_s_vs_0xb0, sizeof(__pyx_k_Incompatible_checksums_s_vs_0xb0), 0, 0, 1, 0},
@@ -16966,9 +17310,10 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ValueError, __pyx_k_ValueError, sizeof(__pyx_k_ValueError), 0, 0, 1, 1},
   {&__pyx_n_s_View_MemoryView, __pyx_k_View_MemoryView, sizeof(__pyx_k_View_MemoryView), 0, 0, 1, 1},
   {&__pyx_n_s__21, __pyx_k__21, sizeof(__pyx_k__21), 0, 0, 1, 1},
+  {&__pyx_n_s_a0, __pyx_k_a0, sizeof(__pyx_k_a0), 0, 0, 1, 1},
+  {&__pyx_n_s_a1, __pyx_k_a1, sizeof(__pyx_k_a1), 0, 0, 1, 1},
   {&__pyx_n_s_allocate_buffer, __pyx_k_allocate_buffer, sizeof(__pyx_k_allocate_buffer), 0, 0, 1, 1},
   {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
-  {&__pyx_n_s_bin_width, __pyx_k_bin_width, sizeof(__pyx_k_bin_width), 0, 0, 1, 1},
   {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
   {&__pyx_n_u_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 1, 0, 1},
   {&__pyx_n_s_class, __pyx_k_class, sizeof(__pyx_k_class), 0, 0, 1, 1},
@@ -16976,6 +17321,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_s_contiguous_and_direct, __pyx_k_contiguous_and_direct, sizeof(__pyx_k_contiguous_and_direct), 0, 0, 1, 0},
   {&__pyx_kp_s_contiguous_and_indirect, __pyx_k_contiguous_and_indirect, sizeof(__pyx_k_contiguous_and_indirect), 0, 0, 1, 0},
   {&__pyx_n_s_counts, __pyx_k_counts, sizeof(__pyx_k_counts), 0, 0, 1, 1},
+  {&__pyx_n_s_cut_width, __pyx_k_cut_width, sizeof(__pyx_k_cut_width), 0, 0, 1, 1},
   {&__pyx_n_s_dict, __pyx_k_dict, sizeof(__pyx_k_dict), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_dtype_is_object, __pyx_k_dtype_is_object, sizeof(__pyx_k_dtype_is_object), 0, 0, 1, 1},
@@ -16999,6 +17345,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_getstate, __pyx_k_getstate, sizeof(__pyx_k_getstate), 0, 0, 1, 1},
   {&__pyx_kp_s_got_differing_extents_in_dimensi, __pyx_k_got_differing_extents_in_dimensi, sizeof(__pyx_k_got_differing_extents_in_dimensi), 0, 0, 1, 0},
   {&__pyx_n_s_i, __pyx_k_i, sizeof(__pyx_k_i), 0, 0, 1, 1},
+  {&__pyx_n_s_i_cut_high, __pyx_k_i_cut_high, sizeof(__pyx_k_i_cut_high), 0, 0, 1, 1},
+  {&__pyx_n_s_i_cut_low, __pyx_k_i_cut_low, sizeof(__pyx_k_i_cut_low), 0, 0, 1, 1},
   {&__pyx_n_s_id, __pyx_k_id, sizeof(__pyx_k_id), 0, 0, 1, 1},
   {&__pyx_n_s_import, __pyx_k_import, sizeof(__pyx_k_import), 0, 0, 1, 1},
   {&__pyx_n_s_interp1d, __pyx_k_interp1d, sizeof(__pyx_k_interp1d), 0, 0, 1, 1},
@@ -17045,6 +17393,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
   {&__pyx_n_s_sigma, __pyx_k_sigma, sizeof(__pyx_k_sigma), 0, 0, 1, 1},
+  {&__pyx_n_s_sigma_current, __pyx_k_sigma_current, sizeof(__pyx_k_sigma_current), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
   {&__pyx_n_s_sqrt, __pyx_k_sqrt, sizeof(__pyx_k_sqrt), 0, 0, 1, 1},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
@@ -17069,7 +17418,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
   __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 35, __pyx_L1_error)
-  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 64, __pyx_L1_error)
+  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 67, __pyx_L1_error)
   __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) __PYX_ERR(1, 148, __pyx_L1_error)
   __pyx_builtin_enumerate = __Pyx_GetBuiltinName(__pyx_n_s_enumerate); if (!__pyx_builtin_enumerate) __PYX_ERR(1, 151, __pyx_L1_error)
   __pyx_builtin_TypeError = __Pyx_GetBuiltinName(__pyx_n_s_TypeError); if (!__pyx_builtin_TypeError) __PYX_ERR(1, 2, __pyx_L1_error)
@@ -17085,36 +17434,36 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "ompy/gauss_smoothing.pyx":64
+  /* "ompy/gauss_smoothing.pyx":67
  *     """
  *     if not len(vector_in) == len(E_array):
  *         raise ValueError("Length mismatch between vector_in and E_array")             # <<<<<<<<<<<<<<
  *     if not len(vector_in) == len(fwhm_divE_array):
  *         raise ValueError("Length mismatch between vector_in and fwhm_divE_array")
  */
-  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_Length_mismatch_between_vector_i); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 64, __pyx_L1_error)
+  __pyx_tuple_ = PyTuple_Pack(1, __pyx_kp_u_Length_mismatch_between_vector_i); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
 
-  /* "ompy/gauss_smoothing.pyx":66
+  /* "ompy/gauss_smoothing.pyx":69
  *         raise ValueError("Length mismatch between vector_in and E_array")
  *     if not len(vector_in) == len(fwhm_divE_array):
  *         raise ValueError("Length mismatch between vector_in and fwhm_divE_array")             # <<<<<<<<<<<<<<
  * 
  *     cdef double[:] vector_in_view = vector_in
  */
-  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_u_Length_mismatch_between_vector_i_2); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 66, __pyx_L1_error)
+  __pyx_tuple__2 = PyTuple_Pack(1, __pyx_kp_u_Length_mismatch_between_vector_i_2); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 69, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
 
-  /* "ompy/gauss_smoothing.pyx":95
+  /* "ompy/gauss_smoothing.pyx":110
  * 
  *     for i in range(matrix_in.shape[0]):
  *         matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],             # <<<<<<<<<<<<<<
  *                                            E_array, fwhm_array)
  * 
  */
-  __pyx_slice__3 = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice__3)) __PYX_ERR(0, 95, __pyx_L1_error)
+  __pyx_slice__3 = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice__3)) __PYX_ERR(0, 110, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_slice__3);
   __Pyx_GIVEREF(__pyx_slice__3);
 
@@ -17315,25 +17664,25 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
  * 
  * 
  * def gauss_smoothing(double[:] vector_in, double[:] E_array,             # <<<<<<<<<<<<<<
- *                     double[:] fwhm_divE_array):
- *     """
+ *                     double[:] fwhm_divE_array,
+ *                     double cut_width=3):
  */
-  __pyx_tuple__24 = PyTuple_Pack(9, __pyx_n_s_vector_in, __pyx_n_s_E_array, __pyx_n_s_fwhm_divE_array, __pyx_n_s_vector_in_view, __pyx_n_s_bin_width, __pyx_n_s_vector_out, __pyx_n_s_i, __pyx_n_s_counts, __pyx_n_s_pdf); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_tuple__24 = PyTuple_Pack(17, __pyx_n_s_vector_in, __pyx_n_s_E_array, __pyx_n_s_fwhm_divE_array, __pyx_n_s_cut_width, __pyx_n_s_vector_in_view, __pyx_n_s_a0, __pyx_n_s_a1, __pyx_n_s_vector_out, __pyx_n_s_i, __pyx_n_s_counts, __pyx_n_s_E_centroid_current, __pyx_n_s_sigma_current, __pyx_n_s_E_cut_low, __pyx_n_s_i_cut_low, __pyx_n_s_E_cut_high, __pyx_n_s_i_cut_high, __pyx_n_s_pdf); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__24);
   __Pyx_GIVEREF(__pyx_tuple__24);
-  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(3, 0, 9, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__24, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_gauss_smoothing, 45, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(4, 0, 17, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__24, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_gauss_smoothing, 45, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(0, 45, __pyx_L1_error)
 
-  /* "ompy/gauss_smoothing.pyx":89
+  /* "ompy/gauss_smoothing.pyx":104
  * 
  * 
  * def gauss_smoothing_matrix(matrix_in, E_array,             # <<<<<<<<<<<<<<
  *                            fwhm_array):
  *     cdef int i
  */
-  __pyx_tuple__26 = PyTuple_Pack(5, __pyx_n_s_matrix_in, __pyx_n_s_E_array, __pyx_n_s_fwhm_array, __pyx_n_s_i, __pyx_n_s_matrix_out); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_tuple__26 = PyTuple_Pack(5, __pyx_n_s_matrix_in, __pyx_n_s_E_array, __pyx_n_s_fwhm_array, __pyx_n_s_i, __pyx_n_s_matrix_out); if (unlikely(!__pyx_tuple__26)) __PYX_ERR(0, 104, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__26);
   __Pyx_GIVEREF(__pyx_tuple__26);
-  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_gauss_smoothing_matrix, 89, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_codeobj__27 = (PyObject*)__Pyx_PyCode_New(3, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__26, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_gauss_smoothing_matrix, 104, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__27)) __PYX_ERR(0, 104, __pyx_L1_error)
 
   /* "View.MemoryView":286
  *         return self.name
@@ -17849,24 +18198,24 @@ if (!__Pyx_RefNanny) {
  * 
  * 
  * def gauss_smoothing(double[:] vector_in, double[:] E_array,             # <<<<<<<<<<<<<<
- *                     double[:] fwhm_divE_array):
- *     """
+ *                     double[:] fwhm_divE_array,
+ *                     double cut_width=3):
  */
   __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_15gauss_smoothing_3gauss_smoothing, NULL, __pyx_n_s_ompy_gauss_smoothing); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_gauss_smoothing, __pyx_t_1) < 0) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "ompy/gauss_smoothing.pyx":89
+  /* "ompy/gauss_smoothing.pyx":104
  * 
  * 
  * def gauss_smoothing_matrix(matrix_in, E_array,             # <<<<<<<<<<<<<<
  *                            fwhm_array):
  *     cdef int i
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_15gauss_smoothing_5gauss_smoothing_matrix, NULL, __pyx_n_s_ompy_gauss_smoothing); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_15gauss_smoothing_5gauss_smoothing_matrix, NULL, __pyx_n_s_ompy_gauss_smoothing); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 104, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_gauss_smoothing_matrix, __pyx_t_1) < 0) __PYX_ERR(0, 89, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_gauss_smoothing_matrix, __pyx_t_1) < 0) __PYX_ERR(0, 104, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
   /* "ompy/gauss_smoothing.pyx":1
@@ -18880,6 +19229,228 @@ bad:
 }
 #endif
 
+/* PyIntBinop */
+#if !CYTHON_COMPILING_IN_PYPY
+static PyObject* __Pyx_PyInt_AddObjC(PyObject *op1, PyObject *op2, CYTHON_UNUSED long intval, int inplace, int zerodivision_check) {
+    (void)inplace;
+    (void)zerodivision_check;
+    #if PY_MAJOR_VERSION < 3
+    if (likely(PyInt_CheckExact(op1))) {
+        const long b = intval;
+        long x;
+        long a = PyInt_AS_LONG(op1);
+            x = (long)((unsigned long)a + b);
+            if (likely((x^a) >= 0 || (x^b) >= 0))
+                return PyInt_FromLong(x);
+            return PyLong_Type.tp_as_number->nb_add(op1, op2);
+    }
+    #endif
+    #if CYTHON_USE_PYLONG_INTERNALS
+    if (likely(PyLong_CheckExact(op1))) {
+        const long b = intval;
+        long a, x;
+#ifdef HAVE_LONG_LONG
+        const PY_LONG_LONG llb = intval;
+        PY_LONG_LONG lla, llx;
+#endif
+        const digit* digits = ((PyLongObject*)op1)->ob_digit;
+        const Py_ssize_t size = Py_SIZE(op1);
+        if (likely(__Pyx_sst_abs(size) <= 1)) {
+            a = likely(size) ? digits[0] : 0;
+            if (size == -1) a = -a;
+        } else {
+            switch (size) {
+                case -2:
+                    if (8 * sizeof(long) - 1 > 2 * PyLong_SHIFT) {
+                        a = -(long) (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 2 * PyLong_SHIFT) {
+                        lla = -(PY_LONG_LONG) (((((unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                case 2:
+                    if (8 * sizeof(long) - 1 > 2 * PyLong_SHIFT) {
+                        a = (long) (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 2 * PyLong_SHIFT) {
+                        lla = (PY_LONG_LONG) (((((unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                case -3:
+                    if (8 * sizeof(long) - 1 > 3 * PyLong_SHIFT) {
+                        a = -(long) (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 3 * PyLong_SHIFT) {
+                        lla = -(PY_LONG_LONG) (((((((unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                case 3:
+                    if (8 * sizeof(long) - 1 > 3 * PyLong_SHIFT) {
+                        a = (long) (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 3 * PyLong_SHIFT) {
+                        lla = (PY_LONG_LONG) (((((((unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                case -4:
+                    if (8 * sizeof(long) - 1 > 4 * PyLong_SHIFT) {
+                        a = -(long) (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 4 * PyLong_SHIFT) {
+                        lla = -(PY_LONG_LONG) (((((((((unsigned PY_LONG_LONG)digits[3]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                case 4:
+                    if (8 * sizeof(long) - 1 > 4 * PyLong_SHIFT) {
+                        a = (long) (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
+                        break;
+#ifdef HAVE_LONG_LONG
+                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 4 * PyLong_SHIFT) {
+                        lla = (PY_LONG_LONG) (((((((((unsigned PY_LONG_LONG)digits[3]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
+                        goto long_long;
+#endif
+                    }
+                    CYTHON_FALLTHROUGH;
+                default: return PyLong_Type.tp_as_number->nb_add(op1, op2);
+            }
+        }
+                x = a + b;
+            return PyLong_FromLong(x);
+#ifdef HAVE_LONG_LONG
+        long_long:
+                llx = lla + llb;
+            return PyLong_FromLongLong(llx);
+#endif
+        
+        
+    }
+    #endif
+    if (PyFloat_CheckExact(op1)) {
+        const long b = intval;
+        double a = PyFloat_AS_DOUBLE(op1);
+            double result;
+            PyFPE_START_PROTECT("add", return NULL)
+            result = ((double)a) + (double)b;
+            PyFPE_END_PROTECT(result)
+            return PyFloat_FromDouble(result);
+    }
+    return (inplace ? PyNumber_InPlaceAdd : PyNumber_Add)(op1, op2);
+}
+#endif
+
+/* SliceObject */
+static CYTHON_INLINE int __Pyx_PyObject_SetSlice(PyObject* obj, PyObject* value,
+        Py_ssize_t cstart, Py_ssize_t cstop,
+        PyObject** _py_start, PyObject** _py_stop, PyObject** _py_slice,
+        int has_cstart, int has_cstop, CYTHON_UNUSED int wraparound) {
+#if CYTHON_USE_TYPE_SLOTS
+    PyMappingMethods* mp;
+#if PY_MAJOR_VERSION < 3
+    PySequenceMethods* ms = Py_TYPE(obj)->tp_as_sequence;
+    if (likely(ms && ms->sq_ass_slice)) {
+        if (!has_cstart) {
+            if (_py_start && (*_py_start != Py_None)) {
+                cstart = __Pyx_PyIndex_AsSsize_t(*_py_start);
+                if ((cstart == (Py_ssize_t)-1) && PyErr_Occurred()) goto bad;
+            } else
+                cstart = 0;
+        }
+        if (!has_cstop) {
+            if (_py_stop && (*_py_stop != Py_None)) {
+                cstop = __Pyx_PyIndex_AsSsize_t(*_py_stop);
+                if ((cstop == (Py_ssize_t)-1) && PyErr_Occurred()) goto bad;
+            } else
+                cstop = PY_SSIZE_T_MAX;
+        }
+        if (wraparound && unlikely((cstart < 0) | (cstop < 0)) && likely(ms->sq_length)) {
+            Py_ssize_t l = ms->sq_length(obj);
+            if (likely(l >= 0)) {
+                if (cstop < 0) {
+                    cstop += l;
+                    if (cstop < 0) cstop = 0;
+                }
+                if (cstart < 0) {
+                    cstart += l;
+                    if (cstart < 0) cstart = 0;
+                }
+            } else {
+                if (!PyErr_ExceptionMatches(PyExc_OverflowError))
+                    goto bad;
+                PyErr_Clear();
+            }
+        }
+        return ms->sq_ass_slice(obj, cstart, cstop, value);
+    }
+#endif
+    mp = Py_TYPE(obj)->tp_as_mapping;
+    if (likely(mp && mp->mp_ass_subscript))
+#endif
+    {
+        int result;
+        PyObject *py_slice, *py_start, *py_stop;
+        if (_py_slice) {
+            py_slice = *_py_slice;
+        } else {
+            PyObject* owned_start = NULL;
+            PyObject* owned_stop = NULL;
+            if (_py_start) {
+                py_start = *_py_start;
+            } else {
+                if (has_cstart) {
+                    owned_start = py_start = PyInt_FromSsize_t(cstart);
+                    if (unlikely(!py_start)) goto bad;
+                } else
+                    py_start = Py_None;
+            }
+            if (_py_stop) {
+                py_stop = *_py_stop;
+            } else {
+                if (has_cstop) {
+                    owned_stop = py_stop = PyInt_FromSsize_t(cstop);
+                    if (unlikely(!py_stop)) {
+                        Py_XDECREF(owned_start);
+                        goto bad;
+                    }
+                } else
+                    py_stop = Py_None;
+            }
+            py_slice = PySlice_New(py_start, py_stop, Py_None);
+            Py_XDECREF(owned_start);
+            Py_XDECREF(owned_stop);
+            if (unlikely(!py_slice)) goto bad;
+        }
+#if CYTHON_USE_TYPE_SLOTS
+        result = mp->mp_ass_subscript(obj, py_slice, value);
+#else
+        result = value ? PyObject_SetItem(obj, py_slice, value) : PyObject_DelItem(obj, py_slice);
+#endif
+        if (!_py_slice) {
+            Py_DECREF(py_slice);
+        }
+        return result;
+    }
+    PyErr_Format(PyExc_TypeError,
+        "'%.200s' object does not support slice %.10s",
+        Py_TYPE(obj)->tp_name, value ? "assignment" : "deletion");
+bad:
+    return -1;
+}
+
 /* GetItemInt */
 static PyObject *__Pyx_GetItemInt_Generic(PyObject *o, PyObject* j) {
     PyObject *r;
@@ -19618,130 +20189,6 @@ static CYTHON_INLINE int __Pyx_PyErr_GivenExceptionMatches2(PyObject *err, PyObj
         return __Pyx_inner_PyErr_GivenExceptionMatches2(err, exc_type1, exc_type2);
     }
     return (PyErr_GivenExceptionMatches(err, exc_type1) || PyErr_GivenExceptionMatches(err, exc_type2));
-}
-#endif
-
-/* PyIntBinop */
-#if !CYTHON_COMPILING_IN_PYPY
-static PyObject* __Pyx_PyInt_AddObjC(PyObject *op1, PyObject *op2, CYTHON_UNUSED long intval, int inplace, int zerodivision_check) {
-    (void)inplace;
-    (void)zerodivision_check;
-    #if PY_MAJOR_VERSION < 3
-    if (likely(PyInt_CheckExact(op1))) {
-        const long b = intval;
-        long x;
-        long a = PyInt_AS_LONG(op1);
-            x = (long)((unsigned long)a + b);
-            if (likely((x^a) >= 0 || (x^b) >= 0))
-                return PyInt_FromLong(x);
-            return PyLong_Type.tp_as_number->nb_add(op1, op2);
-    }
-    #endif
-    #if CYTHON_USE_PYLONG_INTERNALS
-    if (likely(PyLong_CheckExact(op1))) {
-        const long b = intval;
-        long a, x;
-#ifdef HAVE_LONG_LONG
-        const PY_LONG_LONG llb = intval;
-        PY_LONG_LONG lla, llx;
-#endif
-        const digit* digits = ((PyLongObject*)op1)->ob_digit;
-        const Py_ssize_t size = Py_SIZE(op1);
-        if (likely(__Pyx_sst_abs(size) <= 1)) {
-            a = likely(size) ? digits[0] : 0;
-            if (size == -1) a = -a;
-        } else {
-            switch (size) {
-                case -2:
-                    if (8 * sizeof(long) - 1 > 2 * PyLong_SHIFT) {
-                        a = -(long) (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 2 * PyLong_SHIFT) {
-                        lla = -(PY_LONG_LONG) (((((unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                case 2:
-                    if (8 * sizeof(long) - 1 > 2 * PyLong_SHIFT) {
-                        a = (long) (((((unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 2 * PyLong_SHIFT) {
-                        lla = (PY_LONG_LONG) (((((unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                case -3:
-                    if (8 * sizeof(long) - 1 > 3 * PyLong_SHIFT) {
-                        a = -(long) (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 3 * PyLong_SHIFT) {
-                        lla = -(PY_LONG_LONG) (((((((unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                case 3:
-                    if (8 * sizeof(long) - 1 > 3 * PyLong_SHIFT) {
-                        a = (long) (((((((unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 3 * PyLong_SHIFT) {
-                        lla = (PY_LONG_LONG) (((((((unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                case -4:
-                    if (8 * sizeof(long) - 1 > 4 * PyLong_SHIFT) {
-                        a = -(long) (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 4 * PyLong_SHIFT) {
-                        lla = -(PY_LONG_LONG) (((((((((unsigned PY_LONG_LONG)digits[3]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                case 4:
-                    if (8 * sizeof(long) - 1 > 4 * PyLong_SHIFT) {
-                        a = (long) (((((((((unsigned long)digits[3]) << PyLong_SHIFT) | (unsigned long)digits[2]) << PyLong_SHIFT) | (unsigned long)digits[1]) << PyLong_SHIFT) | (unsigned long)digits[0]));
-                        break;
-#ifdef HAVE_LONG_LONG
-                    } else if (8 * sizeof(PY_LONG_LONG) - 1 > 4 * PyLong_SHIFT) {
-                        lla = (PY_LONG_LONG) (((((((((unsigned PY_LONG_LONG)digits[3]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[2]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[1]) << PyLong_SHIFT) | (unsigned PY_LONG_LONG)digits[0]));
-                        goto long_long;
-#endif
-                    }
-                    CYTHON_FALLTHROUGH;
-                default: return PyLong_Type.tp_as_number->nb_add(op1, op2);
-            }
-        }
-                x = a + b;
-            return PyLong_FromLong(x);
-#ifdef HAVE_LONG_LONG
-        long_long:
-                llx = lla + llb;
-            return PyLong_FromLongLong(llx);
-#endif
-        
-        
-    }
-    #endif
-    if (PyFloat_CheckExact(op1)) {
-        const long b = intval;
-        double a = PyFloat_AS_DOUBLE(op1);
-            double result;
-            PyFPE_START_PROTECT("add", return NULL)
-            result = ((double)a) + (double)b;
-            PyFPE_END_PROTECT(result)
-            return PyFloat_FromDouble(result);
-    }
-    return (inplace ? PyNumber_InPlaceAdd : PyNumber_Add)(op1, op2);
 }
 #endif
 
