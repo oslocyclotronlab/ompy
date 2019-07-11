@@ -363,19 +363,25 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         # ax.plot(Eout_array, cmp_high, label="cmp_high")
 
 
+        # Note: We choose not to smoothe the Compton spectrum, because the
+        # simulated Compton spectra stored in file are smoothed already.
+        # To apply smoothing to the Compton spectrum, you could do something like
+        # R[j, :] = gauss_smoothing(R[j, :], Eout_array,
+        #                           fwhm_abs_array)
+
+
 
 
         # === Add peak structures to the spectrum: ===
         E_fe = Eout_array[j]
 
-        
-
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
         full_energy = np.zeros(N_out)  # Allocate with zeros everywhere
         full_energy[j] = f_pFE(E_fe)  # Full probability into sharp peak
-        # MAMA does not smoothe the full-energy peak, it seems.
-        # full_energy = gauss_smoothing(full_energy, Eout_array, fwhm_current)  # Smoothe
+        # Smoothe it:
+        full_energy = gauss_smoothing(full_energy, Eout_array,
+                                      fwhm_abs_array)
         R[j, :] += full_energy
 
         # Add single-escape peak, at index i_se
