@@ -373,54 +373,67 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
 
 
         # === Add peak structures to the spectrum: ===
+        discrete_peaks = np.zeros(N_out)
         E_fe = Eout_array[j]
 
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
-        full_energy = np.zeros(N_out)  # Allocate with zeros everywhere
-        full_energy[j] = f_pFE(E_fe)  # Full probability into sharp peak
+        # full_energy = np.zeros(N_out)  # Allocate with zeros everywhere
+        # full_energy[j] = f_pFE(E_fe)  # Full probability into sharp peak
+        discrete_peaks[j] = f_pFE(E_fe)
         # Smoothe it:
-        full_energy = gauss_smoothing(full_energy, Eout_array,
-                                      fwhm_abs_array)
-        R[j, :] += full_energy
+        # full_energy = gauss_smoothing(full_energy, Eout_array,
+                                      # fwhm_abs_array)
+        # R[j, :] += full_energy
 
         # Add single-escape peak, at index i_se
         E_se = E_fe - 511
         if E_se >= 0:
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_se, Eout_array)
-            single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
+            # single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
             # Put a portion of the counts into floor bin - the further away,the
             # less counts:
-            single_escape[i_floor] = (1-floor_distance) * f_pSE(E_fe)
-            single_escape[i_ceil] = floor_distance * f_pSE(E_fe)
-            single_escape = gauss_smoothing(single_escape, Eout_array,
-                                            fwhm_abs_array)  # Smoothe
-            R[j, :] += single_escape
+            # single_escape[i_floor] = (1-floor_distance) * f_pSE(E_fe)
+            # single_escape[i_ceil] = floor_distance * f_pSE(E_fe)
+            discrete_peaks[i_floor] = (1-floor_distance) * f_pSE(E_fe)
+            discrete_peaks[i_ceil] = floor_distance * f_pSE(E_fe)
+            # single_escape = gauss_smoothing(single_escape, Eout_array,
+                                            # fwhm_abs_array)  # Smoothe
+            # R[j, :] += single_escape
 
         # Repeat for double-escape peak, at index i_de
         E_de = E_fe - 2*511
         if E_de >= 0:
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_de, Eout_array)
-            double_escape = np.zeros(N_out)
-            double_escape[i_floor] = (1-floor_distance) * f_pDE(E_fe)
-            double_escape[i_ceil] = floor_distance * f_pDE(E_fe)
-            double_escape = gauss_smoothing(double_escape, Eout_array,
-                                            fwhm_abs_array)  # Smoothe
-            R[j, :] += double_escape
+            # double_escape = np.zeros(N_out)
+            # double_escape[i_floor] = (1-floor_distance) * f_pDE(E_fe)
+            # double_escape[i_ceil] = floor_distance * f_pDE(E_fe)
+            discrete_peaks[i_floor] = (1-floor_distance) * f_pDE(E_fe)
+            discrete_peaks[i_ceil] = floor_distance * f_pDE(E_fe)
+            # double_escape = gauss_smoothing(double_escape, Eout_array,
+                                            # fwhm_abs_array)  # Smoothe
+            # R[j, :] += double_escape
 
         # Add 511 annihilation peak, at index i_an
         if E_fe > 511:
             E_511 = 511
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_511, Eout_array)
-            fiveeleven = np.zeros(N_out)
-            fiveeleven[i_floor] = (1-floor_distance) * f_p511(E_fe)
-            fiveeleven[i_ceil] = floor_distance * f_p511(E_fe)
-            fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
+            # fiveeleven = np.zeros(N_out)
+            # fiveeleven[i_floor] = (1-floor_distance) * f_p511(E_fe)
+            # fiveeleven[i_ceil] = floor_distance * f_p511(E_fe)
+            discrete_peaks[i_floor] = (1-floor_distance) * f_p511(E_fe)
+            discrete_peaks[i_ceil] = floor_distance * f_p511(E_fe)
+            # fiveeleven = gauss_smoothing(fiveeleven, Eout_array,
+                                         # fwhm_abs_array)  # Smoothe
+            # R[j, :] += fiveeleven
+
+        # Do common smoothing of the discrete_peaks array:
+        discrete_peaks = gauss_smoothing(discrete_peaks, Eout_array,
                                          fwhm_abs_array)  # Smoothe
-            R[j, :] += fiveeleven
+        R[j, :] += discrete_peaks
 
         # === Finally, normalise the row to unity (probability conservation): ===
         R[j, :] = div0(R[j, :], np.sum(R[j, :]))
