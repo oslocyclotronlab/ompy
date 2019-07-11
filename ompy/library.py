@@ -84,6 +84,12 @@ class Matrix():
     def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None,
              **kwargs):
         cbar = None
+        # Add one more element to the array for plotting purposes - this is the
+        # upper bin edge of the last bin:
+        E0_array_plot = np.append(self.E0_array, self.E0_array[-1]
+                                  + self.E0_array[1]-self.E0_array[0])
+        E1_array_plot = np.append(self.E1_array, self.E1_array[-1]
+                                  + self.E1_array[1]-self.E1_array[0])
         if ax is None:
             f, ax = plt.subplots(1, 1)
         if zscale == "log":
@@ -91,32 +97,32 @@ class Matrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin),
                                      **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      norm=LogNorm(vmax=zmax),
                                      **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin, vmax=zmax),
                                      **kwargs
                                      )
             else:
                 # or finally, no limits:
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      norm=LogNorm(),
                                      **kwargs
@@ -126,24 +132,24 @@ class Matrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      vmin=zmin,
                                      **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      vmax=zmax,
                                      **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      vmin=zmin,
                                      vmax=zmax,
@@ -151,8 +157,8 @@ class Matrix():
                                      )
             else:
                 # or finally, no limits.
-                cbar = ax.pcolormesh(self.E1_array,
-                                     self.E0_array,
+                cbar = ax.pcolormesh(E1_array_plot,
+                                     E0_array_plot,
                                      self.matrix,
                                      **kwargs
                                      )
@@ -160,9 +166,19 @@ class Matrix():
             raise Exception("Unknown zscale type", zscale)
         assert cbar is not None  # cbar should be filled at this point
         ax.set_title(title)
-        if ax is None:
-            f.colorbar(cbar, ax=ax)
-            plt.show()
+
+        # == Change tick marks ==
+        # Find a nice spacing between ticks
+        # E1_array_middle_bin = (self.E1_array
+        #                        + (self.E1_array[1] - self.E1_array[0])/2)
+        # ax.set_xticks(E1_array_middle_bin)
+        # E0_array_middle_bin = (self.E0_array
+        #                        + (self.E0_array[1] - self.E0_array[0])/2)
+        # ax.set_yticks(E0_array_middle_bin)
+
+        # if ax is None:
+            # f.colorbar(cbar, ax=ax)
+            # plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
 
     def plot_projection(self, E_limits, axis, ax=None, normalize=False,
@@ -196,8 +212,11 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
-            ax.plot(self.E0_array,
+            E0_array_middle_bin = (self.E0_array
+                                   + (self.E0_array[1] - self.E0_array[0])/2)
+            ax.step(E0_array_middle_bin,
                     projection,
+                    where="mid",  # Corresponds to lower bin edge
                     **kwargs
                     )
         elif axis == 1:
@@ -215,17 +234,25 @@ class Matrix():
                                 )
             else:
                 projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
-            ax.plot(self.E1_array,
+            E1_array_middle_bin = (self.E1_array
+                                   + (self.E1_array[1] - self.E1_array[0])/2)
+            ax.step(E1_array_middle_bin,
                     projection,
+                    where="mid",  # Corresponds to lower bin edge
                     **kwargs
                     )
         else:
-            raise Exception("Variable axis must be one of (0, 1) but is",
-                            axis)
+            raise ValueError("Variable axis must be one of (0, 1) but is",
+                             axis)
 
     def plot_projection_x(self, E_limits, ax=None, normalize=False, **kwargs):
         """ Wrapper to call plot_projection(axis=1) to project on x axis"""
         self.plot_projection(E_limits=E_limits, axis=1, ax=ax,
+                             normalize=normalize, **kwargs)
+
+    def plot_projection_y(self, E_limits, ax=None, normalize=False, **kwargs):
+        """ Wrapper to call plot_projection(axis=0) to project on y axis"""
+        self.plot_projection(E_limits=E_limits, axis=0, ax=ax,
                              normalize=normalize, **kwargs)
 
     def save(self, fname):
