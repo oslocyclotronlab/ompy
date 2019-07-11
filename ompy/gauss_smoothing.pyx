@@ -1,5 +1,6 @@
 import os
 import numpy as np
+cimport numpy as np
 from scipy.interpolate import interp1d#, interp2d
 
 from .rebin import *
@@ -42,7 +43,7 @@ def gaussian(double[:] E_array, double mu, double sigma):
     return gaussian_array
 
 
-def gauss_smoothing(double[:] vector_in, double[:] E_array,
+def gauss_smoothing(double[:] vector_in, np.ndarray E_array,
                     double[:] fwhm_divE_array,
                     double cut_width=3):
     """
@@ -50,7 +51,8 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     of full-width-half-maximum FWHM. Preserves number of counts.
     Args:
         vector_in (array, double): Array of inbound counts to be smoothed
-        E_array (array, double): Array with energy calibration of vector_in
+        E_array (array, double): Array with energy calibration of vector_in, in
+                                 lower-bin-edge calibration
         fwhm_divE_array (array, double): The full-width-half-maximum value to smooth
                                   by, in percent of the energy. Note well that
                                   this means that
@@ -71,8 +73,13 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     cdef double[:] vector_in_view = vector_in
     cdef double a0, a1
 
+    # a0_lower_bin_edge = E_array[0]
     a0 = E_array[0]
     a1 = E_array[1] - E_array[0]
+
+    # # Convert from lower bin edge to middle-bin energy:
+    # E_array = E_array + a1/2
+    # a0 = E_array[0]
 
     vector_out = np.zeros(len(vector_in), dtype=DTYPE)
     # cdef double[:] vector_out_view = vector_out
@@ -81,8 +88,8 @@ def gauss_smoothing(double[:] vector_in, double[:] E_array,
     for i in range(len(vector_out)):
         counts = vector_in_view[i]
         if counts > 0:
-            E_centroid_current = E_array[i]
-            sigma_current = fwhm_divE_array[i]/(2.355*100)*E_array[i]
+            E_centroid_current = E_array[i] + a1/2
+            sigma_current = fwhm_divE_array[i]/(2.355*100)*E_centroid_current
             E_cut_low = E_centroid_current - cut_width * sigma_current
             i_cut_low = int((E_cut_low - a0) / a1)
             i_cut_low = max(0, i_cut_low)
