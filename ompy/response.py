@@ -124,6 +124,14 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
     # print("a0_sim, a1_sim =", a0_sim, a1_sim, flush=True)
     # "Eg_sim" means "gamma, simulated", and refers to the gamma energies where we have simulated Compton spectra.
 
+    # Check that max energy is not larger than the available response function
+    # data:
+    if Eout_array.max() > Eg_sim_array.max():
+        raise ValueError("Maximum energy cannot be larger than largest "
+                         "simulated response function, which is "
+                         "E_max = {:f}".format(Eg_sim_array.max())
+                         )
+
     # Read in Compton spectra for each Eg channel:
     N_Eg = len(Eg_sim_array)
     # Read first Compton spectrum to get number of energy channels in each:
@@ -211,7 +219,6 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         # Skip if below lower threshold
         if E_j < Egmin:
             continue
-
 
         # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
         Egmax = E_j + 6*fwhm_abs*f_fwhm_rel(E_j)/2.35 #FWHM_rel.max()/2.35 
