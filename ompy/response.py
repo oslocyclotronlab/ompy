@@ -374,7 +374,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
 
         # === Add peak structures to the spectrum: ===
         discrete_peaks = np.zeros(N_out)
-        E_fe = Eout_array[j]
+        E_fe = Eout_array[j] + a1_out/2  # Evaluate energies in middle-bin
 
         # Add full-energy peak, which should be at energy corresponding to
         # index j:
