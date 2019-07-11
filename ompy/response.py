@@ -388,7 +388,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
 
         # Add single-escape peak, at index i_se
         E_se = E_fe - 511
-        if E_se >= 0:
+        if E_se >= 0 and E_se >= Eout_array[0]:
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_se, Eout_array)
             # single_escape = np.zeros(N_out)  # Allocate with zeros everywhere
@@ -404,7 +404,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
 
         # Repeat for double-escape peak, at index i_de
         E_de = E_fe - 2*511
-        if E_de >= 0:
+        if E_de >= 0 and E_de >= Eout_array[0]:
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_de, Eout_array)
             # double_escape = np.zeros(N_out)
@@ -417,7 +417,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
             # R[j, :] += double_escape
 
         # Add 511 annihilation peak, at index i_an
-        if E_fe > 511:
+        if E_fe > 511 and 511 >= Eout_array[0]:
             E_511 = 511
             i_floor, i_ceil, floor_distance\
                 = two_channel_split(E_511, Eout_array)
