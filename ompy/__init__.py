@@ -9,3 +9,6 @@ from .first_generation_method import *
 from .error_propagation import *
 from .rhosig import *
 from .spinfunctions import *
+from .response import *
+from .compton_subtraction_method import *
+from .gauss_smoothing import *
