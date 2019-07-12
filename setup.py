@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from distutils.core import setup
 from Cython.Build import cythonize
+import numpy as np
 
 # build me (i.e. compile Cython modules) for testing in this directory using
 # python setup.py build_ext --inplace
@@ -15,6 +16,11 @@ setup(name='OMpy',
       ext_modules=cythonize(
                             [
                              "ompy/rebin.pyx",
-                             "ompy/rhosig.pyx"
-                            ])
+                             "ompy/rhosig.pyx",
+                             # "ompy/response.pyx",
+                             "ompy/gauss_smoothing.pyx",
+                            ],
+                            # Use Python 3:
+                            compiler_directives={'language_level': "3"}),
+      include_dirs=[np.get_include()]
       )
