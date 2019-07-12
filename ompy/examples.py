@@ -2,7 +2,8 @@ from .matrix import Matrix
 import os
 
 EXAMPLES = {'Dy164': {'raw': "../../data/Dy164_raw.m",
-                      'response': "../../data/Dy164_response_matrix.m"}
+                      'response': "../../data/Dy164_response_matrix.m"},
+            'Si28': {'raw': "../../data/Si28_raw_matrix_compressed.m"}
             }
 DATAPATH = os.path.abspath(__file__)
 

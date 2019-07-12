@@ -29,6 +29,12 @@ unfolded1 = unfolder.unfold(mat1)
 unfolded2 = unfolder.unfold(mat2)
 ** Something fishy is going on with the reshaping
 Suspect a 1 off error
+** TODO Fiks projeksion og plotting
+** TODO Fiks indeksering
+** TODO Gjør kalibrering på en smartere måte
+** TODO Gjør Poisson perturbering på signal og bakgrunn separat hvis nok
+informasjon er oppgitt av brukeren.
+** TODO Lag en perfekt matrise ved å gange sammen nivå og styrkefunk
 * Mystifystiske ting
 ** Hvorfor er raw squisha?
 ** Hvorfor er noen counts negative og mange float?
