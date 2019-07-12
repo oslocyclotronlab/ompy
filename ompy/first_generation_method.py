@@ -37,6 +37,7 @@ def first_generation_method(matrix_in,
                             multiplicity_estimation="statistical",
                             apply_area_correction=False,
                             valley_correction_array=None,
+                            initial_weight_function="box",
                             verbose=False):
     """
     Function implementing the first generation method from Guttormsen et
@@ -55,6 +56,9 @@ def first_generation_method(matrix_in,
         valley_correction_array (np.ndarray, optional): Array of weight factors
             for each Ex bin that can be used to manually "turn off"/decrease
             the influence of very large peaks in the method.
+        initial_weight_function (str, optional): The initial assumption for the
+            weight function to start the first-generation method iterations.
+            Possible values: "box", "fermi_gas".
         verbose (bool): Whether to run the method in a verbose, talkative mode
 
     Todo:
@@ -279,27 +283,33 @@ def first_generation_method(matrix_in,
     vmin_diff = -100
     vmax_diff = 100
 
-    # Prepare weight function based on Fermi gas approximation:
-    a_f = 16  # 1/MeV
-    n_f = 4.2  # Exponent for E_gamma
-    # Make the weight array by the formula W(Ex,Eg) = Eg^n_f / (Ex-Eg)^2 *
-    # exp(2*sqrt(a*(Ex-Eg)))
+    # Prepare the initial assumption for the weight function:
+    W_old = None
     Ex_mesh, Eg_mesh = np.meshgrid(Ex_array, Ex_array, indexing="ij")
-    # Make mesh of final energies:
-    Ef_mesh = Ex_mesh - Eg_mesh
-    # Set everything above Ex=Eg diagonal to zero so the weights also
-    # become zero
-    Ef_mesh[Ef_mesh < 0] = 0
-    # Calculate weights. Remember that energies are in keV, while a is in
-    # 1/MeV, so we correct in the exponent:
-    W_old = np.where(Eg_mesh > 0, div0(np.power(
-        Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
-    W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    if initial_weight_function == "box":
+        W_old = np.ones_like(Eg_mesh)
+        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    elif initial_weight_function == "fermi_gas":
+        # Prepare weight function based on Fermi gas approximation:
+        a_f = 16  # 1/MeV
+        n_f = 4.2  # Exponent for E_gamma
+        # Make the weight array by the formula W(Ex,Eg) = Eg^n_f / (Ex-Eg)^2 *
+        # exp(2*sqrt(a*(Ex-Eg)))
+        # Make mesh of final energies:
+        Ef_mesh = Ex_mesh - Eg_mesh
+        # Set everything above Ex=Eg diagonal to zero so the weights also
+        # become zero
+        Ef_mesh[Ef_mesh < 0] = 0
+        # Calculate weights. Remember that energies are in keV, while a is in
+        # 1/MeV, so we correct in the exponent:
+        W_old = np.where(Eg_mesh > 0, div0(np.power(
+            Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
+        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    else:
+        NotImplementedError(
+            "unknown value for variable initial_weight_function",
+            initial_weight_function)
 
-    # Update 20190404: Tested using a box instead of Fermi gas, seems to work just as well.
-    # TODO: Should probably use this instead after double-checking it.
-    # W_old = np.ones_like(Eg_mesh)
-    # W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
 
     mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
                        0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
