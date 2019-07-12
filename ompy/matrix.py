@@ -93,8 +93,8 @@ class Matrix():
         """
 
         self.values: np.ndarray = values
-        self.Eg: np.ndarray = Eg
-        self.Ex: np.ndarray = Ex
+        self.Eg: np.ndarray = np.array(Eg)
+        self.Ex: np.ndarray = np.array(Ex)
         self.std: np.ndarray = std
 
         if filename is not None:
@@ -189,7 +189,12 @@ class Matrix():
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-        lines = ax.pcolormesh(self.Eg, self.Ex, self.values, norm=norm)
+        # TODO: Pcolormesh ignores the last row of self.values if
+        # len(self.Eg) < len(self.values) + 1
+        # Must extend it
+        Eg = np.append(self.Eg, self.Eg[-1] + self.Eg[1] - self.Eg[0])
+        Ex = np.append(self.Ex, self.Ex[-1] + self.Ex[1] - self.Ex[0])
+        lines = ax.pcolormesh(Eg, Ex, self.values, norm=norm)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
@@ -215,42 +220,50 @@ class Matrix():
         Returns:
             The ax used for plotting
         TODO: Fix normalization
+        TODO: Fix bin edge to agree with Jorgens code
         """
         if ax is None:
             fig, ax = plt.subplots()
 
-        axis = self.axis_toint(axis)
+        axis = axis_toint(axis)
         if axis not in (0, 1):
             raise ValueError(f"Axis must be 0 or 1, got: {axis}")
 
+        isEx = axis == 1
+
         # Determine subset of the other axis to be summed
-        indexE = self.index_Eg if axis else self.index_Ex
-        rangeE = self.range_Eg if axis else self.range_Ex
+        indexE = self.index_Ex if isEx else self.index_Eg
+        rangeE = self.range_Ex if isEx else self.range_Eg
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
-        subset = slice(imin, imax)
-        selection = self.values[subset, :] if axis else self.values[:, subset]
+        subset = slice(imin, imax+1)
+        selection = self.values[subset, :] if isEx else self.values[:, subset]
+        energy = self.Ex[subset] if isEx else self.Eg[subset]
 
-        naxis = 0 if axis else 1
+        #naxis = 0 if axis else 1
 
-        projection = selection.sum(axis=naxis)
+        projection = selection.sum(axis=axis)
         if normalize:
-            # Don't know what calibration does, so using specialized code here
-            if axis:
-                projection = div0(selection, selection.sum(axis=axis))
-                projection = projection.mean(axis=naxis)
-            else:
-                calibration = self.calibration()["a01"]
-                calibrated_sum = selection.sum(axis=axis)*calibration
-                calibrated = div0(selection, calibrated_sum[:, None])
-                projection = calibrated.mean(axis=naxis)
+            projection = div0(projection, selection.sum(axis=axis).sum())
+            # # Don't know what calibration does, so using specialized code here
+            # if axis:
+            #     projection = div0(selection, selection.sum(axis=axis))
+            #     projection = projection.mean(axis=naxis)
+            # else:
+            #     calibration = self.calibration()["a01"]
+            #     calibrated_sum = selection.sum(axis=axis)*calibration
+            #     calibrated = div0(selection, calibrated_sum[:, None])
+            #     projection = calibrated.mean(axis=naxis)
 
-        if not axis:
-            ax.step(self.Ex, projection)
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        else:
-            ax.step(self.Eg, projection)
+        # Shift energy by a half bin to make the steps correct
+        shifted_energy = energy + (energy[1] - energy[0])/2
+
+        if isEx:
+            ax.step(shifted_energy, projection, where='mid')
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
+        else:
+            ax.step(energy, projection, where='mid')
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         if normalize:
             ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
         else:
@@ -416,6 +429,7 @@ class Matrix():
         self.remove_negative()
 
     def index_Eg(self, E: float) -> int:
+        #TODO FIX
         """ Returns the closest index corresponding to the Eg value """
         return np.abs(self.Eg - E).argmin()
 
@@ -489,11 +503,11 @@ def axis_toint(axis: Any) -> int:
     except AttributeError:
         pass
 
-    if axis in (0, 'eg'):
+    if axis in (0, 'eg', 'x'):
         return 0
-    elif axis in (1, 'ex'):
+    elif axis in (1, 'ex', 'y'):
         return 1
-    elif axis in (2, 'both', 'egex', 'exeg'):
+    elif axis in (2, 'both', 'egex', 'exeg', 'xy', 'yx'):
         return 2
     else:
         raise ValueError(f"Unrecognized axis: {axis}")
