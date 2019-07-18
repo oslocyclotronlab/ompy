@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 import numpy as np
+from .matrix import Matrix, MatrixState
 from .library import *
 from .rebin import *
 
@@ -61,7 +62,7 @@ def first_generation_method(matrix_in,
             Possible values: "box", "fermi_gas".
         verbose (bool): Whether to run the method in a verbose, talkative mode
 
-    Todo:
+    TODO:
         - Consider removing Ex_max keyword. Can't it just take the whole matrix?
           Compare with MAMA.
     """
@@ -78,9 +79,9 @@ def first_generation_method(matrix_in,
     # # END DEBUG
 
     # Protect input arrays:
-    unfolded_matrix = np.copy(matrix_in.matrix)
-    Ex_array_mat = np.copy(matrix_in.E0_array)
-    Egamma_array = np.copy(matrix_in.E1_array)
+    unfolded_matrix = np.copy(matrix_in.values)
+    Ex_array_mat = np.copy(matrix_in.Ex)
+    Egamma_array = np.copy(matrix_in.Eg)
 
 
     # Cut the input matrix at or above Ex=0. This is implicitly
@@ -121,7 +122,7 @@ def first_generation_method(matrix_in,
     # Ex_max = 7500 # keV - maximum excitation energy
     # Ex_min = 300 # keV - minimal excitation energy, effectively moving
     # the ground-state energy up because we cannot resolve the low-energy
-    # yrast gamma lines. This is weighed up by also using an effective 
+    # yrast gamma lines. This is weighed up by also using an effective
     # multiplicity which is lower than the real one, again not considering
     # the low-energy yrast gammas.
     # dE_gamma = 500  # keV - allow gamma energy to exceed excitation energy
@@ -311,8 +312,11 @@ def first_generation_method(matrix_in,
             initial_weight_function)
 
 
-    mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
-                       0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
+    E1 = (Ex_array[0], Ex_array[0] + dE_gamma)
+    E2 = (Ex_array[-1], Ex_array[-1] + dE_gamma)
+    # mask_W = make_mask(Ex_array, Ex_array, Ex_array[0], Ex_array[
+    #                    0] + dE_gamma, Ex_array[-1], Ex_array[-1] + dE_gamma)
+    mask_W = matrix_in.line_mask(E1, E2)
 
     # Perform the iterative subtraction:
     for iteration in range(N_iterations):
@@ -429,8 +433,10 @@ def first_generation_method(matrix_in,
     # print("Egamma_array.shape =", Egamma_array.shape, flush=True)
     # END DEBUG
 
-    firstgen = Matrix(H,
-    # firstgen = Matrix(G,
-                      Ex_array,
-                      Egamma_array)
+    firstgen = Matrix(values=H, Eg=Egamma_array, Ex=Ex_array)
+    firstgen.state = "firstgen"
+
+    # These two lines feel out of place
+    firstgen.fill_negative(window_size=10)
+    firstgen.remove_negative()
     return firstgen
