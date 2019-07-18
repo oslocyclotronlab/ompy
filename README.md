@@ -1,8 +1,25 @@
+# Oslo Method Python - OMpy
+![Travis CI](https://travis-ci.com/Caronthir/oslo_method_python.svg?token=oq37SFt93PBk5sCGgATJ&branch=master)
+
+<div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
+
+<p align="center">
+<b><a href="#how-to-use-this-package">How to</a></b>
+|
+<b><a href="#the-unfold-function">Unfolding</a></b>
+|
+<b><a href="#credits">Credits</a></b>
+|
+<b><a href="#license">License</a></b>
+</p>
+<br>
+
+NB! This repo is currently under development. Most things do not work correctly. Use at your own risk!
+=======
 Concept DOI: [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
 (to last *published* version; the *master* branch may be ahead of the *published* version)
 
 If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary.
-
 
 NB! OMpy is currently in beta. Use at your own risk!
 
@@ -13,42 +30,41 @@ This is `ompy`, the Oslo method in python. It contains all the functionality nee
 
 ## How to use this package
 First off, make sure to compile the Cython modules by doing (in the main repo folder)
-```
+```console
 python setup.py build_ext --inplace
+pip install .
+```
+On some machines it might be necessary to instead run the command
+```console
+sudo pip3 install -e .
 ```
 
 All the functions and classes in the package are available in the main module. You get everything with the import
 
-```
+```console
 import ompy
 ```
 
 The overarching philosophy is that the package shall be flexible and transparent to use and modify. We would rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
 
-## The Matrix() and Vector() classes
-The two most important utility classes in the package are `ompy.Matrix()` and `ompy.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
-```
+### The Matrix and Vector classes
+The two most important utility classes in the package are `om.Matrix()` and `om.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
+```py
 mat = ompy.Matrix()
-mat.matrix # A 2D numpy array
-mat.E0_array # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
-mat.E1_array # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
+mat.values  # A 2D numpy array
+mat.Ex      # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
+mat.Eg      # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
 
 vec = ompy.Vector()
-vec.vector # A 1D numpy array
-vec.E_array # Array of lower-bin-edge energy values for the single axis
-```
- They also contain some other methods:
-```
-mat.load(filename) # Load a spectrum from a 2D MAMA file (similar, but 1D, for vec)
-mat.save(filename) # Save spectrum to MAMA file
-
+vec.vector   # A 1D numpy array
+vec.E_array  # Array of lower-bin-edge energy values for the single axis
 ```
 
 ## Matrix manipulation
 The core of the Oslo method involves working with two-dimensional spectra, the excitation-energy-gamma-ray-energy-matrices, often called alfna matrices for obscure reasons.<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus. 
 
 
-### The unfold() function
+## The unfold function
 An implementation of the unfolding method presented in Guttormsen et al., Nuclear Instruments and Methods in Physics Research A 374 (1996).
 
 It may contain bugs. Please report any bugs you encounter to the issue tracker, or if you like, fix them and make a pull request.
@@ -153,3 +169,10 @@ It is our hope and goal that `OMpy` will be used, and we are happy to provide su
 
 
 <sup>1</sup>It stands for alfa-natrium, and comes from the fact that the outgoing projectile hitting the excitation energy detector SiRi used to be exclusively alpha particles and that the gamma-detector array CACTUS consisted of NaI scintillators.
+
+## Credits
+The contributors of this project are Jørgen Eriksson Midtbø, Fabio Zeiser and Erlend Lima.
+
+## License
+This project is licensed under the terms of the **GNU General Public License v3.0** license.
+You can find the full license [here](LICENSE.md).
