@@ -33,8 +33,6 @@ from .library import *
 from .rebin import *
 from .unfold import unfold
 from .first_generation_method import first_generation_method
-from .matrix import Matrix
-from .unfolder import Unfolder
 
 # Set seed for reproducibility:
 np.random.seed(1256770)
@@ -42,15 +40,14 @@ np.random.seed(1256770)
 
 class MatrixAnalysis():
 
-    def __init__(self, filename: str = None, matrix: Matrix = None):
-        if filename is not None and matrix is not None:
-            raise ValueError("Specify either filename or matrix.")
-        if filename is not None:
-            self.raw = Matrix(filename=filename)
-        elif matrix is not None:
-            self.raw = matrix
+    def __init__(self, fname_raw=None):
+        # self.fname_raw = fname_raw # File name of raw spectrum
 
         # Allocate matrices to be filled by functions in class later:
+        self.raw = Matrix()
+        # If fname_raw is specified, load the file into self.raw:
+        if fname_raw is not None:
+            self.raw.load(fname_raw)
         self.unfolded = Matrix()
         self.firstgen = Matrix()
         # self.var_firstgen = Matrix() # variance matrix of first-generation
@@ -76,17 +73,14 @@ class MatrixAnalysis():
         self.fg_area_correction = None
         self.fg_fill_and_remove_negative = None
 
-    def plot(self, *args, **kwargs):
-        return self.raw.plot(*args, **kwargs)
-
     def unfold(self, fname_resp_mat=None, fname_resp_dat=None,
                Ex_min=None, Ex_max=None, Eg_min=None, Eg_max=None,
                diag_cut=None,
                verbose=False, plot=False, use_comptonsubtraction=False,
                fill_and_remove_negative=False):
         # = Check that raw matrix is present
-        if self.raw.values is None:
-            raise RuntimeError("Error: No raw matrix is loaded.")
+        if self.raw.matrix is None:
+            raise Exception("Error: No raw matrix is loaded.")
 
         if fname_resp_mat is None or fname_resp_dat is None:
             # if self.response.matrix is None:
@@ -110,7 +104,6 @@ class MatrixAnalysis():
         # are provided. The optional arguments can be None. If the argument
         # is not None, then it checks that it has the right type.
         # fname_resp_mat (required argument):
-        # TODO: Jesus f*cking Christ!
         if fname_resp_mat is not None:
             self.unfold_fname_resp_mat = fname_resp_mat
         else:
@@ -202,17 +195,12 @@ class MatrixAnalysis():
                 raise ValueError("Invalid fill_and_remove_negative")
 
         # Call unfolding function
-
-        # unfolder = Unfolder(self.raw)
-        # unfolder.load_response(fname_resp_mat)
-        # unfolder.make_mask()
-        # self.unfolded = unfolder.unfold()
         self.unfolded = unfold(
             raw=self.raw, fname_resp_mat=fname_resp_mat,
             fname_resp_dat=fname_resp_dat,
             Ex_min=Ex_min, Ex_max=Ex_max, Eg_min=Eg_min,
             diag_cut=diag_cut,
-            Eg_max=Eg_max, plot=plot,
+            Eg_max=Eg_max, verbose=verbose, plot=plot,
             use_comptonsubtraction=use_comptonsubtraction
         )
 
@@ -230,7 +218,7 @@ class MatrixAnalysis():
                                 verbose=False,
                                 fill_and_remove_negative=False):
         # = Check that unfolded matrix is present:
-        if self.unfolded.values is None:
+        if self.unfolded.matrix is None:
             raise Exception("Error in first_generation_method:"
                             " No unfolded matrix is loaded.")
 
@@ -313,7 +301,7 @@ class MatrixAnalysis():
 
         # Cut away everything above Ex_max because it's zero anyway:
         self.firstgen.cut_rect(axis=0,
-                               limits=[self.firstgen.Ex[0], Ex_max]
+                               E_limits=[self.firstgen.E0_array[0], Ex_max]
                                )
 
         # Fill and remove negative:

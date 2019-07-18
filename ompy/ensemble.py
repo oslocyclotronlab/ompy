@@ -27,11 +27,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-from .matrix import Matrix
 import os
 import numpy as np
 import logging
-from typing import Callable
+from typing import Callable, Union, List
+from .matrix import Matrix
 from .unfolder import Unfolder
 
 LOG = logging.getLogger(__name__)
@@ -61,24 +61,14 @@ class Ensemble:
 
     TODO: Separate each step - generation, unfolded, firstgening?
     """
-    def __init__(self, raw: Matrix, save_path: str):
+    def __init__(self, raw: Matrix, save_path: str = "ensemble"):
         self.raw: Matrix = raw
         self.save_path: str = save_path
         self.unfolder: Unfolder = None
         self.first_generation_method: Callable = None
-
-    def save(self, matrix: Matrix, name: str):
-        """Save the matrix to the save folder
-
-        Args:
-            matrix: The matrix to save
-            name: The name of the file relative to self.save_path
-        """
+        self.size = 0
         if not os.path.exists(self.save_path):
             os.mkdir(self.save_path)
-
-        path = os.path.join(self.save_path, name)
-        matrix.save(path)
 
     def generate(self, number: int, method: str = 'poisson',
                  regenerate: bool = False) -> None:
@@ -95,14 +85,16 @@ class Ensemble:
             regenerate: Whether to use already generated files (False) or
                 generate them all anew (True).
         """
-
+        self.size = number
         self.regenerate = regenerate
         raw_ensemble = np.zeros((number, *self.raw.shape))
         unfolded_ensemble = np.zeros_like(raw_ensemble)
         firstgen_ensemble = np.zeros_like(raw_ensemble)
 
         for step in range(number):
+            LOG.info(f"Generating {step}")
             raw = self.generate_raw(step, method)
+            # raw = self.raw
             unfolded = self.unfold(step, raw)
             firstgen = self.first_generation(step, unfolded)
 
@@ -110,7 +102,7 @@ class Ensemble:
             unfolded_ensemble[step, :, :] = unfolded.values
 
             # TODO The first generation method might reshape the matrix
-            if firstgen_ensemble.shape != firstgen.shape:
+            if firstgen_ensemble.shape[1:] != firstgen.shape:
                 firstgen_ensemble = np.zeros((number, *firstgen.shape))
             self.firstgen = firstgen
             firstgen_ensemble[step, :, :] = firstgen.values
@@ -135,6 +127,8 @@ class Ensemble:
         self.std_unfolded = unfolded_std
         self.std_firstgen = firstgen_std
 
+        self.raw_ensemble = raw_ensemble
+        self.unfolded_ensemble = unfolded_ensemble
         self.firstgen_ensemble = firstgen_ensemble
 
     def generate_raw(self, step: int, method: str) -> Matrix:
@@ -148,12 +142,10 @@ class Ensemble:
         Returns:
             The generated matrix
         """
-        LOG.info(f"Generating raw ensemble {step}")
+        LOG.debug(f"Generating raw ensemble {step}")
         path = os.path.join(self.save_path, f"raw_{step}.m")
-        if os.path.isfile(path) and not self.regenerate:
-            LOG.debug(f"Loading {path}")
-            current = Matrix(filename=path)
-        else:
+        raw = self.load(path)
+        if raw is None:
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
                 values = self.generate_gaussian()
@@ -161,9 +153,9 @@ class Ensemble:
                 values = self.generate_poisson()
             else:
                 raise ValueError(f"Method {method} is not supported")
-            current = Matrix(values, Eg=self.raw.Eg, Ex=self.raw.Ex)
-            current.save(path)
-        return current
+            raw = Matrix(values, Eg=self.raw.Eg, Ex=self.raw.Ex)
+            raw.save(path)
+        return raw
 
     def unfold(self, step: int, raw: Matrix) -> Matrix:
         """Unfolds the raw matrix
@@ -175,12 +167,10 @@ class Ensemble:
         Returns:
             The unfolded matrix
         """
-        LOG.info(f"Unfolding raw {step}")
+        LOG.debug(f"Unfolding raw {step}")
         path = os.path.join(self.save_path, f"unfolded_{step}.m")
-        if os.path.isfile(path) and not self.regenerate:
-            LOG.debug("Loading {path}")
-            unfolded = Matrix(filename=path)
-        else:
+        unfolded = self.load(path)
+        if unfolded is None:
             LOG.debug("Unfolding matrix")
             unfolded = self.unfolder.unfold(raw)
             unfolded.save(path)
@@ -196,12 +186,10 @@ class Ensemble:
         Returns:
             The resulting matrix
         """
-        LOG.info(f"Performing first generation on unfolded {step}")
+        LOG.debug(f"Performing first generation on unfolded {step}")
         path = os.path.join(self.save_path, f"firstgen_{step}.m")
-        if os.path.isfile(path) and not self.regenerate:
-            LOG.debug("Loading {path}")
-            firstgen = Matrix(filename=path)
-        else:
+        firstgen = self.load(path)
+        if firstgen is None:
             LOG.debug("Calculating first generation matrix")
             firstgen = self.first_generation_method(unfolded)
             firstgen.save(path)
@@ -225,6 +213,96 @@ class Ensemble:
         Returns:
             The resulting array
         """
-        std = np.sqrt(np.where(self.raw.values > 0, self.raw.values, 0))
+        std = np.where(self.raw.values > 0, self.raw.values, 0)
         perturbed = np.random.poisson(std)
         return perturbed
+
+    def save(self, matrix: Matrix, name: str):
+        """Save the matrix to the save folder
+
+        Args:
+            matrix: The matrix to save
+            name: The name of the file relative to self.save_path
+        """
+        path = os.path.join(self.save_path, name)
+        matrix.save(path)
+
+    def load(self, path: str) -> Union[Matrix, None]:
+        """Check if file exists and should not be regenerated
+
+        Args:
+            path: Path to file to load
+        Returns:
+            Matrix if file exists and can be loaded, None otherwise.
+        """
+        if os.path.isfile(path) and not self.regenerate:
+            LOG.debug(f"Loading {path}")
+            return Matrix(filename=path)
+
+    def get_raw(self, index: Union[int, List[int]]) -> Union[Matrix,
+                                                             List[Matrix]]:
+        """Get the raw matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.raw_ensemble[i], self.raw.Eg,
+                                       self.raw.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.raw_ensemble[index], self.raw.Eg,
+                      self.raw.Ex)
+
+    def get_unfolded(self,
+                     index: Union[int, List[int]]) -> Union[Matrix,
+                                                            List[Matrix]]:
+        """Get the unfolded matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.unfolded_ensemble[i], self.raw.Eg,
+                                       self.raw.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.unfolded_ensemble[index], self.raw.Eg,
+                      self.raw.Ex, state='unfolded')
+
+    def get_firstgen(self,
+                     index: Union[int, List[int]]) -> Union[Matrix,
+                                                            List[Matrix]]:
+        """Get the first generation matrix(ces) created in ensemble generation.
+
+        Args:
+            index: The index of the ensemble. If an iterable,
+                a list of matrices will be returned.
+        Returns:
+            The matrix(ces) corresponding to index(ces)
+        """
+        try:
+            matrices = []
+            for i in index:
+                matrices.append(Matrix(self.firstgen_ensemble[i],
+                                       self.firstgen.Eg,
+                                       self.firstgen.Ex))
+            return matrices
+        except TypeError:
+            pass
+        return Matrix(self.firstgen_ensemble[index],
+                      self.firstgen.Eg,
+                      self.firstgen.Ex, state='firstgen')
