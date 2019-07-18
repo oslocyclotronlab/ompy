@@ -2,21 +2,17 @@
 # at the package level:
 from .library import *
 from .rebin import *
+from .spinfunctions import *
 from .fit_rho_T import *
-from .unfold import *
 from .first_generation_method import *
 from .matrix import Matrix, Vector
 from .rhosig import *
-<<<<<<< HEAD:ompy/__init__.py
 from .unfolder import *
 from .examples import *
 from .ensemble import Ensemble
 from .norm_nld import *
 from .norm_gsf import *
 from .multinest_setup import *
-=======
-from .spinfunctions import *
 from .response import *
 from .compton_subtraction_method import *
 from .gauss_smoothing import *
->>>>>>> jompy/master:oslo_method_python/__init__.py

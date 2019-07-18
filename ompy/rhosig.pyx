@@ -27,7 +27,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from uncertainties import unumpy
-from spinfunctions import SpinFunctions
+
+from .spinfunctions import SpinFunctions
 
 cimport cython
 cimport numpy as np

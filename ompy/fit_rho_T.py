@@ -30,18 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import numpy as np
-import ompy.library as lib
-# from oslo_method_python.library import calibration
-import ompy.rebin as rebin
-from ompy.rebin import rebin_matrix
-from ompy.constants import *
-import ompy.rhosig as rsg
+from . import library as lib
+from . import rebin as rebin
+from . import rhosig as rsg
+from .rebin import rebin_matrix
+from .constants import *
 from .matrix import Matrix
 from .matrix import Vector
-
-from scipy.optimize import minimize
+import numpy as np
 import copy
+from scipy.optimize import minimize
 
 # Define constants from constants.py as global vars
 global DE_PARTICLE

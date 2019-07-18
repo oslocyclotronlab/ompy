@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Oslo Method Python - OMpy
 ![Travis CI](https://travis-ci.com/Caronthir/oslo_method_python.svg?token=oq37SFt93PBk5sCGgATJ&branch=master)
 
@@ -20,8 +19,6 @@ NB! This repo is currently under development. Most things do not work correctly.
 Concept DOI: [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
 
 If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above.
->>>>>>> jompy/master
-
 
 NB! OMpy is currently in beta. Use at your own risk!
 
@@ -36,43 +33,30 @@ First off, make sure to compile the Cython modules by doing (in the main repo fo
 python setup.py build_ext --inplace
 pip install .
 ```
+On some machines it might be necessary to instead run the command
+```console
+sudo pip3 install -e .
+```
 
 All the functions and classes in the package are available in the main module. You get everything with the import
 
-<<<<<<< HEAD
 ```console
-=======
-```
->>>>>>> jompy/master
 import ompy
 ```
 
 The overarching philosophy is that the package shall be flexible and transparent to use and modify. We would rather open up for possible misuse of the code than hinder the user from doing something. Therefore, there are several ways to use the package, which will now be outlined:
 
-<<<<<<< HEAD
 ### The Matrix and Vector classes
 The two most important utility classes in the package are `om.Matrix()` and `om.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
 ```py
-mat = om.Matrix()
-=======
-## The Matrix() and Vector() classes
-The two most important utility classes in the package are `ompy.Matrix()` and `ompy.Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers (typically spectra of counts) along with energy calibration information. These are just numpy arrays, and the structure is like this:
-```
 mat = ompy.Matrix()
->>>>>>> jompy/master
-mat.matrix # A 2D numpy array
-mat.E0_array # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
-mat.E1_array # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
+mat.values  # A 2D numpy array
+mat.Ex      # Array of lower-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
+mat.Eg      # Array of lower-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
 
 vec = ompy.Vector()
-vec.vector # A 1D numpy array
-vec.E_array # Array of lower-bin-edge energy values for the single axis
-```
- They also contain some other methods:
-```py
-mat.load(filename) # Load a spectrum from a 2D MAMA file (similar, but 1D, for vec)
-mat.save(filename) # Save spectrum to MAMA file
-
+vec.vector   # A 1D numpy array
+vec.E_array  # Array of lower-bin-edge energy values for the single axis
 ```
 
 ## Matrix manipulation

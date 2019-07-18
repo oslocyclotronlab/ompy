@@ -1,12 +1,12 @@
 """
 Normalization of GSF with the Oslo method
 """
-from .spin_functions import SpinFunctions
-import ompy.library as lib
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
+
+from .spinfunctions import SpinFunctions
+from . import library as lib
 
 
 class NormGSF:
