@@ -168,7 +168,7 @@ class Matrix():
         return np.array(list(self.calibration().values()))
 
     def plot(self, ax: Any = None, title: str = None, zscale: str = "log",
-             zmin: float = None, zmax: float = None) -> Any:
+             zmin: float = None, zmax: float = None, **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -194,7 +194,7 @@ class Matrix():
         # Must extend it
         Eg = np.append(self.Eg, self.Eg[-1] + self.Eg[1] - self.Eg[0])
         Ex = np.append(self.Ex, self.Ex[-1] + self.Ex[1] - self.Ex[0])
-        lines = ax.pcolormesh(Eg, Ex, self.values, norm=norm)
+        lines = ax.pcolormesh(Eg, Ex, self.values, norm=norm, **kwargs)
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
@@ -206,7 +206,7 @@ class Matrix():
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, ax: Any = None,
-                        normalize: bool = False) -> Any:
+                        normalize: bool = False, **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
         Args:
@@ -259,10 +259,10 @@ class Matrix():
         shifted_energy = energy + (energy[1] - energy[0])/2
 
         if isEx:
-            ax.step(shifted_energy, projection, where='mid')
+            ax.step(shifted_energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         else:
-            ax.step(energy, projection, where='mid')
+            ax.step(energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         if normalize:
             ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
