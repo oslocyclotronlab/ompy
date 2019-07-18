@@ -4,6 +4,7 @@ import math
 import scipy.stats
 import pymultinest
 import os
+import numpy as np
 
 from .norm_nld import NormNLD
 from .norm_gsf import NormGSF
@@ -57,7 +58,7 @@ def run_nld_2regions(p0, chi2_args):
     def prior(cube, ndim, nparams):
         # NOTE: You may want to adjust this for your case!
         # normal prior
-        cube[0] = scipy.stats.norm.ppf(cube[0], loc=A, scale=4*A)
+        cube[0] = scipy.stats.halfnorm.ppf(cube[0], loc=A, scale=4*A)
         # log-uniform prior
         # if alpha = 1e2, it's between 1e1 and 1e3
         cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -65,7 +66,10 @@ def run_nld_2regions(p0, chi2_args):
         # if T = 1e2, it's between 1e1 and 1e3
         cube[2] = 10**(cube[2]*2 + (T_exponent-1))
         # normal prior
-        cube[3] = scipy.stats.norm.ppf(cube[3], loc=D0[0], scale=D0[1])
+        cp = cube[3]
+        cube[3] = scipy.stats.halfnorm.ppf(cube[3], loc=D0[0], scale=D0[1])
+        if np.isinf(cube[3]):
+            print("Cube 3:", cp)
 
     def loglike(cube, ndim, nparams):
         chi2 = NormNLD.chi2_disc_ext(cube, *chi2_args)
@@ -158,7 +162,7 @@ def run_nld_gsf_simultan(p0, chi2_args):
     def prior(cube, ndim, nparams):
         # NOTE: You may want to adjust this for your case!
         # normal prior
-        cube[0] = scipy.stats.norm.ppf(cube[0], loc=A, scale=4*A)
+        cube[0] = scipy.stats.halfnorm.ppf(cube[0], loc=A, scale=4*A)
         # log-uniform prior
         # if alpha = 1e2, it's between 1e1 and 1e3
         cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -166,9 +170,9 @@ def run_nld_gsf_simultan(p0, chi2_args):
         # if T = 1e2, it's between 1e1 and 1e3
         cube[2] = 10**(cube[2]*2 + (T_exponent-1))
         # normal prior
-        cube[3] = scipy.stats.norm.ppf(cube[3], loc=D0[0], scale=D0[1])
+        cube[3] = scipy.stats.halfnorm.ppf(cube[3], loc=D0[0], scale=D0[1])
         # normal prior
-        cube[4] = scipy.stats.norm.ppf(cube[4], loc=B, scale=4*B)
+        cube[4] = scipy.stats.halfnorm.ppf(cube[4], loc=B, scale=4*B)
 
     def loglike(cube, ndim, nparams):
         chi2 = NormGSF.chi2_nld_gsf(cube, *chi2_args)
