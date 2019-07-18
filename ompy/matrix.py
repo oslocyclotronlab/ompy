@@ -514,37 +514,23 @@ def axis_toint(axis: Any) -> int:
 
 
 class Vector():
-    def __init__(self, values=None, E_array=None):
+    def __init__(self, values=None, E=None):
         self.values = values
-        self.E_array = E_array
+        self.E = E
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
         """
         calibration = None
-        if (self.values is not None and self.E_array is not None):
+        if (self.values is not None and self.E is not None):
             calibration = {
                            # Formatted as "a{axis}{power of E}"
-                           "a0": self.E_array[0],
-                           "a1": self.E_array[1]-self.E_array[0],
+                           "a0": self.E[0],
+                           "a1": self.E[1]-self.E[0],
                           }
         else:
             raise RuntimeError("calibration() called on empty Vector instance")
         return calibration
-
-    def transform(self, const=1, alpha=0, inplace=False):
-        """
-        Return a transformed version of the vector:
-        vector -> const * vector * exp(alpha*E_array)
-        """
-        E_array_midbin = self.E_array + self.calibration()["a1"]/2
-        vector_transformed = (const * self.values
-                              * np.exp(alpha*E_array_midbin)
-                              )
-        if inplace:
-            self.values = vector_transformed
-        else:
-            return Vector(E_array=self.E_array, values=vector_transformed)
 
     def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
              title=None, label=None):
@@ -552,11 +538,11 @@ class Vector():
             f, ax = plt.subplots(1, 1)
 
         # Plot with middle-bin energy values:
-        E_array_midbin = self.E_array + self.calibration()["a1"]/2
+        E_midbin = self.E + self.calibration()["a1"]/2
         if label is None:
-            ax.plot(E_array_midbin, self.values)
+            ax.plot(E_midbin, self.values)
         elif isinstance(label, str):
-            ax.plot(E_array_midbin, self.values, label=label)
+            ax.plot(E_midbin, self.values, label=label)
         else:
             raise ValueError("Keyword label must be None or string, but is",
                              label)
@@ -593,11 +579,11 @@ class Vector():
         Return a transformed version of the vector:
         vector -> const * vector * exp(alpha*E_array)
         """
-        E_array_midbin = self.E_array + self.calibration()["a1"]/2
-        vector_transformed = (const * self.vector
+        E_array_midbin = self.E + self.calibration()["a1"]/2
+        vector_transformed = (const * self.values
                               * np.exp(alpha*E_array_midbin)
                               )
         if implicit:
-            self.vector = vector_transformed
+            self.values= vector_transformed
         else:
-            return vector_transformed
+            return Vector(vector_transformed, E=self.E)

@@ -27,103 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import time
-import warnings
 from matplotlib.colors import LogNorm
+import time
 from scipy.interpolate import interp1d, RectBivariateSpline
 
 
-def mama_read(filename):
-    # Reads a MAMA matrix file and returns the matrix as a numpy array,
-    # as well as a list containing the four calibration coefficients
-    # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
-    # and 1-D arrays of lower-bin-edge calibrated x and y values for plotting
-    # and similar.
-    matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1)
-    cal = {}
-    with open(filename, 'r') as datafile:
-        calibration_line = datafile.readlines()[6].split(",")
-        # a = [float(calibration_line[2][:-1]), float(calibration_line[3][:-1]), float(calibration_line[5][:-1]), float(calibration_line[6][:-1])]
-        # JEM update 20180723: Changing to dict, including second-order term for generality:
-        # print("calibration_line =", calibration_line, flush=True)
-        cal = {
-            "a0x": float(calibration_line[1]),
-            "a1x": float(calibration_line[2]),
-            "a2x": float(calibration_line[3]),
-            "a0y": float(calibration_line[4]),
-            "a1y": float(calibration_line[5]),
-            "a2y": float(calibration_line[6])
-        }
-    Ny, Nx = matrix.shape
-    y_array = np.linspace(0, Ny - 1, Ny)
-    x_array = np.linspace(0, Nx - 1, Nx)
-    # Make arrays in center-bin calibration:
-    x_array = cal["a0x"] + cal["a1x"] * x_array + cal["a2x"] * x_array**2
-    y_array = cal["a0y"] + cal["a1y"] * y_array + cal["a2y"] * y_array**2
-    # Then correct them to lower-bin-edge:
-    y_array = y_array - cal["a1y"] / 2
-    x_array = x_array - cal["a1x"] / 2
-    # Matrix, Eg array, Ex array
-    return matrix, x_array, y_array
-
-
-def mama_write(mat, filename, comment=""):
-    # Calculate calibration coefficients.
-    calibration = mat.calibration()
-    cal = {
-        "a0x": calibration['a00'],
-        "a1x": calibration['a01'],
-        "a2x": 0,
-        "a0y": calibration['a10'],
-        "a1y": calibration['a11'],
-        "a2y": 0
-    }
-    # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
-    # format is supposed to have:
-    cal["a0x"] += cal["a1x"] / 2
-    cal["a0y"] += cal["a1y"] / 2
-
-    # Write mandatory header:
-    header_string = '!FILE=Disk \n'
-    header_string += '!KIND=Spectrum \n'
-    header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
-    header_string += '!EXPERIMENT= oslo_method_python \n'
-    header_string += '!COMMENT={:s} \n'.format(comment)
-    header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
-                                                   time.localtime()) + '   \n'
-    header_string += (
-        '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
-        % (
-            cal["a0x"],
-            cal["a1x"],
-            cal["a2x"],
-            cal["a0y"],
-            cal["a1y"],
-            cal["a2y"],
-        ))
-    header_string += '!PRECISION=16 \n'
-    header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
-        mat.shape[1] - 1, mat.shape[0] - 1)
-    header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (mat.shape[1] - 1,
-                                                  mat.shape[0] - 1)
-
-    footer_string = "!IDEND=\n"
-
-    # Write matrix:
-    np.savetxt(
-        filename,
-        mat.values,
-        fmt="%-17.8E",
-        delimiter=" ",
-        newline="\n",
-        header=header_string,
-        footer=footer_string,
-        comments="")
-
-
-
-
-class OldMatrix():
+class Matrix():
     """
     The matrix class stores matrices along with calibration and energy axis
     arrays.
@@ -163,10 +72,8 @@ class OldMatrix():
                            # Formatted as "a{axis}{power of E}"
                            "a00": self.E0_array[0],
                            "a01": self.E0_array[1]-self.E0_array[0],
-                           "N0": len(self.E0_array),
                            "a10": self.E1_array[0],
                            "a11": self.E1_array[1]-self.E1_array[0],
-                           "N1": len(self.E1_array)
                           }
         else:
             raise Exception("calibration() called on empty Matrix instance")
@@ -175,12 +82,6 @@ class OldMatrix():
     def plot(self, ax=None, title="", zscale="log", zmin=None, zmax=None,
              **kwargs):
         cbar = None
-        # Add one more element to the array for plotting purposes - this is the
-        # upper bin edge of the last bin:
-        E0_array_plot = np.append(self.E0_array, self.E0_array[-1]
-                                  + self.E0_array[1]-self.E0_array[0])
-        E1_array_plot = np.append(self.E1_array, self.E1_array[-1]
-                                  + self.E1_array[1]-self.E1_array[0])
         if ax is None:
             f, ax = plt.subplots(1, 1)
         if zscale == "log":
@@ -188,32 +89,32 @@ class OldMatrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin),
                                      **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmax=zmax),
                                      **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(vmin=zmin, vmax=zmax),
                                      **kwargs
                                      )
             else:
                 # or finally, no limits:
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      norm=LogNorm(),
                                      **kwargs
@@ -223,24 +124,24 @@ class OldMatrix():
             # Check whether z limits were given:
             if (zmin is not None and zmax is None):
                 # zmin only,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
                                      **kwargs
                                      )
             elif (zmin is None and zmax is not None):
                 # or zmax only,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmax=zmax,
                                      **kwargs
                                      )
             elif (zmin is not None and zmax is not None):
                 # or both,
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      vmin=zmin,
                                      vmax=zmax,
@@ -248,8 +149,8 @@ class OldMatrix():
                                      )
             else:
                 # or finally, no limits.
-                cbar = ax.pcolormesh(E1_array_plot,
-                                     E0_array_plot,
+                cbar = ax.pcolormesh(self.E1_array,
+                                     self.E0_array,
                                      self.matrix,
                                      **kwargs
                                      )
@@ -257,23 +158,13 @@ class OldMatrix():
             raise Exception("Unknown zscale type", zscale)
         assert cbar is not None  # cbar should be filled at this point
         ax.set_title(title)
-
-        # == Change tick marks ==
-        # Find a nice spacing between ticks
-        # E1_array_middle_bin = (self.E1_array
-        #                        + (self.E1_array[1] - self.E1_array[0])/2)
-        # ax.set_xticks(E1_array_middle_bin)
-        # E0_array_middle_bin = (self.E0_array
-        #                        + (self.E0_array[1] - self.E0_array[0])/2)
-        # ax.set_yticks(E0_array_middle_bin)
-
-        # if ax is None:
-            # f.colorbar(cbar, ax=ax)
-            # plt.show()
+        if ax is None:
+            f.colorbar(cbar, ax=ax)
+            plt.show()
         return cbar  # Return the colorbar to allow it to be plotted outside
 
     def plot_projection(self, E_limits, axis, ax=None, normalize=False,
-                        **kwargs):
+                        label=None):
         """Plots the projection of the matrix along axis
 
         Args:
@@ -303,13 +194,18 @@ class OldMatrix():
                                 )
             else:
                 projection = self.matrix[:, i_E_low:i_E_high].sum(axis=1)
-            E0_array_middle_bin = (self.E0_array
-                                   + (self.E0_array[1] - self.E0_array[0])/2)
-            ax.step(E0_array_middle_bin,
-                    projection,
-                    where="mid",  # Corresponds to lower bin edge
-                    **kwargs
-                    )
+            if label is None:
+                ax.plot(self.E0_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E0_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
         elif axis == 1:
             i_E_low = i_from_E(E_limits[0], self.E0_array)
             i_E_high = i_from_E(E_limits[1], self.E0_array)
@@ -318,33 +214,36 @@ class OldMatrix():
                                 div0(
                                     self.matrix[i_E_low:i_E_high, :],
                                     (np.sum(self.matrix[i_E_low:i_E_high, :],
-                                     axis=1)
+                                           axis=1)
                                      * self.calibration()["a01"])[:, None]
                                     ),
                                 axis=0
                                 )
             else:
                 projection = self.matrix[i_E_low:i_E_high, :].sum(axis=0)
-            E1_array_middle_bin = (self.E1_array
-                                   + (self.E1_array[1] - self.E1_array[0])/2)
-            ax.step(E1_array_middle_bin,
-                    projection,
-                    where="mid",  # Corresponds to lower bin edge
-                    **kwargs
-                    )
+            if label is None:
+                ax.plot(self.E1_array,
+                        projection,
+                        )
+            elif isinstance(label, str):
+                ax.plot(self.E1_array,
+                        projection,
+                        label=label
+                        )
+            else:
+                raise ValueError("Keyword label should be str or None, but is",
+                                 label)
         else:
-            raise ValueError("Variable axis must be one of (0, 1) but is",
-                             axis)
+            raise Exception("Variable axis must be one of (0, 1) but is",
+                            axis)
+        if label is not None:
+            ax.legend()
 
-    def plot_projection_x(self, E_limits, ax=None, normalize=False, **kwargs):
+    def plot_projection_x(self, E_limits, ax=None, normalize=False,
+                          label=""):
         """ Wrapper to call plot_projection(axis=1) to project on x axis"""
-        self.plot_projection(E_limits=E_limits, axis=1, ax=ax,
-                             normalize=normalize, **kwargs)
-
-    def plot_projection_y(self, E_limits, ax=None, normalize=False, **kwargs):
-        """ Wrapper to call plot_projection(axis=0) to project on y axis"""
-        self.plot_projection(E_limits=E_limits, axis=0, ax=ax,
-                             normalize=normalize, **kwargs)
+        self.plot_projection_x(E_limits=E_limits, axis=1, ax=ax,
+                               normalize=normalize, label=label)
 
     def save(self, fname):
         """
@@ -671,6 +570,99 @@ def line(x, points):
     return a*x + b
 
 
+
+
+def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
+    # Updated 201807: Trying to vectorize so all Ex bins are handled simultaneously.
+    # Takes a 2D array of counts, shifts it (downward only!) with energy 'shift'
+    # and smooths it with a gaussian of specified 'FWHM'.
+    # This version is vectorized to shift, smooth and scale all points
+    # of 'array' individually, and then sum together and return.
+
+    # TODO: FIX ME! There is a bug here, it does not do Compton subtraction right.
+
+    # The arrays from resp.dat are missing the first channel.
+    p = np.append(0, p) 
+    FWHM = np.append(0, FWHM)
+
+    a1_Eg = (Eg_array[1]-Eg_array[0]) # bin width
+    N_Ex, N_Eg = array.shape
+
+    # Shift is the same for all energies 
+    if shift == "annihilation":
+        # For the annihilation peak, all channels should be mapped on E = 511 keV. Of course, gamma channels below 511 keV,
+        # and even well above that, cannot produce annihilation counts, but this is taken into account by the fact that p
+        # is zero for these channels. Thus, we set i_shift=0 and make a special dimensions_shifted array to map all channels of
+        # original array to i(511). 
+        i_shift = 0 
+    else:
+        i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of indices to shift by
+
+
+    N_Eg_sh = N_Eg - i_shift
+    indices_original = np.linspace(i_shift, N_Eg-1, N_Eg-i_shift).astype(int) # Index array for original array, truncated to shifted array length
+    if shift == "annihilation": # If this is the annihilation peak then all counts should end up with their centroid at E = 511 keV
+        # indices_shifted = (np.ones(N_Eg-i_from_E(511, Eg_array))*i_from_E(511, Eg_array)).astype(int)
+        indices_shifted = (np.ones(N_Eg)*i_from_E(511, Eg_array)).astype(int)
+    else:
+        indices_shifted = np.linspace(0,N_Eg-i_shift-1,N_Eg-i_shift).astype(int) # Index array for shifted array
+
+
+    if smoothing:
+        # Scale each Eg count by the corresponding probability
+        # Do this for all Ex bins at once:
+        array = array * p[0:N_Eg].reshape(1,N_Eg)
+        # Shift array down in energy by i_shift indices,
+        # so that index i_shift of array is index 0 of array_shifted.
+        # Also flatten array along Ex axis to facilitate multiplication.
+        array_shifted_flattened = array[:,indices_original].ravel()
+        # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions 
+        # to multiply each Eg channel by. This array is the same for all Ex bins,
+        # so it will be repeated N_Ex times and stacked for multiplication
+        # To get correct normalization we multiply by bin width
+        pdfarray = a1_Eg* norm.pdf(
+                            np.tile(Eg_array[0:N_Eg_sh], N_Eg_sh).reshape((N_Eg_sh, N_Eg_sh)),
+                            loc=Eg_array[indices_shifted].reshape(N_Eg_sh,1),
+                            scale=FWHM[indices_shifted].reshape(N_Eg_sh,1)/2.355
+                        )
+                        
+        # Remove eventual NaN values:
+        pdfarray = np.nan_to_num(pdfarray, copy=False)
+        # print("Eg_array[indices_shifted] =", Eg_array[indices_shifted], flush=True)
+        # print("pdfarray =", pdfarray, flush=True)
+        # Repeat and stack:
+        pdfarray_repeated_stacked = np.tile(pdfarray, (N_Ex,1))
+
+        # Multiply array of counts with pdfarray:
+        multiplied = pdfarray_repeated_stacked*array_shifted_flattened.reshape(N_Ex*N_Eg_sh,1)
+
+        # Finally, for each Ex bin, we now need to sum the contributions from the smoothing
+        # of each Eg bin to get a total Eg spectrum containing the entire smoothed spectrum:
+        # Do this by reshaping into 3-dimensional array where each Eg bin (axis 0) contains a 
+        # N_Eg_sh x N_Eg_sh matrix, where each row is the smoothed contribution from one 
+        # original Eg pixel. We sum the columns of each of these matrices:
+        array_out = multiplied.reshape((N_Ex, N_Eg_sh, N_Eg_sh)).sum(axis=1)
+        # print("array_out.shape =", array_out.shape)
+        # print("array.shape[0],array.shape[1]-N_Eg_sh =", array.shape[0],array.shape[1]-N_Eg_sh)
+
+    else:
+        # array_out = np.zeros(N)
+        # for i in range(N):
+        #     try:
+        #         array_out[i-i_shift] = array[i] #* p[i+1]
+        #     except IndexError:
+        #         pass
+
+        # Instead of above, vectorizing:
+        array_out = p[indices_original].reshape(1,N_Eg_sh)*array[:,indices_original]
+
+    # Append zeros to the end of Eg axis so we match the length of the original array:
+    if i_shift > 0:
+        array_out = np.concatenate((array_out, np.zeros((N_Ex, N_Eg-N_Eg_sh))),axis=1)
+    return array_out
+
+
+
 def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     # Define cut   x1    y1    x2    y2
@@ -742,7 +734,7 @@ def fill_negative(matrix, window_size):
 
     Todo: Debug me!
     """
-    warnings.warn("Hello from the fill_negative() function. Please debug me.")
+    print("Hello from the fill_negative() function. Please debug me.")
     matrix_out = np.copy(matrix)
     # Loop over rows:
     for i_Ex in range(matrix.shape[0]):

@@ -27,11 +27,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-from .matrix import Matrix
 import os
 import numpy as np
 import logging
 from typing import Callable, Union, List
+from .matrix import Matrix
 from .unfolder import Unfolder
 
 LOG = logging.getLogger(__name__)
