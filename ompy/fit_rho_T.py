@@ -113,9 +113,6 @@ class FitRhoT:
         # resolution might change slightly after rebinning
         self.calc_resolution(Ex_array=self.firstgen.Ex)
 
-        self.send_to_fit()
-
-
     def check_input(self):
         """Checks input
 
@@ -180,7 +177,7 @@ class FitRhoT:
         Eg_max = Ex_max + self.dE_max_res
         calib_fit = {"a0": E_min, "a1": bin_width_out}
         # Set up the energy arrays for recalibration of 1Gen matrix
-        Eg_array = lib.E_array_from_calibration(a0=calib_fit["a0"],
+        Eg_array = E_array_from_calibration(a0=calib_fit["a0"],
                                            a1=calib_fit["a1"],
                                            E_max=Eg_max)
         # Cut away the "top" of the Ex-array, which is too large
@@ -202,12 +199,13 @@ class FitRhoT:
         # Update 20190212: Interpolate the std matrix instead of rebinning:
         # TODO: Is this the propper way to get the uncertainties
         firstgen_std = Matrix()
-        firstgen_std.values = lib.interpolate_matrix_2D(firstgen_std_in.values,
-                                             firstgen_std_in.Ex,
-                                             firstgen_std_in.Eg,
-                                             Ex_array,
-                                             Eg_array
-                                             )
+        firstgen_std.values = lib.interpolate_matrix_2D(
+                firstgen_std_in.values,
+                firstgen_std_in.Ex,
+                firstgen_std_in.Eg,
+                Ex_array,
+                Eg_array
+                )
         # Set energy axes accordingly
         firstgen_std.Ex = Ex_array
         firstgen_std.Eg = Eg_array
@@ -230,34 +228,36 @@ class FitRhoT:
         self.firstgen = firstgen
         self.firstgen_std = firstgen_std
 
+    def fit(self, p0=None, use_z_correction=False, spin_dist_par=None):
 
-    def send_to_fit(self):
         """ Helper class just for now: sends FG to fit and get rho and T """
         Eg_min = self.Eg_min
         Ex_min = self.Ex_min
         Ex_max = self.Ex_max
         bin_width_out = self.bin_width_out
 
-        pars_fg = {"Egmin" : Eg_min,
-                   "Exmin" : Ex_min,
-                   "Emax" : Ex_max}
+        pars_fg = {"Egmin": Eg_min,
+                   "Exmin": Ex_min,
+                   "Emax": Ex_max}
 
-        Enld_array = lib.E_array_from_calibration(a0=-self.dE_max_res,
+        Enld_array = E_array_from_calibration(a0=-self.dE_max_res,
                                               a1=bin_width_out,
                                               E_max=Ex_max-Eg_min)
         Enld_array -= bin_width_out/2
         Ex_array = self.firstgen.Ex
         Eg_array = self.firstgen.Eg
 
-
         rho_fit, T_fit = rsg.decompose_matrix(self.firstgen.values,
                                           self.firstgen_std.values,
                                           Emid_Eg=Eg_array+bin_width_out/2,
                                           Emid_nld=Enld_array+bin_width_out/2,
                                           Emid_Ex=Ex_array+bin_width_out/2,
-                                          dE_resolution = self.dE_resolution,
+                                          dE_resolution=self.dE_resolution,
+                                          p0=p0,
                                           method=self.method,
-                                          options=self.options)
+                                          options=self.options,
+                                          use_z_correction=use_z_correction,
+                                          spin_dist_par=spin_dist_par)
 
         rho = Vector(rho_fit, Enld_array)
         T = Vector(T_fit, Eg_array)
@@ -267,14 +267,22 @@ class FitRhoT:
         self.T = T
 
         # save "bestfit"
-        Pfit = rsg.PfromRhoT(rho_fit, T_fit,
+        z_array = None
+        if use_z_correction:
+            z_array = z(Ex_array+bin_width_out/2, Eg_array+bin_width_out/2,
+                        # TODO implement custom spin_dist_par here:
+                        spin_dist_par=spin_dist_par)
+        else:
+            z_array = np.ones((len(Ex_array), len(Eg_array)))
+        Pfit = PfromRhoT(rho_fit, T_fit,
                              len(Ex_array),
                              Emid_Eg=Eg_array+bin_width_out/2,
                              Emid_nld=Enld_array+bin_width_out/2,
                              Emid_Ex=Ex_array+bin_width_out/2,
-                             dE_resolution = self.dE_resolution)
+                             dE_resolution=self.dE_resolution,
+                             z_array_in=z_array
+                             )
         self.Pfit = Matrix(Pfit, Ex=Ex_array, Eg=Eg_array)
-
 
     def calc_resolution(self, Ex_array):
         """ Calculate Ex-dependent detector resolution (sum of sqroot)

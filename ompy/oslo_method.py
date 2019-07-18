@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-This file contains definitions of constants that are
-used in various places in the code.
+This is oslo_method_python, a python implementation of the Oslo method.
+It handles two-dimensional matrices of event count spectra, and
+implements detector response unfolding, first generation method
+and other manipulation of the spectra.
 
----
-
-This file is part of oslo_method_python, a python implementation of the
-Oslo method.
+It is heavily inspired by MAMA, written by Magne Guttormsen and others,
+available at https://github.com/oslocyclotronlab/oslo-method-software
 
 Copyright (C) 2018 Jørgen Eriksson Midtbø
 Oslo Cyclotron Laboratory
@@ -26,20 +26,3 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-
-
-# === fit_rho_T / "rhosighi" ===
-# The following constants are used in fit_rho_T() and its
-# helper functions:
-DE_PARTICLE = 150  # keV - Particle energy resolution
-DE_GAMMA_1MEV = 60  # keV - Gamma energy resolution at 1 MeV
-DE_GAMMA_8MEV = 300  # keV - Gamma energy resolution at 8 MeV
-
-
-# === response / unfolding ===
-
-# Default folder paths and absolute full-width-half-max at 1.33
-# MeV for different detector setups:
-# OSCAR:
-FWHM_1332KEV_OSCAR = 2.277  # percent of the energy
-FOLDER_PATH_RESPONSE_OSCAR = "oscar2017_scale1.15"
