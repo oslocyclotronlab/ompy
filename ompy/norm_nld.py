@@ -314,16 +314,30 @@ class NormNLD:
         # self.alpha_norm = self.popt["alpha"][0]
         # self.T = self.popt["T"][0]
 
+        # TODO: NEED TO FIX A SEED HERE!,
+        # but should not effect seed of the other programs
+        # -- could also ensure that the std of the sample
+        # in the for loop is similar to the std of all elements...
+        # otherwise replace it
+
+        # need to sweep though multinest samples at random!
+        for key, value in samples.items():
+            N_samples = len(value)
+            break
+        randlist = np.arange(N_samples)
+        np.random.shuffle(randlist) # works in-place
+
         # combine uncertainties from nld (from 1Gen fit) and transformation
         if nld.shape[1] == 3:
             N_samples_max = 100
             N_loop = min(N_samples_max, len(samples["A"]))
             nld_samples = np.zeros((N_loop, len(Ex)))
             for i in range(N_loop):
+                i_multi = randlist[i]
                 nld_tmp = stats.norm.rvs(self.nld[:, 1], self.nld[:, 2])
                 nld_tmp = self.normalize(np.c_[Ex, nld_tmp],
-                                         samples["A"][i],
-                                         samples["alpha"][i])
+                                         samples["A"][i_multi],
+                                         samples["alpha"][i_multi])
                 nld_samples[i] = nld_tmp[:, 1]
             median = np.median(nld_samples, axis=0)
             std = nld_samples.std(axis=0)
