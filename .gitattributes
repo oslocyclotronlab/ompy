@@ -1,2 +1,2 @@
 data/* text
-*.m text
+*.m linguist-detectable=false
