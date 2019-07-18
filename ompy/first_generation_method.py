@@ -37,6 +37,8 @@ def first_generation_method(matrix_in,
                             Ex_max, dE_gamma, N_iterations=10,
                             multiplicity_estimation="statistical",
                             apply_area_correction=False,
+                            valley_correction_array=None,
+                            initial_weight_function="box",
                             verbose=False):
     """
     Function implementing the first generation method from Guttormsen et
@@ -47,7 +49,18 @@ def first_generation_method(matrix_in,
 
     Args:
         matrix (Matrix): The matrix to apply the first eneration method to
+        Ex_max (double): The maximum excitation energy to run the method for
+        dE_gamma (double): The amount of leeway to the right of the Ex=Eg
+                            diagonal, due to experimental uncertainty
         multiplicity_estimation (str): One of ["statistical", "total"]
+        apply_area_correction (bool): Whether to use the area correction method
+        valley_correction_array (np.ndarray, optional): Array of weight factors
+            for each Ex bin that can be used to manually "turn off"/decrease
+            the influence of very large peaks in the method.
+        initial_weight_function (str, optional): The initial assumption for the
+            weight function to start the first-generation method iterations.
+            Possible values: "box", "fermi_gas".
+        verbose (bool): Whether to run the method in a verbose, talkative mode
 
     TODO:
         - Consider removing Ex_max keyword. Can't it just take the whole matrix?
@@ -70,6 +83,7 @@ def first_generation_method(matrix_in,
     Ex_array_mat = np.copy(matrix_in.Ex)
     Egamma_array = np.copy(matrix_in.Eg)
 
+
     # Cut the input matrix at or above Ex=0. This is implicitly
     # done in MAMA by the variable IyL.
     i_Ex_low = i_from_E(0, Ex_array_mat)
@@ -86,6 +100,16 @@ def first_generation_method(matrix_in,
     ax = calib_in["a11"]
     by = calib_in["a00"]
     ay = calib_in["a01"]
+
+    N_Exbins = Ny  # TODO clean up and rename energy arrays, Nbins vars, etc
+
+    # Check if the valley correction array is present, else
+    # fill it with ones
+    if valley_correction_array is None:
+        valley_correction_array = np.ones(N_Exbins)
+    else:
+        # If it was sent in, then trim it accordingly with the unfolded matrix
+        valley_correction_array = valley_correction_array[i_Ex_low:]
 
     ThresSta = 430.0
     # AreaCorr = 1
@@ -195,13 +219,13 @@ def first_generation_method(matrix_in,
     if verbose:
         print("Multiplicities:")
         for i_Ex in range(len(Ex_array)):
-            print("Ex = {:f}, multiplicity(Ex) = {:f}".format(Ex_array[i_Ex], multiplicity[i_Ex]))
+            print("Ex = {:f}, multiplicity(Ex) = {:f}".format(Ex_array[i_Ex],
+                  multiplicity[i_Ex]))
         print("")
 
 
     # Set up dummy first-generation matrix to start iterations, made of
     # normalized boxes:
-    N_Exbins = Ny # TODO clean up and rename energy arrays, Nbins vars, etc
     # N_Exbins = np.argmin(np.abs(Ex_array - (Ex_max+dE_gamma)))  # TODO reimplement the energy arrays in a more consistent way
     H = np.zeros((N_Exbins, Nx))
     for i in range(N_Exbins):
@@ -260,22 +284,33 @@ def first_generation_method(matrix_in,
     vmin_diff = -100
     vmax_diff = 100
 
-    # Prepare weight function based on Fermi gas approximation:
-    a_f = 16  # 1/MeV
-    n_f = 4.2  # Exponent for E_gamma
-    # Make the weight array by the formula W(Ex,Eg) = Eg^n_f / (Ex-Eg)^2 *
-    # exp(2*sqrt(a*(Ex-Eg)))
+    # Prepare the initial assumption for the weight function:
+    W_old = None
     Ex_mesh, Eg_mesh = np.meshgrid(Ex_array, Ex_array, indexing="ij")
-    # Make mesh of final energies:
-    Ef_mesh = Ex_mesh - Eg_mesh
-    # Set everything above Ex=Eg diagonal to zero so the weights also
-    # become zero
-    Ef_mesh[Ef_mesh < 0] = 0
-    # Calculate weights. Remember that energies are in keV, while a is in
-    # 1/MeV, so we correct in the exponent:
-    W_old = np.where(Eg_mesh > 0, div0(np.power(
-        Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
-    W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    if initial_weight_function == "box":
+        W_old = np.ones_like(Eg_mesh)
+        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    elif initial_weight_function == "fermi_gas":
+        # Prepare weight function based on Fermi gas approximation:
+        a_f = 16  # 1/MeV
+        n_f = 4.2  # Exponent for E_gamma
+        # Make the weight array by the formula W(Ex,Eg) = Eg^n_f / (Ex-Eg)^2 *
+        # exp(2*sqrt(a*(Ex-Eg)))
+        # Make mesh of final energies:
+        Ef_mesh = Ex_mesh - Eg_mesh
+        # Set everything above Ex=Eg diagonal to zero so the weights also
+        # become zero
+        Ef_mesh[Ef_mesh < 0] = 0
+        # Calculate weights. Remember that energies are in keV, while a is in
+        # 1/MeV, so we correct in the exponent:
+        W_old = np.where(Eg_mesh > 0, div0(np.power(
+            Eg_mesh, n_f) , np.power(Ef_mesh, 2) * np.exp(2 * np.sqrt(a_f * Ef_mesh / 1000))), 0)
+        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+    else:
+        NotImplementedError(
+            "unknown value for variable initial_weight_function",
+            initial_weight_function)
+
 
     E1 = (Ex_array[0], Ex_array[0] + dE_gamma)
     E2 = (Ex_array[-1], Ex_array[-1] + dE_gamma)
@@ -295,7 +330,6 @@ def first_generation_method(matrix_in,
         # H_compressed, Egamma_array_compressed = rebin(
             # H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], N_Exbins, rebin_axis=1)
         # Updated 20190130 to rebin_matrix() with energy calibratiON.
-        # TODO cut to i_Egamma_max once and for all above instead of here?
         H_compressed = rebin_matrix(
             # H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], Ex_array,
             H, Egamma_array, Ex_array,  # DEBUG 20190206 removed the subset selection. No difference on 164Dy, which is good.
@@ -334,13 +368,13 @@ def first_generation_method(matrix_in,
         # Store for next iteration:
         W_old = np.copy(W)
 
-
         # Calculate product of normalization matrix, weight matrix and
         # all-generations count matrix:
         # Matrix of weighted sum of spectra below
         # Todo write better comments on what happens here.
         # What are the dimensions and calibrations?
-        G = np.dot((normalization_matrix * W), matrix_ex_compressed)
+        G = np.dot((normalization_matrix * W * valley_correction_array),
+                   matrix_ex_compressed)
 
         # Apply area correction
         if apply_area_correction:
@@ -381,7 +415,6 @@ def first_generation_method(matrix_in,
         # The actual subtraction
         # H = matrix_ex_compressed - alpha.reshape((len(alpha), 1)) * G
         H = matrix_ex_compressed - G
-
 
         # Check convergence
         max_diff = np.max(np.abs(H - H_old))
