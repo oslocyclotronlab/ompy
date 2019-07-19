@@ -28,9 +28,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
+import copy
+import logging
 import numpy as np
 from .matrix import Matrix
-import copy
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class FirstGeneration:
@@ -43,13 +47,11 @@ class FirstGeneration:
 
     def apply(self, unfolded: Matrix):
         matrix = copy.deepcopy(unfolded)
-        iEx = matrix.index_Ex(0.0)
-        cut = matrix[iEx:, :]
-        cut.Ex = matrix.Ex[iEx:]
+        # We don't want negative energies
+        matrix.cut('Ex', Emin=0.0)
 
         # Get some numbers:
-        Ny = len(cut[:, 0])
-        Nx = len(cut[0, :])
+        Nx, Ny = matrix.shape
         calib_in = matrix.calibration()
         bx = calib_in["a10"]
         ax = calib_in["a11"]

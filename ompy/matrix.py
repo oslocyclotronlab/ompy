@@ -93,8 +93,8 @@ class Matrix():
         """
 
         self.values: np.ndarray = values
-        self.Eg: np.ndarray = np.array(Eg)
-        self.Ex: np.ndarray = np.array(Ex)
+        self.Eg: np.ndarray = np.array(Eg, dtype=float)
+        self.Ex: np.ndarray = np.array(Ex, dtype=float)
         self.std: np.ndarray = std
 
         if filename is not None:
@@ -276,68 +276,50 @@ class Matrix():
         """
         mama_write(self, fname, comment="Made by Oslo Method Python")
 
-    def cut(self, axis: Union[int, str], limits: Iterable[float],
+    def cut(self, axis: Union[int, str], 
+            Emin: Union[None, float] = None,
+            Emax: Union[None, float] = None,
             inplace: bool = True) -> Any:
         """Cuts the matrix to the sub-interval limits along given axis.
 
         Args:
             axis: Which axis to apply the cut to.
-                Can be 0, "Eg" or 1, "Ex", or 2, "both".
-            limits: [E_min, E_max, (E_min, E_max)], where
-                E_min, E_max: Upper and lower energy limits for cut.
-                Supply 4 numbers if 'axis' is 'both'.
+                Can be 0, "Eg" or 1, "Ex".
+            Emin: lower energy limit for cut. Defaults to
+                lowest energy.
+            Emax: upper energy limit for cut. Defaults to
+                highest energy.
             inplace: Whether to make the cut in place or not.
 
         Returns:
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        assert(limits[1] >= limits[0])  # Sanity check
         axis = axis_toint(axis)
-        out = None
+        range = self.Eg if axis == 0 else self.Ex
+        indices = self.indices_Eg if axis == 0 else self.indices_Ex
+        Emin = Emin if Emin is not None else min(range)
+        Emax = Emax if Emax is not None else max(range)
+        iEmin, iEmax = indices((Emin, Emax))
+        Ecut = range[iEmin:iEmax]
+
         if axis == 0:
-            iE_min, iE_max = self.indices_Eg(limits)
-            values_cut = self.values[:, iE_min:iE_max]
-            E_cut = self.Eg[iE_min:iE_max]
-            mask_cut = self.mask[:, iE_min:iE_max]
-            if inplace:
-                self.values = values_cut
-                self.Eg = E_cut
-                self.mask = mask_cut
-            else:
-                out = Matrix(values_cut, E_cut, self.Ex)
-                out.mask = mask_cut
-
+            values_cut = self.values[:, iEmin:iEmax]
+            Eg = Ecut
+            Ex = self.Ex
         elif axis == 1:
-            iE_min, iE_max = self.indices_Ex(limits)
-            values_cut = self.values[iE_min:iE_max, :]
-            E_cut = self.Ex[iE_min:iE_max]
-            mask_cut = self.mask[iE_min:iE_max, :]
-            if inplace:
-                self.values = values_cut
-                self.Ex = E_cut
-                self.mask = mask_cut
-            else:
-                out = Matrix(values_cut, self.Eg, E_cut)
-                out.mask = mask_cut
+            values_cut = self.values[iEmin:iEmax, :]
+            Ex = Ecut
+            Eg = self.Eg
+        else:
+            raise ValueError("Expected axis 0 or 1")
 
-        elif axis == 2:
-            iEg_min, iEg_max = self.indices_Eg(limits[:2])
-            iEx_min, iEx_max = self.indices_Ex(limits[2:])
-            values_cut = self.values[iEx_min:iEx_max, iEg_min:iEg_max]
-            Eg_cut = self.Eg[iEg_min:iEg_max]
-            Ex_cut = self.Ex[iEx_min:iEx_max]
-            mask_cut = self.mask[iEx_min:iEx_max, iEg_min:iEg_max]
-            if inplace:
-                self.values = values_cut
-                self.Eg = Eg_cut
-                self.Ex = Ex_cut
-                self.mask = mask_cut
-            else:
-                out = Matrix(values_cut, Eg_cut, Ex_cut)
-                out.mask = mask_cut
-
-        return out
+        if inplace:
+            self.values = values_cut
+            self.Ex = Ex
+            self.Eg = Eg
+        else:
+            return Matrix(values_cut, Eg=Eg, Ex=Ex)
 
     def cut_diagonal(self, E1: Iterable[float], E2: Iterable[float]):
         """Cut away counts to the right of a diagonal line defined by indices
