@@ -32,6 +32,8 @@ import warnings
 from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 
+import ompy as om
+
 
 def mama_read(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array,
@@ -554,7 +556,7 @@ def read_mama_2D(filename):
         # a = [float(calibration_line[2][:-1]), float(calibration_line[3][:-1]), float(calibration_line[5][:-1]), float(calibration_line[6][:-1])]
         # JEM update 20180723: Changing to dict, including second-order term for generality:
         # print("calibration_line =", calibration_line, flush=True)
-        cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]), 
+        cal = {"a0x":float(calibration_line[1]), "a1x":float(calibration_line[2]), "a2x":float(calibration_line[3]),
              "a0y":float(calibration_line[4]), "a1y":float(calibration_line[5]), "a2y":float(calibration_line[6])}
     Ny, Nx = matrix.shape
     y_array = np.linspace(0, Ny-1, Ny)
@@ -624,8 +626,8 @@ def read_response(fname_resp_mat, fname_resp_dat):
                 resp.append(row)
             except:
                 break
-    
-    
+
+
     resp = np.array(resp)
     # Name the columns for ease of reading
     FWHM = resp[:,1]#*6.8 # Correct with fwhm @ 1.33 MeV?
@@ -674,9 +676,9 @@ def line(x, points):
 def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     # Define cut   x1    y1    x2    y2
-    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array), 
+    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array),
                   i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
-    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis
     j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
     i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
@@ -685,7 +687,7 @@ def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
 
 def EffExp(Eg_array):
     # Function from MAMA which makes an additional efficiency correction based on discriminator thresholds etc.
-    # Basically there is a hard-coded set of energies and corresponding efficiencies in MAMA, and it should be 
+    # Basically there is a hard-coded set of energies and corresponding efficiencies in MAMA, and it should be
     # zero below and 1 above this range.
     Egs = np.array([30.,80.,122.,183.,244.,294.,344.,562.,779.,1000])
     Effs = np.array([0.0,0.0,0.0,0.06,0.44,0.60,0.87,0.99,1.00,1.000])
@@ -882,3 +884,89 @@ def get_discretes(Emids, fname, resolution=0.1):
     from scipy.ndimage import gaussian_filter1d
     hist_smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
     return hist_smoothed, hist
+
+
+def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
+                     N_max: int = 100,
+                     random_state=np.random.RandomState(65489)):
+    """
+    Use a list(dict) of samples of `A`, `B`, and `alpha` parameters from
+    multinest to transform a (list of) nld and/or gsf sample(s). Can be used
+    to normalize the nld and/or gsf
+
+    Args:
+        samples (dict): Multinest samples.
+        nld (om.Vector or list/array[om.Vector], optional):
+            nld ("unnormalized")
+        gsf (om.Vector or list/array[om.Vector], optional):
+            gsf ("unnormalized")
+        N_max (int, optional): Maximum number of samples returned if `nld`
+                               and `gsf` is a list/array
+        random_state (optional): random state, set by default such that
+                                 a repeted use of the function gives the same
+                                 results.
+
+    Returns:
+        `nld_trans` and/or `gsf_trans`: Transformed `nld` and or `gsf`,
+                                        depending on what input is given.
+
+    """
+
+    # Need to sweep though multinest samples in random order
+    # as they are ordered with decreasing likelihood by default
+    for key, value in samples.items():
+        N_multinest = len(value)
+        break
+    randlist = np.arange(N_multinest)
+    random_state.shuffle(randlist)  # works in-place
+
+    if nld is not None:
+        A = samples["A"]
+        alpha = samples["alpha"]
+        if type(nld) is om.Vector:
+            N = min(N_multinest, N_max)
+        else:
+            N = len(nld)
+        nld_trans = []
+
+    if gsf is not None:
+        B = samples["B"]
+        alpha = samples["alpha"]
+        if type(gsf) is om.Vector:
+            N = min(N_multinest, N_max)
+        else:
+            N = len(gsf)
+        gsf_trans = []
+
+    # transform the list
+    for i in range(N):
+        i_multi = randlist[i]
+        # nld loop
+        try:
+            if type(nld) is om.Vector:
+                nld_tmp = nld
+            else:
+                nld_tmp = nld[i]
+            nld_tmp = nld_tmp.transform(alpha=alpha[i_multi],
+                                        const=A[i_multi])
+            nld_trans.append(nld_tmp)
+        except:
+            pass
+        # gsf loop
+        try:
+            if type(gsf) is om.Vector:
+                gsf_tmp = gsf
+            else:
+                gsf_tmp = gsf[i]
+            gsf_tmp = gsf_tmp.transform(alpha=alpha[i_multi],
+                                        const=B[i_multi])
+            gsf_trans.append(gsf_tmp)
+        except:
+            pass
+
+    if nld is not None and gsf is not None:
+        return nld_trans, gsf_trans
+    elif gsf is not None:
+        return gsf_trans
+    elif nld is not None:
+        return nld_trans
