@@ -170,6 +170,7 @@ def div0(a, b):
 
 def i_from_E(E, E_array):
     # Returns index of the E_array value closest to given E
+    assert(E_array.ndim == 1), "E_array has more then one dimension"
     return np.argmin(np.abs(E_array - E))
 
 

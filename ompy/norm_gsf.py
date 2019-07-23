@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
 import scipy.stats as stats
+from scipy.optimize import curve_fit
 import warnings
 
 from .norm_nld import NormNLD
@@ -22,8 +23,6 @@ class NormGSF:
         format: [E_i, value_i] or [E_i, value_i, yerror_i]
     method : string
         Method for normalization
-    extModel : dict of string: string
-        Model for extrapolation at ("low", "high") energies
     pext : dict
         Parameters needed for the chosen extrapolation method
     ext_range : ndarrat
@@ -35,6 +34,11 @@ class NormGSF:
     nld : ndarray
         normalized NLD
         format: [E_i, value_i] or [E_i, value_i, yerror_i]
+
+    Deleted:
+    --------
+    extModel : dict of string: string
+               Model for extrapolation at ("low", "high") energies
 
     Further inputs & units:
     # Emid_Eg, nld, gsf in MeV, MeV^-1, MeV^-3
@@ -53,7 +57,7 @@ class NormGSF:
 
     def __init__(self, gsf, method,
                  J_target, D0, Gg, Sn, alpha_norm,
-                 pext, ext_range, extModel=None,
+                 pext, ext_range,
                  spincutModel=None, spincutPars={},
                  nld=None, nld_ext=None):
         self.gsf_in = self.transform(
@@ -65,23 +69,25 @@ class NormGSF:
         self.Gg = np.atleast_1d(Gg)
         self.Sn = Sn
 
-        # define defaults
-        key = 'gsf_ext_low'
-        if key not in pext:
-            print("Set {} to a default".format(key))
-            pext['gsf_ext_low'] = np.array([1., -25.])
-        key = 'gsf_ext_high'
-        if key not in pext:
-            print("Set {} to a default".format(key))
-            pext['gsf_ext_high'] = np.array([1., -25.])
-        self.pext = pext
-
         self.ext_range = ext_range
         self.spincutModel = spincutModel
         self.spincutPars = spincutPars
         self.nld_in = nld
         self.nld_ext = nld_ext
 
+        # define defaults if missing
+        if pext["method"] == "chi2":
+            pass
+        elif pext["method"] == "parameters":
+            key = 'gsf_ext_low'
+            if key not in pext:
+                print("Set {} to a default".format(key))
+                pext['gsf_ext_lochiw'] = np.array([1., -25.])
+            key = 'gsf_ext_high'
+            if key not in pext:
+                print("Set {} to a default".format(key))
+                pext['gsf_ext_high'] = np.array([1., -25.])
+        self.pext = pext
         # initial extrapolation
         gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
         self.gsf_ext_low = gsf_ext_low
@@ -113,9 +119,9 @@ class NormGSF:
 
         Parameters
         ----------
-        nld_ens : List of Matrix
+        nld_ens : List of Vectors
             Ensemble of normalized NLDs
-        gsf_ens : List of Matrix
+        gsf_ens : List of Vectors
             Ensemble of /non/-normalized gSFs
 
         Returns
@@ -127,7 +133,7 @@ class NormGSF:
         integral_unc_rel : float
             Std. of the integral (for the given transformation parameters)
         """
-        assert self.gsf_in.shape[1] == 3, "Need correct gsf shape: (E,val,unc)"
+        # assert self.gsf_in.shape[1] == 3, "Need correct gsf shape: (E,val,unc)"
         #assert type(gsf_samples[0]) == ompy.matrix.Vector
 
         Gg = self.Gg
@@ -173,7 +179,8 @@ class NormGSF:
                                                     const=norm_tmp))
 
         gsf = transform(self.gsf_in, B=norm, alpha=0)
-        gsf[:,2] = np.std([vec.values for vec in gsf_samples], axis=0)
+        if self.gsf_in.shape[1] == 3:
+            gsf[:,2] = np.std([vec.values for vec in gsf_samples], axis=0)
         gsf_ext_low = transform(gsf_ext_low, B=norm, alpha=0)
         gsf_ext_high = transform(gsf_ext_high, B=norm, alpha=0)
 
@@ -257,42 +264,117 @@ class NormGSF:
         gsf_norm = np.c_[E_array, gsf_norm]
         return gsf_norm
 
+    def gsf_extrapolation(self, pars=None):
+        """Calculate extraploation of the gsf
 
-    def gsf_extrapolation(self, pars):
-        """finding and plotting extraploation of the gsf
-          Parameters:
-          -----------
-          pars: dictionary with saved parameters
+        Parameters:
+            pars: dictionary with saved parameters or necessary params
 
-          Returns:
-          --------
-          gsf_ext_low : np.array of lower extrapolation
-          gsf_ext_high : np.array of higher extrapolation
+        Returns:
+            gsf_ext_low: np.array of lower extrapolation
+            gsf_ext_high: np.array of higher extrapolation
 
-          TODO: Automatic choice of ext model according to method from dict.
+            TODO: Automatic choice of ext model according to method from dict.
         """
+        # TODO:
+        # assert(method in ["chi", "parameters"])
 
-        # assert self.extModel==["exp_gsf","exp_trans"]
         ext_range = self.ext_range
         Emin_low, Emax_low, Emin_high, Emax_high = ext_range
-        ext_a, ext_b = pars['gsf_ext_high']
-        ext_c, ext_d = pars['gsf_ext_low']
 
-        def f_gsf_ext_low(Eg, c, d):
-            return np.exp(c * Eg + d)
+        method = self.pext["method"]
+        if pars is None:
+            pars = self.pext
 
-        def f_gsf_ext_high(Eg, a, b):
-            return np.exp(a * Eg + b) / np.power(Eg, 3)
+        if method == "chi2":
+            pars_req = {"Elow_min", "Elow_max",
+                        "Ehigh_min", "Ehigh_max"}
+            lib.call_model(self.set_extrapolation_chi2,
+                           pars, pars_req)
+            pars = self.pext
+        elif method == "parameters":
+            pass
+        else:
+            NotImplementedError("Only two methods implemented; check spelling")
+            # assert self.extModel==["exp_gsf","exp_trans"]
 
         Emid = np.linspace(Emin_low, Emax_low)
-        value = f_gsf_ext_low(Emid, ext_c, ext_d)
+        value = NormGSF.f_gsf_ext_low(Emid, *pars["gsf_ext_low"])
         gsf_ext_low = np.c_[Emid, value]
 
         Emid = np.linspace(Emin_high, Emax_high)
-        value = f_gsf_ext_high(Emid, ext_a, ext_b)
+        value = NormGSF.f_gsf_ext_high(Emid, *pars["gsf_ext_high"])
         gsf_ext_high = np.c_[Emid, value]
 
         return gsf_ext_low, gsf_ext_high
+
+    @staticmethod
+    def f_gsf_ext_low(Eg, c, d):
+        """ gsf extrapolation at low energies
+
+        Args:
+            Eg (array): Gamma-ray energies
+            c (double): extrapolation parameter
+            d (double): extrapolation parameter
+
+        Returns:
+            array: values of the extrapolation
+
+        """
+        return np.exp(c * Eg + d)
+
+    @staticmethod
+    def f_gsf_ext_high(Eg, a, b):
+        """ gsf extrapolation at high energies
+
+        Args:
+            Eg (array): Gamma-ray energies
+            a (double): extrapolation parameter
+            b (double): extrapolation parameter
+
+        Returns:
+            array: values of the extrapolation
+        """
+        return np.exp(a * Eg + b) / np.power(Eg, 3)
+
+    def set_extrapolation_chi2(self,
+                               Elow_min, Elow_max,
+                               Ehigh_min, Ehigh_max,
+                               gsf=None,
+                               **kwargs):
+        """Set gsf extrapolation from chi2-fit within a certain data range
+
+        Args:
+            Elow_min, ... (double): Energy ranges for chi2 fit
+            gsf (array, optional): gsf. Default: input gsf
+
+        """
+        if gsf is None:
+            gsf = self.gsf_in
+        assert(2 <= gsf.shape[1] <= 3), "Input gsf of wrong shape"
+
+        Egs = gsf[:, 0]
+
+        def fit(Emin, Emax, ffit):
+            idx1 = lib.i_from_E(Emin, Egs)
+            idx2 = lib.i_from_E(Emax, Egs)
+            gsf_tmp = gsf[idx1:idx2+1, :]
+
+            if gsf.shape[1] == 2:
+                popt, pcov = curve_fit(ffit, gsf_tmp[:,0],
+                                       gsf_tmp[:, 1])
+            else:
+                popt, pcov = curve_fit(ffit, gsf_tmp[:,0],
+                                       gsf_tmp[:, 1],
+                                       sigma=gsf_tmp[:, 2])
+            return popt, pcov
+
+        popt_low, pcov_low = fit(Elow_min, Elow_max,
+                                 NormGSF.f_gsf_ext_low)
+        popt_high, pcov_high = fit(Ehigh_min, Ehigh_max,
+                                   NormGSF.f_gsf_ext_high)
+        self.pext["gsf_ext_low"] = popt_low
+        self.pext["gsf_ext_high"] = popt_high
 
     def fnld(self, E, nld=None, nld_ext=None):
         """ compose nld of data & extrapolation
@@ -686,7 +768,7 @@ class NormGSF:
             Enable interactive renormalization according to the chosen
             extrapolations
         gsf_referece : ndarray
-            Refernce for plotting and normalization during code debugging
+            Reference for plotting and normalization eg. during code debugging
         """
         gsf = self.gsf
         gsf_ext_low = self.gsf_ext_low
@@ -707,72 +789,191 @@ class NormGSF:
 
         ax.legend()
 
+        # draw errors showing chi2 fit regions
+        if self.pext["method"] == "chi2":
+            arrows = self.plot_arrows_chi2(ax, gsf)
+
         # load referece gsf
         if gsf_referece is not None:
             ax.plot(gsf_referece[:, 0], gsf_referece[:, 1])
 
         if interactive:
-            # Define an axes area and draw a slider in it
-            axis_color = 'lightgoldenrodyellow'
-            ext_a, ext_b = self.pext['gsf_ext_high']
-            ext_c, ext_d = self.pext['gsf_ext_low']
-            ext_a_slider_ax = fig.add_axes([0.25, 0.05, 0.65, 0.03],
+            if self.pext["method"] == "chi2":
+                self.iplot_chi2(fig, ax, gsf_plot,
+                                gsf_ext_low_plt, gsf_ext_high_plt,
+                                arrows)
+            if self.pext["method"] == "parameters":
+                self.iplot_parameters(fig, ax, gsf_plot,
+                                      gsf_ext_low_plt, gsf_ext_high_plt)
+
+    def plot_arrows_chi2(self, ax, gsf):
+        """ plots arrows that indicate the chi2 fit region """
+        arrows = []
+        keys = ["Elow_min", "Elow_max", "Ehigh_min", "Ehigh_max"]
+        for key in keys:
+            x = self.pext[key]
+            idx = lib.i_from_E(x, gsf[:, 0])
+            arrow = ax.annotate("", (x, gsf[idx, 1]),
+                                xytext=(0, 25), textcoords='offset points',
+                                arrowprops=dict(facecolor='black',
+                                                arrowstyle="->"),
+                                horizontalalignment='right',
+                                verticalalignment='bottom')
+            arrows.append(arrow)
+        return arrows
+
+
+
+    def iplot_chi2(self, fig, ax,
+                   gsf_plot,
+                   gsf_ext_low_plt,
+                   gsf_ext_high_plt,
+                   arrows):
+        """ Interactive plot for pext method=chi2"""
+        # Define an axes area and draw a slider in it
+        axis_color = 'lightgoldenrodyellow'
+        Elow_min = self.pext['Elow_min']
+        Elow_max = self.pext['Elow_max']
+        Ehigh_min = self.pext['Ehigh_min']
+        Ehigh_max = self.pext['Ehigh_max']
+        Elow_min_slider_ax = fig.add_axes([0.20, 0.20, 0.65, 0.03],
+                                          facecolor=axis_color)
+        Elow_max_slider_ax = fig.add_axes([0.20, 0.15, 0.65, 0.03],
+                                          facecolor=axis_color)
+        Ehigh_min_slider_ax = fig.add_axes([0.20, 0.10, 0.65, 0.03],
                                            facecolor=axis_color)
-            ext_b_slider_ax = fig.add_axes([0.25, 0.10, 0.65, 0.03],
-                                           facecolor=axis_color)
-            ext_c_slider_ax = fig.add_axes([0.25, 0.15, 0.65, 0.03],
-                                           facecolor=axis_color)
-            ext_d_slider_ax = fig.add_axes([0.25, 0.20, 0.65, 0.03],
+        Ehigh_max_slider_ax = fig.add_axes([0.20, 0.05, 0.65, 0.03],
                                            facecolor=axis_color)
 
-            sext_a = Slider(ext_a_slider_ax, 'a', 0., 4., valinit=ext_a)
-            sext_b = Slider(ext_b_slider_ax, 'b', -30, 5, valinit=ext_b)
-            sext_c = Slider(ext_c_slider_ax, 'c', 0, 4., valinit=ext_c)
-            sext_d = Slider(ext_d_slider_ax, 'd', -30, 5, valinit=ext_d)
+        sElow_min = Slider(Elow_min_slider_ax, 'Elow\_min', 0., 4.,
+                           valinit=Elow_min)
+        sElow_max = Slider(Elow_max_slider_ax, 'Elow\_max', 0, 4.,
+                           valinit=Elow_max)
+        sEhigh_min = Slider(Ehigh_min_slider_ax, 'Ehigh\_min', 4., 10.,
+                            valinit=Ehigh_min)
+        sEhigh_max = Slider(Ehigh_max_slider_ax, 'Ehigh\_max', 4., 10.,
+                            valinit=Ehigh_max)
 
-            def slider_update(val):
-                ext_a = sext_a.val
-                ext_b = sext_b.val
-                ext_c = sext_c.val
-                ext_d = sext_d.val
-                # save the values
-                self.pext['gsf_ext_low'] = np.array([ext_c, ext_d])
-                self.pext['gsf_ext_high'] = np.array([ext_a, ext_b])
+        def slider_update(val):
+            Elow_min = sElow_min.val
+            Elow_max = sElow_max.val
+            Ehigh_min = sEhigh_min.val
+            Ehigh_max = sEhigh_max.val
+            # save the values
+            self.pext['Elow_min'] = Elow_min
+            self.pext['Elow_max'] = Elow_max
+            self.pext['Ehigh_min'] = Ehigh_min
+            self.pext['Ehigh_max'] = Ehigh_max
 
-                # apply
-                gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
-                self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
-                norm = self.GetNormFromGgD0()
-                gsf = self.transform(self.gsf_in, B=norm, alpha=0)
-                gsf_ext_low = self.transform(gsf_ext_low, B=norm, alpha=0)
-                gsf_ext_high = self.transform(gsf_ext_high, B=norm, alpha=0)
+            # apply
+            gsf_ext_low, gsf_ext_high = self.gsf_extrapolation()
+            self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
+            norm = self.GetNormFromGgD0()
+            gsf = self.transform(self.gsf_in, B=norm, alpha=0)
+            gsf_ext_low = self.transform(gsf_ext_low, B=norm, alpha=0)
+            gsf_ext_high = self.transform(gsf_ext_high, B=norm, alpha=0)
 
-                self.gsf = gsf
-                self.gsf_ext_low = gsf_ext_low
-                self.gsf_ext_high = gsf_ext_high
+            self.gsf = gsf
+            self.gsf_ext_low = gsf_ext_low
+            self.gsf_ext_high = gsf_ext_high
 
-                gsf_plot.set_ydata(gsf[:, 1])
-                gsf_ext_high_plt.set_ydata(gsf_ext_high[:, 1])
-                gsf_ext_low_plt.set_ydata(gsf_ext_low[:, 1])
-                fig.canvas.draw_idle()
+            gsf_plot.set_ydata(gsf[:, 1])
+            gsf_ext_high_plt.set_ydata(gsf_ext_high[:, 1])
+            gsf_ext_low_plt.set_ydata(gsf_ext_low[:, 1])
 
-            sext_a.on_changed(slider_update)
-            sext_b.on_changed(slider_update)
-            sext_c.on_changed(slider_update)
-            sext_d.on_changed(slider_update)
+            nonlocal arrows
+            for arrow in arrows:
+                arrow.remove()
+            arrows[:] = []
+            arrows = self.plot_arrows_chi2(ax, gsf)
 
-            # make button an attribute, such that it survives for interactive
-            # plot
-            reset_ax = plt.axes([0.8, 0.025, 0.1, 0.04])
-            self.button = Button(reset_ax, 'Reset', color=axis_color,
-                                 hovercolor='0.975')
+            fig.canvas.draw_idle()
 
-            def reset(event):
-                sext_a.reset()
-                sext_b.reset()
-                sext_c.reset()
-                sext_d.reset()
-            self.button.on_clicked(reset)
+        sElow_min.on_changed(slider_update)
+        sElow_max.on_changed(slider_update)
+        sEhigh_min.on_changed(slider_update)
+        sEhigh_max.on_changed(slider_update)
+
+        # make button an attribute, such that it survives for interactive
+        # plot
+        reset_ax = plt.axes([0.8, 0.025, 0.1, 0.04])
+        self.button = Button(reset_ax, 'Reset', color=axis_color,
+                             hovercolor='0.975')
+
+        def reset(event):
+            sElow_min.reset()
+            sElow_max.reset()
+            sEhigh_min.reset()
+            sEhigh_max.reset()
+        self.button.on_clicked(reset)
+
+    def iplot_parameters(self, fig, ax,
+                         gsf_plot,
+                         gsf_ext_low_plt,
+                         gsf_ext_high_plt
+                         ):
+        """ Interactive plot pext method=parameters"""
+        # Define an axes area and draw a slider in it
+        axis_color = 'lightgoldenrodyellow'
+        ext_a, ext_b = self.pext['gsf_ext_high']
+        ext_c, ext_d = self.pext['gsf_ext_low']
+        ext_a_slider_ax = fig.add_axes([0.25, 0.05, 0.65, 0.03],
+                                       facecolor=axis_color)
+        ext_b_slider_ax = fig.add_axes([0.25, 0.10, 0.65, 0.03],
+                                       facecolor=axis_color)
+        ext_c_slider_ax = fig.add_axes([0.25, 0.15, 0.65, 0.03],
+                                       facecolor=axis_color)
+        ext_d_slider_ax = fig.add_axes([0.25, 0.20, 0.65, 0.03],
+                                       facecolor=axis_color)
+
+        sext_a = Slider(ext_a_slider_ax, 'a', 0., 4., valinit=ext_a)
+        sext_b = Slider(ext_b_slider_ax, 'b', -30, 5, valinit=ext_b)
+        sext_c = Slider(ext_c_slider_ax, 'c', 0, 4., valinit=ext_c)
+        sext_d = Slider(ext_d_slider_ax, 'd', -30, 5, valinit=ext_d)
+
+        def slider_update(val):
+            ext_a = sext_a.val
+            ext_b = sext_b.val
+            ext_c = sext_c.val
+            ext_d = sext_d.val
+            # save the values
+            self.pext['gsf_ext_low'] = np.array([ext_c, ext_d])
+            self.pext['gsf_ext_high'] = np.array([ext_a, ext_b])
+
+            # apply
+            gsf_ext_low, gsf_ext_high = self.gsf_extrapolation(self.pext)
+            self.gsf_ext_low, self.gsf_ext_high = gsf_ext_low, gsf_ext_high
+            norm = self.GetNormFromGgD0()
+            gsf = self.transform(self.gsf_in, B=norm, alpha=0)
+            gsf_ext_low = self.transform(gsf_ext_low, B=norm, alpha=0)
+            gsf_ext_high = self.transform(gsf_ext_high, B=norm, alpha=0)
+
+            self.gsf = gsf
+            self.gsf_ext_low = gsf_ext_low
+            self.gsf_ext_high = gsf_ext_high
+
+            gsf_plot.set_ydata(gsf[:, 1])
+            gsf_ext_high_plt.set_ydata(gsf_ext_high[:, 1])
+            gsf_ext_low_plt.set_ydata(gsf_ext_low[:, 1])
+            fig.canvas.draw_idle()
+
+        sext_a.on_changed(slider_update)
+        sext_b.on_changed(slider_update)
+        sext_c.on_changed(slider_update)
+        sext_d.on_changed(slider_update)
+
+        # make button an attribute, such that it survives for interactive
+        # plot
+        reset_ax = plt.axes([0.8, 0.025, 0.1, 0.04])
+        self.button = Button(reset_ax, 'Reset', color=axis_color,
+                             hovercolor='0.975')
+
+        def reset(event):
+            sext_a.reset()
+            sext_b.reset()
+            sext_c.reset()
+            sext_d.reset()
+        self.button.on_clicked(reset)
 
     @staticmethod
     def chi2_nld_gsf(x, obj, nld, chi2_args, pext_nld, nldModel,
@@ -841,3 +1042,111 @@ class NormGSF:
         chi2_Gg = (Gg - modelGg)**2/(sigma2)
 
         return chi2_nld + chi2_Gg
+
+
+#####################
+#####################
+# Some other functions for convenience
+#####################
+
+def normalize_simultaneous_each_member(nlds_MeV,
+                                       gsfs_MeV,
+                                       pnld_norm, pnld_ext, D0,
+                                       pspin, fname_discretes,
+                                       pext, gsf_ext_range,
+                                       N_max=20,
+                                       ):
+    """ normalize each ensemble member separately """
+
+    nldModel = "CT"
+    # Current implementation: Need to run it once first:
+    nld = np.c_[nlds_MeV[0].E, nlds_MeV[0].values,
+                np.ones_like(nlds_MeV[0].values)]
+
+    normNLD = NormNLD(nld=nld,
+                      method="find_norm", pnorm=pnld_norm,
+                      nldModel=nldModel, pext=pnld_ext,
+                      D0=D0,
+                      pspin=pspin,
+                      fname_discretes=fname_discretes)
+    alpha_norm = normNLD.alpha_norm
+    rho_fit = normNLD.nld_norm
+    nld_ext = normNLD.nld_ext
+    multinest_samples_nld = normNLD.multinest_samples
+
+    normGSF = NormGSF(gsf=np.c_[gsfs_MeV[0].E, gsfs_MeV[0].values],
+                      method="standard",
+                      D0=D0,
+                      alpha_norm=alpha_norm,
+                      pext=pext, ext_range=gsf_ext_range,
+                      nld=rho_fit, nld_ext=nld_ext,
+                      **pspin)
+
+    # Now run simultaneous normalization for each member
+    nlds = []
+    # nld_exts = []
+    gsfs = []
+    # nld_samples_sims = []
+    # gsf_samples_sims = []
+
+    N_max = min(N_max, len(nlds_MeV))
+    for i in range(N_max):
+        print("\n Attempt iteration nr {}".format(i))
+        # HACK: Fake uncertainties (each point same value)
+        #       as some functions currently didin't run without
+        nld_tmp = np.c_[nlds_MeV[0].E, nlds_MeV[i].values,
+                        np.ones_like(nlds_MeV[0].values)]
+        gsf_tmp = np.c_[gsfs_MeV[0].E, gsfs_MeV[i].values,
+                        np.ones_like(nlds_MeV[0].values)]
+
+        gsf_ext_low = normGSF.gsf_ext_low
+        gsf_ext_high = normGSF.gsf_ext_high
+
+        # TODO: NEED TO DO SOMETHING ABOUT THE RELATIVE UNCERTAINTY HERE
+        nld_transformed = lib.tranform_nld_gsf(multinest_samples_nld, nlds_MeV)
+        integral_unc_rel, norm = \
+            normGSF.normalize_Gg_chi2(nld_transformed, gsfs_MeV)
+        sigma_integral_rel = integral_unc_rel
+        Gg = pspin["Gg"]
+        pext_nld = normNLD.pext
+        chi2_args = normNLD.chi2_args
+
+        args = (normGSF, nld_tmp, chi2_args, pext_nld, nldModel,
+                gsf_tmp, gsf_ext_low, gsf_ext_high,
+                sigma_integral_rel, Gg)
+
+        # object_fun = normGSF.chi2_nld_gsf
+
+        bounds = np.array([(0.1, 10),  # A
+                           (0.5, 3),  # alpha
+                           (0.4, 0.7),  # T
+                           # D0 -- need to keep fixed for diff evo
+                           (D0[0]*0.98, D0[0]*1.02),  # D0
+                           (norm*1e-1, norm*1e1)])  # B
+
+        popt_simultan, multinest_samples = \
+            normGSF.normalize_nld_gsf_simultan(args, bounds, D0)
+
+        nld_samples, gsf_samples = \
+            lib.tranform_nld_gsf(multinest_samples,
+                                 nlds_MeV[i],
+                                 gsfs_MeV[i])
+
+        # apped all samples from the multinest combination(s)
+        nlds.append([vec.values for vec in nld_samples])
+        gsfs.append([vec.values for vec in gsf_samples])
+
+    # calc mean and std
+    nlds_arr = np.array(nlds)
+    gsfs_arr = np.array(gsfs)
+
+    nlds_arr = nlds_arr.reshape(nlds_arr.shape[:-3]
+                                + (-1, len(nlds_MeV[0].E)))
+    gsfs_arr = gsfs_arr.reshape(gsfs_arr.shape[:-3]
+                                + (-1, len(gsfs_MeV[0].E)))
+
+    nld_mean = np.mean(nlds_arr, axis=0)
+    gsf_mean = np.mean(gsfs_arr, axis=0)
+    nld_std = np.std(nlds_arr, axis=0)
+    gsf_std = np.std(gsfs_arr, axis=0)
+    return nlds, gsfs, np.c_[nld_mean, nld_std], np.c_[gsf_mean, gsf_std]
