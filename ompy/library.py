@@ -25,10 +25,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-import numpy as np
-import matplotlib.pyplot as plt
 import time
 import warnings
+import numpy as np
+import matplotlib.pyplot as plt
+from .constants import DE_PARTICLE, DE_GAMMA_8MEV, DE_GAMMA_1MEV
 from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 
@@ -882,3 +883,21 @@ def get_discretes(Emids, fname, resolution=0.1):
     from scipy.ndimage import gaussian_filter1d
     hist_smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
     return hist_smoothed, hist
+
+
+def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
+    """ Calculate Ex-dependent detector resolution (sum of sqroot)
+
+    Args:
+        Ex: Excitation energy bin array
+    """
+    # Assume constant particle resolution:
+    dE_particle = DE_PARTICLE
+    # Interpolate the gamma resolution linearly:
+    # Eg = Ex + self.bin_width_out/2
+    dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
+                * (Ex - 1000))  + DE_GAMMA_1MEV
+
+    dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
+    #dE_max_res = np.max(dE_resolution)
+    return dE_resolution

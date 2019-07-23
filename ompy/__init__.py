@@ -16,3 +16,4 @@ from .multinest_setup import *
 from .response import *
 from .compton_subtraction_method import *
 from .gauss_smoothing import *
+from .firstgeneration import FirstGeneration

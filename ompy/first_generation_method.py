@@ -161,18 +161,21 @@ def first_generation_method(matrix_in,
     multiplicity = None
     if multiplicity_estimation == "statistical":
         # Statistical multiplicity calculation (i.e. trying to use
-        # statistical/continuum region only)
+        # sttistical/continuum region only)
         # The sliding lower limit for Egamma integral - sliding between
         # ThresTot and ThresSta.
         slide = np.minimum(np.maximum(
             ThresRatio * Ex_mesh, ThresTot), ThresSta)
-        # plt.figure(5)
-        # plt.plot(slide[:,0])
-        # plt.show()
-        # sys.exit(0)
+        #fig, ax = plt.subplots(1)
+        # ax.matshow(slide)
+        # return
         # good_indices = np.where(np.logical_and(slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid) , True, False)
+        # ax.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed, norm=LogNorm())
         matrix_ex_compressed_cut = np.where(np.logical_and(
-            slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid), matrix_ex_compressed, 0)
+             slide < Egamma_mesh, Egamma_mesh < Egamma_max_grid), matrix_ex_compressed, 0)
+        # fig, ax = plt.subplots(1)
+        # ax.pcolormesh(Egamma_array, Ex_array, matrix_ex_compressed_cut, norm=LogNorm())
+        # return
 
         # Calculate average multiplicity for each Ex channel
         area_matrix_ex_compressed_cut = np.sum(
@@ -180,6 +183,7 @@ def first_generation_method(matrix_in,
         Egamma_average = div0(np.sum(
             Egamma_mesh * matrix_ex_compressed_cut, axis=1),
             area_matrix_ex_compressed_cut)
+         
 
         # Statistical multiplicity - use the effective Ex0 value
         multiplicity = div0(
@@ -232,8 +236,6 @@ def first_generation_method(matrix_in,
         Ni = len(Egamma_array[Egamma_array < Ex_array[i] + dE_gamma])
         # print("Ni =", Ni, flush=True)
         H[i, Egamma_array < Ex_array[i] + dE_gamma] = 1 / max(Ni, 1)
-    # print np.sum(H0, axis=1) # Seems to work!
-
     # Set up normalization matrix N
     # Get total number of counts in each Ex bin
     area = np.sum(matrix_ex_compressed_cut, axis=1)
@@ -259,6 +261,7 @@ def first_generation_method(matrix_in,
                                                      multiplicity[i]*area[j]
                                                      )
     normalization_matrix = normalization_matrix_manual
+
     # normalization_matrix[np.isnan(normalization_matrix)] = 0
 
 
@@ -310,6 +313,13 @@ def first_generation_method(matrix_in,
         NotImplementedError(
             "unknown value for variable initial_weight_function",
             initial_weight_function)
+
+    # import matplotlib.pyplot as plt
+    # from matplotlib.colors import LogNorm
+    # fig, ax = plt.subplots(1)
+    # ax.pcolormesh(Ex_array, Ex_array, W_old, norm=LogNorm())
+    # print(W_old)
+    # return
 
 
     E1 = (Ex_array[0], Ex_array[0] + dE_gamma)
