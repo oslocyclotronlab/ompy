@@ -118,8 +118,8 @@ def rebin(double[:] counts_in, double[:] E_array_in,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin_matrix(double[:, :] mat_counts_in, double[:] E_array_in,
-                 double[:] E_array_out, int rebin_axis=0):
+def rebin_matrix(double[:, :] matrix, double[:] E_array_in,
+                 double[:] E_array_out, int axis=0):
     """Rebin a matrix of counts from binning E_array_in to binning E_array_out
 
     This is a currently just a wrapper for rebin() to handle the logistics
@@ -128,12 +128,12 @@ def rebin_matrix(double[:, :] mat_counts_in, double[:] E_array_in,
     the axis that is not being rebinned.
 
     Args:
-        mat_counts_in (np.ndarray): Matrix of counts to rebin
+        matrix (np.ndarray): Matrix of counts to rebin
         E_array_in (np.ndarray): Lower-bin-edge energy calibration of input
                                  matrix along rebin axis
         E_array_out (np.ndarray): Lower-bin-edge energy calibration of output
                                   matrix along rebin axis
-        rebin_axis (int): Axis to rebin
+        axis (int): Axis to rebin
     Returns:
         mat_counts_out (np.ndarray): Matrix of rebinned counts
 
@@ -146,29 +146,32 @@ def rebin_matrix(double[:, :] mat_counts_in, double[:] E_array_in,
     # cdef int[:] shape_out
 
     # Axis number of non-rebin axis (Z2 group, fancy!):
-    assert (rebin_axis == 0 or rebin_axis == 1)
-    other_axis = (rebin_axis + 1) % 2
+    if axis not in (0, 1):
+        raise ValueError("Axis must be either 0 or 1, got %i" % axis)
+
+    other_axis = (axis + 1) % 2
+
     # Number of bins along that axis:
-    N_loop = mat_counts_in.shape[other_axis]
+    N_loop = matrix.shape[other_axis]
 
     # Calculate shape of rebinned matrix and allocate it:
-    shape_out = np.array([mat_counts_in.shape[0], mat_counts_in.shape[1]],
+    shape_out = np.array([matrix.shape[0], matrix.shape[1]],
                          dtype=int)
-    shape_out[rebin_axis] = len(E_array_out)
+    shape_out[axis] = len(E_array_out)
     mat_counts_out = np.zeros(shape_out, dtype=DTYPE)
 
     # For simplicity I use an if test to know axis ordering. Can probably
     # be done smarter later:
     # cdef double[:, :] mat_counts_out_view = mat_counts_out
-    if rebin_axis == 0:
+    if axis == 0:
         # TODO figure out how to best put arrays into mat_counts_out. 
         # Use memoryview or no?
         for i in range(N_loop):
-            mat_counts_out[:, i] = rebin(mat_counts_in[:, i],
+            mat_counts_out[:, i] = rebin(matrix[:, i],
                                          E_array_in, E_array_out)
     else:
         for i in range(N_loop):
-            counts_out = rebin(mat_counts_in[i, :],
+            counts_out = rebin(matrix[i, :],
                                E_array_in, E_array_out)
             mat_counts_out[i, :] = counts_out
     return mat_counts_out

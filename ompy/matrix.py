@@ -29,11 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+import copy
 from matplotlib.colors import LogNorm, Normalize
 from typing import Dict, Iterable, Any, Union, Tuple
 from enum import IntEnum
 from .matrixstate import MatrixState
-from .library import (mama_read, mama_write, div0, fill_negative)
+from .library import mama_read, mama_write, div0, fill_negative, diagonal_resolution
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
 
 
@@ -220,11 +221,47 @@ class Matrix():
         Returns:
             The ax used for plotting
         TODO: Fix normalization
-        TODO: Fix bin edge to agree with Jorgens code
         """
         if ax is None:
             fig, ax = plt.subplots()
 
+        axis = axis_toint(axis)
+        is_Ex = axis == 1
+        projection, energy = self.projection(axis, Emin, Emax, normalize=normalize)
+
+        # Shift energy by a half bin to make the steps correct
+        shifted_energy = energy + (energy[1] - energy[0])/2
+
+        if is_Ex:
+            ax.step(shifted_energy, projection, where='mid', **kwargs)
+            ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
+        else:
+            ax.step(energy, projection, where='mid', **kwargs)
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+        if normalize:
+            ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
+        else:
+            ax.set_ylabel(r"$ \# counts $")
+
+        return ax
+
+    def projection(self, axis: Union[int, str], Emin: float = None,
+                   Emax: float = None,
+                   normalize: bool = False) -> Tuple[np.ndarray]:
+        """ Returns the projection along the specified axis
+
+        Args:
+            axis: The axis to project onto. Can be 0 or 1.
+            Emin (optional): The minimum energy to be summed over.
+            Emax (optional): The maximum energy to be summed over.
+            normalize: Whether or not to normalize the counts.
+                       Defaults to False
+        Raises:
+            ValueError: If axis is not in [0, 1]
+        Returns:
+            The projection and the energies summed onto
+        TODO: Fix normalization
+        """
         axis = axis_toint(axis)
         if axis not in (0, 1):
             raise ValueError(f"Axis must be 0 or 1, got: {axis}")
@@ -240,43 +277,18 @@ class Matrix():
         selection = self.values[subset, :] if isEx else self.values[:, subset]
         energy = self.Ex[subset] if isEx else self.Eg[subset]
 
-        #naxis = 0 if axis else 1
-
         projection = selection.sum(axis=axis)
         if normalize:
             projection = div0(projection, selection.sum(axis=axis).sum())
-            # # Don't know what calibration does, so using specialized code here
-            # if axis:
-            #     projection = div0(selection, selection.sum(axis=axis))
-            #     projection = projection.mean(axis=naxis)
-            # else:
-            #     calibration = self.calibration()["a01"]
-            #     calibrated_sum = selection.sum(axis=axis)*calibration
-            #     calibrated = div0(selection, calibrated_sum[:, None])
-            #     projection = calibrated.mean(axis=naxis)
 
-        # Shift energy by a half bin to make the steps correct
-        shifted_energy = energy + (energy[1] - energy[0])/2
-
-        if isEx:
-            ax.step(shifted_energy, projection, where='mid', **kwargs)
-            ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
-        else:
-            ax.step(energy, projection, where='mid', **kwargs)
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        if normalize:
-            ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
-        else:
-            ax.set_ylabel(r"$ \# counts $")
-
-        return ax
+        return projection, energy
 
     def save(self, fname):
         """Save matrix to mama file
         """
         mama_write(self, fname, comment="Made by Oslo Method Python")
 
-    def cut(self, axis: Union[int, str], 
+    def cut(self, axis: Union[int, str],
             Emin: Union[None, float] = None,
             Emax: Union[None, float] = None,
             inplace: bool = True) -> Any:
@@ -321,17 +333,39 @@ class Matrix():
         else:
             return Matrix(values_cut, Eg=Eg, Ex=Ex)
 
-    def cut_diagonal(self, E1: Iterable[float], E2: Iterable[float]):
+    def cut_diagonal(self, E1: Iterable[float] = None,
+                     E2: Iterable[float] = None,
+                     inplace: bool = True) -> Union[None, Any]:
         """Cut away counts to the right of a diagonal line defined by indices
 
+        If no limits are provided, an automatic cut will be made.
         Args:
-            E1: First point of intercept, ordered as Ex, Eg
-            E2: Second point of intercept
+            E1 (optional): First point of intercept, ordered as Ex, Eg
+            E2 (optional): Second point of intercept
+            inplace (optional): Whether the operation should be applied to the
+                current matrix, or to a copy which is then returned.
         Returns:
-            The matrix with counts above diagonal removed
+            The matrix with counts above diagonal removed if not inplace.
         """
-        self.mask = self.line_mask(E1, E2)
-        self.values[self.mask] = 0.0
+        if E1 is None and E2 is None:
+            dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg)).reshape(self.shape)
+            Eg, Ex = np.meshgrid(self.Eg, self.Ex)
+            mask = np.zeros_like(self.values, dtype=bool)
+            mask[Eg >= Ex + dEg] = True
+        elif E1 is None or E2 is None:
+            raise ValueError("If either E1 or E2 is specified, "
+                             "both must be specified and have same type")
+        else:
+            mask = self.line_mask(E1, E2)
+
+        if inplace:
+            self.mask = mask
+            self.values[mask] = 0.0
+        else:
+            matrix = copy.deepcopy(self)
+            matrix.mask = mask
+            matrix.values[mask] = 0.0
+            return matrix
 
     def line_mask(self, E1: Iterable[float],
                   E2: Iterable[float]) -> np.ndarray:
@@ -375,27 +409,17 @@ class Matrix():
             Eg_min: The left edge of the trapezoid
         Returns:
             The boolean array with counts below the line set to False
-        TODO: Doesn't work. Use Fabio's method
+        TODO: Is this function necessary?
         """
         # Transform to index basis
         iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
         iEg_min = self.index_Ex(Eg_min)
 
+        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
+        Ex_cut = self.Ex[(self.Ex > Ex_min) & (self.Ex < Ex_max)]
+        dEg = np.repeat(diagonal_resolution, len(self.Ex)).reshape(self.shape)
         mask = np.zeros_like(self.values, dtype=bool)
-        for iEx in range(iEx_min, iEx_max+1):
-            # Loop over rows in array and fill with ones up to sliding Eg
-            # threshold
-            Ex = self.values[iEx]
-            # Assume constant particle resolution
-            dE_particle = DE_PARTICLE
-            dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
-                        * (Ex - 1000))
-            Eg_max = Ex + np.sqrt(dE_particle**2 + dE_gamma**2)
-            iEg_max = self.index_Eg(Eg_max)
-            if iEg_max < iEg_min:
-                continue
-
-            mask[iEx, iEg_min:iEg_max+1] = True
+        mask[(Ex_min < Ex) & (Ex < Ex_max) & (Eg < Ex + dEg)] = True
 
         return mask
 
