@@ -1,0 +1,28 @@
+#include "TGraph.h"
+double adGSF_ETable[] = {
+0.0,
+10.0,
+20.0
+};
+const int nGSF_ETable = sizeof(adGSF_ETable)/sizeof(double);
+
+double adGSF_E1[] = {
+1e-9,
+1e-8,
+1e-7
+};
+TGraph *grGSF_E1 = new TGraph(nGSF_ETable,adGSF_ETable,adGSF_E1);
+
+double adGSF_M1[] = {
+1e-10,
+1e-9,
+1e-8
+};
+TGraph *grGSF_M1 = new TGraph(nGSF_ETable,adGSF_ETable,adGSF_M1);
+
+double adGSF_E2[] = {
+1e-11,
+1e-10,
+1e-9
+};
+TGraph *grGSF_E2 = new TGraph(nGSF_ETable,adGSF_ETable,adGSF_E2);
