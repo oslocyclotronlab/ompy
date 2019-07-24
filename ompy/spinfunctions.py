@@ -36,7 +36,7 @@ class SpinFunctions:
         # different spin cut models
         def EB05(mass, NLDa, Eshift, Ex=Ex):
             """
-            Von Egidy & B PRC72,044311(2005)
+            Von Egidy & B PRC72,044311(2005), Eq. (4)
             The rigid moment of inertia formula (RMI)
             FG+CT
             """
@@ -50,20 +50,22 @@ class SpinFunctions:
 
         def EB09_CT(mass):
             """
-            The constant temperature (CT) formula Von Egidy & B PRC80,054310 and NPA 481 (1988) 189
+            The constant temperature (CT) formula
+            - Von Egidy & B PRC80,054310, below Eq. (8)
+            - original ref: Von Egidy et al., NPA 481 (1988) 189, Eq. (3)
             """
             sigma2 = np.power(0.98 * (mass**(0.29)), 2)
             return sigma2
 
         def EB09_emp(mass, Pa_prime, Ex=Ex):
             """
-            Von Egidy & B PRC80,054310
+            Von Egidy & B PRC80,054310, Eq.(16)
             FG+CT
             """
             Ex = np.atleast_1d(Ex)
             Eeff = Ex - 0.5 * Pa_prime
             Eeff[Eeff < 0] = 0
-            sigma2 = 0.391 * np.power(mass, 0.675) * np.power(mass, 0.312)
+            sigma2 = 0.391 * np.power(mass, 0.675) * np.power(Eeff, 0.312)
             return sigma2
 
         def Disc_and_EB05(mass, NLDa, Eshift, Sn, sigma2_disc, Ex=Ex):
