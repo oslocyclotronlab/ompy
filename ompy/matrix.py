@@ -26,16 +26,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+from __future__ import annotations
+import warnings
+import logging
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import warnings
-import copy
+from tabulate import tabulate
 from matplotlib.colors import LogNorm, Normalize
-from typing import Dict, Iterable, Any, Union, Tuple
-from enum import IntEnum
+from typing import (Dict, Iterable, Any, Union, Tuple,
+                    List, Sequence, Optional)
 from .matrixstate import MatrixState
-from .library import mama_read, mama_write, div0, fill_negative, diagonal_resolution
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV, DE_GAMMA_8MEV
+from .library import (mama_read, mama_write, div0, fill_negative,
+                      diagonal_resolution)
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV
+from .rebin import rebin_2D
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class Matrix():
@@ -93,9 +101,9 @@ class Matrix():
         It can be filled later using the load() method.
         """
 
-        self.values: np.ndarray = values
-        self.Eg: np.ndarray = np.array(Eg, dtype=float)
-        self.Ex: np.ndarray = np.array(Ex, dtype=float)
+        self.values: np.ndarray = np.asarray(values, dtype=float)
+        self.Eg: np.ndarray = np.asarray(Eg, dtype=float)
+        self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
         self.std: np.ndarray = std
 
         if filename is not None:
@@ -121,14 +129,35 @@ class Matrix():
                 raise ValueError(("Shape mismatch between matrix and Ex:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Ex)}"))
+            if len(self.Ex) > 2:
+                # Verify equispaced array
+                diff = (self.Ex - np.roll(self.Ex, 1))[1:]
+                try:
+                    diffdiff = diff - diff[1]
+                    np.testing.assert_array_almost_equal(diffdiff,
+                            np.zeros_like(diff))
+                except AssertionError:
+                    raise ValueError("Ex array is not equispaced")
+
         if self.Eg is not None:
             if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Eg)}"))
+            if len(self.Eg) > 2:
+                # Verify equispaced array
+                diff = (self.Eg - np.roll(self.Eg, 1))[1:]
+                try:
+                    diffdiff = diff - diff[1]
+                    np.testing.assert_array_almost_equal(diffdiff,
+                            np.zeros_like(diff))
+                except AssertionError:
+                    raise ValueError("Eg array is not equispaced")
+
         if self.std is not None:
             if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
+
 
     def load(self, filename: str):
         """ Load matrix from mama file
@@ -190,12 +219,15 @@ class Matrix():
             norm = Normalize(vmin=zmin, vmax=zmax)
         else:
             raise ValueError("Unsupported zscale ", zscale)
-        # TODO: Pcolormesh ignores the last row of self.values if
-        # len(self.Eg) < len(self.values) + 1
-        # Must extend it
-        Eg = np.append(self.Eg, self.Eg[-1] + self.Eg[1] - self.Eg[0])
-        Ex = np.append(self.Ex, self.Ex[-1] + self.Ex[1] - self.Ex[0])
+        # Must extend it the range to make pcolormesh happy
+        dEg = self.Eg[1] - self.Eg[0]
+        dEx = self.Ex[1] - self.Ex[0]
+        Eg = np.append(self.Eg, self.Eg[-1] + dEg)
+        Ex = np.append(self.Ex, self.Ex[-1] + dEx)
+
         lines = ax.pcolormesh(Eg, Ex, self.values, norm=norm, **kwargs)
+        fix_pcolormesh_ticks(ax, xvalues=Eg, yvalues=Ex)
+
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
@@ -206,7 +238,7 @@ class Matrix():
         return ax
 
     def plot_projection(self, axis: int, Emin: float = None,
-                        Emax: float = None, ax: Any = None,
+                        Emax: float = None, *, ax: Any = None,
                         normalize: bool = False, **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
@@ -225,7 +257,7 @@ class Matrix():
         if ax is None:
             fig, ax = plt.subplots()
 
-        axis = axis_toint(axis)
+        axis = axis_to_int(axis)
         is_Ex = axis == 1
         projection, energy = self.projection(axis, Emin, Emax, normalize=normalize)
 
@@ -262,7 +294,7 @@ class Matrix():
             The projection and the energies summed onto
         TODO: Fix normalization
         """
-        axis = axis_toint(axis)
+        axis = axis_to_int(axis)
         if axis not in (0, 1):
             raise ValueError(f"Axis must be 0 or 1, got: {axis}")
 
@@ -307,7 +339,7 @@ class Matrix():
             None if inplace==False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        axis = axis_toint(axis)
+        axis = axis_to_int(axis)
         range = self.Eg if axis == 0 else self.Ex
         indices = self.indices_Eg if axis == 0 else self.indices_Ex
         Emin = Emin if Emin is not None else min(range)
@@ -411,6 +443,7 @@ class Matrix():
             The boolean array with counts below the line set to False
         TODO: Is this function necessary?
         """
+        raise NotImplementedError()
         # Transform to index basis
         iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
         iEg_min = self.index_Ex(Eg_min)
@@ -422,6 +455,66 @@ class Matrix():
         mask[(Ex_min < Ex) & (Ex < Ex_max) & (Eg < Ex + dEg)] = True
 
         return mask
+
+    def rebin(self, axis: Union[int, str],
+              edges: Optional[Sequence[float]] = None,
+              factor: Optional[float] = None,
+              inplace: bool = True) -> Optional[Matrix]:
+        """ Rebins one axis of the matrix
+
+        Args:
+            axis: the axis to rebin.
+            edges: The new edges along the axis. Can not be
+                given alongside 'factor'.
+            factor: The factor by which the step size shall be
+                changed. Can not be given alongside 'edges'.
+            inplace: Whether to change the axis and values
+                inplace or return the rebinned matrix.
+        Returns:
+            The rebinned Matrix if inplace is 'False'.
+        Raises:
+            ValueError if the axis is not a valid axis.
+        """
+
+        axis: int = axis_to_int(axis)
+        if axis not in (0, 1):
+            raise ValueError("Axis must be 0 or 1")
+        if not (edges is None) ^ (factor is None):
+            raise ValueError("Either 'edges' or 'factor' must be"
+                             " specified, but not both.")
+        edges_old = self.Ex if axis else self.Eg
+
+        if factor is not None:
+            if factor <= 0:
+                raise ValueError("'factor' must be positive")
+            num_edges = int(len(edges_old)/factor)
+            old_step = edges_old[1] - edges_old[0]
+            step = factor*old_step
+            edge = edges_old[0]
+            edges = []
+            while len(edges) < num_edges:
+                edges.append(edge)
+                edge += step
+            LOG.debug("Rebinning with factor %g, giving %g edges",
+                      factor, num_edges)
+            LOG.debug("Old step size: %g\nNew step size: %g",
+                      old_step, step)
+            edges = np.asarray(edges, dtype=float)
+
+        naxis = (axis + 1) % 2
+        rebinned = rebin_2D(self.values, edges_old, edges, naxis)
+        if inplace:
+            self.values = rebinned
+            if axis:
+                self.Ex = edges
+            else:
+                self.Eg = edges
+            self.verify_integrity()
+        else:
+            if naxis:
+                return Matrix(Eg=edges, Ex=self.Ex, values=rebinned)
+            else:
+                return Matrix(Eg=self.Eg, Ex=rebinned, values=rebinned)
 
     def fill_negative(self, window_size):
         self.values = fill_negative(self.values, window_size)
@@ -468,7 +561,7 @@ class Matrix():
         return self.values.sum()
 
     @property
-    def shape(self) -> Tuple[int]:
+    def shape(self) -> Tuple[int, int]:
         return self.values.shape
 
     @property
@@ -493,7 +586,7 @@ class Matrix():
         return self.values.__setitem__(key, item)
 
 
-def axis_toint(axis: Any) -> int:
+def axis_to_int(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
@@ -593,3 +686,66 @@ class Vector():
             self.values= vector_transformed
         else:
             return Vector(vector_transformed, E=self.E)
+
+
+def fix_pcolormesh_ticks(axis, xvalues: np.ndarray,
+                         yvalues: np.ndarray) -> None:
+    """ Shifts the ticks of ax to closest values in x/yvalues
+
+    If x/yvalues are the range along x and y bins of ax, the
+    ticks of ax will be shifted to the closest elements in
+    x/yvalues plus half a step, making the ticks end up in
+    mid bins.
+    The reason this is necessary is that pcolormesh sometimes
+    places the ticks mid-bin, sometimes on the edges.
+
+    Args:
+        ax: The pcolormesh axis
+        xvalues: Values along the x axis
+        yvalues: Values along the y axis
+    Returns:
+        Nothing. Modifies the axis inplace
+    TODO: Replace with matplotlib.ticker.<Locator>
+    """
+    # Shift all bins by ΔE/2 to get the ticks right
+    if len(axis.get_xticks()) > len(xvalues):
+        axis.set_xticks(xvalues[:-1] + (xvalues[1]-xvalues[0])/2)
+    else:
+        ticks = fix_bin_ticks(axis.get_xticks(), xvalues)
+        axis.set_xticks(ticks)
+
+    if len(axis.get_yticks()) > len(yvalues):
+        axis.set_yticks(yvalues[:-1] + (yvalues[1]-yvalues[0])/2)
+    else:
+        ticks = fix_bin_ticks(axis.get_yticks(), yvalues)
+        axis.set_yticks(ticks)
+
+
+def fix_bin_ticks(ticks: Sequence[float],
+                  values: np.ndarray) -> List[float]:
+    """ Finds the elements in values[-2] closest to ticks
+
+    Is a helper function for fix_pcolormesh_ticks. The
+    result is ticks that are equidistant along an axis
+    positioned mid bin
+
+    Args:
+        ticks: The ticks suggested by plt.pcolormesh
+        values: The actual values along the axis
+    Returns:
+        The values in values closest to ticks
+    """
+    first = np.argmin(np.abs(values - ticks[0]))
+    second = np.argmin(np.abs(values - ticks[1]))
+    step = second - first
+    half_bin = (values[1] - values[0])/2
+    new_ticks: List[float] = []
+    i = first
+    while len(new_ticks) < len(values):
+        tick = values[i] + half_bin
+        if tick > values[-1]:
+            break
+        new_ticks.append(tick)
+        i += step
+    return new_ticks
+

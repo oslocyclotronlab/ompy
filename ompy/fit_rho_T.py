@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from . import library as lib
 from . import rebin as rebin
 from . import rhosig as rsg
-from .rebin import rebin_matrix
+from .rebin import rebin_2D
 from .constants import *
 from .matrix import Matrix
 from .matrix import Vector
@@ -185,10 +185,10 @@ class FitRhoT:
 
         # Rebin firstgen to calib_fit along both axes and store it in a new Matrix:
         firstgen = Matrix()
-        firstgen.values = rebin_matrix(firstgen_in.values,
+        firstgen.values = rebin_2D(firstgen_in.values,
                                        firstgen_in.Ex,
                                        Ex_array, rebin_axis=0)
-        firstgen.values = rebin_matrix(firstgen.values,
+        firstgen.values = rebin_2D(firstgen.values,
                                        firstgen_in.Eg,
                                        Eg_array, rebin_axis=1)
         # Set energy axes accordingly

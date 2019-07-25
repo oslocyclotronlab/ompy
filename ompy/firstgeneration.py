@@ -32,10 +32,10 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import List
+from typing import Tuple, Generator
 from .matrix import Matrix
 from .library import div0
-from .rebin import rebin_matrix
+from .rebin import rebin_2D
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -71,7 +71,7 @@ class FirstGeneration:
         matrix.cut('Ex', Emin=0.0)
 
         multiplicities = self.multiplicity(matrix)
-        LOG.info("Multiplicites:\n%s", tt.to_string(
+        LOG.debug("Multiplicites:\n%s", tt.to_string(
             np.vstack([matrix.Ex, multiplicities.round(2)]).T,
             header=('Ex', 'Multiplicities')
             ))
@@ -91,7 +91,7 @@ class FirstGeneration:
         self.num_iterations = 1
         for iteration in range(self.num_iterations):
             H_old = np.copy(H)
-            H_compressed = rebin_matrix(H, matrix.Eg, matrix.Ex,
+            H_compressed = rebin_2D(H, matrix.Eg, matrix.Ex,
                     rebin_axis=1)
             import matplotlib.pyplot as plt
             from matplotlib.colors import LogNorm
@@ -100,7 +100,6 @@ class FirstGeneration:
         # fig, ax = plt.subplots(1)
         # ax.pcolormesh(matrix.Eg, matrix.Ex, matrix.values, norm=LogNorm())
         # print(np.sum(H, axis=1)) # Seems to work!
-
 
     def multiplicity(self, matrix: Matrix) -> np.ndarray:
         """ Dispatch method returning statistical or total multiplicity
@@ -197,7 +196,7 @@ class FirstGeneration:
                              " be either 'statistical' or 'total'")
 
 
-def diagonal_elements(mat: Matrix) -> List[int]:
+def diagonal_elements(mat: Matrix) -> Generator[Tuple[int, int], None, None]:
     """ Iterates over the last non-zero elements
 
     Args:

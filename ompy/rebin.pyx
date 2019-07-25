@@ -41,26 +41,29 @@ cimport cython
 DTYPE = np.float64
 
 
-cdef double calc_overlap(double Ein_l, double Ein_h,
-                         double Eout_l, double Eout_h):
-    """Calculate overlap between energy intervals
+cdef double overlap(double edge_in_l, double edge_in_u,
+                    double edge_out_l, double edge_out_u):
+    """ Calculate overlap between energy intervals
 
-    It is made for use in a rebin function, hence the names "in" and "out"
-    for the energy intervals.
-    It is implemented as a pure C function to be as fast as possible.
+       1
+    |_____|_____|_____| Binning A
+    |___|___|___|___|__ Binning B
+      2   3
+    Overlap of bins A1 and B2 is 3_
+    Overlap of bins A1 and B3 is 1.5_
 
     Args:
-        Ein_l (double): Lower edge of input interval
-        Ein_h (double): Upper edge of input interval
-        Eout_l (double): Lower edge of output interval
-        Eout_h (double): Upper edge of output interval
+        edge_in_l: Lower edge of input interval
+        edge_in_u: Upper edge of input interval
+        edge_out_l: Lower edge of output interval
+        edge_out_u: Upper edge of output interval
     Returns:
-        overlap
+        overlap of the two bins
     """
     cdef double overlap
     overlap = max(0,
-                  min(Eout_h, Ein_h)
-                  - max(Eout_l, Ein_l)
+                  min(edge_out_u, edge_in_u) -
+                  max(edge_out_l, edge_in_l)
                   )
     return overlap
 
@@ -68,19 +71,18 @@ cdef double calc_overlap(double Ein_l, double Ein_h,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin(double[:] counts_in, double[:] E_array_in,
-          double[:] E_array_out):
-    """Rebin an array of counts from binning E_array_in to binning E_array_out
+def rebin_1D(double[:] counts, double[:] edges_in, double[:] edges_out):
+    """Rebin an array of counts from binning edges_in to binning edges_out
 
     Args:
-        counts_in (np.ndarray): Array of counts to be rebinned
-        E_array_in (np.ndarray): Array of lower-bin-edge energies giving
-                                 the calibration of counts_in
-        E_array_out (np.ndarray): Array of lower-bin-edge energies of the
-                                  counts array after rebin
+        counts: Array of counts to be rebinned
+        edges_in: Array of lower-bin-edge energies giving
+             the calibration of counts_in
+        edges_out: Array of lower-bin-edge energies of the
+              counts array after rebin
     Returns:
-        counts_out (np.ndarray): Array of rebinned counts with calibration
-                                 given by E_array_out
+        counts_out: Array of rebinned counts with calibration
+             given by edges_out
     """
 
     cdef int Nin, Nout
@@ -88,16 +90,17 @@ def rebin(double[:] counts_in, double[:] E_array_in,
     cdef double a0_in, a1_in, a0_out, a1_out
 
     # Get calibration coefficients and number of elements from array:
-    Nin = E_array_in.shape[0]
-    a0_in, a1_in = E_array_in[0], E_array_in[1]-E_array_in[0]
-    Nout = E_array_out.shape[0]
-    a0_out, a1_out = E_array_out[0], E_array_out[1]-E_array_out[0]
+    Nin = edges_in.shape[0]
+    a0_in, a1_in = edges_in[0], edges_in[1]-edges_in[0]
+    Nout = edges_out.shape[0]
+    a0_out, a1_out = edges_out[0], edges_out[1]-edges_out[0]
 
     # Allocate rebinned array to fill:
     counts_out = np.zeros(Nout, dtype=DTYPE)
     cdef double[:] counts_out_view = counts_out
     cdef int i, j
     cdef double Eout_i, Ein_j
+    cdef double bins_overlap
     for i in range(Nout):
         # Only loop over the relevant subset of j indices where there may be
         # overlap:
@@ -108,9 +111,9 @@ def rebin(double[:] counts_in, double[:] E_array_in,
         for j in range(jmin, jmax+1):
             # Calculate proportionality factor based on current overlap:
             Ein_j = a0_in + a1_in*j
-            overlap = calc_overlap(Ein_j, Ein_j+a1_in,
+            bins_overlap = overlap(Ein_j, Ein_j+a1_in,
                                    Eout_i, Eout_i+a1_out)
-            counts_out_view[i] += counts_in[j] * overlap / a1_in
+            counts_out_view[i] += counts[j] * bins_overlap / a1_in
 
     return counts_out
 
@@ -118,9 +121,9 @@ def rebin(double[:] counts_in, double[:] E_array_in,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin_matrix(double[:, :] matrix, double[:] E_array_in,
-                 double[:] E_array_out, int axis=0):
-    """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+def rebin_2D(double[:, :] counts, double[:] edges_in,
+                 double[:] edges_out, int axis=0):
+    """Rebin a matrix of counts from binning edges_in to binning edges_out
 
     This is a currently just a wrapper for rebin() to handle the logistics
     of getting a matrix as input.
@@ -128,14 +131,14 @@ def rebin_matrix(double[:, :] matrix, double[:] E_array_in,
     the axis that is not being rebinned.
 
     Args:
-        matrix (np.ndarray): Matrix of counts to rebin
-        E_array_in (np.ndarray): Lower-bin-edge energy calibration of input
+        counts: Matrix of counts to rebin
+        edges_in: Lower-bin-edge energy calibration of input
                                  matrix along rebin axis
-        E_array_out (np.ndarray): Lower-bin-edge energy calibration of output
+        edges_out: Lower-bin-edge energy calibration of output
                                   matrix along rebin axis
-        axis (int): Axis to rebin
+        axis: Axis to rebin
     Returns:
-        mat_counts_out (np.ndarray): Matrix of rebinned counts
+        counts_out: Matrix of rebinned counts
 
 
 
@@ -143,7 +146,6 @@ def rebin_matrix(double[:, :] matrix, double[:] E_array_in,
 
     # Define variables for Cython:
     cdef int other_axis, N_loop, i
-    # cdef int[:] shape_out
 
     # Axis number of non-rebin axis (Z2 group, fancy!):
     if axis not in (0, 1):
@@ -152,26 +154,21 @@ def rebin_matrix(double[:, :] matrix, double[:] E_array_in,
     other_axis = (axis + 1) % 2
 
     # Number of bins along that axis:
-    N_loop = matrix.shape[other_axis]
+    N_loop = counts.shape[other_axis]
 
     # Calculate shape of rebinned matrix and allocate it:
-    shape_out = np.array([matrix.shape[0], matrix.shape[1]],
+    shape = np.array([counts.shape[0], counts.shape[1]],
                          dtype=int)
-    shape_out[axis] = len(E_array_out)
-    mat_counts_out = np.zeros(shape_out, dtype=DTYPE)
+    shape[axis] = len(edges_out)
+    counts_out = np.zeros(shape, dtype=DTYPE)
 
-    # For simplicity I use an if test to know axis ordering. Can probably
-    # be done smarter later:
-    # cdef double[:, :] mat_counts_out_view = mat_counts_out
     if axis == 0:
-        # TODO figure out how to best put arrays into mat_counts_out. 
+        # TODO figure out how to best put arrays into counts_out. 
         # Use memoryview or no?
+        # 
         for i in range(N_loop):
-            mat_counts_out[:, i] = rebin(matrix[:, i],
-                                         E_array_in, E_array_out)
+            counts_out[:, i] = rebin_1D(counts[:, i], edges_in, edges_out)
     else:
         for i in range(N_loop):
-            counts_out = rebin(matrix[i, :],
-                               E_array_in, E_array_out)
-            mat_counts_out[i, :] = counts_out
-    return mat_counts_out
+            counts_out[i, :] = rebin_1D(counts[i, :], edges_in, edges_out)
+    return counts_out
