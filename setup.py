@@ -9,7 +9,9 @@ import numpy
 setup(name='OMpy',
       version='0.2',
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
-      author_email="jorgenem@gmail.com, fabio.zeiser@fys.uio.no, erlenlim@fys.uio.no",
+      author_email=("jorgenem@gmail.com, "
+                    "fabio.zeiser@fys.uio.no, "
+                    "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
       py_modules=['ompy'],
       include_dirs=[numpy.get_include()],
@@ -20,6 +22,10 @@ setup(name='OMpy',
                              # "ompy/response.pyx",
                              "ompy/gauss_smoothing.pyx",
                             ],
-      # Use Python 3:
-      compiler_directives={'language_level': "3"})
+                            compiler_directives={'language_level': "3"}),
+      install_requires=[
+          'numpy',
+          'matplotlib',
+          'termtables'
+      ]
       )

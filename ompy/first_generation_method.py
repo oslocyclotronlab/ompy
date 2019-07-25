@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 from .matrix import Matrix, MatrixState
 from .library import *
-from .rebin import *
+from .rebin import rebin_2D
 
 
 def first_generation_method(matrix_in,
@@ -340,10 +340,10 @@ def first_generation_method(matrix_in,
         # H_compressed, Egamma_array_compressed = rebin(
             # H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], N_Exbins, rebin_axis=1)
         # Updated 20190130 to rebin_matrix() with energy calibratiON.
-        H_compressed = rebin_matrix(
+        H_compressed = rebin_2D(
             # H[:, 0:i_Egamma_max], Egamma_array[0:i_Egamma_max], Ex_array,
             H, Egamma_array, Ex_array,  # DEBUG 20190206 removed the subset selection. No difference on 164Dy, which is good.
-            rebin_axis=1)
+            axis=1)
 
         # DEBUG:
         # plt.pcolormesh(Ex_array, Ex_array, H_compressed)

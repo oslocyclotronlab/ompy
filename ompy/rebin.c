@@ -1719,7 +1719,7 @@ static PyObject *contiguous = 0;
 static PyObject *indirect_contiguous = 0;
 static int __pyx_memoryview_thread_locks_used;
 static PyThread_type_lock __pyx_memoryview_thread_locks[8];
-static double __pyx_f_4ompy_5rebin_calc_overlap(double, double, double, double); /*proto*/
+static double __pyx_f_4ompy_5rebin_overlap(double, double, double, double); /*proto*/
 static struct __pyx_array_obj *__pyx_array_new(PyObject *, Py_ssize_t, char *, char *, char *); /*proto*/
 static void *__pyx_align_pointer(void *, size_t); /*proto*/
 static PyObject *__pyx_memoryview_new(PyObject *, int, int, __Pyx_TypeInfo *); /*proto*/
@@ -1803,7 +1803,6 @@ static const char __pyx_k_error[] = "error";
 static const char __pyx_k_flags[] = "flags";
 static const char __pyx_k_numpy[] = "numpy";
 static const char __pyx_k_range[] = "range";
-static const char __pyx_k_rebin[] = "rebin";
 static const char __pyx_k_shape[] = "shape";
 static const char __pyx_k_start[] = "start";
 static const char __pyx_k_zeros[] = "zeros";
@@ -1811,10 +1810,10 @@ static const char __pyx_k_Eout_i[] = "Eout_i";
 static const char __pyx_k_N_loop[] = "N_loop";
 static const char __pyx_k_a0_out[] = "a0_out";
 static const char __pyx_k_a1_out[] = "a1_out";
+static const char __pyx_k_counts[] = "counts";
 static const char __pyx_k_encode[] = "encode";
 static const char __pyx_k_format[] = "format";
 static const char __pyx_k_import[] = "__import__";
-static const char __pyx_k_matrix[] = "matrix";
 static const char __pyx_k_name_2[] = "__name__";
 static const char __pyx_k_pickle[] = "pickle";
 static const char __pyx_k_reduce[] = "__reduce__";
@@ -1824,19 +1823,19 @@ static const char __pyx_k_update[] = "update";
 static const char __pyx_k_float64[] = "float64";
 static const char __pyx_k_fortran[] = "fortran";
 static const char __pyx_k_memview[] = "memview";
-static const char __pyx_k_overlap[] = "overlap";
 static const char __pyx_k_Ellipsis[] = "Ellipsis";
+static const char __pyx_k_edges_in[] = "edges_in";
 static const char __pyx_k_getstate[] = "__getstate__";
 static const char __pyx_k_itemsize[] = "itemsize";
 static const char __pyx_k_pyx_type[] = "__pyx_type";
+static const char __pyx_k_rebin_1D[] = "rebin_1D";
+static const char __pyx_k_rebin_2D[] = "rebin_2D";
 static const char __pyx_k_setstate[] = "__setstate__";
 static const char __pyx_k_TypeError[] = "TypeError";
-static const char __pyx_k_counts_in[] = "counts_in";
+static const char __pyx_k_edges_out[] = "edges_out";
 static const char __pyx_k_enumerate[] = "enumerate";
 static const char __pyx_k_pyx_state[] = "__pyx_state";
 static const char __pyx_k_reduce_ex[] = "__reduce_ex__";
-static const char __pyx_k_shape_out[] = "shape_out";
-static const char __pyx_k_E_array_in[] = "E_array_in";
 static const char __pyx_k_IndexError[] = "IndexError";
 static const char __pyx_k_ValueError[] = "ValueError";
 static const char __pyx_k_counts_out[] = "counts_out";
@@ -1844,15 +1843,13 @@ static const char __pyx_k_ompy_rebin[] = "ompy.rebin";
 static const char __pyx_k_other_axis[] = "other_axis";
 static const char __pyx_k_pyx_result[] = "__pyx_result";
 static const char __pyx_k_pyx_vtable[] = "__pyx_vtable__";
-static const char __pyx_k_E_array_out[] = "E_array_out";
 static const char __pyx_k_MemoryError[] = "MemoryError";
 static const char __pyx_k_PickleError[] = "PickleError";
+static const char __pyx_k_bins_overlap[] = "bins_overlap";
 static const char __pyx_k_pyx_checksum[] = "__pyx_checksum";
-static const char __pyx_k_rebin_matrix[] = "rebin_matrix";
 static const char __pyx_k_stringsource[] = "stringsource";
 static const char __pyx_k_pyx_getbuffer[] = "__pyx_getbuffer";
 static const char __pyx_k_reduce_cython[] = "__reduce_cython__";
-static const char __pyx_k_mat_counts_out[] = "mat_counts_out";
 static const char __pyx_k_ompy_rebin_pyx[] = "ompy/rebin.pyx";
 static const char __pyx_k_View_MemoryView[] = "View.MemoryView";
 static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
@@ -1896,8 +1893,6 @@ static PyObject *__pyx_kp_s_Cannot_assign_to_read_only_memor;
 static PyObject *__pyx_kp_s_Cannot_create_writable_memory_vi;
 static PyObject *__pyx_kp_s_Cannot_index_with_type_s;
 static PyObject *__pyx_n_s_DTYPE;
-static PyObject *__pyx_n_s_E_array_in;
-static PyObject *__pyx_n_s_E_array_out;
 static PyObject *__pyx_n_s_Ein_j;
 static PyObject *__pyx_n_s_Ellipsis;
 static PyObject *__pyx_kp_s_Empty_shape_tuple_for_cython_arr;
@@ -1928,18 +1923,21 @@ static PyObject *__pyx_n_s_allocate_buffer;
 static PyObject *__pyx_n_s_array;
 static PyObject *__pyx_n_s_axis;
 static PyObject *__pyx_n_s_base;
+static PyObject *__pyx_n_s_bins_overlap;
 static PyObject *__pyx_n_s_c;
 static PyObject *__pyx_n_u_c;
 static PyObject *__pyx_n_s_class;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_kp_s_contiguous_and_direct;
 static PyObject *__pyx_kp_s_contiguous_and_indirect;
-static PyObject *__pyx_n_s_counts_in;
+static PyObject *__pyx_n_s_counts;
 static PyObject *__pyx_n_s_counts_out;
 static PyObject *__pyx_n_s_counts_out_view;
 static PyObject *__pyx_n_s_dict;
 static PyObject *__pyx_n_s_dtype;
 static PyObject *__pyx_n_s_dtype_is_object;
+static PyObject *__pyx_n_s_edges_in;
+static PyObject *__pyx_n_s_edges_out;
 static PyObject *__pyx_n_s_encode;
 static PyObject *__pyx_n_s_enumerate;
 static PyObject *__pyx_n_s_error;
@@ -1959,8 +1957,6 @@ static PyObject *__pyx_n_s_j;
 static PyObject *__pyx_n_s_jmax;
 static PyObject *__pyx_n_s_jmin;
 static PyObject *__pyx_n_s_main;
-static PyObject *__pyx_n_s_mat_counts_out;
-static PyObject *__pyx_n_s_matrix;
 static PyObject *__pyx_n_s_memview;
 static PyObject *__pyx_n_s_mode;
 static PyObject *__pyx_n_s_name;
@@ -1974,7 +1970,6 @@ static PyObject *__pyx_n_s_obj;
 static PyObject *__pyx_n_s_ompy_rebin;
 static PyObject *__pyx_kp_s_ompy_rebin_pyx;
 static PyObject *__pyx_n_s_other_axis;
-static PyObject *__pyx_n_s_overlap;
 static PyObject *__pyx_n_s_pack;
 static PyObject *__pyx_n_s_pickle;
 static PyObject *__pyx_n_s_pyx_PickleError;
@@ -1986,15 +1981,14 @@ static PyObject *__pyx_n_s_pyx_type;
 static PyObject *__pyx_n_s_pyx_unpickle_Enum;
 static PyObject *__pyx_n_s_pyx_vtable;
 static PyObject *__pyx_n_s_range;
-static PyObject *__pyx_n_s_rebin;
-static PyObject *__pyx_n_s_rebin_matrix;
+static PyObject *__pyx_n_s_rebin_1D;
+static PyObject *__pyx_n_s_rebin_2D;
 static PyObject *__pyx_n_s_reduce;
 static PyObject *__pyx_n_s_reduce_cython;
 static PyObject *__pyx_n_s_reduce_ex;
 static PyObject *__pyx_n_s_setstate;
 static PyObject *__pyx_n_s_setstate_cython;
 static PyObject *__pyx_n_s_shape;
-static PyObject *__pyx_n_s_shape_out;
 static PyObject *__pyx_n_s_size;
 static PyObject *__pyx_n_s_start;
 static PyObject *__pyx_n_s_step;
@@ -2010,8 +2004,8 @@ static PyObject *__pyx_kp_s_unable_to_allocate_shape_and_str;
 static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_update;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts_in, __Pyx_memviewslice __pyx_v_E_array_in, __Pyx_memviewslice __pyx_v_E_array_out); /* proto */
-static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_matrix, __Pyx_memviewslice __pyx_v_E_array_in, __Pyx_memviewslice __pyx_v_E_array_out, int __pyx_v_axis); /* proto */
+static PyObject *__pyx_pf_4ompy_5rebin_rebin_1D(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts, __Pyx_memviewslice __pyx_v_edges_in, __Pyx_memviewslice __pyx_v_edges_out); /* proto */
+static PyObject *__pyx_pf_4ompy_5rebin_2rebin_2D(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts, __Pyx_memviewslice __pyx_v_edges_in, __Pyx_memviewslice __pyx_v_edges_out, int __pyx_v_axis); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array___cinit__(struct __pyx_array_obj *__pyx_v_self, PyObject *__pyx_v_shape, Py_ssize_t __pyx_v_itemsize, PyObject *__pyx_v_format, PyObject *__pyx_v_mode, int __pyx_v_allocate_buffer); /* proto */
 static int __pyx_array___pyx_pf_15View_dot_MemoryView_5array_2__getbuffer__(struct __pyx_array_obj *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_array___pyx_pf_15View_dot_MemoryView_5array_4__dealloc__(struct __pyx_array_obj *__pyx_v_self); /* proto */
@@ -2096,12 +2090,12 @@ static PyObject *__pyx_codeobj__29;
 /* "ompy/rebin.pyx":44
  * 
  * 
- * cdef double calc_overlap(double Ein_l, double Ein_h,             # <<<<<<<<<<<<<<
- *                          double Eout_l, double Eout_h):
- *     """Calculate overlap between energy intervals
+ * cdef double overlap(double edge_in_l, double edge_in_u,             # <<<<<<<<<<<<<<
+ *                     double edge_out_l, double edge_out_u):
+ *     """ Calculate overlap between energy intervals
  */
 
-static double __pyx_f_4ompy_5rebin_calc_overlap(double __pyx_v_Ein_l, double __pyx_v_Ein_h, double __pyx_v_Eout_l, double __pyx_v_Eout_h) {
+static double __pyx_f_4ompy_5rebin_overlap(double __pyx_v_edge_in_l, double __pyx_v_edge_in_u, double __pyx_v_edge_out_l, double __pyx_v_edge_out_u) {
   double __pyx_v_overlap;
   double __pyx_r;
   __Pyx_RefNannyDeclarations
@@ -2110,37 +2104,45 @@ static double __pyx_f_4ompy_5rebin_calc_overlap(double __pyx_v_Ein_l, double __p
   double __pyx_t_3;
   double __pyx_t_4;
   long __pyx_t_5;
-  __Pyx_RefNannySetupContext("calc_overlap", 0);
+  __Pyx_RefNannySetupContext("overlap", 0);
 
-  /* "ompy/rebin.pyx":62
+  /* "ompy/rebin.pyx":65
  *     cdef double overlap
  *     overlap = max(0,
- *                   min(Eout_h, Ein_h)             # <<<<<<<<<<<<<<
- *                   - max(Eout_l, Ein_l)
+ *                   min(edge_out_u, edge_in_u) -             # <<<<<<<<<<<<<<
+ *                   max(edge_out_l, edge_in_l)
  *                   )
  */
-  __pyx_t_1 = __pyx_v_Ein_h;
-  __pyx_t_2 = __pyx_v_Eout_h;
+  __pyx_t_1 = __pyx_v_edge_in_u;
+  __pyx_t_2 = __pyx_v_edge_out_u;
   if (((__pyx_t_1 < __pyx_t_2) != 0)) {
     __pyx_t_3 = __pyx_t_1;
   } else {
     __pyx_t_3 = __pyx_t_2;
   }
 
-  /* "ompy/rebin.pyx":63
+  /* "ompy/rebin.pyx":66
  *     overlap = max(0,
- *                   min(Eout_h, Ein_h)
- *                   - max(Eout_l, Ein_l)             # <<<<<<<<<<<<<<
+ *                   min(edge_out_u, edge_in_u) -
+ *                   max(edge_out_l, edge_in_l)             # <<<<<<<<<<<<<<
  *                   )
  *     return overlap
  */
-  __pyx_t_1 = __pyx_v_Ein_l;
-  __pyx_t_2 = __pyx_v_Eout_l;
+  __pyx_t_1 = __pyx_v_edge_in_l;
+  __pyx_t_2 = __pyx_v_edge_out_l;
   if (((__pyx_t_1 > __pyx_t_2) != 0)) {
     __pyx_t_4 = __pyx_t_1;
   } else {
     __pyx_t_4 = __pyx_t_2;
   }
+
+  /* "ompy/rebin.pyx":65
+ *     cdef double overlap
+ *     overlap = max(0,
+ *                   min(edge_out_u, edge_in_u) -             # <<<<<<<<<<<<<<
+ *                   max(edge_out_l, edge_in_l)
+ *                   )
+ */
   __pyx_t_1 = (__pyx_t_3 - __pyx_t_4);
   __pyx_t_5 = 0;
   if (((__pyx_t_1 > __pyx_t_5) != 0)) {
@@ -2150,8 +2152,8 @@ static double __pyx_f_4ompy_5rebin_calc_overlap(double __pyx_v_Ein_l, double __p
   }
   __pyx_v_overlap = __pyx_t_4;
 
-  /* "ompy/rebin.pyx":65
- *                   - max(Eout_l, Ein_l)
+  /* "ompy/rebin.pyx":68
+ *                   max(edge_out_l, edge_in_l)
  *                   )
  *     return overlap             # <<<<<<<<<<<<<<
  * 
@@ -2163,9 +2165,9 @@ static double __pyx_f_4ompy_5rebin_calc_overlap(double __pyx_v_Ein_l, double __p
   /* "ompy/rebin.pyx":44
  * 
  * 
- * cdef double calc_overlap(double Ein_l, double Ein_h,             # <<<<<<<<<<<<<<
- *                          double Eout_l, double Eout_h):
- *     """Calculate overlap between energy intervals
+ * cdef double overlap(double edge_in_l, double edge_in_u,             # <<<<<<<<<<<<<<
+ *                     double edge_out_l, double edge_out_u):
+ *     """ Calculate overlap between energy intervals
  */
 
   /* function exit code */
@@ -2174,27 +2176,27 @@ static double __pyx_f_4ompy_5rebin_calc_overlap(double __pyx_v_Ein_l, double __p
   return __pyx_r;
 }
 
-/* "ompy/rebin.pyx":71
+/* "ompy/rebin.pyx":74
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin(double[:] counts_in, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *           double[:] E_array_out):
- *     """Rebin an array of counts from binning E_array_in to binning E_array_out
+ * def rebin_1D(double[:] counts, double[:] edges_in, double[:] edges_out):             # <<<<<<<<<<<<<<
+ *     """Rebin an array of counts from binning edges_in to binning edges_out
+ * 
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_4ompy_5rebin_1rebin(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_5rebin_rebin[] = "Rebin an array of counts from binning E_array_in to binning E_array_out\n\n    Args:\n        counts_in (np.ndarray): Array of counts to be rebinned\n        E_array_in (np.ndarray): Array of lower-bin-edge energies giving\n                                 the calibration of counts_in\n        E_array_out (np.ndarray): Array of lower-bin-edge energies of the\n                                  counts array after rebin\n    Returns:\n        counts_out (np.ndarray): Array of rebinned counts with calibration\n                                 given by E_array_out\n    ";
-static PyMethodDef __pyx_mdef_4ompy_5rebin_1rebin = {"rebin", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_5rebin_1rebin, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_5rebin_rebin};
-static PyObject *__pyx_pw_4ompy_5rebin_1rebin(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
-  __Pyx_memviewslice __pyx_v_counts_in = { 0, 0, { 0 }, { 0 }, { 0 } };
-  __Pyx_memviewslice __pyx_v_E_array_in = { 0, 0, { 0 }, { 0 }, { 0 } };
-  __Pyx_memviewslice __pyx_v_E_array_out = { 0, 0, { 0 }, { 0 }, { 0 } };
+static PyObject *__pyx_pw_4ompy_5rebin_1rebin_1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_5rebin_rebin_1D[] = "Rebin an array of counts from binning edges_in to binning edges_out\n\n    Args:\n        counts: Array of counts to be rebinned\n        edges_in: Array of lower-bin-edge energies giving\n             the calibration of counts_in\n        edges_out: Array of lower-bin-edge energies of the\n              counts array after rebin\n    Returns:\n        counts_out: Array of rebinned counts with calibration\n             given by edges_out\n    ";
+static PyMethodDef __pyx_mdef_4ompy_5rebin_1rebin_1D = {"rebin_1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_5rebin_1rebin_1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_5rebin_rebin_1D};
+static PyObject *__pyx_pw_4ompy_5rebin_1rebin_1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  __Pyx_memviewslice __pyx_v_counts = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_edges_in = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_edges_out = { 0, 0, { 0 }, { 0 }, { 0 } };
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("rebin (wrapper)", 0);
+  __Pyx_RefNannySetupContext("rebin_1D (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_counts_in,&__pyx_n_s_E_array_in,&__pyx_n_s_E_array_out,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_counts,&__pyx_n_s_edges_in,&__pyx_n_s_edges_out,0};
     PyObject* values[3] = {0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
@@ -2212,23 +2214,23 @@ static PyObject *__pyx_pw_4ompy_5rebin_1rebin(PyObject *__pyx_self, PyObject *__
       kw_args = PyDict_Size(__pyx_kwds);
       switch (pos_args) {
         case  0:
-        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_counts_in)) != 0)) kw_args--;
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_counts)) != 0)) kw_args--;
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
-        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array_in)) != 0)) kw_args--;
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_edges_in)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rebin", 1, 3, 3, 1); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("rebin_1D", 1, 3, 3, 1); __PYX_ERR(0, 74, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
-        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array_out)) != 0)) kw_args--;
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_edges_out)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rebin", 1, 3, 3, 2); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("rebin_1D", 1, 3, 3, 2); __PYX_ERR(0, 74, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rebin") < 0)) __PYX_ERR(0, 71, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rebin_1D") < 0)) __PYX_ERR(0, 74, __pyx_L3_error)
       }
     } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
       goto __pyx_L5_argtuple_error;
@@ -2237,26 +2239,26 @@ static PyObject *__pyx_pw_4ompy_5rebin_1rebin(PyObject *__pyx_self, PyObject *__
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
     }
-    __pyx_v_counts_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_counts_in.memview)) __PYX_ERR(0, 71, __pyx_L3_error)
-    __pyx_v_E_array_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_E_array_in.memview)) __PYX_ERR(0, 71, __pyx_L3_error)
-    __pyx_v_E_array_out = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_E_array_out.memview)) __PYX_ERR(0, 72, __pyx_L3_error)
+    __pyx_v_counts = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_counts.memview)) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_edges_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_edges_in.memview)) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_edges_out = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_edges_out.memview)) __PYX_ERR(0, 74, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("rebin", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 71, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("rebin_1D", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 74, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ompy.rebin.rebin", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rebin.rebin_1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_5rebin_rebin(__pyx_self, __pyx_v_counts_in, __pyx_v_E_array_in, __pyx_v_E_array_out);
+  __pyx_r = __pyx_pf_4ompy_5rebin_rebin_1D(__pyx_self, __pyx_v_counts, __pyx_v_edges_in, __pyx_v_edges_out);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts_in, __Pyx_memviewslice __pyx_v_E_array_in, __Pyx_memviewslice __pyx_v_E_array_out) {
+static PyObject *__pyx_pf_4ompy_5rebin_rebin_1D(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts, __Pyx_memviewslice __pyx_v_edges_in, __Pyx_memviewslice __pyx_v_edges_out) {
   int __pyx_v_Nin;
   int __pyx_v_Nout;
   int __pyx_v_jmin;
@@ -2271,7 +2273,7 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   int __pyx_v_j;
   double __pyx_v_Eout_i;
   double __pyx_v_Ein_j;
-  double __pyx_v_overlap;
+  double __pyx_v_bins_overlap;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
   Py_ssize_t __pyx_t_1;
@@ -2296,82 +2298,82 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   long __pyx_t_20;
   Py_ssize_t __pyx_t_21;
   Py_ssize_t __pyx_t_22;
-  __Pyx_RefNannySetupContext("rebin", 0);
+  __Pyx_RefNannySetupContext("rebin_1D", 0);
 
-  /* "ompy/rebin.pyx":91
+  /* "ompy/rebin.pyx":93
  * 
  *     # Get calibration coefficients and number of elements from array:
- *     Nin = E_array_in.shape[0]             # <<<<<<<<<<<<<<
- *     a0_in, a1_in = E_array_in[0], E_array_in[1]-E_array_in[0]
- *     Nout = E_array_out.shape[0]
+ *     Nin = edges_in.shape[0]             # <<<<<<<<<<<<<<
+ *     a0_in, a1_in = edges_in[0], edges_in[1]-edges_in[0]
+ *     Nout = edges_out.shape[0]
  */
-  __pyx_v_Nin = (__pyx_v_E_array_in.shape[0]);
+  __pyx_v_Nin = (__pyx_v_edges_in.shape[0]);
 
-  /* "ompy/rebin.pyx":92
+  /* "ompy/rebin.pyx":94
  *     # Get calibration coefficients and number of elements from array:
- *     Nin = E_array_in.shape[0]
- *     a0_in, a1_in = E_array_in[0], E_array_in[1]-E_array_in[0]             # <<<<<<<<<<<<<<
- *     Nout = E_array_out.shape[0]
- *     a0_out, a1_out = E_array_out[0], E_array_out[1]-E_array_out[0]
+ *     Nin = edges_in.shape[0]
+ *     a0_in, a1_in = edges_in[0], edges_in[1]-edges_in[0]             # <<<<<<<<<<<<<<
+ *     Nout = edges_out.shape[0]
+ *     a0_out, a1_out = edges_out[0], edges_out[1]-edges_out[0]
  */
   __pyx_t_1 = 0;
-  __pyx_t_2 = (*((double *) ( /* dim=0 */ (__pyx_v_E_array_in.data + __pyx_t_1 * __pyx_v_E_array_in.strides[0]) )));
+  __pyx_t_2 = (*((double *) ( /* dim=0 */ (__pyx_v_edges_in.data + __pyx_t_1 * __pyx_v_edges_in.strides[0]) )));
   __pyx_t_3 = 1;
   __pyx_t_4 = 0;
-  __pyx_t_5 = ((*((double *) ( /* dim=0 */ (__pyx_v_E_array_in.data + __pyx_t_3 * __pyx_v_E_array_in.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_E_array_in.data + __pyx_t_4 * __pyx_v_E_array_in.strides[0]) ))));
+  __pyx_t_5 = ((*((double *) ( /* dim=0 */ (__pyx_v_edges_in.data + __pyx_t_3 * __pyx_v_edges_in.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_edges_in.data + __pyx_t_4 * __pyx_v_edges_in.strides[0]) ))));
   __pyx_v_a0_in = __pyx_t_2;
   __pyx_v_a1_in = __pyx_t_5;
 
-  /* "ompy/rebin.pyx":93
- *     Nin = E_array_in.shape[0]
- *     a0_in, a1_in = E_array_in[0], E_array_in[1]-E_array_in[0]
- *     Nout = E_array_out.shape[0]             # <<<<<<<<<<<<<<
- *     a0_out, a1_out = E_array_out[0], E_array_out[1]-E_array_out[0]
+  /* "ompy/rebin.pyx":95
+ *     Nin = edges_in.shape[0]
+ *     a0_in, a1_in = edges_in[0], edges_in[1]-edges_in[0]
+ *     Nout = edges_out.shape[0]             # <<<<<<<<<<<<<<
+ *     a0_out, a1_out = edges_out[0], edges_out[1]-edges_out[0]
  * 
  */
-  __pyx_v_Nout = (__pyx_v_E_array_out.shape[0]);
+  __pyx_v_Nout = (__pyx_v_edges_out.shape[0]);
 
-  /* "ompy/rebin.pyx":94
- *     a0_in, a1_in = E_array_in[0], E_array_in[1]-E_array_in[0]
- *     Nout = E_array_out.shape[0]
- *     a0_out, a1_out = E_array_out[0], E_array_out[1]-E_array_out[0]             # <<<<<<<<<<<<<<
+  /* "ompy/rebin.pyx":96
+ *     a0_in, a1_in = edges_in[0], edges_in[1]-edges_in[0]
+ *     Nout = edges_out.shape[0]
+ *     a0_out, a1_out = edges_out[0], edges_out[1]-edges_out[0]             # <<<<<<<<<<<<<<
  * 
  *     # Allocate rebinned array to fill:
  */
   __pyx_t_6 = 0;
-  __pyx_t_5 = (*((double *) ( /* dim=0 */ (__pyx_v_E_array_out.data + __pyx_t_6 * __pyx_v_E_array_out.strides[0]) )));
+  __pyx_t_5 = (*((double *) ( /* dim=0 */ (__pyx_v_edges_out.data + __pyx_t_6 * __pyx_v_edges_out.strides[0]) )));
   __pyx_t_7 = 1;
   __pyx_t_8 = 0;
-  __pyx_t_2 = ((*((double *) ( /* dim=0 */ (__pyx_v_E_array_out.data + __pyx_t_7 * __pyx_v_E_array_out.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_E_array_out.data + __pyx_t_8 * __pyx_v_E_array_out.strides[0]) ))));
+  __pyx_t_2 = ((*((double *) ( /* dim=0 */ (__pyx_v_edges_out.data + __pyx_t_7 * __pyx_v_edges_out.strides[0]) ))) - (*((double *) ( /* dim=0 */ (__pyx_v_edges_out.data + __pyx_t_8 * __pyx_v_edges_out.strides[0]) ))));
   __pyx_v_a0_out = __pyx_t_5;
   __pyx_v_a1_out = __pyx_t_2;
 
-  /* "ompy/rebin.pyx":97
+  /* "ompy/rebin.pyx":99
  * 
  *     # Allocate rebinned array to fill:
  *     counts_out = np.zeros(Nout, dtype=DTYPE)             # <<<<<<<<<<<<<<
  *     cdef double[:] counts_out_view = counts_out
  *     cdef int i, j
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_9, __pyx_n_s_np); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_9, __pyx_n_s_np); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
-  __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_t_9, __pyx_n_s_zeros); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __pyx_t_10 = __Pyx_PyObject_GetAttrStr(__pyx_t_9, __pyx_n_s_zeros); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_10);
   __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-  __pyx_t_9 = __Pyx_PyInt_From_int(__pyx_v_Nout); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyInt_From_int(__pyx_v_Nout); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
-  __pyx_t_11 = PyTuple_New(1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __pyx_t_11 = PyTuple_New(1); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_11);
   __Pyx_GIVEREF(__pyx_t_9);
   PyTuple_SET_ITEM(__pyx_t_11, 0, __pyx_t_9);
   __pyx_t_9 = 0;
-  __pyx_t_9 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __pyx_t_9 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_9);
-  __Pyx_GetModuleGlobalName(__pyx_t_12, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_12, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_12);
-  if (PyDict_SetItem(__pyx_t_9, __pyx_n_s_dtype, __pyx_t_12) < 0) __PYX_ERR(0, 97, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_9, __pyx_n_s_dtype, __pyx_t_12) < 0) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
-  __pyx_t_12 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_11, __pyx_t_9); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 97, __pyx_L1_error)
+  __pyx_t_12 = __Pyx_PyObject_Call(__pyx_t_10, __pyx_t_11, __pyx_t_9); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 99, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_12);
   __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
   __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
@@ -2379,21 +2381,21 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_v_counts_out = __pyx_t_12;
   __pyx_t_12 = 0;
 
-  /* "ompy/rebin.pyx":98
+  /* "ompy/rebin.pyx":100
  *     # Allocate rebinned array to fill:
  *     counts_out = np.zeros(Nout, dtype=DTYPE)
  *     cdef double[:] counts_out_view = counts_out             # <<<<<<<<<<<<<<
  *     cdef int i, j
  *     cdef double Eout_i, Ein_j
  */
-  __pyx_t_13 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_counts_out, PyBUF_WRITABLE); if (unlikely(!__pyx_t_13.memview)) __PYX_ERR(0, 98, __pyx_L1_error)
+  __pyx_t_13 = __Pyx_PyObject_to_MemoryviewSlice_ds_double(__pyx_v_counts_out, PyBUF_WRITABLE); if (unlikely(!__pyx_t_13.memview)) __PYX_ERR(0, 100, __pyx_L1_error)
   __pyx_v_counts_out_view = __pyx_t_13;
   __pyx_t_13.memview = NULL;
   __pyx_t_13.data = NULL;
 
-  /* "ompy/rebin.pyx":101
- *     cdef int i, j
+  /* "ompy/rebin.pyx":104
  *     cdef double Eout_i, Ein_j
+ *     cdef double bins_overlap
  *     for i in range(Nout):             # <<<<<<<<<<<<<<
  *         # Only loop over the relevant subset of j indices where there may be
  *         # overlap:
@@ -2403,67 +2405,67 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   for (__pyx_t_16 = 0; __pyx_t_16 < __pyx_t_15; __pyx_t_16+=1) {
     __pyx_v_i = __pyx_t_16;
 
-    /* "ompy/rebin.pyx":104
+    /* "ompy/rebin.pyx":107
  *         # Only loop over the relevant subset of j indices where there may be
  *         # overlap:
  *         jmin = max(0, int((a0_out + a1_out*(i-1) - a0_in)/a1_in))             # <<<<<<<<<<<<<<
  *         jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
  *         # Calculate the bin edge energies manually for speed:
  */
-    __pyx_t_12 = __Pyx_PyInt_FromDouble((((__pyx_v_a0_out + (__pyx_v_a1_out * (__pyx_v_i - 1))) - __pyx_v_a0_in) / __pyx_v_a1_in)); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 104, __pyx_L1_error)
+    __pyx_t_12 = __Pyx_PyInt_FromDouble((((__pyx_v_a0_out + (__pyx_v_a1_out * (__pyx_v_i - 1))) - __pyx_v_a0_in) / __pyx_v_a1_in)); if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 107, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_12);
     __pyx_t_17 = 0;
-    __pyx_t_11 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 104, __pyx_L1_error)
+    __pyx_t_11 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 107, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_11);
-    __pyx_t_10 = PyObject_RichCompare(__pyx_t_12, __pyx_t_11, Py_GT); __Pyx_XGOTREF(__pyx_t_10); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 104, __pyx_L1_error)
+    __pyx_t_10 = PyObject_RichCompare(__pyx_t_12, __pyx_t_11, Py_GT); __Pyx_XGOTREF(__pyx_t_10); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 107, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
-    __pyx_t_18 = __Pyx_PyObject_IsTrue(__pyx_t_10); if (unlikely(__pyx_t_18 < 0)) __PYX_ERR(0, 104, __pyx_L1_error)
+    __pyx_t_18 = __Pyx_PyObject_IsTrue(__pyx_t_10); if (unlikely(__pyx_t_18 < 0)) __PYX_ERR(0, 107, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
     if (__pyx_t_18) {
       __Pyx_INCREF(__pyx_t_12);
       __pyx_t_9 = __pyx_t_12;
     } else {
-      __pyx_t_10 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 104, __pyx_L1_error)
+      __pyx_t_10 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 107, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_10);
       __pyx_t_9 = __pyx_t_10;
       __pyx_t_10 = 0;
     }
     __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
-    __pyx_t_19 = __Pyx_PyInt_As_int(__pyx_t_9); if (unlikely((__pyx_t_19 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 104, __pyx_L1_error)
+    __pyx_t_19 = __Pyx_PyInt_As_int(__pyx_t_9); if (unlikely((__pyx_t_19 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 107, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
     __pyx_v_jmin = __pyx_t_19;
 
-    /* "ompy/rebin.pyx":105
+    /* "ompy/rebin.pyx":108
  *         # overlap:
  *         jmin = max(0, int((a0_out + a1_out*(i-1) - a0_in)/a1_in))
  *         jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))             # <<<<<<<<<<<<<<
  *         # Calculate the bin edge energies manually for speed:
  *         Eout_i = a0_out + a1_out*i
  */
-    __pyx_t_9 = __Pyx_PyInt_FromDouble((((__pyx_v_a0_out + (__pyx_v_a1_out * (__pyx_v_i + 1))) - __pyx_v_a0_in) / __pyx_v_a1_in)); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 105, __pyx_L1_error)
+    __pyx_t_9 = __Pyx_PyInt_FromDouble((((__pyx_v_a0_out + (__pyx_v_a1_out * (__pyx_v_i + 1))) - __pyx_v_a0_in) / __pyx_v_a1_in)); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 108, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_9);
     __pyx_t_17 = (__pyx_v_Nin - 1);
-    __pyx_t_10 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 105, __pyx_L1_error)
+    __pyx_t_10 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_10)) __PYX_ERR(0, 108, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_10);
-    __pyx_t_11 = PyObject_RichCompare(__pyx_t_9, __pyx_t_10, Py_LT); __Pyx_XGOTREF(__pyx_t_11); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 105, __pyx_L1_error)
+    __pyx_t_11 = PyObject_RichCompare(__pyx_t_9, __pyx_t_10, Py_LT); __Pyx_XGOTREF(__pyx_t_11); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 108, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_10); __pyx_t_10 = 0;
-    __pyx_t_18 = __Pyx_PyObject_IsTrue(__pyx_t_11); if (unlikely(__pyx_t_18 < 0)) __PYX_ERR(0, 105, __pyx_L1_error)
+    __pyx_t_18 = __Pyx_PyObject_IsTrue(__pyx_t_11); if (unlikely(__pyx_t_18 < 0)) __PYX_ERR(0, 108, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_11); __pyx_t_11 = 0;
     if (__pyx_t_18) {
       __Pyx_INCREF(__pyx_t_9);
       __pyx_t_12 = __pyx_t_9;
     } else {
-      __pyx_t_11 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 105, __pyx_L1_error)
+      __pyx_t_11 = __Pyx_PyInt_From_long(__pyx_t_17); if (unlikely(!__pyx_t_11)) __PYX_ERR(0, 108, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_11);
       __pyx_t_12 = __pyx_t_11;
       __pyx_t_11 = 0;
     }
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    __pyx_t_19 = __Pyx_PyInt_As_int(__pyx_t_12); if (unlikely((__pyx_t_19 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 105, __pyx_L1_error)
+    __pyx_t_19 = __Pyx_PyInt_As_int(__pyx_t_12); if (unlikely((__pyx_t_19 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 108, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_12); __pyx_t_12 = 0;
     __pyx_v_jmax = __pyx_t_19;
 
-    /* "ompy/rebin.pyx":107
+    /* "ompy/rebin.pyx":110
  *         jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
  *         # Calculate the bin edge energies manually for speed:
  *         Eout_i = a0_out + a1_out*i             # <<<<<<<<<<<<<<
@@ -2472,7 +2474,7 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
  */
     __pyx_v_Eout_i = (__pyx_v_a0_out + (__pyx_v_a1_out * __pyx_v_i));
 
-    /* "ompy/rebin.pyx":108
+    /* "ompy/rebin.pyx":111
  *         # Calculate the bin edge energies manually for speed:
  *         Eout_i = a0_out + a1_out*i
  *         for j in range(jmin, jmax+1):             # <<<<<<<<<<<<<<
@@ -2484,39 +2486,39 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
     for (__pyx_t_19 = __pyx_v_jmin; __pyx_t_19 < __pyx_t_20; __pyx_t_19+=1) {
       __pyx_v_j = __pyx_t_19;
 
-      /* "ompy/rebin.pyx":110
+      /* "ompy/rebin.pyx":113
  *         for j in range(jmin, jmax+1):
  *             # Calculate proportionality factor based on current overlap:
  *             Ein_j = a0_in + a1_in*j             # <<<<<<<<<<<<<<
- *             overlap = calc_overlap(Ein_j, Ein_j+a1_in,
+ *             bins_overlap = overlap(Ein_j, Ein_j+a1_in,
  *                                    Eout_i, Eout_i+a1_out)
  */
       __pyx_v_Ein_j = (__pyx_v_a0_in + (__pyx_v_a1_in * __pyx_v_j));
 
-      /* "ompy/rebin.pyx":111
+      /* "ompy/rebin.pyx":114
  *             # Calculate proportionality factor based on current overlap:
  *             Ein_j = a0_in + a1_in*j
- *             overlap = calc_overlap(Ein_j, Ein_j+a1_in,             # <<<<<<<<<<<<<<
+ *             bins_overlap = overlap(Ein_j, Ein_j+a1_in,             # <<<<<<<<<<<<<<
  *                                    Eout_i, Eout_i+a1_out)
- *             counts_out_view[i] += counts_in[j] * overlap / a1_in
+ *             counts_out_view[i] += counts[j] * bins_overlap / a1_in
  */
-      __pyx_v_overlap = __pyx_f_4ompy_5rebin_calc_overlap(__pyx_v_Ein_j, (__pyx_v_Ein_j + __pyx_v_a1_in), __pyx_v_Eout_i, (__pyx_v_Eout_i + __pyx_v_a1_out));
+      __pyx_v_bins_overlap = __pyx_f_4ompy_5rebin_overlap(__pyx_v_Ein_j, (__pyx_v_Ein_j + __pyx_v_a1_in), __pyx_v_Eout_i, (__pyx_v_Eout_i + __pyx_v_a1_out));
 
-      /* "ompy/rebin.pyx":113
- *             overlap = calc_overlap(Ein_j, Ein_j+a1_in,
+      /* "ompy/rebin.pyx":116
+ *             bins_overlap = overlap(Ein_j, Ein_j+a1_in,
  *                                    Eout_i, Eout_i+a1_out)
- *             counts_out_view[i] += counts_in[j] * overlap / a1_in             # <<<<<<<<<<<<<<
+ *             counts_out_view[i] += counts[j] * bins_overlap / a1_in             # <<<<<<<<<<<<<<
  * 
  *     return counts_out
  */
       __pyx_t_21 = __pyx_v_j;
       __pyx_t_22 = __pyx_v_i;
-      *((double *) ( /* dim=0 */ (__pyx_v_counts_out_view.data + __pyx_t_22 * __pyx_v_counts_out_view.strides[0]) )) += (((*((double *) ( /* dim=0 */ (__pyx_v_counts_in.data + __pyx_t_21 * __pyx_v_counts_in.strides[0]) ))) * __pyx_v_overlap) / __pyx_v_a1_in);
+      *((double *) ( /* dim=0 */ (__pyx_v_counts_out_view.data + __pyx_t_22 * __pyx_v_counts_out_view.strides[0]) )) += (((*((double *) ( /* dim=0 */ (__pyx_v_counts.data + __pyx_t_21 * __pyx_v_counts.strides[0]) ))) * __pyx_v_bins_overlap) / __pyx_v_a1_in);
     }
   }
 
-  /* "ompy/rebin.pyx":115
- *             counts_out_view[i] += counts_in[j] * overlap / a1_in
+  /* "ompy/rebin.pyx":118
+ *             counts_out_view[i] += counts[j] * bins_overlap / a1_in
  * 
  *     return counts_out             # <<<<<<<<<<<<<<
  * 
@@ -2527,12 +2529,12 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_r = __pyx_v_counts_out;
   goto __pyx_L0;
 
-  /* "ompy/rebin.pyx":71
+  /* "ompy/rebin.pyx":74
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin(double[:] counts_in, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *           double[:] E_array_out):
- *     """Rebin an array of counts from binning E_array_in to binning E_array_out
+ * def rebin_1D(double[:] counts, double[:] edges_in, double[:] edges_out):             # <<<<<<<<<<<<<<
+ *     """Rebin an array of counts from binning edges_in to binning edges_out
+ * 
  */
 
   /* function exit code */
@@ -2542,41 +2544,41 @@ static PyObject *__pyx_pf_4ompy_5rebin_rebin(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_XDECREF(__pyx_t_11);
   __Pyx_XDECREF(__pyx_t_12);
   __PYX_XDEC_MEMVIEW(&__pyx_t_13, 1);
-  __Pyx_AddTraceback("ompy.rebin.rebin", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rebin.rebin_1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_counts_out);
   __PYX_XDEC_MEMVIEW(&__pyx_v_counts_out_view, 1);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_counts_in, 1);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_E_array_in, 1);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_E_array_out, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_counts, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_edges_in, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_edges_out, 1);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-/* "ompy/rebin.pyx":121
+/* "ompy/rebin.pyx":124
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin_matrix(double[:, :] matrix, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *                  double[:] E_array_out, int axis=0):
- *     """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+ * def rebin_2D(double[:, :] counts, double[:] edges_in,             # <<<<<<<<<<<<<<
+ *                  double[:] edges_out, int axis=0):
+ *     """Rebin a matrix of counts from binning edges_in to binning edges_out
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_4ompy_5rebin_3rebin_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_5rebin_2rebin_matrix[] = "Rebin a matrix of counts from binning E_array_in to binning E_array_out\n\n    This is a currently just a wrapper for rebin() to handle the logistics\n    of getting a matrix as input.\n    Todo: It is unnecessary to calculate the overlap for each bin along\n    the axis that is not being rebinned.\n\n    Args:\n        matrix (np.ndarray): Matrix of counts to rebin\n        E_array_in (np.ndarray): Lower-bin-edge energy calibration of input\n                                 matrix along rebin axis\n        E_array_out (np.ndarray): Lower-bin-edge energy calibration of output\n                                  matrix along rebin axis\n        axis (int): Axis to rebin\n    Returns:\n        mat_counts_out (np.ndarray): Matrix of rebinned counts\n\n\n\n    ";
-static PyMethodDef __pyx_mdef_4ompy_5rebin_3rebin_matrix = {"rebin_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_5rebin_3rebin_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_5rebin_2rebin_matrix};
-static PyObject *__pyx_pw_4ompy_5rebin_3rebin_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
-  __Pyx_memviewslice __pyx_v_matrix = { 0, 0, { 0 }, { 0 }, { 0 } };
-  __Pyx_memviewslice __pyx_v_E_array_in = { 0, 0, { 0 }, { 0 }, { 0 } };
-  __Pyx_memviewslice __pyx_v_E_array_out = { 0, 0, { 0 }, { 0 }, { 0 } };
+static PyObject *__pyx_pw_4ompy_5rebin_3rebin_2D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_5rebin_2rebin_2D[] = "Rebin a matrix of counts from binning edges_in to binning edges_out\n\n    This is a currently just a wrapper for rebin() to handle the logistics\n    of getting a matrix as input.\n    Todo: It is unnecessary to calculate the overlap for each bin along\n    the axis that is not being rebinned.\n\n    Args:\n        counts: Matrix of counts to rebin\n        edges_in: Lower-bin-edge energy calibration of input\n                                 matrix along rebin axis\n        edges_out: Lower-bin-edge energy calibration of output\n                                  matrix along rebin axis\n        axis: Axis to rebin\n    Returns:\n        counts_out: Matrix of rebinned counts\n\n\n\n    ";
+static PyMethodDef __pyx_mdef_4ompy_5rebin_3rebin_2D = {"rebin_2D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_5rebin_3rebin_2D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_5rebin_2rebin_2D};
+static PyObject *__pyx_pw_4ompy_5rebin_3rebin_2D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+  __Pyx_memviewslice __pyx_v_counts = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_edges_in = { 0, 0, { 0 }, { 0 }, { 0 } };
+  __Pyx_memviewslice __pyx_v_edges_out = { 0, 0, { 0 }, { 0 }, { 0 } };
   int __pyx_v_axis;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("rebin_matrix (wrapper)", 0);
+  __Pyx_RefNannySetupContext("rebin_2D (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_matrix,&__pyx_n_s_E_array_in,&__pyx_n_s_E_array_out,&__pyx_n_s_axis,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_counts,&__pyx_n_s_edges_in,&__pyx_n_s_edges_out,&__pyx_n_s_axis,0};
     PyObject* values[4] = {0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
@@ -2596,19 +2598,19 @@ static PyObject *__pyx_pw_4ompy_5rebin_3rebin_matrix(PyObject *__pyx_self, PyObj
       kw_args = PyDict_Size(__pyx_kwds);
       switch (pos_args) {
         case  0:
-        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_matrix)) != 0)) kw_args--;
+        if (likely((values[0] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_counts)) != 0)) kw_args--;
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
-        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array_in)) != 0)) kw_args--;
+        if (likely((values[1] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_edges_in)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rebin_matrix", 0, 3, 4, 1); __PYX_ERR(0, 121, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("rebin_2D", 0, 3, 4, 1); __PYX_ERR(0, 124, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
-        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_E_array_out)) != 0)) kw_args--;
+        if (likely((values[2] = __Pyx_PyDict_GetItemStr(__pyx_kwds, __pyx_n_s_edges_out)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("rebin_matrix", 0, 3, 4, 2); __PYX_ERR(0, 121, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("rebin_2D", 0, 3, 4, 2); __PYX_ERR(0, 124, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  3:
@@ -2618,7 +2620,7 @@ static PyObject *__pyx_pw_4ompy_5rebin_3rebin_matrix(PyObject *__pyx_self, PyObj
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rebin_matrix") < 0)) __PYX_ERR(0, 121, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "rebin_2D") < 0)) __PYX_ERR(0, 124, __pyx_L3_error)
       }
     } else {
       switch (PyTuple_GET_SIZE(__pyx_args)) {
@@ -2631,36 +2633,35 @@ static PyObject *__pyx_pw_4ompy_5rebin_3rebin_matrix(PyObject *__pyx_self, PyObj
         default: goto __pyx_L5_argtuple_error;
       }
     }
-    __pyx_v_matrix = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_matrix.memview)) __PYX_ERR(0, 121, __pyx_L3_error)
-    __pyx_v_E_array_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_E_array_in.memview)) __PYX_ERR(0, 121, __pyx_L3_error)
-    __pyx_v_E_array_out = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_E_array_out.memview)) __PYX_ERR(0, 122, __pyx_L3_error)
+    __pyx_v_counts = __Pyx_PyObject_to_MemoryviewSlice_dsds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_counts.memview)) __PYX_ERR(0, 124, __pyx_L3_error)
+    __pyx_v_edges_in = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[1], PyBUF_WRITABLE); if (unlikely(!__pyx_v_edges_in.memview)) __PYX_ERR(0, 124, __pyx_L3_error)
+    __pyx_v_edges_out = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[2], PyBUF_WRITABLE); if (unlikely(!__pyx_v_edges_out.memview)) __PYX_ERR(0, 125, __pyx_L3_error)
     if (values[3]) {
-      __pyx_v_axis = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_axis == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 122, __pyx_L3_error)
+      __pyx_v_axis = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_axis == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 125, __pyx_L3_error)
     } else {
       __pyx_v_axis = ((int)0);
     }
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("rebin_matrix", 0, 3, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 121, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("rebin_2D", 0, 3, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 124, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("ompy.rebin.rebin_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rebin.rebin_2D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_5rebin_2rebin_matrix(__pyx_self, __pyx_v_matrix, __pyx_v_E_array_in, __pyx_v_E_array_out, __pyx_v_axis);
+  __pyx_r = __pyx_pf_4ompy_5rebin_2rebin_2D(__pyx_self, __pyx_v_counts, __pyx_v_edges_in, __pyx_v_edges_out, __pyx_v_axis);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_matrix, __Pyx_memviewslice __pyx_v_E_array_in, __Pyx_memviewslice __pyx_v_E_array_out, int __pyx_v_axis) {
+static PyObject *__pyx_pf_4ompy_5rebin_2rebin_2D(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_counts, __Pyx_memviewslice __pyx_v_edges_in, __Pyx_memviewslice __pyx_v_edges_out, int __pyx_v_axis) {
   int __pyx_v_other_axis;
   int __pyx_v_N_loop;
   int __pyx_v_i;
-  PyObject *__pyx_v_shape_out = NULL;
-  PyObject *__pyx_v_mat_counts_out = NULL;
+  PyObject *__pyx_v_shape = NULL;
   PyObject *__pyx_v_counts_out = NULL;
   PyObject *__pyx_r = NULL;
   __Pyx_RefNannyDeclarations
@@ -2679,9 +2680,9 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
   PyObject *__pyx_t_13 = NULL;
   int __pyx_t_14;
   PyObject *__pyx_t_15 = NULL;
-  __Pyx_RefNannySetupContext("rebin_matrix", 0);
+  __Pyx_RefNannySetupContext("rebin_2D", 0);
 
-  /* "ompy/rebin.pyx":149
+  /* "ompy/rebin.pyx":151
  * 
  *     # Axis number of non-rebin axis (Z2 group, fancy!):
  *     if axis not in (0, 1):             # <<<<<<<<<<<<<<
@@ -2700,26 +2701,26 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
   __pyx_t_2 = (__pyx_t_1 != 0);
   if (unlikely(__pyx_t_2)) {
 
-    /* "ompy/rebin.pyx":150
+    /* "ompy/rebin.pyx":152
  *     # Axis number of non-rebin axis (Z2 group, fancy!):
  *     if axis not in (0, 1):
  *         raise ValueError("Axis must be either 0 or 1, got %i" % axis)             # <<<<<<<<<<<<<<
  * 
  *     other_axis = (axis + 1) % 2
  */
-    __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_axis); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 150, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyInt_From_int(__pyx_v_axis); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 152, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_4 = PyUnicode_Format(__pyx_kp_u_Axis_must_be_either_0_or_1_got_i, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 150, __pyx_L1_error)
+    __pyx_t_4 = PyUnicode_Format(__pyx_kp_u_Axis_must_be_either_0_or_1_got_i, __pyx_t_3); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 152, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_builtin_ValueError, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 150, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyObject_CallOneArg(__pyx_builtin_ValueError, __pyx_t_4); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 152, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_Raise(__pyx_t_3, 0, 0, 0);
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __PYX_ERR(0, 150, __pyx_L1_error)
+    __PYX_ERR(0, 152, __pyx_L1_error)
 
-    /* "ompy/rebin.pyx":149
+    /* "ompy/rebin.pyx":151
  * 
  *     # Axis number of non-rebin axis (Z2 group, fancy!):
  *     if axis not in (0, 1):             # <<<<<<<<<<<<<<
@@ -2728,7 +2729,7 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
  */
   }
 
-  /* "ompy/rebin.pyx":152
+  /* "ompy/rebin.pyx":154
  *         raise ValueError("Axis must be either 0 or 1, got %i" % axis)
  * 
  *     other_axis = (axis + 1) % 2             # <<<<<<<<<<<<<<
@@ -2737,32 +2738,32 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
  */
   __pyx_v_other_axis = ((__pyx_v_axis + 1) % 2);
 
-  /* "ompy/rebin.pyx":155
+  /* "ompy/rebin.pyx":157
  * 
  *     # Number of bins along that axis:
- *     N_loop = matrix.shape[other_axis]             # <<<<<<<<<<<<<<
+ *     N_loop = counts.shape[other_axis]             # <<<<<<<<<<<<<<
  * 
  *     # Calculate shape of rebinned matrix and allocate it:
  */
-  __pyx_v_N_loop = (__pyx_v_matrix.shape[__pyx_v_other_axis]);
+  __pyx_v_N_loop = (__pyx_v_counts.shape[__pyx_v_other_axis]);
 
-  /* "ompy/rebin.pyx":158
+  /* "ompy/rebin.pyx":160
  * 
  *     # Calculate shape of rebinned matrix and allocate it:
- *     shape_out = np.array([matrix.shape[0], matrix.shape[1]],             # <<<<<<<<<<<<<<
+ *     shape = np.array([counts.shape[0], counts.shape[1]],             # <<<<<<<<<<<<<<
  *                          dtype=int)
- *     shape_out[axis] = len(E_array_out)
+ *     shape[axis] = len(edges_out)
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_array); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_array); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = PyInt_FromSsize_t((__pyx_v_matrix.shape[0])); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_3 = PyInt_FromSsize_t((__pyx_v_counts.shape[0])); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_5 = PyInt_FromSsize_t((__pyx_v_matrix.shape[1])); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_5 = PyInt_FromSsize_t((__pyx_v_counts.shape[1])); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_6 = PyList_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_6 = PyList_New(2); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_GIVEREF(__pyx_t_3);
   PyList_SET_ITEM(__pyx_t_6, 0, __pyx_t_3);
@@ -2770,98 +2771,98 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
   PyList_SET_ITEM(__pyx_t_6, 1, __pyx_t_5);
   __pyx_t_3 = 0;
   __pyx_t_5 = 0;
-  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 158, __pyx_L1_error)
+  __pyx_t_5 = PyTuple_New(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 160, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_GIVEREF(__pyx_t_6);
   PyTuple_SET_ITEM(__pyx_t_5, 0, __pyx_t_6);
   __pyx_t_6 = 0;
 
-  /* "ompy/rebin.pyx":159
+  /* "ompy/rebin.pyx":161
  *     # Calculate shape of rebinned matrix and allocate it:
- *     shape_out = np.array([matrix.shape[0], matrix.shape[1]],
+ *     shape = np.array([counts.shape[0], counts.shape[1]],
  *                          dtype=int)             # <<<<<<<<<<<<<<
- *     shape_out[axis] = len(E_array_out)
- *     mat_counts_out = np.zeros(shape_out, dtype=DTYPE)
+ *     shape[axis] = len(edges_out)
+ *     counts_out = np.zeros(shape, dtype=DTYPE)
  */
-  __pyx_t_6 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 159, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 161, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
-  if (PyDict_SetItem(__pyx_t_6, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 159, __pyx_L1_error)
-
-  /* "ompy/rebin.pyx":158
- * 
- *     # Calculate shape of rebinned matrix and allocate it:
- *     shape_out = np.array([matrix.shape[0], matrix.shape[1]],             # <<<<<<<<<<<<<<
- *                          dtype=int)
- *     shape_out[axis] = len(E_array_out)
- */
-  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_5, __pyx_t_6); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 158, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-  __pyx_v_shape_out = __pyx_t_3;
-  __pyx_t_3 = 0;
+  if (PyDict_SetItem(__pyx_t_6, __pyx_n_s_dtype, ((PyObject *)(&PyInt_Type))) < 0) __PYX_ERR(0, 161, __pyx_L1_error)
 
   /* "ompy/rebin.pyx":160
- *     shape_out = np.array([matrix.shape[0], matrix.shape[1]],
+ * 
+ *     # Calculate shape of rebinned matrix and allocate it:
+ *     shape = np.array([counts.shape[0], counts.shape[1]],             # <<<<<<<<<<<<<<
  *                          dtype=int)
- *     shape_out[axis] = len(E_array_out)             # <<<<<<<<<<<<<<
- *     mat_counts_out = np.zeros(shape_out, dtype=DTYPE)
+ *     shape[axis] = len(edges_out)
+ */
+  __pyx_t_3 = __Pyx_PyObject_Call(__pyx_t_4, __pyx_t_5, __pyx_t_6); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 160, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_3);
+  __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
+  __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
+  __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+  __pyx_v_shape = __pyx_t_3;
+  __pyx_t_3 = 0;
+
+  /* "ompy/rebin.pyx":162
+ *     shape = np.array([counts.shape[0], counts.shape[1]],
+ *                          dtype=int)
+ *     shape[axis] = len(edges_out)             # <<<<<<<<<<<<<<
+ *     counts_out = np.zeros(shape, dtype=DTYPE)
  * 
  */
-  __pyx_t_7 = __Pyx_MemoryView_Len(__pyx_v_E_array_out); 
-  __pyx_t_3 = __Pyx_PyInt_FromSize_t(__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 160, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_MemoryView_Len(__pyx_v_edges_out); 
+  __pyx_t_3 = __Pyx_PyInt_FromSize_t(__pyx_t_7); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 162, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  if (unlikely(__Pyx_SetItemInt(__pyx_v_shape_out, __pyx_v_axis, __pyx_t_3, int, 1, __Pyx_PyInt_From_int, 0, 0, 0) < 0)) __PYX_ERR(0, 160, __pyx_L1_error)
+  if (unlikely(__Pyx_SetItemInt(__pyx_v_shape, __pyx_v_axis, __pyx_t_3, int, 1, __Pyx_PyInt_From_int, 0, 0, 0) < 0)) __PYX_ERR(0, 162, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "ompy/rebin.pyx":161
+  /* "ompy/rebin.pyx":163
  *                          dtype=int)
- *     shape_out[axis] = len(E_array_out)
- *     mat_counts_out = np.zeros(shape_out, dtype=DTYPE)             # <<<<<<<<<<<<<<
+ *     shape[axis] = len(edges_out)
+ *     counts_out = np.zeros(shape, dtype=DTYPE)             # <<<<<<<<<<<<<<
  * 
- *     # For simplicity I use an if test to know axis ordering. Can probably
+ *     if axis == 0:
  */
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_n_s_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_n_s_zeros); if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_6);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_INCREF(__pyx_v_shape_out);
-  __Pyx_GIVEREF(__pyx_v_shape_out);
-  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_v_shape_out);
-  __pyx_t_5 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __Pyx_INCREF(__pyx_v_shape);
+  __Pyx_GIVEREF(__pyx_v_shape);
+  PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_v_shape);
+  __pyx_t_5 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_DTYPE); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 161, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_5, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_3, __pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 161, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_6, __pyx_t_3, __pyx_t_5); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 163, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-  __pyx_v_mat_counts_out = __pyx_t_4;
+  __pyx_v_counts_out = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "ompy/rebin.pyx":166
- *     # be done smarter later:
- *     # cdef double[:, :] mat_counts_out_view = mat_counts_out
+  /* "ompy/rebin.pyx":165
+ *     counts_out = np.zeros(shape, dtype=DTYPE)
+ * 
  *     if axis == 0:             # <<<<<<<<<<<<<<
- *         # TODO figure out how to best put arrays into mat_counts_out.
+ *         # TODO figure out how to best put arrays into counts_out.
  *         # Use memoryview or no?
  */
   __pyx_t_2 = ((__pyx_v_axis == 0) != 0);
   if (__pyx_t_2) {
 
     /* "ompy/rebin.pyx":169
- *         # TODO figure out how to best put arrays into mat_counts_out.
  *         # Use memoryview or no?
+ *         #
  *         for i in range(N_loop):             # <<<<<<<<<<<<<<
- *             mat_counts_out[:, i] = rebin(matrix[:, i],
- *                                          E_array_in, E_array_out)
+ *             counts_out[:, i] = rebin_1D(counts[:, i], edges_in, edges_out)
+ *     else:
  */
     __pyx_t_8 = __pyx_v_N_loop;
     __pyx_t_9 = __pyx_t_8;
@@ -2869,24 +2870,24 @@ static PyObject *__pyx_pf_4ompy_5rebin_2rebin_matrix(CYTHON_UNUSED PyObject *__p
       __pyx_v_i = __pyx_t_10;
 
       /* "ompy/rebin.pyx":170
- *         # Use memoryview or no?
+ *         #
  *         for i in range(N_loop):
- *             mat_counts_out[:, i] = rebin(matrix[:, i],             # <<<<<<<<<<<<<<
- *                                          E_array_in, E_array_out)
+ *             counts_out[:, i] = rebin_1D(counts[:, i], edges_in, edges_out)             # <<<<<<<<<<<<<<
  *     else:
+ *         for i in range(N_loop):
  */
-      __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_rebin); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 170, __pyx_L1_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_rebin_1D); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
-      __pyx_t_11.data = __pyx_v_matrix.data;
-      __pyx_t_11.memview = __pyx_v_matrix.memview;
+      __pyx_t_11.data = __pyx_v_counts.data;
+      __pyx_t_11.memview = __pyx_v_counts.memview;
       __PYX_INC_MEMVIEW(&__pyx_t_11, 0);
-      __pyx_t_11.shape[0] = __pyx_v_matrix.shape[0];
-__pyx_t_11.strides[0] = __pyx_v_matrix.strides[0];
+      __pyx_t_11.shape[0] = __pyx_v_counts.shape[0];
+__pyx_t_11.strides[0] = __pyx_v_counts.strides[0];
     __pyx_t_11.suboffsets[0] = -1;
 
 {
     Py_ssize_t __pyx_tmp_idx = __pyx_v_i;
-    Py_ssize_t __pyx_tmp_stride = __pyx_v_matrix.strides[1];
+    Py_ssize_t __pyx_tmp_stride = __pyx_v_counts.strides[1];
         if ((0)) __PYX_ERR(0, 170, __pyx_L1_error)
         __pyx_t_11.data += __pyx_tmp_idx * __pyx_tmp_stride;
 }
@@ -2896,17 +2897,9 @@ __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
       __PYX_XDEC_MEMVIEW(&__pyx_t_11, 1);
       __pyx_t_11.memview = NULL;
       __pyx_t_11.data = NULL;
-
-      /* "ompy/rebin.pyx":171
- *         for i in range(N_loop):
- *             mat_counts_out[:, i] = rebin(matrix[:, i],
- *                                          E_array_in, E_array_out)             # <<<<<<<<<<<<<<
- *     else:
- *         for i in range(N_loop):
- */
-      __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_E_array_in, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 171, __pyx_L1_error)
+      __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_edges_in, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_6);
-      __pyx_t_12 = __pyx_memoryview_fromslice(__pyx_v_E_array_out, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 171, __pyx_L1_error)
+      __pyx_t_12 = __pyx_memoryview_fromslice(__pyx_v_edges_out, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_12);
       __pyx_t_13 = NULL;
       __pyx_t_14 = 0;
@@ -2962,14 +2955,6 @@ __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
         __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
       }
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-
-      /* "ompy/rebin.pyx":170
- *         # Use memoryview or no?
- *         for i in range(N_loop):
- *             mat_counts_out[:, i] = rebin(matrix[:, i],             # <<<<<<<<<<<<<<
- *                                          E_array_in, E_array_out)
- *     else:
- */
       __pyx_t_5 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 170, __pyx_L1_error)
@@ -2980,27 +2965,27 @@ __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
       __Pyx_GIVEREF(__pyx_t_5);
       PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_t_5);
       __pyx_t_5 = 0;
-      if (unlikely(PyObject_SetItem(__pyx_v_mat_counts_out, __pyx_t_15, __pyx_t_4) < 0)) __PYX_ERR(0, 170, __pyx_L1_error)
+      if (unlikely(PyObject_SetItem(__pyx_v_counts_out, __pyx_t_15, __pyx_t_4) < 0)) __PYX_ERR(0, 170, __pyx_L1_error)
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
 
-    /* "ompy/rebin.pyx":166
- *     # be done smarter later:
- *     # cdef double[:, :] mat_counts_out_view = mat_counts_out
+    /* "ompy/rebin.pyx":165
+ *     counts_out = np.zeros(shape, dtype=DTYPE)
+ * 
  *     if axis == 0:             # <<<<<<<<<<<<<<
- *         # TODO figure out how to best put arrays into mat_counts_out.
+ *         # TODO figure out how to best put arrays into counts_out.
  *         # Use memoryview or no?
  */
     goto __pyx_L4;
   }
 
-  /* "ompy/rebin.pyx":173
- *                                          E_array_in, E_array_out)
+  /* "ompy/rebin.pyx":172
+ *             counts_out[:, i] = rebin_1D(counts[:, i], edges_in, edges_out)
  *     else:
  *         for i in range(N_loop):             # <<<<<<<<<<<<<<
- *             counts_out = rebin(matrix[i, :],
- *                                E_array_in, E_array_out)
+ *             counts_out[i, :] = rebin_1D(counts[i, :], edges_in, edges_out)
+ *     return counts_out
  */
   /*else*/ {
     __pyx_t_8 = __pyx_v_N_loop;
@@ -3008,45 +2993,36 @@ __pyx_t_3 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
     for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
       __pyx_v_i = __pyx_t_10;
 
-      /* "ompy/rebin.pyx":174
+      /* "ompy/rebin.pyx":173
  *     else:
  *         for i in range(N_loop):
- *             counts_out = rebin(matrix[i, :],             # <<<<<<<<<<<<<<
- *                                E_array_in, E_array_out)
- *             mat_counts_out[i, :] = counts_out
+ *             counts_out[i, :] = rebin_1D(counts[i, :], edges_in, edges_out)             # <<<<<<<<<<<<<<
+ *     return counts_out
  */
-      __Pyx_GetModuleGlobalName(__pyx_t_15, __pyx_n_s_rebin); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 174, __pyx_L1_error)
+      __Pyx_GetModuleGlobalName(__pyx_t_15, __pyx_n_s_rebin_1D); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_15);
-      __pyx_t_11.data = __pyx_v_matrix.data;
-      __pyx_t_11.memview = __pyx_v_matrix.memview;
+      __pyx_t_11.data = __pyx_v_counts.data;
+      __pyx_t_11.memview = __pyx_v_counts.memview;
       __PYX_INC_MEMVIEW(&__pyx_t_11, 0);
       {
     Py_ssize_t __pyx_tmp_idx = __pyx_v_i;
-    Py_ssize_t __pyx_tmp_stride = __pyx_v_matrix.strides[0];
-        if ((0)) __PYX_ERR(0, 174, __pyx_L1_error)
+    Py_ssize_t __pyx_tmp_stride = __pyx_v_counts.strides[0];
+        if ((0)) __PYX_ERR(0, 173, __pyx_L1_error)
         __pyx_t_11.data += __pyx_tmp_idx * __pyx_tmp_stride;
 }
 
-__pyx_t_11.shape[0] = __pyx_v_matrix.shape[1];
-__pyx_t_11.strides[0] = __pyx_v_matrix.strides[1];
+__pyx_t_11.shape[0] = __pyx_v_counts.shape[1];
+__pyx_t_11.strides[0] = __pyx_v_counts.strides[1];
     __pyx_t_11.suboffsets[0] = -1;
 
-__pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 174, __pyx_L1_error)
+__pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_5);
       __PYX_XDEC_MEMVIEW(&__pyx_t_11, 1);
       __pyx_t_11.memview = NULL;
       __pyx_t_11.data = NULL;
-
-      /* "ompy/rebin.pyx":175
- *         for i in range(N_loop):
- *             counts_out = rebin(matrix[i, :],
- *                                E_array_in, E_array_out)             # <<<<<<<<<<<<<<
- *             mat_counts_out[i, :] = counts_out
- *     return mat_counts_out
- */
-      __pyx_t_12 = __pyx_memoryview_fromslice(__pyx_v_E_array_in, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 175, __pyx_L1_error)
+      __pyx_t_12 = __pyx_memoryview_fromslice(__pyx_v_edges_in, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_12)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_12);
-      __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_E_array_out, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 175, __pyx_L1_error)
+      __pyx_t_6 = __pyx_memoryview_fromslice(__pyx_v_edges_out, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_6);
       __pyx_t_3 = NULL;
       __pyx_t_14 = 0;
@@ -3063,7 +3039,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
       #if CYTHON_FAST_PYCALL
       if (PyFunction_Check(__pyx_t_15)) {
         PyObject *__pyx_temp[4] = {__pyx_t_3, __pyx_t_5, __pyx_t_12, __pyx_t_6};
-        __pyx_t_4 = __Pyx_PyFunction_FastCall(__pyx_t_15, __pyx_temp+1-__pyx_t_14, 3+__pyx_t_14); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_4 = __Pyx_PyFunction_FastCall(__pyx_t_15, __pyx_temp+1-__pyx_t_14, 3+__pyx_t_14); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 173, __pyx_L1_error)
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_GOTREF(__pyx_t_4);
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
@@ -3074,7 +3050,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
       #if CYTHON_FAST_PYCCALL
       if (__Pyx_PyFastCFunction_Check(__pyx_t_15)) {
         PyObject *__pyx_temp[4] = {__pyx_t_3, __pyx_t_5, __pyx_t_12, __pyx_t_6};
-        __pyx_t_4 = __Pyx_PyCFunction_FastCall(__pyx_t_15, __pyx_temp+1-__pyx_t_14, 3+__pyx_t_14); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_4 = __Pyx_PyCFunction_FastCall(__pyx_t_15, __pyx_temp+1-__pyx_t_14, 3+__pyx_t_14); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 173, __pyx_L1_error)
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_GOTREF(__pyx_t_4);
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
@@ -3083,7 +3059,7 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
       } else
       #endif
       {
-        __pyx_t_13 = PyTuple_New(3+__pyx_t_14); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_13 = PyTuple_New(3+__pyx_t_14); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 173, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_13);
         if (__pyx_t_3) {
           __Pyx_GIVEREF(__pyx_t_3); PyTuple_SET_ITEM(__pyx_t_13, 0, __pyx_t_3); __pyx_t_3 = NULL;
@@ -3097,52 +3073,44 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
         __pyx_t_5 = 0;
         __pyx_t_12 = 0;
         __pyx_t_6 = 0;
-        __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_15, __pyx_t_13, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 174, __pyx_L1_error)
+        __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_15, __pyx_t_13, NULL); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 173, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_4);
         __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
       }
       __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
-      __Pyx_XDECREF_SET(__pyx_v_counts_out, __pyx_t_4);
-      __pyx_t_4 = 0;
-
-      /* "ompy/rebin.pyx":176
- *             counts_out = rebin(matrix[i, :],
- *                                E_array_in, E_array_out)
- *             mat_counts_out[i, :] = counts_out             # <<<<<<<<<<<<<<
- *     return mat_counts_out
- */
-      __pyx_t_4 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 176, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_4);
-      __pyx_t_15 = PyTuple_New(2); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 176, __pyx_L1_error)
+      __pyx_t_15 = __Pyx_PyInt_From_int(__pyx_v_i); if (unlikely(!__pyx_t_15)) __PYX_ERR(0, 173, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_15);
-      __Pyx_GIVEREF(__pyx_t_4);
-      PyTuple_SET_ITEM(__pyx_t_15, 0, __pyx_t_4);
+      __pyx_t_13 = PyTuple_New(2); if (unlikely(!__pyx_t_13)) __PYX_ERR(0, 173, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_13);
+      __Pyx_GIVEREF(__pyx_t_15);
+      PyTuple_SET_ITEM(__pyx_t_13, 0, __pyx_t_15);
       __Pyx_INCREF(__pyx_slice_);
       __Pyx_GIVEREF(__pyx_slice_);
-      PyTuple_SET_ITEM(__pyx_t_15, 1, __pyx_slice_);
-      __pyx_t_4 = 0;
-      if (unlikely(PyObject_SetItem(__pyx_v_mat_counts_out, __pyx_t_15, __pyx_v_counts_out) < 0)) __PYX_ERR(0, 176, __pyx_L1_error)
-      __Pyx_DECREF(__pyx_t_15); __pyx_t_15 = 0;
+      PyTuple_SET_ITEM(__pyx_t_13, 1, __pyx_slice_);
+      __pyx_t_15 = 0;
+      if (unlikely(PyObject_SetItem(__pyx_v_counts_out, __pyx_t_13, __pyx_t_4) < 0)) __PYX_ERR(0, 173, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_13); __pyx_t_13 = 0;
+      __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     }
   }
   __pyx_L4:;
 
-  /* "ompy/rebin.pyx":177
- *                                E_array_in, E_array_out)
- *             mat_counts_out[i, :] = counts_out
- *     return mat_counts_out             # <<<<<<<<<<<<<<
+  /* "ompy/rebin.pyx":174
+ *         for i in range(N_loop):
+ *             counts_out[i, :] = rebin_1D(counts[i, :], edges_in, edges_out)
+ *     return counts_out             # <<<<<<<<<<<<<<
  */
   __Pyx_XDECREF(__pyx_r);
-  __Pyx_INCREF(__pyx_v_mat_counts_out);
-  __pyx_r = __pyx_v_mat_counts_out;
+  __Pyx_INCREF(__pyx_v_counts_out);
+  __pyx_r = __pyx_v_counts_out;
   goto __pyx_L0;
 
-  /* "ompy/rebin.pyx":121
+  /* "ompy/rebin.pyx":124
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin_matrix(double[:, :] matrix, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *                  double[:] E_array_out, int axis=0):
- *     """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+ * def rebin_2D(double[:, :] counts, double[:] edges_in,             # <<<<<<<<<<<<<<
+ *                  double[:] edges_out, int axis=0):
+ *     """Rebin a matrix of counts from binning edges_in to binning edges_out
  */
 
   /* function exit code */
@@ -3155,15 +3123,14 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_11, 1, (PyObject *(*)(char *)) __
   __Pyx_XDECREF(__pyx_t_12);
   __Pyx_XDECREF(__pyx_t_13);
   __Pyx_XDECREF(__pyx_t_15);
-  __Pyx_AddTraceback("ompy.rebin.rebin_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rebin.rebin_2D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
-  __Pyx_XDECREF(__pyx_v_shape_out);
-  __Pyx_XDECREF(__pyx_v_mat_counts_out);
+  __Pyx_XDECREF(__pyx_v_shape);
   __Pyx_XDECREF(__pyx_v_counts_out);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_matrix, 1);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_E_array_in, 1);
-  __PYX_XDEC_MEMVIEW(&__pyx_v_E_array_out, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_counts, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_edges_in, 1);
+  __PYX_XDEC_MEMVIEW(&__pyx_v_edges_out, 1);
   __Pyx_XGIVEREF(__pyx_r);
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
@@ -16680,8 +16647,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_s_Cannot_create_writable_memory_vi, __pyx_k_Cannot_create_writable_memory_vi, sizeof(__pyx_k_Cannot_create_writable_memory_vi), 0, 0, 1, 0},
   {&__pyx_kp_s_Cannot_index_with_type_s, __pyx_k_Cannot_index_with_type_s, sizeof(__pyx_k_Cannot_index_with_type_s), 0, 0, 1, 0},
   {&__pyx_n_s_DTYPE, __pyx_k_DTYPE, sizeof(__pyx_k_DTYPE), 0, 0, 1, 1},
-  {&__pyx_n_s_E_array_in, __pyx_k_E_array_in, sizeof(__pyx_k_E_array_in), 0, 0, 1, 1},
-  {&__pyx_n_s_E_array_out, __pyx_k_E_array_out, sizeof(__pyx_k_E_array_out), 0, 0, 1, 1},
   {&__pyx_n_s_Ein_j, __pyx_k_Ein_j, sizeof(__pyx_k_Ein_j), 0, 0, 1, 1},
   {&__pyx_n_s_Ellipsis, __pyx_k_Ellipsis, sizeof(__pyx_k_Ellipsis), 0, 0, 1, 1},
   {&__pyx_kp_s_Empty_shape_tuple_for_cython_arr, __pyx_k_Empty_shape_tuple_for_cython_arr, sizeof(__pyx_k_Empty_shape_tuple_for_cython_arr), 0, 0, 1, 0},
@@ -16712,18 +16677,21 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_array, __pyx_k_array, sizeof(__pyx_k_array), 0, 0, 1, 1},
   {&__pyx_n_s_axis, __pyx_k_axis, sizeof(__pyx_k_axis), 0, 0, 1, 1},
   {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
+  {&__pyx_n_s_bins_overlap, __pyx_k_bins_overlap, sizeof(__pyx_k_bins_overlap), 0, 0, 1, 1},
   {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
   {&__pyx_n_u_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 1, 0, 1},
   {&__pyx_n_s_class, __pyx_k_class, sizeof(__pyx_k_class), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_kp_s_contiguous_and_direct, __pyx_k_contiguous_and_direct, sizeof(__pyx_k_contiguous_and_direct), 0, 0, 1, 0},
   {&__pyx_kp_s_contiguous_and_indirect, __pyx_k_contiguous_and_indirect, sizeof(__pyx_k_contiguous_and_indirect), 0, 0, 1, 0},
-  {&__pyx_n_s_counts_in, __pyx_k_counts_in, sizeof(__pyx_k_counts_in), 0, 0, 1, 1},
+  {&__pyx_n_s_counts, __pyx_k_counts, sizeof(__pyx_k_counts), 0, 0, 1, 1},
   {&__pyx_n_s_counts_out, __pyx_k_counts_out, sizeof(__pyx_k_counts_out), 0, 0, 1, 1},
   {&__pyx_n_s_counts_out_view, __pyx_k_counts_out_view, sizeof(__pyx_k_counts_out_view), 0, 0, 1, 1},
   {&__pyx_n_s_dict, __pyx_k_dict, sizeof(__pyx_k_dict), 0, 0, 1, 1},
   {&__pyx_n_s_dtype, __pyx_k_dtype, sizeof(__pyx_k_dtype), 0, 0, 1, 1},
   {&__pyx_n_s_dtype_is_object, __pyx_k_dtype_is_object, sizeof(__pyx_k_dtype_is_object), 0, 0, 1, 1},
+  {&__pyx_n_s_edges_in, __pyx_k_edges_in, sizeof(__pyx_k_edges_in), 0, 0, 1, 1},
+  {&__pyx_n_s_edges_out, __pyx_k_edges_out, sizeof(__pyx_k_edges_out), 0, 0, 1, 1},
   {&__pyx_n_s_encode, __pyx_k_encode, sizeof(__pyx_k_encode), 0, 0, 1, 1},
   {&__pyx_n_s_enumerate, __pyx_k_enumerate, sizeof(__pyx_k_enumerate), 0, 0, 1, 1},
   {&__pyx_n_s_error, __pyx_k_error, sizeof(__pyx_k_error), 0, 0, 1, 1},
@@ -16743,8 +16711,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_jmax, __pyx_k_jmax, sizeof(__pyx_k_jmax), 0, 0, 1, 1},
   {&__pyx_n_s_jmin, __pyx_k_jmin, sizeof(__pyx_k_jmin), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
-  {&__pyx_n_s_mat_counts_out, __pyx_k_mat_counts_out, sizeof(__pyx_k_mat_counts_out), 0, 0, 1, 1},
-  {&__pyx_n_s_matrix, __pyx_k_matrix, sizeof(__pyx_k_matrix), 0, 0, 1, 1},
   {&__pyx_n_s_memview, __pyx_k_memview, sizeof(__pyx_k_memview), 0, 0, 1, 1},
   {&__pyx_n_s_mode, __pyx_k_mode, sizeof(__pyx_k_mode), 0, 0, 1, 1},
   {&__pyx_n_s_name, __pyx_k_name, sizeof(__pyx_k_name), 0, 0, 1, 1},
@@ -16758,7 +16724,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_ompy_rebin, __pyx_k_ompy_rebin, sizeof(__pyx_k_ompy_rebin), 0, 0, 1, 1},
   {&__pyx_kp_s_ompy_rebin_pyx, __pyx_k_ompy_rebin_pyx, sizeof(__pyx_k_ompy_rebin_pyx), 0, 0, 1, 0},
   {&__pyx_n_s_other_axis, __pyx_k_other_axis, sizeof(__pyx_k_other_axis), 0, 0, 1, 1},
-  {&__pyx_n_s_overlap, __pyx_k_overlap, sizeof(__pyx_k_overlap), 0, 0, 1, 1},
   {&__pyx_n_s_pack, __pyx_k_pack, sizeof(__pyx_k_pack), 0, 0, 1, 1},
   {&__pyx_n_s_pickle, __pyx_k_pickle, sizeof(__pyx_k_pickle), 0, 0, 1, 1},
   {&__pyx_n_s_pyx_PickleError, __pyx_k_pyx_PickleError, sizeof(__pyx_k_pyx_PickleError), 0, 0, 1, 1},
@@ -16770,15 +16735,14 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_pyx_unpickle_Enum, __pyx_k_pyx_unpickle_Enum, sizeof(__pyx_k_pyx_unpickle_Enum), 0, 0, 1, 1},
   {&__pyx_n_s_pyx_vtable, __pyx_k_pyx_vtable, sizeof(__pyx_k_pyx_vtable), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
-  {&__pyx_n_s_rebin, __pyx_k_rebin, sizeof(__pyx_k_rebin), 0, 0, 1, 1},
-  {&__pyx_n_s_rebin_matrix, __pyx_k_rebin_matrix, sizeof(__pyx_k_rebin_matrix), 0, 0, 1, 1},
+  {&__pyx_n_s_rebin_1D, __pyx_k_rebin_1D, sizeof(__pyx_k_rebin_1D), 0, 0, 1, 1},
+  {&__pyx_n_s_rebin_2D, __pyx_k_rebin_2D, sizeof(__pyx_k_rebin_2D), 0, 0, 1, 1},
   {&__pyx_n_s_reduce, __pyx_k_reduce, sizeof(__pyx_k_reduce), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
   {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
   {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
   {&__pyx_n_s_setstate_cython, __pyx_k_setstate_cython, sizeof(__pyx_k_setstate_cython), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
-  {&__pyx_n_s_shape_out, __pyx_k_shape_out, sizeof(__pyx_k_shape_out), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
   {&__pyx_n_s_step, __pyx_k_step, sizeof(__pyx_k_step), 0, 0, 1, 1},
@@ -16797,8 +16761,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {0, 0, 0, 0, 0, 0, 0}
 };
 static CYTHON_SMALL_CODE int __Pyx_InitCachedBuiltins(void) {
-  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 101, __pyx_L1_error)
-  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 150, __pyx_L1_error)
+  __pyx_builtin_range = __Pyx_GetBuiltinName(__pyx_n_s_range); if (!__pyx_builtin_range) __PYX_ERR(0, 104, __pyx_L1_error)
+  __pyx_builtin_ValueError = __Pyx_GetBuiltinName(__pyx_n_s_ValueError); if (!__pyx_builtin_ValueError) __PYX_ERR(0, 152, __pyx_L1_error)
   __pyx_builtin_MemoryError = __Pyx_GetBuiltinName(__pyx_n_s_MemoryError); if (!__pyx_builtin_MemoryError) __PYX_ERR(1, 148, __pyx_L1_error)
   __pyx_builtin_enumerate = __Pyx_GetBuiltinName(__pyx_n_s_enumerate); if (!__pyx_builtin_enumerate) __PYX_ERR(1, 151, __pyx_L1_error)
   __pyx_builtin_TypeError = __Pyx_GetBuiltinName(__pyx_n_s_TypeError); if (!__pyx_builtin_TypeError) __PYX_ERR(1, 2, __pyx_L1_error)
@@ -16815,11 +16779,11 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
   /* "ompy/rebin.pyx":170
- *         # Use memoryview or no?
+ *         #
  *         for i in range(N_loop):
- *             mat_counts_out[:, i] = rebin(matrix[:, i],             # <<<<<<<<<<<<<<
- *                                          E_array_in, E_array_out)
+ *             counts_out[:, i] = rebin_1D(counts[:, i], edges_in, edges_out)             # <<<<<<<<<<<<<<
  *     else:
+ *         for i in range(N_loop):
  */
   __pyx_slice_ = PySlice_New(Py_None, Py_None, Py_None); if (unlikely(!__pyx_slice_)) __PYX_ERR(0, 170, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_slice_);
@@ -17006,29 +16970,29 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__18);
   __Pyx_GIVEREF(__pyx_tuple__18);
 
-  /* "ompy/rebin.pyx":71
+  /* "ompy/rebin.pyx":74
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin(double[:] counts_in, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *           double[:] E_array_out):
- *     """Rebin an array of counts from binning E_array_in to binning E_array_out
+ * def rebin_1D(double[:] counts, double[:] edges_in, double[:] edges_out):             # <<<<<<<<<<<<<<
+ *     """Rebin an array of counts from binning edges_in to binning edges_out
+ * 
  */
-  __pyx_tuple__19 = PyTuple_Pack(18, __pyx_n_s_counts_in, __pyx_n_s_E_array_in, __pyx_n_s_E_array_out, __pyx_n_s_Nin, __pyx_n_s_Nout, __pyx_n_s_jmin, __pyx_n_s_jmax, __pyx_n_s_a0_in, __pyx_n_s_a1_in, __pyx_n_s_a0_out, __pyx_n_s_a1_out, __pyx_n_s_counts_out, __pyx_n_s_counts_out_view, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_Eout_i, __pyx_n_s_Ein_j, __pyx_n_s_overlap); if (unlikely(!__pyx_tuple__19)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_tuple__19 = PyTuple_Pack(18, __pyx_n_s_counts, __pyx_n_s_edges_in, __pyx_n_s_edges_out, __pyx_n_s_Nin, __pyx_n_s_Nout, __pyx_n_s_jmin, __pyx_n_s_jmax, __pyx_n_s_a0_in, __pyx_n_s_a1_in, __pyx_n_s_a0_out, __pyx_n_s_a1_out, __pyx_n_s_counts_out, __pyx_n_s_counts_out_view, __pyx_n_s_i, __pyx_n_s_j, __pyx_n_s_Eout_i, __pyx_n_s_Ein_j, __pyx_n_s_bins_overlap); if (unlikely(!__pyx_tuple__19)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__19);
   __Pyx_GIVEREF(__pyx_tuple__19);
-  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(3, 0, 18, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rebin_pyx, __pyx_n_s_rebin, 71, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_codeobj__20 = (PyObject*)__Pyx_PyCode_New(3, 0, 18, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__19, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rebin_pyx, __pyx_n_s_rebin_1D, 74, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__20)) __PYX_ERR(0, 74, __pyx_L1_error)
 
-  /* "ompy/rebin.pyx":121
+  /* "ompy/rebin.pyx":124
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin_matrix(double[:, :] matrix, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *                  double[:] E_array_out, int axis=0):
- *     """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+ * def rebin_2D(double[:, :] counts, double[:] edges_in,             # <<<<<<<<<<<<<<
+ *                  double[:] edges_out, int axis=0):
+ *     """Rebin a matrix of counts from binning edges_in to binning edges_out
  */
-  __pyx_tuple__21 = PyTuple_Pack(10, __pyx_n_s_matrix, __pyx_n_s_E_array_in, __pyx_n_s_E_array_out, __pyx_n_s_axis, __pyx_n_s_other_axis, __pyx_n_s_N_loop, __pyx_n_s_i, __pyx_n_s_shape_out, __pyx_n_s_mat_counts_out, __pyx_n_s_counts_out); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(0, 121, __pyx_L1_error)
+  __pyx_tuple__21 = PyTuple_Pack(9, __pyx_n_s_counts, __pyx_n_s_edges_in, __pyx_n_s_edges_out, __pyx_n_s_axis, __pyx_n_s_other_axis, __pyx_n_s_N_loop, __pyx_n_s_i, __pyx_n_s_shape, __pyx_n_s_counts_out); if (unlikely(!__pyx_tuple__21)) __PYX_ERR(0, 124, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__21);
   __Pyx_GIVEREF(__pyx_tuple__21);
-  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(4, 0, 10, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rebin_pyx, __pyx_n_s_rebin_matrix, 121, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(0, 121, __pyx_L1_error)
+  __pyx_codeobj__22 = (PyObject*)__Pyx_PyCode_New(4, 0, 9, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__21, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rebin_pyx, __pyx_n_s_rebin_2D, 124, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__22)) __PYX_ERR(0, 124, __pyx_L1_error)
 
   /* "View.MemoryView":286
  *         return self.name
@@ -17461,28 +17425,28 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_DTYPE, __pyx_t_2) < 0) __PYX_ERR(0, 41, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "ompy/rebin.pyx":71
+  /* "ompy/rebin.pyx":74
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin(double[:] counts_in, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *           double[:] E_array_out):
- *     """Rebin an array of counts from binning E_array_in to binning E_array_out
+ * def rebin_1D(double[:] counts, double[:] edges_in, double[:] edges_out):             # <<<<<<<<<<<<<<
+ *     """Rebin an array of counts from binning edges_in to binning edges_out
+ * 
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4ompy_5rebin_1rebin, NULL, __pyx_n_s_ompy_rebin); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4ompy_5rebin_1rebin_1D, NULL, __pyx_n_s_ompy_rebin); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rebin, __pyx_t_2) < 0) __PYX_ERR(0, 71, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rebin_1D, __pyx_t_2) < 0) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "ompy/rebin.pyx":121
+  /* "ompy/rebin.pyx":124
  * @cython.wraparound(False)   # Deactivate negative indexing.
  * @cython.cdivision(True)
- * def rebin_matrix(double[:, :] matrix, double[:] E_array_in,             # <<<<<<<<<<<<<<
- *                  double[:] E_array_out, int axis=0):
- *     """Rebin a matrix of counts from binning E_array_in to binning E_array_out
+ * def rebin_2D(double[:, :] counts, double[:] edges_in,             # <<<<<<<<<<<<<<
+ *                  double[:] edges_out, int axis=0):
+ *     """Rebin a matrix of counts from binning edges_in to binning edges_out
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4ompy_5rebin_3rebin_matrix, NULL, __pyx_n_s_ompy_rebin); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 121, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_4ompy_5rebin_3rebin_2D, NULL, __pyx_n_s_ompy_rebin); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 124, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rebin_matrix, __pyx_t_2) < 0) __PYX_ERR(0, 121, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_rebin_2D, __pyx_t_2) < 0) __PYX_ERR(0, 124, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "ompy/rebin.pyx":1
