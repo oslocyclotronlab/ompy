@@ -79,24 +79,53 @@ class FirstGeneration:
 
         # Set up initial first generation matrix with
         # normalized Ex rows
-        H = self.initial_first_generation_matrix(matrix)
+        H = self.row_normalized(matrix)
         # Initial weights should also be row normalized
-        W = self.initial_first_generation_matrix(matrix)
+        W = self.row_normalized(matrix)
 
         sum_counts, _ = matrix.projection('Ex')
 
         normalization = div0(np.outer(sum_counts, multiplicities),
                              np.outer(multiplicities, sum_counts))
 
-        self.num_iterations = 1
         for iteration in range(self.num_iterations):
             H_old = np.copy(H)
-            H_compressed = rebin_2D(H, matrix.Eg, matrix.Ex,
-                    rebin_axis=1)
-            import matplotlib.pyplot as plt
-            from matplotlib.colors import LogNorm
-            fig, ax = plt.subplots(1)
-            ax.pcolormesh(matrix.Eg, matrix.Ex, H_compressed, norm=LogNorm())
+            W_old = np.copy(W)
+
+            H = rebin_2D(H, matrix.Eg, matrix.Ex, 1)
+
+            mat = Matrix(values=H, Ex=matrix.Ex, Eg=matrix.Ex)
+            if iteration == 1:
+                mat.plot(zscale='log', title=r'$H_{compressed}$',
+                        vmin=1e-3, vmax=1e5)
+
+            W = np.zeros_like(H)
+            for i in range(W.shape[0]):  # Loop over Ex rows
+                W[i, :i] = H[i, i:0:-1]
+
+            if iteration == 1:
+                mat = Matrix(values=W, Ex=matrix.Ex, Eg=matrix.Ex)
+                mat.plot(zscale='log', title=r'$W$', vmin=1e-3, vmax=1e5)
+
+            # Prevent oscillations
+            if iteration > 4:
+                W = 0.7*W + 0.3*W_old
+            W = np.nan_to_num(W)
+            W[W < 0] = 0.0
+
+            # Normalize each row to unity
+            W = div0(W, W.sum(axis=1))
+
+            G = (normalization * W) @ matrix.values
+            H = matrix.values - G
+
+            diff = np.max(np.abs(H - H_old))
+            LOG.info("iter %i/%i: ε = %g", iteration,
+                     self.num_iterations, diff)
+        final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
+        final.state = "firstgen"
+        return final
+
         # fig, ax = plt.subplots(1)
         # ax.pcolormesh(matrix.Eg, matrix.Ex, matrix.values, norm=LogNorm())
         # print(np.sum(H, axis=1)) # Seems to work!
@@ -172,7 +201,7 @@ class FirstGeneration:
         multiplicity[multiplicity < 0] = 0
         return multiplicity
 
-    def initial_first_generation_matrix(self, matrix: Matrix) -> np.ndarray:
+    def row_normalized(self, matrix: Matrix) -> np.ndarray:
         """ Set up a diagonal array with constant Ex rows
 
         Each Ex-row has constant value given as 1/γ where

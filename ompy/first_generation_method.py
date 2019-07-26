@@ -292,7 +292,11 @@ def first_generation_method(matrix_in,
     Ex_mesh, Eg_mesh = np.meshgrid(Ex_array, Ex_array, indexing="ij")
     if initial_weight_function == "box":
         W_old = np.ones_like(Eg_mesh)
-        W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
+        asdf = np.zeros_like(Eg_mesh)
+        for i, j in diagonal_elements(matrix_ex_compressed):
+            asdf[i, :j] = 1/max(1, j)
+        W_old = asdf
+        #W_old = div0(W_old, W_old.sum(axis=1).reshape(N_Exbins, 1))
     elif initial_weight_function == "fermi_gas":
         # Prepare weight function based on Fermi gas approximation:
         a_f = 16  # 1/MeV
@@ -350,6 +354,7 @@ def first_generation_method(matrix_in,
         # plt.show()
         # END DEBUG
 
+
         # if iteration == 0:
         # Don't use H as weights for first iteration.
         # W = W_old
@@ -361,6 +366,17 @@ def first_generation_method(matrix_in,
                 # print H_compressed[i,i:0:-1].shape
                 W[i, 0:i] = H_compressed[i, i:0:-1]
                 # TODO Consider implementing something like Massage(), but try to understand if it is necessary first.
+
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm
+        if iteration == 1:
+            fig, ax = plt.subplots(1)
+            lines= ax.pcolormesh(Ex_array, Ex_array, H_compressed, 
+                    norm=LogNorm(vmin=1e-3, vmax=1e5))
+            fig.colorbar(lines, ax=ax)
+            fig, ax = plt.subplots(1)
+            lines = ax.pcolormesh(Ex_array, Ex_array, W,  norm=LogNorm(vmin=1e-3, vmax=1e5))
+            fig.colorbar(lines, ax=ax)
 
         # Prevent oscillations, following MAMA:
         if iteration > 4:
@@ -450,3 +466,26 @@ def first_generation_method(matrix_in,
     firstgen.fill_negative(window_size=10)
     firstgen.remove_negative()
     return firstgen
+
+
+def diagonal_elements(mat: Matrix):
+    """diagonal_elements
+
+    :param mat:
+    :type mat: Matrix
+    :rtype: Generator[Tuple[int, int],None,None]
+    """
+    """ Iterates over the last non-zero elements
+
+    Args:
+        mat: The matrix to iterate over
+    Yields:
+        Indicies (i, j) over the last non-zero (=diagonal)
+        elements.
+    """
+    Ny = mat.shape[1]
+    for i, row in enumerate(mat):
+        for j, col in enumerate(reversed(row)):
+            if col != 0.0:
+                yield i, Ny-j
+                break

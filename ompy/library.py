@@ -898,6 +898,6 @@ def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
     dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
                 * (Ex - 1000))  + DE_GAMMA_1MEV
 
-    dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
+    dE_resolution = np.zeros_like(Ex)#np.sqrt(dE_particle**2 + dE_gamma**2)
     #dE_max_res = np.max(dE_resolution)
     return dE_resolution
