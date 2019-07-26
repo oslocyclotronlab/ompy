@@ -32,8 +32,9 @@ import logging
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from tabulate import tabulate
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional)
 from .matrixstate import MatrixState
@@ -197,8 +198,13 @@ class Matrix():
         """
         return np.array(list(self.calibration().values()))
 
-    def plot(self, ax: Any = None, title: str = None, zscale: str = "log",
-             zmin: float = None, zmax: float = None, **kwargs) -> Any:
+    def plot(self, ax: Any = None, 
+             title: Optional[str] = None,
+             zscale: Optional[str] = "log",
+             zmin: Optional[float] = None,
+             zmax: Optional[float] = None,
+             annotate_counts: bool = False,
+             **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -212,7 +218,7 @@ class Matrix():
         Raises:
             ValueError: If zscale is unsupported
         """
-        fig, ax = plt.subplots() if ax is None else (None, ax)
+        fig, ax = plt.subplots(figsize=(5,5)) if ax is None else (None, ax)
         if zscale == 'log':
             norm = LogNorm(vmin=zmin, vmax=zmax)
         elif zscale == 'linear':
@@ -225,17 +231,32 @@ class Matrix():
         Eg = np.append(self.Eg, self.Eg[-1] + dEg)
         Ex = np.append(self.Ex, self.Ex[-1] + dEx)
 
-        lines = ax.pcolormesh(Eg, Ex, self.values, norm=norm, **kwargs)
+        # Set entries of 0 to white
+        current_cmap = cm.get_cmap()
+        current_cmap.set_bad(color='white')
+        mask = np.isnan(self.values) | (self.values == 0)
+        masked = np.ma.array(self.values, mask=mask)
+
+        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
         fix_pcolormesh_ticks(ax, xvalues=Eg, yvalues=Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+
         if fig is not None:
-            cbar = fig.colorbar(lines, ax=ax)
+            if zmin is not None and zmax is not None:
+                cbar = fig.colorbar(lines, ax=ax, extend='both')
+            elif zmin is not None:
+                cbar = fig.colorbar(lines, ax=ax, extend='min')
+            elif zmax is not None:
+                cbar = fig.colorbar(lines, ax=ax, extend='max')
+            else:
+                cbar = fig.colorbar(lines, ax=ax)
+
             cbar.ax.set_ylabel("# counts")
             plt.show()
-        return ax
+        return lines, ax, fig
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
@@ -279,7 +300,7 @@ class Matrix():
 
     def projection(self, axis: Union[int, str], Emin: float = None,
                    Emax: float = None,
-                   normalize: bool = False) -> Tuple[np.ndarray]:
+                   normalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """ Returns the projection along the specified axis
 
         Args:
@@ -710,13 +731,13 @@ def fix_pcolormesh_ticks(axis, xvalues: np.ndarray,
     # Shift all bins by ΔE/2 to get the ticks right
     if len(axis.get_xticks()) > len(xvalues):
         axis.set_xticks(xvalues[:-1] + (xvalues[1]-xvalues[0])/2)
-    else:
+    elif len(xvalues) < 20:
         ticks = fix_bin_ticks(axis.get_xticks(), xvalues)
         axis.set_xticks(ticks)
 
     if len(axis.get_yticks()) > len(yvalues):
         axis.set_yticks(yvalues[:-1] + (yvalues[1]-yvalues[0])/2)
-    else:
+    elif len(yvalues) < 20:
         ticks = fix_bin_ticks(axis.get_yticks(), yvalues)
         axis.set_yticks(ticks)
 
@@ -735,10 +756,15 @@ def fix_bin_ticks(ticks: Sequence[float],
     Returns:
         The values in values closest to ticks
     """
-    first = np.argmin(np.abs(values - ticks[0]))
-    second = np.argmin(np.abs(values - ticks[1]))
+    first, second = 0, 0
+    i = 0
+    while first == second:
+        first = np.argmin(np.abs(values - ticks[i]))
+        second = np.argmin(np.abs(values - ticks[i+1]))
+        i += 1
+
     step = second - first
-    half_bin = (values[1] - values[0])/2
+    half_bin = abs(values[1] - values[0])/2
     new_ticks: List[float] = []
     i = first
     while len(new_ticks) < len(values):
@@ -747,5 +773,7 @@ def fix_bin_ticks(ticks: Sequence[float],
             break
         new_ticks.append(tick)
         i += step
+        if i >= len(values):
+            break
     return new_ticks
 
