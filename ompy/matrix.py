@@ -624,7 +624,7 @@ class Matrix():
             if naxis:
                 return Matrix(Eg=edges, Ex=self.Ex, values=rebinned)
             else:
-                return Matrix(Eg=self.Eg, Ex=rebinned, values=rebinned)
+                return Matrix(Eg=self.Eg, Ex=edges, values=rebinned)
 
     def fill_negative(self, window_size):
         self.values = fill_negative(self.values, window_size)
@@ -712,6 +712,8 @@ class Matrix():
         return self.values.__setitem__(key, item)
 
     def __sub__(self, other) -> Matrix:
+        if not isinstance(other, Matrix):
+            raise TypeError("Other must be a Matrix")
         if np.all(self.Ex != other.Ex) or np.all(self.Eg != other.Eg):
             raise NotImplementedError()
             # other = other.rebin('Ex', self.Ex, inplace=False)
@@ -721,6 +723,8 @@ class Matrix():
         return result
 
     def __add__(self, other) -> Matrix:
+        if not isinstance(other, Matrix):
+            raise TypeError("Other must be a Matrix")
         raise NotImplementedError
 
     def __rmul__(self, factor) -> Matrix:

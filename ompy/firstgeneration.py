@@ -142,7 +142,6 @@ class FirstGeneration:
 
         G = (N * W) @ matrix.values
         H = matrix.values - G
-        H[H < 0] = 0.001
         return H, W
 
     def multiplicity_normalization(self, matrix: Matrix) -> np.ndarray:
