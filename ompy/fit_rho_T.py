@@ -37,44 +37,53 @@ from .rebin import rebin_2D
 from .constants import *
 from .matrix import Matrix
 from .matrix import Vector
-import numpy as np
 import copy
+import numpy as np
 from scipy.optimize import minimize
+from typing import Optional, Any, Union, Dict, Tuple
+import logging
+
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 # Define constants from constants.py as global vars
 global DE_PARTICLE
 global DE_GAMMA_1MEV
 global DE_GAMMA_8MEV
 
+
 class FitRhoT:
     def __init__(self,
-                 firstgen_in, firstgen_std_in,
-                 bin_width_out,
-                 Ex_min, Ex_max, Eg_min,
-                 method="Powell",
-                 verbose=True,
-                 negatives_penalty=0,
-                 regularizer=0,
+                 firstgen: Matrix,
+                 firstgen_std: Matrix,
+                 bin_width_out: float,
+                 Ex_min: float, Ex_max: float,
+                 Eg_min: float,
+                 method: str = "Powell",
+                 verbose: bool = True,
+                 negatives_penalty: float = 0,
+                 regularizer: float = 0,
                  options={'disp': True}):
         """
         Class Wrapper for fit of the firstgen spectrum to the product of transmission coeff T and level density rho
 
         Args:
-            firstgen (Matrix): The first-generation matrix.
-            firstgen_std (Matrix): The standard deviations in the first-gen matrix
-            bin_width_out (float): Bin-width of the output rho and T
-            Ex_min (float): Minimum excitation energy for the fit
-            Ex_max (float): Maximum excitation energy for the fit
-            Eg_min (float): Minimum gamma-ray energy for the fit
+            firstgen: The first-generation matrix.
+            firstgen_std: The standard deviations in the first-gen matrix
+            bin_width_out: Bin-width of the output rho and T
+            Ex_min: Minimum excitation energy for the fit
+            Ex_max: Maximum excitation energy for the fit
+            Eg_min: Minimum gamma-ray energy for the fit
                             (Eg_max is equal to Ex_max)
-            method (str): Method to use for minimization.
+            method: Method to use for minimization.
                           Must be one of the methods available
                           in scipy.optimize.minimize.
-            verbose (bool): Whether to print information
+            verbose: Whether to print information
                             from the fitting routine.
-            negatives_penalty : For Chi2 # TODO: send to fit
-            regularizer : For Chi2 # TODO: send to fit
-            options (dict): Options to the minimization routine. See docs of
+            negatives_penalty: For Chi2 # TODO: send to fit
+            regularizer: For Chi2 # TODO: send to fit
+            options: Options to the minimization routine. See docs of
                 scipy.optimize.minimize
 
         TODO:
@@ -83,22 +92,22 @@ class FitRhoT:
                   the standard deviation using the rhosigchi techniques.
         """
         # Protect the input matrix:
-        self.firstgen_in = copy.deepcopy(firstgen_in)
-        self.firstgen_std_in = copy.deepcopy(firstgen_in)
+        matrix: Matrix = copy.deepcopy(firstgen)
+        std: Matrix = copy.deepcopy(firstgen_std)
         self.bin_width_out = bin_width_out
         self.Ex_min = Ex_min
         self.Ex_max = Ex_max
         self.Eg_min = Eg_min
         self.method = method
         self.verbose = verbose
-        self.negatives_penalty = negatives_penalty # TODO: send to fit
-        self.regularizer = regularizer # TODO: send to fit
+        self.negatives_penalty = negatives_penalty  # TODO: send to fit
+        self.regularizer = regularizer  # TODO: send to fit
         self.options = options
-        self.check_input()
+        self.check_input(matrix, std, Ex_min, Eg_min)
 
         # To be filled later
-        self.firstgen = None
-        self.firstgen_std = None
+        self.firstgen: Optional[Matrix] = None
+        self.firstgen_std: Optional[Matrix] = None
         self.Pfit = None
 
         self.dE_max_res = None
@@ -106,137 +115,82 @@ class FitRhoT:
 
         # Prepare fit
         # need to calculate detector resolution for recalibration
-        self.calc_resolution(Ex_array=self.firstgen_in.Ex)
-        self.recalibrate_and_cut()
+        self.calc_resolution(Ex_array=firstgen.Ex)
+        self.firstgen, self.firstgen_std = self.recalibrate_and_cut(matrix, std)
+        return
         # resolution might change slightly after rebinning
         self.calc_resolution(Ex_array=self.firstgen.Ex)
 
-
-    def check_input(self):
+    def check_input(self, matrix: Matrix, std: Matrix, Ex_min: float, Eg_min: float):
         """Checks input
 
         Raises:
-            Exception: If there is a mismatch in shape or calibration
-            ValueError: If input values are unphysical
+            ValueError: If input values are incompatible or are unphysical
         """
         # Check that firstgen and firstgen_std calibration match each other
-        firstgen_in = self.firstgen_in
-        firstgen_std_in = self.firstgen_std_in
-        if not (firstgen_in.calibration() == firstgen_std_in.calibration()):
-            raise Exception("Calibration mismatch between firstgen_in and"
-                            " firstgen_std_in.")
-        if not (firstgen_in.values.shape == firstgen_std_in.values.shape):
-            raise Exception("Shape mismatch between firstgen_in and"
-                            " firstgen_std_in")
+        if not matrix.calibration() == std.calibration():
+            raise ValueError("Calibration mismatch between matrix and std.")
+        if not matrix.values.shape == std.values.shape:
+            raise ValueError("Shape mismatch between matrix and std")
 
         # Check that there are no negative counts
-        assert firstgen_in.values.min() >= 0, "no negative counts"
-        assert firstgen_std_in.values.min() >= 0, "no negative stddevs"
+        assert matrix.values.min() >= 0, "no negative counts allowed"
+        assert std.values.min() >= 0, "no negative stddevs allowed"
 
         # Check that Ex_min >= Eg_min:
-        Ex_min = self.Ex_min
-        Eg_min = self.Eg_min
         if Ex_min < Eg_min:
             raise ValueError("Ex_min must be >= Eg_min.")
 
-
-    # def fit_rho_T(self):
-    #     """Performs the fit
-
-    #     Returns:
-    #         rho, T (tuple):
-    #             rho (Vector): Fit result for rho
-    #             T (Vector): Fit result for T
-    #     Todo:
-    #         - Check rebinning/interpolation of 1Gen uncertainty
-    #     """
-
-
-
-    #     firstgen_in, firstgen_std_in, bin_width_out,
-    #               Ex_min, Ex_max, Eg_min,
-    #               method="Powell",
-    #               verbose=True,
-    #               negatives_penalty=0,
-    #               regularizer=0
-
-    def recalibrate_and_cut(self):
+    def recalibrate_and_cut(self, matrix: Matrix, std: Matrix) -> Tuple[Matrix, Matrix]:
         """
         Set calibration & cuts [Ex_min:Ex_max, Eg_min:Eg_max] for input matrix.
         """
-        Eg_min = self.Eg_min
-        Ex_min = self.Ex_min
-        bin_width_out = self.bin_width_out
-        firstgen_in = self.firstgen_in
-        firstgen_std_in = self.firstgen_std_in
-        Ex_max = self.Ex_max
-
-        E_min = min(Eg_min, Ex_min)
-        # TODO: SHOULD THIS BE + +bin_width_out/2 (?)
-        Eg_max = Ex_max + self.dE_max_res
-        calib_fit = {"a0": E_min, "a1": bin_width_out}
+        E_min = min(self.Eg_min, self.Ex_min)
+        dE_resolution = lib.diagonal_resolution(matrix.Ex)
+        Eg_max = self.Ex_max + dE_resolution.max()
+        a0 = E_min
+        a1 = self.bin_width_out
         # Set up the energy arrays for recalibration of 1Gen matrix
-        Eg_array = lib.E_array_from_calibration(a0=calib_fit["a0"],
-                                                a1=calib_fit["a1"],
-                                                E_max=Eg_max)
+        Eg = lib.E_array_from_calibration(a0=a0, a1=a1, E_max=Eg_max)
         # Cut away the "top" of the Ex-array, which is too large
         # when we have a bad detector resolution
-        i_Exmax = (np.abs(Eg_array-Ex_max)).argmin()+1
-        Ex_array = Eg_array[:i_Exmax]
+        i_Exmax = (np.abs(Eg-self.Ex_max)).argmin()+1
+        Ex = Eg[:i_Exmax]
 
-        # Rebin firstgen to calib_fit along both axes and store it in a new Matrix:
-        firstgen = Matrix()
-        firstgen.values = rebin_2D(firstgen_in.values,
-                                       firstgen_in.Ex,
-                                       Ex_array, rebin_axis=0)
-        firstgen.values = rebin_2D(firstgen.values,
-                                       firstgen_in.Eg,
-                                       Eg_array, rebin_axis=1)
-        # Set energy axes accordingly
-        firstgen.Ex = Ex_array
-        firstgen.Eg = Eg_array
-        # Update 20190212: Interpolate the std matrix instead of rebinning:
+        # Rebin firstgen to calib_fit along both axes
+        recalibrated = matrix.rebin('Ex', Ex, inplace=False)
+        assert recalibrated is not None
+        recalibrated.rebin('Eg', Eg)
+
         # TODO: Is this the propper way to get the uncertainties
-        firstgen_std = Matrix()
-        firstgen_std.values = lib.interpolate_matrix_2D(
-                firstgen_std_in.values,
-                firstgen_std_in.Ex,
-                firstgen_std_in.Eg,
-                Ex_array,
-                Eg_array
-                )
-        # Set energy axes accordingly
-        firstgen_std.Ex = Ex_array
-        firstgen_std.Eg = Eg_array
+        interpolated_std = Matrix(Ex=Ex, Eg=Eg)
+        interpolated_std.values = lib.interpolate_matrix_2D(
+            std.values, std.Ex, std.Eg,
+            Ex, Eg
+        )
         # Verify that it got rebinned and assigned correctly:
-        calib_firstgen = firstgen.calibration()
+        calib = recalibrated.calibration()
         assert (
-                calib_firstgen["a00"] == calib_fit["a0"] and
-                calib_firstgen["a01"] == calib_fit["a1"] and
-                calib_firstgen["a10"] == calib_fit["a0"] and
-                calib_firstgen["a11"] == calib_fit["a1"]
-               ), "firstgen does not have correct calibration."
-        calib_firstgen_std = firstgen_std.calibration()
-        assert (
-                calib_firstgen_std["a00"] == calib_fit["a0"] and
-                calib_firstgen_std["a01"] == calib_fit["a1"] and
-                calib_firstgen_std["a10"] == calib_fit["a0"] and
-                calib_firstgen_std["a11"] == calib_fit["a1"]
-               ), "firstgen_std does not have correct calibration."
+            calib["a00"] == a0 and
+            calib["a01"] == a1 and
+            calib["a10"] == a0 and
+            calib["a11"] == a1
+        ), "recalibrated does not have correct calibration."
+        assert calib == interpolated_std.calibration(), "interpolated_std does not have correct calibration."
 
-        self.firstgen = firstgen
-        self.firstgen_std = firstgen_std
+        return recalibrated, interpolated_std
 
-
-    def fit(self, p0: np.ndarray = None, use_z=False, spin_dist_par=None):
+    def fit(self, p0: Optional[np.ndarray] = None,
+            use_z: Optional[Union[bool, np.ndarray]] = False,
+            spin_dist_par: Optional[Dict[str, Any]] = None):
         """Helper class just for now: sends FG to fit and get rho and T
 
         Args:
-            p0 (np.ndarray, optional):
+            p0:
                 Initial guess for nld and transmission coefficient, given as a
                 1D array (rho0, T0). Defaults to the choice desribed in
                 Schiller2000
-            use_z (bool or np.ndarray, optional):
+            use_z:
                 If `bool`, it either uses the additional "z-factor" in the
                 decomposition, which is a spin-dependent factor *potentially*
                 missing in the previous implementations of the Oslo Method. By
@@ -244,18 +198,13 @@ class FitRhoT:
                 created matching the specified spin-parity distribution
                 `spin_dist_par`. If the type is `np.ndarray(shape=(Nbins_Ex,
                 Nbins_T))`, it will use the specified array directly.
-            spin_dist_par (dict, optional):
+            spin_dist_par:
                 Dict of spin-parity paramters to create the `z-factor`, see
                 `use_z`.
         """
         Eg_min = self.Eg_min
-        Ex_min = self.Ex_min
         Ex_max = self.Ex_max
         bin_width_out = self.bin_width_out
-
-        pars_fg = {"Egmin": Eg_min,
-                   "Exmin": Ex_min,
-                   "Emax": Ex_max}
 
         Enld_array = lib.E_array_from_calibration(a0=-self.dE_max_res,
                                                   a1=bin_width_out,
@@ -263,7 +212,6 @@ class FitRhoT:
         Enld_array -= bin_width_out/2
         Ex_array = self.firstgen.Ex
         Eg_array = self.firstgen.Eg
-
 
         result = rsg.decompose_matrix(self.firstgen.values,
                                       self.firstgen_std.values,
@@ -282,7 +230,6 @@ class FitRhoT:
         else:
             rho_fit, T_fit, z_array = result
 
-
         rho = Vector(rho_fit, Enld_array)
         T = Vector(T_fit, Eg_array)
 
@@ -299,13 +246,13 @@ class FitRhoT:
         else:
             z_array = np.ones((len(Ex_array), len(Eg_array)))
         Pfit = rsg.PfromRhoT(rho_fit, T_fit,
-                            len(Ex_array),
-                            Emid_Eg=Eg_array+bin_width_out/2,
-                            Emid_nld=Enld_array+bin_width_out/2,
-                            Emid_Ex=Ex_array+bin_width_out/2,
-                            dE_resolution = self.dE_resolution,
-                            z_array_in=z_array)
-        self.Pfit = Matrix(Pfit, Ex=Ex_array, Eg=Eg_array)
+                             len(Ex_array),
+                             Emid_Eg=Eg_array+bin_width_out/2,
+                             Emid_nld=Enld_array+bin_width_out/2,
+                             Emid_Ex=Ex_array+bin_width_out/2,
+                             dE_resolution=self.dE_resolution,
+                             z_array_in=z_array)
+        self.Pfit = Matrix(values=Pfit, Ex=Ex_array, Eg=Eg_array)
 
     def calc_resolution(self, Ex_array):
         """ Calculate Ex-dependent detector resolution (sum of sqroot)
@@ -318,9 +265,10 @@ class FitRhoT:
         # Interpolate the gamma resolution linearly:
         Eg_array = Ex_array + self.bin_width_out/2
         dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
-                    * (Ex_array - 1000))  + DE_GAMMA_1MEV
+                    * (Ex_array - 1000)) + DE_GAMMA_1MEV
 
         dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
 
         self.dE_max_res = np.max(dE_resolution)
         self.dE_resolution = dE_resolution
+        return dE_resolution

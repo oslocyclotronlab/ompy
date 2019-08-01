@@ -404,29 +404,6 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
         `nld_trans` and/or `gsf_trans`: Transformed `nld` and or `gsf`,
                                         depending on what input is given.
 
-<<<<<<< variant A
-    Parameters
-    ----------
-    im
-        The AxesImage to be labeled.
-    data
-        Data used to annotate.  If None, the image's data is used.  Optional.
-    valfmt
-        The format of the annotations inside the heatmap.  This should either
-        use the string format method, e.g. "$ {x:.2f}", or be a
-        `matplotlib.ticker.Formatter`.  Optional.
-    textcolors
-        A list or array of two color specifications.  The first is used for
-        values below a threshold, the second for those above.  Optional.
-    threshold
-        Value in data units according to which the colors from textcolors are
-        applied.  If None (the default) uses the middle of the colormap as
-        separation.  Optional.
-    **kwargs
-        All other arguments are forwarded to each call to `text` used to create
-        the text labels.
->>>>>>> variant B
-======= end
     """
 
     # Need to sweep though multinest samples in random order
@@ -487,3 +464,76 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
         return gsf_trans
     elif nld is not None:
         return nld_trans
+
+
+def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
+    """ Calculate Ex-dependent detector resolution (sum of sqroot)
+    Args:
+        Ex: Excitation energy bin array
+    """
+    # Assume constant particle resolution:
+    dE_particle = DE_PARTICLE
+    # Interpolate the gamma resolution linearly:
+    dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
+                * (Ex - 1000)) + DE_GAMMA_1MEV
+
+    dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
+    return dE_resolution
+
+
+def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
+                     textcolors=["black", "white"],
+                     threshold=None, **textkw):
+    """
+    A function to annotate a heatmap.
+    Parameters
+    ----------
+    im
+        The AxesImage to be labeled.
+    data
+        Data used to annotate.  If None, the image's data is used.  Optional.
+    valfmt
+        The format of the annotations inside the heatmap.  This should either
+        use the string format method, e.g. "$ {x:.2f}", or be a
+        `matplotlib.ticker.Formatter`.  Optional.
+    textcolors
+        A list or array of two color specifications.  The first is used for
+        values below a threshold, the second for those above.  Optional.
+    threshold
+        Value in data units according to which the colors from textcolors are
+        applied.  If None (the default) uses the middle of the colormap as
+        separation.  Optional.
+    **kwargs
+        All other arguments are forwarded to each call to `text` used to create
+        the text labels.
+    """
+
+    # Normalize the threshold to the images color range.
+    if threshold is not None:
+        threshold = im.norm(threshold)
+    else:
+        threshold = im.norm(matrix.values.max())/2.
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by textkw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(textkw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(valfmt, str):
+        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    texts = []
+    dx = matrix.Ex[1] - matrix.Ex[0]
+    dg = matrix.Eg[1] - matrix.Eg[0]
+    for j, i in product(*map(range, matrix.shape)):
+        x = matrix.Eg[i] + dg/2
+        y = matrix.Ex[j] + dx/2
+        kw.update(color=textcolors[int(im.norm(matrix.values[i, j]) > threshold)])
+        text = im.axes.text(y, x, valfmt(matrix.values[i, j], None), **kw)
+        texts.append(text)
+
+    return texts

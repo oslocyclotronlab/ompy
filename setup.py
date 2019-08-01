@@ -26,6 +26,7 @@ setup(name='OMpy',
       install_requires=[
           'numpy',
           'matplotlib',
-          'termtables'
+          'termtables',
+          'pymultinest'
       ]
       )
