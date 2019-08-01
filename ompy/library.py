@@ -35,6 +35,8 @@ from scipy.interpolate import interp1d, RectBivariateSpline
 import matplotlib
 from itertools import product
 
+import ompy as om
+
 
 def mama_read(filename):
     # Reads a MAMA matrix file and returns the matrix as a numpy array,
@@ -126,7 +128,7 @@ def mama_write(mat, filename, comment=""):
 
 def read_response(fname_resp_mat, fname_resp_dat):
     # Import response matrix
-    R, cal_R, Eg_array_R, tmp = read_mama_2D(fname_resp_mat)
+    R, cal_R, Eg_array_R, tmp = mama_read(fname_resp_mat)
     # We also need info from the resp.dat file:
     resp = []
     with open(fname_resp_dat) as file:
@@ -138,8 +140,8 @@ def read_response(fname_resp_mat, fname_resp_dat):
                 resp.append(row)
             except:
                 break
-    
-    
+
+
     resp = np.array(resp)
     # Name the columns for ease of reading
     FWHM = resp[:,1]#*6.8 # Correct with fwhm @ 1.33 MeV?
@@ -171,14 +173,12 @@ def div0(a, b):
 
 def i_from_E(E, E_array):
     # Returns index of the E_array value closest to given E
+    assert(E_array.ndim == 1), "E_array has more then one dimension"
     return np.argmin(np.abs(E_array - E))
 
 
 def line(x, points):
-    """
-    Returns a line through coordinates [x1,y1,x2,y2]=points
-
-
+    """ Returns a line through coordinates [x1,y1,x2,y2]=points
     """
     a = (points[3]-points[1])/float(points[2]-points[0])
     b = points[1] - a*points[0]
@@ -188,31 +188,12 @@ def line(x, points):
 def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     # Make masking array to cut away noise below Eg=Ex+dEg diagonal
     # Define cut   x1    y1    x2    y2
-    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array), 
+    cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array),
                   i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
-    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis 
+    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis
     j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
     i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
-
-
-
-def EffExp(Eg_array):
-    # Function from MAMA which makes an additional efficiency correction based on discriminator thresholds etc.
-    # Basically there is a hard-coded set of energies and corresponding efficiencies in MAMA, and it should be 
-    # zero below and 1 above this range.
-    Egs = np.array([30.,80.,122.,183.,244.,294.,344.,562.,779.,1000])
-    Effs = np.array([0.0,0.0,0.0,0.06,0.44,0.60,0.87,0.99,1.00,1.000])
-    EffExp_array =  np.zeros(len(Eg_array))
-    for iEg in range(len(Eg_array)):
-        if Eg_array[iEg] < Egs.min():
-            EffExp_array[iEg] = 0
-        elif Eg_array[iEg] >= Egs.max():
-            EffExp_array[iEg] = 1
-        else:
-            EffExp_array[iEg] = Effs[np.argmin(np.abs(Egs - Eg_array[iEg]))]
-
-    return EffExp_array
 
 
 def E_array_from_calibration(a0, a1, N=None, E_max=None):
@@ -330,6 +311,7 @@ def interpolate_matrix_1D(matrix_in, E_array_in, E_array_out, axis=1):
 
     return matrix_out
 
+
 def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
                           E0_array_out, E1_array_out):
     """Does a two-dimensional interpolation of the given matrix to the _out
@@ -398,29 +380,31 @@ def get_discretes(Emids, fname, resolution=0.1):
     return hist_smoothed, hist
 
 
-def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
-    """ Calculate Ex-dependent detector resolution (sum of sqroot)
+def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
+                     N_max: int = 100,
+                     random_state=np.random.RandomState(65489)):
+    """
+    Use a list(dict) of samples of `A`, `B`, and `alpha` parameters from
+    multinest to transform a (list of) nld and/or gsf sample(s). Can be used
+    to normalize the nld and/or gsf
 
     Args:
-        Ex: Excitation energy bin array
-    """
-    # Assume constant particle resolution:
-    dE_particle = DE_PARTICLE
-    # Interpolate the gamma resolution linearly:
-    # Eg = Ex + self.bin_width_out/2
-    dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
-                * (Ex - 1000))  + DE_GAMMA_1MEV
+        samples (dict): Multinest samples.
+        nld (om.Vector or list/array[om.Vector], optional):
+            nld ("unnormalized")
+        gsf (om.Vector or list/array[om.Vector], optional):
+            gsf ("unnormalized")
+        N_max (int, optional): Maximum number of samples returned if `nld`
+                               and `gsf` is a list/array
+        random_state (optional): random state, set by default such that
+                                 a repeted use of the function gives the same
+                                 results.
 
-    dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
-    #dE_max_res = np.max(dE_resolution)
-    return dE_resolution
+    Returns:
+        `nld_trans` and/or `gsf_trans`: Transformed `nld` and or `gsf`,
+                                        depending on what input is given.
 
-def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
-                     textcolors=["black", "white"],
-                     threshold=None, **textkw):
-    """
-    A function to annotate a heatmap.
-
+<<<<<<< variant A
     Parameters
     ----------
     im
@@ -441,37 +425,65 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     **kwargs
         All other arguments are forwarded to each call to `text` used to create
         the text labels.
+>>>>>>> variant B
+======= end
     """
 
-    #if not isinstance(data, (list, np.ndarray)):
-    #    data = im.get_array()
+    # Need to sweep though multinest samples in random order
+    # as they are ordered with decreasing likelihood by default
+    for key, value in samples.items():
+        N_multinest = len(value)
+        break
+    randlist = np.arange(N_multinest)
+    random_state.shuffle(randlist)  # works in-place
 
-    # Normalize the threshold to the images color range.
-    if threshold is not None:
-        threshold = im.norm(threshold)
-    else:
-        threshold = im.norm(matrix.values.max())/2.
+    if nld is not None:
+        A = samples["A"]
+        alpha = samples["alpha"]
+        if type(nld) is om.Vector:
+            N = min(N_multinest, N_max)
+        else:
+            N = len(nld)
+        nld_trans = []
 
-    # Set default alignment to center, but allow it to be
-    # overwritten by textkw.
-    kw = dict(horizontalalignment="center",
-              verticalalignment="center")
-    kw.update(textkw)
+    if gsf is not None:
+        B = samples["B"]
+        alpha = samples["alpha"]
+        if type(gsf) is om.Vector:
+            N = min(N_multinest, N_max)
+        else:
+            N = len(gsf)
+        gsf_trans = []
 
-    # Get the formatter in case a string is supplied
-    if isinstance(valfmt, str):
-        valfmt = matplotlib.ticker.StrMethodFormatter(valfmt)
+    # transform the list
+    for i in range(N):
+        i_multi = randlist[i]
+        # nld loop
+        try:
+            if type(nld) is om.Vector:
+                nld_tmp = nld
+            else:
+                nld_tmp = nld[i]
+            nld_tmp = nld_tmp.transform(alpha=alpha[i_multi],
+                                        const=A[i_multi])
+            nld_trans.append(nld_tmp)
+        except:
+            pass
+        # gsf loop
+        try:
+            if type(gsf) is om.Vector:
+                gsf_tmp = gsf
+            else:
+                gsf_tmp = gsf[i]
+            gsf_tmp = gsf_tmp.transform(alpha=alpha[i_multi],
+                                        const=B[i_multi])
+            gsf_trans.append(gsf_tmp)
+        except:
+            pass
 
-    # Loop over the data and create a `Text` for each "pixel".
-    # Change the text's color depending on the data.
-    texts = []
-    dx = matrix.Ex[1] - matrix.Ex[0]
-    dg = matrix.Eg[1] - matrix.Eg[0]
-    for j, i in product(*map(range, matrix.shape)):
-        x = matrix.Eg[i] + dg/2
-        y = matrix.Ex[j] + dx/2
-        kw.update(color=textcolors[int(im.norm(matrix.values[i, j]) > threshold)])
-        text = im.axes.text(y, x, valfmt(matrix.values[i, j], None), **kw)
-        texts.append(text)
-
-    return texts
+    if nld is not None and gsf is not None:
+        return nld_trans, gsf_trans
+    elif gsf is not None:
+        return gsf_trans
+    elif nld is not None:
+        return nld_trans

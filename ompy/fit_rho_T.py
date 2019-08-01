@@ -111,6 +111,7 @@ class FitRhoT:
         # resolution might change slightly after rebinning
         self.calc_resolution(Ex_array=self.firstgen.Ex)
 
+
     def check_input(self):
         """Checks input
 
@@ -175,9 +176,9 @@ class FitRhoT:
         Eg_max = Ex_max + self.dE_max_res
         calib_fit = {"a0": E_min, "a1": bin_width_out}
         # Set up the energy arrays for recalibration of 1Gen matrix
-        Eg_array = E_array_from_calibration(a0=calib_fit["a0"],
-                                           a1=calib_fit["a1"],
-                                           E_max=Eg_max)
+        Eg_array = lib.E_array_from_calibration(a0=calib_fit["a0"],
+                                                a1=calib_fit["a1"],
+                                                E_max=Eg_max)
         # Cut away the "top" of the Ex-array, which is too large
         # when we have a bad detector resolution
         i_Exmax = (np.abs(Eg_array-Ex_max)).argmin()+1
@@ -226,9 +227,27 @@ class FitRhoT:
         self.firstgen = firstgen
         self.firstgen_std = firstgen_std
 
-    def fit(self, p0=None, use_z_correction=False, spin_dist_par=None):
 
-        """ Helper class just for now: sends FG to fit and get rho and T """
+    def fit(self, p0: np.ndarray = None, use_z=False, spin_dist_par=None):
+        """Helper class just for now: sends FG to fit and get rho and T
+
+        Args:
+            p0 (np.ndarray, optional):
+                Initial guess for nld and transmission coefficient, given as a
+                1D array (rho0, T0). Defaults to the choice desribed in
+                Schiller2000
+            use_z (bool or np.ndarray, optional):
+                If `bool`, it either uses the additional "z-factor" in the
+                decomposition, which is a spin-dependent factor *potentially*
+                missing in the previous implementations of the Oslo Method. By
+                default, it will be ignored. If `True`, then an array will be
+                created matching the specified spin-parity distribution
+                `spin_dist_par`. If the type is `np.ndarray(shape=(Nbins_Ex,
+                Nbins_T))`, it will use the specified array directly.
+            spin_dist_par (dict, optional):
+                Dict of spin-parity paramters to create the `z-factor`, see
+                `use_z`.
+        """
         Eg_min = self.Eg_min
         Ex_min = self.Ex_min
         Ex_max = self.Ex_max
@@ -238,24 +257,31 @@ class FitRhoT:
                    "Exmin": Ex_min,
                    "Emax": Ex_max}
 
-        Enld_array = E_array_from_calibration(a0=-self.dE_max_res,
-                                              a1=bin_width_out,
-                                              E_max=Ex_max-Eg_min)
+        Enld_array = lib.E_array_from_calibration(a0=-self.dE_max_res,
+                                                  a1=bin_width_out,
+                                                  E_max=Ex_max-Eg_min)
         Enld_array -= bin_width_out/2
         Ex_array = self.firstgen.Ex
         Eg_array = self.firstgen.Eg
 
-        rho_fit, T_fit = rsg.decompose_matrix(self.firstgen.values,
-                                          self.firstgen_std.values,
-                                          Emid_Eg=Eg_array+bin_width_out/2,
-                                          Emid_nld=Enld_array+bin_width_out/2,
-                                          Emid_Ex=Ex_array+bin_width_out/2,
-                                          dE_resolution=self.dE_resolution,
-                                          p0=p0,
-                                          method=self.method,
-                                          options=self.options,
-                                          use_z_correction=use_z_correction,
-                                          spin_dist_par=spin_dist_par)
+
+        result = rsg.decompose_matrix(self.firstgen.values,
+                                      self.firstgen_std.values,
+                                      Emid_Eg=Eg_array+bin_width_out/2,
+                                      Emid_nld=Enld_array+bin_width_out/2,
+                                      Emid_Ex=Ex_array+bin_width_out/2,
+                                      dE_resolution=self.dE_resolution,
+                                      p0=p0,
+                                      method=self.method,
+                                      options=self.options,
+                                      use_z=use_z,
+                                      spin_dist_par=spin_dist_par
+                                      )
+        if use_z is False:
+            rho_fit, T_fit = result
+        else:
+            rho_fit, T_fit, z_array = result
+
 
         rho = Vector(rho_fit, Enld_array)
         T = Vector(T_fit, Eg_array)
@@ -266,20 +292,19 @@ class FitRhoT:
 
         # save "bestfit"
         z_array = None
-        if use_z_correction:
+        if use_z:
             z_array = z(Ex_array+bin_width_out/2, Eg_array+bin_width_out/2,
                         # TODO implement custom spin_dist_par here:
                         spin_dist_par=spin_dist_par)
         else:
             z_array = np.ones((len(Ex_array), len(Eg_array)))
-        Pfit = PfromRhoT(rho_fit, T_fit,
-                             len(Ex_array),
-                             Emid_Eg=Eg_array+bin_width_out/2,
-                             Emid_nld=Enld_array+bin_width_out/2,
-                             Emid_Ex=Ex_array+bin_width_out/2,
-                             dE_resolution=self.dE_resolution,
-                             z_array_in=z_array
-                             )
+        Pfit = rsg.PfromRhoT(rho_fit, T_fit,
+                            len(Ex_array),
+                            Emid_Eg=Eg_array+bin_width_out/2,
+                            Emid_nld=Enld_array+bin_width_out/2,
+                            Emid_Ex=Ex_array+bin_width_out/2,
+                            dE_resolution = self.dE_resolution,
+                            z_array_in=z_array)
         self.Pfit = Matrix(Pfit, Ex=Ex_array, Eg=Eg_array)
 
     def calc_resolution(self, Ex_array):
