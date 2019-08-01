@@ -79,10 +79,11 @@ def first_generation_method(matrix_in,
     # # END DEBUG
 
     # Protect input arrays:
+    # print(matrix_in.values)
     unfolded_matrix = np.copy(matrix_in.values)
     Ex_array_mat = np.copy(matrix_in.Ex)
     Egamma_array = np.copy(matrix_in.Eg)
-
+    # print("A slice_orig:", unfolded_matrix[3,:])
 
     # Cut the input matrix at or above Ex=0. This is implicitly
     # done in MAMA by the variable IyL.
@@ -145,9 +146,13 @@ def first_generation_method(matrix_in,
     matrix_ex_compressed = unfolded_matrix
     Ex_array = Ex_array_mat
 
-
+    # print(unfolded_matrix[:15, :15])
     # Remove counts in matrix for Ex higher than Ex_max:
     matrix_ex_compressed[Ex_array > Ex_max, :] = 0
+    # print(matrix_ex_compressed[:15, :15])
+    # print("shape:", matrix_ex_compressed.shape)
+    # print("Ex_array_mat:", Ex_array_mat)
+    # print("A slice_before multi:", matrix_ex_compressed[2,:])
     # plt.matshow(matrix_ex_compressed)
     # plt.colorbar()
     # plt.show()
@@ -183,7 +188,7 @@ def first_generation_method(matrix_in,
         Egamma_average = div0(np.sum(
             Egamma_mesh * matrix_ex_compressed_cut, axis=1),
             area_matrix_ex_compressed_cut)
-         
+
 
         # Statistical multiplicity - use the effective Ex0 value
         multiplicity = div0(
@@ -232,12 +237,21 @@ def first_generation_method(matrix_in,
     # normalized boxes:
     # N_Exbins = np.argmin(np.abs(Ex_array - (Ex_max+dE_gamma)))  # TODO reimplement the energy arrays in a more consistent way
     H = np.zeros((N_Exbins, Nx))
-    for i in range(N_Exbins):
-        Ni = len(Egamma_array[Egamma_array < Ex_array[i] + dE_gamma])
-        # print("Ni =", Ni, flush=True)
-        H[i, Egamma_array < Ex_array[i] + dE_gamma] = 1 / max(Ni, 1)
+    # for i in range(N_Exbins):
+    #     Ni = len(Egamma_array[Egamma_array < Ex_array[i] + dE_gamma])
+    #     # print("Ni =", Ni, flush=True)
+    #     H[i, Egamma_array < Ex_array[i] + dE_gamma] = 1 / max(Ni, 1)
+
+    # H = np.ones_like(H)
+    asdf = np.zeros_like(H)
+    for i, j in diagonal_elements(matrix_ex_compressed):
+        asdf[i, :j] = 1/max(1, j)
+    H = asdf
     # Set up normalization matrix N
     # Get total number of counts in each Ex bin
+    print("H.shape", H.shape)
+    print("A H slice:", H[31:33,:15])
+    # print("A slice:", matrix_ex_compressed_cut[2,:])
     area = np.sum(matrix_ex_compressed_cut, axis=1)
     # plt.plot(Ex_array, area)
     # plt.show()
@@ -318,12 +332,7 @@ def first_generation_method(matrix_in,
             "unknown value for variable initial_weight_function",
             initial_weight_function)
 
-    # import matplotlib.pyplot as plt
-    # from matplotlib.colors import LogNorm
-    # fig, ax = plt.subplots(1)
-    # ax.pcolormesh(Ex_array, Ex_array, W_old, norm=LogNorm())
-    # print(W_old)
-    # return
+    print(W_old)
 
 
     E1 = (Ex_array[0], Ex_array[0] + dE_gamma)
@@ -338,7 +347,13 @@ def first_generation_method(matrix_in,
         # max_diff = 100
         # while max_diff > convergence_criterion:
         # Store H from previous iteration to compare at the end
+        import matplotlib.pyplot as plt
+        from matplotlib.colors import LogNorm
         H_old = np.copy(H)
+        fig, ax = plt.subplots(1)
+        lines= ax.pcolormesh(H)
+
+        fig.colorbar(lines, ax=ax)
         # Compress the H matrix along gamma axis to make it square and facilitate conversion to excitation energy
         # H_compressed = H[:,0:i_Egamma_max].reshape(N_Exbins, N_Exbins, grouping_Egamma).sum(axis=2)
         # H_compressed, Egamma_array_compressed = rebin(
@@ -367,20 +382,30 @@ def first_generation_method(matrix_in,
                 W[i, 0:i] = H_compressed[i, i:0:-1]
                 # TODO Consider implementing something like Massage(), but try to understand if it is necessary first.
 
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import LogNorm
-        if iteration == 1:
+        if iteration == 0:
             fig, ax = plt.subplots(1)
-            lines= ax.pcolormesh(Ex_array, Ex_array, H_compressed, 
-                    norm=LogNorm(vmin=1e-3, vmax=1e5))
+            print("H_comp slice: ", H_compressed[31:33,:15])
+            mask = np.isnan(H_compressed) | (H_compressed == 0)
+            masked = np.ma.array(H_compressed, mask=mask)
+            lines= ax.pcolormesh(Ex_array, Ex_array, masked,
+                    vmin=-200, vmax=200)
             fig.colorbar(lines, ax=ax)
+            plt.title("H_compressed")
+
             fig, ax = plt.subplots(1)
             lines = ax.pcolormesh(Ex_array, Ex_array, W,  norm=LogNorm(vmin=1e-3, vmax=1e5))
             fig.colorbar(lines, ax=ax)
+            plt.title("W")
 
         # Prevent oscillations, following MAMA:
         if iteration > 4:
             W = 0.7 * W + 0.3 * W_old
+
+        # if iteration == 0:
+            # print("H_comp slice: ", H_compressed[31:33,:15])
+        #     print("counts:", area)
+        #     print(normalization_matrix.shape)
+        #     print("normalization_mat:", normalization_matrix[:15,:15])
 
         # Remove Inf and NaN
         W = np.nan_to_num(W)
@@ -401,6 +426,16 @@ def first_generation_method(matrix_in,
         # What are the dimensions and calibrations?
         G = np.dot((normalization_matrix * W * valley_correction_array),
                    matrix_ex_compressed)
+
+        if iteration == 0:
+            fig, ax = plt.subplots(1)
+            print("W_final slice: ", W[31:33,:15])
+            mask = np.isnan(W) | (W == 0)
+            masked = np.ma.array(W, mask=mask)
+            lines= ax.pcolormesh(Ex_array, Ex_array, masked,
+                    vmin=-5, vmax=5)
+            fig.colorbar(lines, ax=ax)
+            plt.title("W_final")
 
         # Apply area correction
         if apply_area_correction:

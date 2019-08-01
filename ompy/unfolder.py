@@ -97,6 +97,10 @@ class Unfolder:
         self._Eg_min: float = None
         self._Eg_max: float = None
 
+    def __call__(self, matrix: Matrix) -> Matrix:
+        """ Wrapper for self.apply() """
+        return self.apply(matrix)
+
     def update_values(self):
         """Verify internal consistency and set default values
 
@@ -173,7 +177,7 @@ class Unfolder:
         """
         self.mask_points = (E1, E2)
 
-    def unfold(self, raw: Matrix) -> np.ndarray:
+    def apply(self, raw: Matrix) -> np.ndarray:
         """Run unfolding
 
         TODO: Use better criteria for terminating
@@ -190,7 +194,7 @@ class Unfolder:
         # Use u⁰ = r as initial guess
         unfolded = self.r
         for i in range(self.num_iter):
-            unfolded, folded = self.unfold_step(unfolded, folded, i)
+            unfolded, folded = self.step(unfolded, folded, i)
             unfolded_cube[i, :, :] = unfolded
             chisquare[i, :] = self.chi_square(folded)
             fluctuations[i, :] = self.fluctuations(unfolded)
@@ -216,7 +220,7 @@ class Unfolder:
         # unfolded.remove_negative()
         return unfolded
 
-    def unfold_step(self, unfolded, folded, step):
+    def step(self, unfolded, folded, step):
         """Perform a single step of Guttormsen unfolding
 
         Performs the steps
@@ -227,7 +231,7 @@ class Unfolder:
         """
         if step > 0:
             unfolded = unfolded + (self.r - folded)
-        folded = unfolded@self.R  # Should be equal to (R.T@unfolded.T).T
+        folded = unfolded@self.R
 
         # Suppress everything below the diagonal
         folded[self.mask] = 0.0
