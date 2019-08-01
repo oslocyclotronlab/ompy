@@ -103,7 +103,8 @@ def decompose_matrix(P_in, P_err,
                      p0=None,
                      method="Powell", options={'disp': True},
                      fill_value=0,
-                     use_z_correction=False, spin_dist_par=None):
+                     use_z=False,
+                     spin_dist_par=None):
     """ routine for the decomposition of the first generations spectrum P_in
 
     Parameters:
@@ -117,7 +118,14 @@ def decompose_matrix(P_in, P_err,
     options : dict
         minimization methods
     fill_value : currently unused
-
+    p0 (np.ndarray, optional):
+        Initial guess for nld and transmission coefficient. See `FitRhoT.fit()`
+    use_z (bool or np.ndarray, optional):
+        See `FitRhoT.fit`; if not `False`, the created z-factor array
+        will be returned.
+    spin_dist_par (dict, optional):
+        Dict of spin-parity paramters to create the `z-factor`, see
+        See `FitRhoT.fit`
 
     Returns:
     --------
@@ -125,6 +133,8 @@ def decompose_matrix(P_in, P_err,
         fitted nld
     T_fit: ndarray
         fitted transmission coefficient
+    z_array (optional): If `use_z` is not `False`, the array for the
+                        `z-factor`is returned, too
 
     """
     print("attempt decomposition")
@@ -148,10 +158,13 @@ def decompose_matrix(P_in, P_err,
 
     # Addition 20190329 to add z factor:
     z_array = None
-    if use_z_correction:
-        z_array = z(Emid_Ex, Emid_Eg, spin_dist_par=spin_dist_par)
-    else:
+    if use_z is False:
         z_array = np.ones((Nbins_Ex, Nbins_T))
+    elif use_z is True:
+        z_array = z_from_spin_dist(Emid_Ex, Emid_Eg,
+                                   spin_dist_par=spin_dist_par)
+    else:
+        z_array = use_z
     assert (z_array is not None), "z_array should be set"
 
     # initial guesses
@@ -182,9 +195,13 @@ def decompose_matrix(P_in, P_err,
     #   options={'disp': True}) # does a bad job
 
     p_fit = res.x
+
     rho_fit, T_fit = rhoTfrom1D(p_fit, Nbins_rho)
 
-    return rho_fit, T_fit
+    if use_z is False:
+        return rho_fit, T_fit
+    else:
+        return rho_fit, T_fit, z_array
 
 def normalize(P_in, P_err=0):
     ##############
@@ -312,7 +329,6 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
               np.ndarray dE_resolution, type="transCoeff",
               np.ndarray z_array_in=None):
     """ Generate a first gernation matrix P from given nld and T (or gsf)
-
     Parameters:
     -----------
     rho: ndarray
@@ -326,7 +342,6 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
     Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:
         bin number and bin center values
     Note: rho and T must have the same bin width
-
     Returns:
     --------
     P: ndarray
@@ -335,7 +350,7 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
 
     cdef int Nbins_T = len(T)
     cdef int i_Ex, i_Eg, i_Ef, Nbins
-    cdef double Ef ,Ex
+    cdef double Ef, Ex
     cdef double Eg
     cdef np.ndarray z_array
     if z_array_in is None:
@@ -358,11 +373,12 @@ def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,
             # if input T was a gsf, not transmission coeff: * E^(2L+1)
             if type == "gsfL1":
                 Eg = Emid_Eg[i_Eg]
-                P[i_Ex,i_Eg] *= np.power(Eg,3.)
+                P[i_Ex, i_Eg] *= np.power(Eg,3.)
     # normalize each Ex row to 1 (-> get decay probability)
-    for i, normalization in enumerate(np.sum(P,axis=1)):
-        P[i,:] /= normalization
+    for i, normalization in enumerate(np.sum(P, axis=1)):
+        P[i, :] /= normalization
     return P
+
 
 
 def div0(np.ndarray a, np.ndarray b ):
@@ -421,3 +437,66 @@ def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):
     Emid_nld = Emid[:i_Emax-i_Egmin]
 
     return array, Emid_Eg, Emid_Ex, Emid_nld
+
+def spin_dist(Ex, J, spincutModel, spincutPars):
+    """ See `SpinFunctions` """
+    return SpinFunctions(Ex=Ex, J=J,
+                         model=spincutModel,
+                         pars=spincutPars).distibution()
+
+
+def z_from_spin_dist(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):
+    """
+    Create a array for the *z-factor*, a spin-parity dependent factor
+    that *might* have be missing the in previous implementation of the
+    Oslo Method.
+    """
+    cdef np.ndarray z
+    cdef float inner_sum
+    cdef list Jfs
+    cdef float g_pop
+    cdef int ji
+    cdef int jf
+    cdef int i_Ex, i_Eg
+    cdef float Ex, Eg
+
+    # If no spin distribution parameters are specified, use some defaults:
+    # (TODO: This could be made nicer, but let's get some use experience first)
+    if spin_dist_par is None:
+        spin_dist_par = {
+            # some dummy values:
+            "spincutModel": "EB05",
+            "spincutPars": {"mass": 164, "NLDa": 25.16, "Eshift": 0.12},
+            "Jmax": 20
+        }
+
+    cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],
+                                     spin_dist_par["Jmax"]+1)
+
+    z = np.zeros((len(Exarr), len(Egarr)))
+
+    for i_Ex, Ex in enumerate(Exarr):
+        for i_Eg, Eg in enumerate(Egarr):
+            if Ex-Eg <= 0:
+                continue
+            for ji in Js:
+                if ji==0:
+                    Jfs = [1]
+                else:
+                    Jfs = [ji-1, ji, ji+1]
+                # assume g_pop propto g_int
+                # TODO: should the 1/2 be there?
+                g_pop = 1./2. * spin_dist(Ex, ji,
+                                          spin_dist_par["spincutModel"],
+                                          spin_dist_par["spincutPars"]
+                                          )
+                inner_sum = 0
+                for jf in Jfs:
+                    # TODO: should the 1/2 be there?
+                    inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
+                                             spin_dist_par["spincutModel"],
+                                             spin_dist_par["spincutPars"]
+                                             )
+                    # print(spin_dist(Ex-Eg, jf))
+                z[i_Ex, i_Eg] += g_pop * inner_sum
+    return z
