@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Implementation of the first generation method
+Implementation of the first generation method based on
 (Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in
 Physics Research A 255 (1987).)
 
@@ -32,7 +32,7 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Generator
+from typing import Tuple, Generator, Optional, Union
 from .matrix import Matrix
 from .library import div0
 from .rebin import rebin_2D
@@ -62,73 +62,110 @@ class FirstGeneration:
 
         self.num_iterations = 10
 
-        self.valley_collection: np.ndarray = None
+        self.valley_collection: Optional[np.ndarray] = None
         self.multiplicity_estimation = 'statistical'
+        self.use_slide: bool = False
 
-    def apply(self, unfolded: Matrix):
+    def __call__(self, matrix: Matrix) -> Matrix:
+        """ Wrapper for self.apply() """
+        return self.apply(matrix)
+
+    def apply(self, unfolded: Matrix) -> Matrix:
+        """ Apply the first generation method to a matrix
+
+        Args:
+            unfolded: An unfolded matrix to apply
+                the first generation method to.
+        Returns:
+            The first generation matrix
+        """
         matrix = copy.deepcopy(unfolded)
         # We don't want negative energies
         matrix.cut('Ex', Emin=0.0)
 
+        H, W, normalization = self.setup(matrix)
+        for iteration in range(self.num_iterations):
+            H_old = np.copy(H)
+            H, W = self.step(iteration, H, W, normalization, matrix)
+
+            diff = np.max(np.abs(H - H_old))
+            LOG.info("iter %i/%i: ε = %g", iteration+1,
+                     self.num_iterations, diff)
+
+        final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
+        final.state = "firstgen"
+        final.fill_negative(window_size=10)
+        final.remove_negative()
+        return final
+
+    def setup(self, matrix: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
+        # Set up initial first generation matrix with
+        # normalized Ex rows
+        H: np.ndarray = self.row_normalized(matrix)
+        # Initial weights should also be row normalized
+        W: np.ndarray = self.row_normalized(matrix)
+        # The multiplicity normalization
+        normalization = self.multiplicity_normalization(matrix)
+
+        return H, W, normalization
+
+
+    def step(self, iteration: int, H_old: np.ndarray,
+             W_old: np.ndarray, N: np.ndarray,
+             matrix: Matrix) -> Tuple[np.ndarray, np.ndarray]:
+        """ An iteration step in the first generation method
+
+        The most interesting part of the first generation method.
+        Implementation of a single step in the first generation method.
+
+        Args:
+            iteration: the current iteration step
+            H_old: The previous H matrix
+            W_old: The previous weights
+            N: The normalization
+            matrix: The matrix the method is applied to
+        """
+        H = rebin_2D(H_old, matrix.Eg, matrix.Ex, 1)
+        W = np.zeros_like(H)
+
+        for i in range(W.shape[0]):  # Loop over Ex rows
+            W[i, :i] = H[i, i:0:-1]
+
+        # Prevent oscillations
+        if iteration > 4:
+            W = 0.7*W + 0.3*W_old
+        W = np.nan_to_num(W)
+        W[W < 0] = 0.0
+
+        # Normalize each row to unity
+        W = normalize_rows(W)
+
+        G = (N * W) @ matrix.values
+        H = matrix.values - G
+        H[H < 0] = 0.001
+        return H, W
+
+    def multiplicity_normalization(self, matrix: Matrix) -> np.ndarray:
+        """ Generate multiplicity normalization
+
+        Args:
+            matrix: The matrix to find the multiplicty
+                normalization of.
+
+        Returns:
+            A square matrix of the normalization
+        """
         multiplicities = self.multiplicity(matrix)
         LOG.debug("Multiplicites:\n%s", tt.to_string(
             np.vstack([matrix.Ex, multiplicities.round(2)]).T,
             header=('Ex', 'Multiplicities')
             ))
         assert (multiplicities >= 0).all(), "Bug. Contact developers"
-
-        # Set up initial first generation matrix with
-        # normalized Ex rows
-        H = self.row_normalized(matrix)
-        # Initial weights should also be row normalized
-        W = self.row_normalized(matrix)
-
         sum_counts, _ = matrix.projection('Ex')
 
         normalization = div0(np.outer(sum_counts, multiplicities),
                              np.outer(multiplicities, sum_counts))
-
-        for iteration in range(self.num_iterations):
-            H_old = np.copy(H)
-            W_old = np.copy(W)
-
-            H = rebin_2D(H, matrix.Eg, matrix.Ex, 1)
-
-            mat = Matrix(values=H, Ex=matrix.Ex, Eg=matrix.Ex)
-            if iteration == 1:
-                mat.plot(zscale='log', title=r'$H_{compressed}$',
-                        vmin=1e-3, vmax=1e5)
-
-            W = np.zeros_like(H)
-            for i in range(W.shape[0]):  # Loop over Ex rows
-                W[i, :i] = H[i, i:0:-1]
-
-            if iteration == 1:
-                mat = Matrix(values=W, Ex=matrix.Ex, Eg=matrix.Ex)
-                mat.plot(zscale='log', title=r'$W$', vmin=1e-3, vmax=1e5)
-
-            # Prevent oscillations
-            if iteration > 4:
-                W = 0.7*W + 0.3*W_old
-            W = np.nan_to_num(W)
-            W[W < 0] = 0.0
-
-            # Normalize each row to unity
-            W = div0(W, W.sum(axis=1))
-
-            G = (normalization * W) @ matrix.values
-            H = matrix.values - G
-
-            diff = np.max(np.abs(H - H_old))
-            LOG.info("iter %i/%i: ε = %g", iteration,
-                     self.num_iterations, diff)
-        final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
-        final.state = "firstgen"
-        return final
-
-        # fig, ax = plt.subplots(1)
-        # ax.pcolormesh(matrix.Eg, matrix.Ex, matrix.values, norm=LogNorm())
-        # print(np.sum(H, axis=1)) # Seems to work!
+        return normalization
 
     def multiplicity(self, matrix: Matrix) -> np.ndarray:
         """ Dispatch method returning statistical or total multiplicity
@@ -163,9 +200,12 @@ class FirstGeneration:
         values = copy.copy(matrix.values)
         Eg, Ex = np.meshgrid(matrix.Eg, matrix.Ex)
         Ex_prime = Ex * self.statistical_ratio
-        slide = np.minimum(np.maximum(Ex_prime,
-                                      self.statistical_lower),
-                           self.statistical_upper)
+        if self.use_slide:
+            slide = np.minimum(np.maximum(Ex_prime,
+                                          self.statistical_lower),
+                               self.statistical_upper)
+        else:
+            slide = self.statistical_upper
         values[slide > Eg] = 0.0
 
         # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
@@ -195,7 +235,7 @@ class FirstGeneration:
         """
         # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
         sum_counts = np.sum(matrix.values, axis=1)
-        Eg_sum_counts = np.sum(matrix.Eg*matrix.values, axis=1)
+        Eg_sum_counts = np.sum((matrix.Eg)*matrix.values, axis=1)
         Eg_mean = div0(Eg_sum_counts, sum_counts)
         multiplicity = div0(matrix.Ex, Eg_mean)
         multiplicity[multiplicity < 0] = 0
@@ -240,3 +280,9 @@ def diagonal_elements(mat: Matrix) -> Generator[Tuple[int, int], None, None]:
             if col != 0.0:
                 yield i, Ny-j
                 break
+
+
+def normalize_rows(array: np.ndarray) -> np.ndarray:
+    """ Normalize each row to unity """
+    return div0(array, array.sum(axis=1).reshape(array.shape[1], 1))
+    # return div0(array, array.sum(axis=1)[:, np.newaxis])

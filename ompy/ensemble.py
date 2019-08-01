@@ -64,8 +64,8 @@ class Ensemble:
     def __init__(self, raw: Matrix, save_path: str = "ensemble"):
         self.raw: Matrix = raw
         self.save_path: str = save_path
-        self.unfolder: Unfolder = None
-        self.first_generation_method: Callable = None
+        self.unfolder: Callable[[Matrix], Matrix] = None
+        self.first_generation_method: Callable[[Matrix], [Matrix]] = None
         self.size = 0
         if not os.path.exists(self.save_path):
             os.mkdir(self.save_path)
@@ -172,7 +172,7 @@ class Ensemble:
         unfolded = self.load(path)
         if unfolded is None:
             LOG.debug("Unfolding matrix")
-            unfolded = self.unfolder.unfold(raw)
+            unfolded = self.unfolder(raw)
             unfolded.save(path)
         return unfolded
 

@@ -30,13 +30,15 @@ from __future__ import annotations
 import warnings
 import logging
 import copy
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from tabulate import tabulate
+from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
-                    List, Sequence, Optional)
+                    List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
 from .library import (mama_read, mama_write, div0, fill_negative,
                       diagonal_resolution)
@@ -89,23 +91,45 @@ class Matrix():
         * Synchronize cuts. When a cut is made along one axis,
           such as values[min:max, :] = 0, make cuts to the
           other relevant variables
+        * Make values, Ex and Eg to properties so that
+          the integrity of the matrix can be ensured.
     """
-    def __init__(self, values: np.ndarray = None,
-                 Eg: np.ndarray = None,
-                 Ex: np.ndarray = None,
-                 std: np.ndarray = None,
-                 filename: str = None,
+    def __init__(self,
+                 values: Optional[np.ndarray] = None,
+                 Eg: Optional[np.ndarray] = None,
+                 Ex: Optional[np.ndarray] = None,
+                 std: Optional[np.ndarray] = None,
+                 filename: Optional[str] = None,
+                 shape: Optional[Tuple[int, int]] = None,
                  state: Union[str, MatrixState] = 'raw'):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
         It can be filled later using the load() method.
+
+        For initializing one can give values, [Ex, Eg] arrays,
+        a filename for loading a saved matrix or a shape
+        for initialzing it with zero entries..
         """
 
-        self.values: np.ndarray = np.asarray(values, dtype=float)
+        if shape is not None and values is not None:
+            raise ValueError("'shape' and 'values' are exclusive")
+
+        if shape is not None:
+            self.values = np.zeros(shape, dtype=float)
+        else:
+            self.values = np.asarray(values, dtype=float)
+
+        if (values is not None or shape is not None) and Ex is None:
+            Ex = range(self.values.shape[0])
+            Ex = np.asarray(Ex) + 0.5
+        if (values is not None or shape is not None) and Eg is None:
+            Eg = range(self.values.shape[1])
+            Eg = np.asarray(Eg) + 0.5
+
         self.Eg: np.ndarray = np.asarray(Eg, dtype=float)
         self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
-        self.std: np.ndarray = std
+        self.std = std
 
         if filename is not None:
             self.load(filename)
@@ -120,12 +144,12 @@ class Matrix():
         Raises:
             ValueError: If any check fails
         """
-        if self.values is None:
+        if self.values is None or self.values.ndim != 2:
             return
 
         # Check shapes:
         shape = self.values.shape
-        if self.Ex is not None:
+        if self.Ex is not None and self.Ex.ndim == 1:
             if shape[0] != len(self.Ex):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
@@ -139,8 +163,10 @@ class Matrix():
                             np.zeros_like(diff))
                 except AssertionError:
                     raise ValueError("Ex array is not equispaced")
+        if self.Ex is not None and self.Ex.ndim > 1:
+            raise ValueError(f"Ex array must be ndim 1, not {self.Ex.ndim}")
 
-        if self.Eg is not None:
+        if self.Eg is not None and self.Eg.ndim == 1:
             if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
@@ -148,33 +174,28 @@ class Matrix():
             if len(self.Eg) > 2:
                 # Verify equispaced array
                 diff = (self.Eg - np.roll(self.Eg, 1))[1:]
-                try:
-                    diffdiff = diff - diff[1]
-                    np.testing.assert_array_almost_equal(diffdiff,
-                            np.zeros_like(diff))
-                except AssertionError:
+                diffdiff = diff - diff[1]
+                if not np.allclose(diffdiff, np.zeros_like(diff)):
+                    print(self.Eg)
                     raise ValueError("Eg array is not equispaced")
+        if self.Eg is not None and self.Eg.ndim > 1:
+            raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
 
         if self.std is not None:
             if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
 
-
-    def load(self, filename: str):
+    def load(self, filename: str) -> None:
         """ Load matrix from mama file
 
         Args:
             filename: Path to mama file
         """
-        if self.values is not None:
-            warnings.warn("load() called on non-empty matrix")
-
         # Load matrix from file:
         matrix, Eg, Ex = mama_read(filename)
         self.values = matrix
         self.Eg = Eg
         self.Ex = Ex
-
         self.verify_integrity()
 
     def calibration(self) -> Dict[str, np.ndarray]:
@@ -198,38 +219,48 @@ class Matrix():
         """
         return np.array(list(self.calibration().values()))
 
-    def plot(self, ax: Any = None, 
+    def plot(self, ax: Any = None,
              title: Optional[str] = None,
-             zscale: Optional[str] = "log",
-             zmin: Optional[float] = None,
-             zmax: Optional[float] = None,
-             annotate_counts: bool = False,
+             scale: Optional[str] = None,
+             vmin: Optional[float] = None,
+             vmax: Optional[float] = None,
              **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
         Args:
             ax: A matplotlib axis to plot onto
             title: Defaults to the current matrix state
-            zscale: Scale along the z-axis. Defaults to logarithmic
-            zmin: Minimum value for coloring in scaling
-            zmax Maximum value for coloring in scaling
+            scale: Scale along the z-axis. Can be either "log"
+                or "linear". Defaults to logarithmic
+                if number of counts > 1000
+            vmin: Minimum value for coloring in scaling
+            vmax Maximum value for coloring in scaling
         Returns:
             The ax used for plotting
         Raises:
-            ValueError: If zscale is unsupported
+            ValueError: If scale is unsupported
         """
-        fig, ax = plt.subplots(figsize=(5,5)) if ax is None else (None, ax)
-        if zscale == 'log':
-            norm = LogNorm(vmin=zmin, vmax=zmax)
-        elif zscale == 'linear':
-            norm = Normalize(vmin=zmin, vmax=zmax)
+        fig, ax = plt.subplots() if ax is None else (None, ax)
+        if len(self.Ex) <= 1 or len(self.Eg) <= 1:
+            raise ValueError("Number of bins must be greater than 1")
+
+        if scale is None:
+            scale = 'log' if self.counts > 1000 else 'linear'
+        if scale == 'log':
+            norm = LogNorm(vmin=vmin, vmax=vmax)
+        elif scale == 'linear':
+            norm = Normalize(vmin=vmin, vmax=vmax)
         else:
-            raise ValueError("Unsupported zscale ", zscale)
+            raise ValueError("Unsupported zscale ", scale)
+        # Move all bins down to lower bins
+        self.to_lower_bin()
         # Must extend it the range to make pcolormesh happy
         dEg = self.Eg[1] - self.Eg[0]
         dEx = self.Ex[1] - self.Ex[0]
         Eg = np.append(self.Eg, self.Eg[-1] + dEg)
         Ex = np.append(self.Ex, self.Ex[-1] + dEx)
+        # Move the bins back up
+        self.to_mid_bin()
 
         # Set entries of 0 to white
         current_cmap = cm.get_cmap()
@@ -238,18 +269,19 @@ class Matrix():
         masked = np.ma.array(self.values, mask=mask)
 
         lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
-        fix_pcolormesh_ticks(ax, xvalues=Eg, yvalues=Ex)
+        # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
+        fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
 
         if fig is not None:
-            if zmin is not None and zmax is not None:
+            if vmin is not None and vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='both')
-            elif zmin is not None:
+            elif vmin is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='min')
-            elif zmax is not None:
+            elif vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='max')
             else:
                 cbar = fig.colorbar(lines, ax=ax)
@@ -278,15 +310,15 @@ class Matrix():
         if ax is None:
             fig, ax = plt.subplots()
 
-        axis = axis_to_int(axis)
+        axis = to_plot_axis(axis)
         is_Ex = axis == 1
         projection, energy = self.projection(axis, Emin, Emax, normalize=normalize)
 
         # Shift energy by a half bin to make the steps correct
-        shifted_energy = energy + (energy[1] - energy[0])/2
+        #shifted_energy = energy + (energy[1] - energy[0])/2
 
         if is_Ex:
-            ax.step(shifted_energy, projection, where='mid', **kwargs)
+            ax.step(energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         else:
             ax.step(energy, projection, where='mid', **kwargs)
@@ -315,7 +347,7 @@ class Matrix():
             The projection and the energies summed onto
         TODO: Fix normalization
         """
-        axis = axis_to_int(axis)
+        axis = to_plot_axis(axis)
         if axis not in (0, 1):
             raise ValueError(f"Axis must be 0 or 1, got: {axis}")
 
@@ -336,44 +368,96 @@ class Matrix():
 
         return projection, energy
 
+    def ascii_plot(self, shape=(5, 5)):
+        """ Plots a rebinned ascii version of the matrix
+
+        """
+        values = np.unique(np.sort(self.values.flatten()))
+        values = values[values > 0]
+        N = len(values)/4
+
+        def block(count):
+            i = np.argmin(np.abs(count - values))
+            b = int(i // N)
+            return ['░░', '▒▒', '▓▓', '██'][b]
+
+        for row in reversed(range(self.shape[0])):
+            print('│', end='')
+            for col in range(self.shape[1]):
+                elem = self[row, col]
+                if elem == 0:
+                    print('  ', end='')
+                else:
+                    print(block(elem), end='')
+            print('')
+        print('└', end='')
+        for col in range(self.shape[1]):
+            print('──', end='')
+        print('')
+
     def save(self, fname):
         """Save matrix to mama file
         """
         mama_write(self, fname, comment="Made by Oslo Method Python")
 
     def cut(self, axis: Union[int, str],
-            Emin: Union[None, float] = None,
-            Emax: Union[None, float] = None,
-            inplace: bool = True) -> Any:
+            Emin: Optional[float] = None,
+            Emax: Optional[float] = None,
+            inplace: bool = True,
+            Emin_inclusive: bool = True,
+            Emax_inclusive: bool = True) -> Optional[Matrix]:
         """Cuts the matrix to the sub-interval limits along given axis.
 
         Args:
             axis: Which axis to apply the cut to.
                 Can be 0, "Eg" or 1, "Ex".
-            Emin: lower energy limit for cut. Defaults to
-                lowest energy.
-            Emax: upper energy limit for cut. Defaults to
-                highest energy.
+            Emin: Lowest energy to be included. Defaults to
+                lowest energy. Inclusive.
+            Emax: Higest energy to be included. Defaults to
+                highest energy. Inclusive.
             inplace: Whether to make the cut in place or not.
+            Emin_inclusive: whether the bin containing the lower bin
+                should be included (True) or excluded (False).
+                Defaults to True.
+            Emax_inclusive: whether the bin containing the higest bin
+                should be included (True) or excluded (False).
+                Defaults to True.
 
         Returns:
-            None if inplace==False
+            None if inplace == False
             cut_matrix (Matrix): The cut version of the matrix
         """
-        axis = axis_to_int(axis)
+        axis = to_plot_axis(axis)
         range = self.Eg if axis == 0 else self.Ex
-        indices = self.indices_Eg if axis == 0 else self.indices_Ex
+        index = self.index_Eg if axis == 0 else self.index_Ex
         Emin = Emin if Emin is not None else min(range)
         Emax = Emax if Emax is not None else max(range)
-        iEmin, iEmax = indices((Emin, Emax))
-        Ecut = range[iEmin:iEmax]
+
+        iEmin = index(Emin)
+        if range[iEmin] < Emin:
+            iEmin += 1
+        if not Emin_inclusive:
+            iEmin += 1
+        iEmax = index(Emax)
+        if range[iEmax] > Emax:
+            iEmax -= 1
+        if not Emax_inclusive:
+            iEmax -= 1
+        # Fix for boundaries
+        if Emin >= len(range):
+            Emin = len(range)-1
+        if Emax <= 0:
+            Emax = 0
+        iEmax += 1  # Because of slicing
+        Eslice = slice(iEmin, iEmax)
+        Ecut = range[Eslice]
 
         if axis == 0:
-            values_cut = self.values[:, iEmin:iEmax]
+            values_cut = self.values[:, Eslice]
             Eg = Ecut
             Ex = self.Ex
         elif axis == 1:
-            values_cut = self.values[iEmin:iEmax, :]
+            values_cut = self.values[Eslice, :]
             Ex = Ecut
             Eg = self.Eg
         else:
@@ -497,7 +581,7 @@ class Matrix():
             ValueError if the axis is not a valid axis.
         """
 
-        axis: int = axis_to_int(axis)
+        axis: int = to_plot_axis(axis)
         if axis not in (0, 1):
             raise ValueError("Axis must be 0 or 1")
         if not (edges is None) ^ (factor is None):
@@ -549,7 +633,6 @@ class Matrix():
         self.remove_negative()
 
     def index_Eg(self, E: float) -> int:
-        #TODO FIX
         """ Returns the closest index corresponding to the Eg value """
         return np.abs(self.Eg - E).argmin()
 
@@ -600,14 +683,51 @@ class Matrix():
             raise ValueError(f"state must be str or MatrixState"
                              f". Got {type(state)}")
 
+    def to_lower_bin(self):
+        dEx = (self.Ex[1] - self.Ex[0])/2
+        dEg = (self.Eg[1] - self.Eg[0])/2
+        self.Ex -= dEx
+        self.Eg -= dEg
+
+    def to_mid_bin(self):
+        dEx = (self.Ex[1] - self.Ex[0])/2
+        dEg = (self.Eg[1] - self.Eg[0])/2
+        self.Ex += dEx
+        self.Eg += dEg
+
+    def iter(self) -> Iterator[Tuple[int, int]]:
+        for row in range(self.shape[0]):
+            for col in range(self.shape[1]):
+                yield row, col
+
     def __getitem__(self, key):
         return self.values.__getitem__(key)
 
     def __setitem__(self, key, item):
         return self.values.__setitem__(key, item)
 
+    def __sub__(self, other) -> Matrix:
+        if np.all(self.Ex != other.Ex) or np.all(self.Eg != other.Eg):
+            raise NotImplementedError()
+            # other = other.rebin('Ex', self.Ex, inplace=False)
+            # other = other.rebin('Eg', self.Eg, inplace=False)
+        result = copy.deepcopy(self)
+        result.values -= other.values
+        return result
 
-def axis_to_int(axis: Any) -> int:
+    def __add__(self, other) -> Matrix:
+        raise NotImplementedError
+
+    def __rmul__(self, factor) -> Matrix:
+        other = copy.deepcopy(self)
+        other.values *= factor
+        return other
+
+    def __mul__(self, factor) -> Matrix:
+        return self.__rmul__(factor)
+
+
+def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
@@ -631,6 +751,29 @@ def axis_to_int(axis: Any) -> int:
         return 2
     else:
         raise ValueError(f"Unrecognized axis: {axis}")
+
+
+def to_values_axis(axis: Any) -> int:
+    """Maps axis to 0, 1 or 2 according to which axis is specified
+
+    Args:
+        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+    Returns:
+        An int describing the axis in the basis of values,
+        _not_ the plot's dimension.
+    Raises:
+        ValueError if the axis is not supported
+    """
+    try:
+        axis = axis.lower()
+    except AttributeError:
+        pass
+
+    axis = to_plot_axis(axis)
+    if axis == 2:
+        return axis
+    return (axis + 1) % 2
+
 
 
 class Vector():
@@ -727,16 +870,19 @@ def fix_pcolormesh_ticks(axis, xvalues: np.ndarray,
     Returns:
         Nothing. Modifies the axis inplace
     TODO: Replace with matplotlib.ticker.<Locator>
+          None of the standard tickers solve the problem.
+          Need to subclass matplotlib.ticker.Locator to
+          implement this ticking scheme.
     """
     # Shift all bins by ΔE/2 to get the ticks right
     if len(axis.get_xticks()) > len(xvalues):
-        axis.set_xticks(xvalues[:-1] + (xvalues[1]-xvalues[0])/2)
+        axis.set_xticks(xvalues)
     elif len(xvalues) < 20:
         ticks = fix_bin_ticks(axis.get_xticks(), xvalues)
         axis.set_xticks(ticks)
 
     if len(axis.get_yticks()) > len(yvalues):
-        axis.set_yticks(yvalues[:-1] + (yvalues[1]-yvalues[0])/2)
+        axis.set_yticks(yvalues)
     elif len(yvalues) < 20:
         ticks = fix_bin_ticks(axis.get_yticks(), yvalues)
         axis.set_yticks(ticks)
@@ -755,6 +901,7 @@ def fix_bin_ticks(ticks: Sequence[float],
         values: The actual values along the axis
     Returns:
         The values in values closest to ticks
+
     """
     first, second = 0, 0
     i = 0
@@ -764,11 +911,10 @@ def fix_bin_ticks(ticks: Sequence[float],
         i += 1
 
     step = second - first
-    half_bin = abs(values[1] - values[0])/2
     new_ticks: List[float] = []
     i = first
     while len(new_ticks) < len(values):
-        tick = values[i] + half_bin
+        tick = values[i]
         if tick > values[-1]:
             break
         new_ticks.append(tick)
