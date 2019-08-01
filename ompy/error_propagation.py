@@ -126,7 +126,7 @@ class ErrorPropagation:
         # === Unfold it ===:
         # fname_unfolded_orig = os.path.join(folder, name+"-unfolded-orig.m")
         # if os.path.isfile(fname_unfolded_orig) and not purge_files:
-        #     unfolded_orig, tmp, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unfolded_orig)
+        #     unfolded_orig, tmp, Ex_array_unf, Eg_array_unf = mama_read(fname_unfolded_orig)
         #     if verbose:
         #         print("Read unfolded matrix from file", flush=True)
         # else:
@@ -134,26 +134,26 @@ class ErrorPropagation:
         #         print("Unfolding matrix", flush=True)
         #     # Unfold:
         #     unfolded_orig, Ex_array_unf, Eg_array_unf = unfold(data_raw, Ex_array, Eg_array, fname_resp_dat, fname_resp_mat, verbose=False, use_comptonsubtraction=False)
-        #     write_mama_2D(unfolded_orig, fname_unfolded_orig, Ex_array_unf, Eg_array_unf, comment="unfolded matrix, original (not perturbed).")
+        #     mama_write(unfolded_orig, fname_unfolded_orig, Ex_array_unf, Eg_array_unf, comment="unfolded matrix, original (not perturbed).")
 
         #     if verbose:
         #         print("unfolded_orig.shape =", unfolded_orig.shape, flush=True)
 
-        # # === Extract first generation spectrum ===: 
+        # # === Extract first generation spectrum ===:
         # Ex_max = 12000 # keV - maximum excitation energy
         # dE_gamma = 1000 # keV - allow gamma energy to exceed excitation energy by this much, to account for experimental resolution
         # # N_Exbins = 300
         # N_Exbins = len(Ex_array_unf)
         # fname_firstgen_orig = os.path.join(folder, name+"-firstgen-orig.m")
         # if os.path.isfile(fname_firstgen_orig) and not purge_files:
-        #     firstgen_orig, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_orig)
+        #     firstgen_orig, tmp, Ex_array_fg, Eg_array_fg = mama_read(fname_firstgen_orig)
         #     print("Read first generation matrix from file", flush=True)
         # else:
         #     print("Calculating first generation matrix", flush=True)
         #     print("unfolded_orig.shape =", unfolded_orig.shape, flush=True)
         #     # Find first generation spectrum:
         #     firstgen_orig, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded_orig, Ex_array_unf, Eg_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=10)
-        #     write_mama_2D(firstgen_orig, fname_firstgen_orig, Ex_array_fg, Eg_array_fg, comment="first generation matrix, original (not perturbed).")
+        #     mama_write(firstgen_orig, fname_firstgen_orig, Ex_array_fg, Eg_array_fg, comment="first generation matrix, original (not perturbed).")
 
 
 
@@ -265,7 +265,7 @@ class ErrorPropagation:
             if os.path.isfile(fname_unfolded_current) and not purge_files:
                 ma_curr.unfolded.load(fname_unfolded_current,
                                       suppress_warning=True)
-                # unfolded_ensemblemember, tmp, Ex_array_unf, Eg_array_unf = read_mama_2D(fname_unfolded_current)
+                # unfolded_ensemblemember, tmp, Ex_array_unf, Eg_array_unf = mama_read(fname_unfolded_current)
                 if verbose:
                     print("Read unfolded matrix from file", flush=True)
             else:
@@ -291,7 +291,7 @@ class ErrorPropagation:
             if os.path.isfile(fname_firstgen_current) and not purge_files:
                 ma_curr.firstgen.load(fname_firstgen_current,
                                       suppress_warning=True)
-                # firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = read_mama_2D(fname_firstgen_current)
+                # firstgen_ensemblemember, tmp, Ex_array_fg, Eg_array_fg = mama_read(fname_firstgen_current)
                 if verbose:
                     print("Read first generation matrix from file", flush=True)
             else:
@@ -300,7 +300,7 @@ class ErrorPropagation:
                 # print("unfolded_ensemblemember.shape =", unfolded_ensemblemember.shape, flush=True)
                 # Find first generation spectrum:
                 # firstgen_ensemblemember, diff, Ex_array_fg, Eg_array_fg = first_generation_spectrum(unfolded_ensemblemember, Ex_array_unf, Eg_array_unf, N_Exbins, Ex_max, dE_gamma, N_iterations=10)
-                # write_mama_2D(firstgen_ensemblemember, fname_firstgen_current, Ex_array_fg, Eg_array_fg, comment="first generation matrix, ensemble member no. "+str(i))
+                # mama_write(firstgen_ensemblemember, fname_firstgen_current, Ex_array_fg, Eg_array_fg, comment="first generation matrix, ensemble member no. "+str(i))
                 ma_curr.first_generation_method()
                 ma_curr.firstgen.save(fname_firstgen_current)
 
