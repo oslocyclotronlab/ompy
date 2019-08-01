@@ -224,6 +224,7 @@ class Matrix():
              scale: Optional[str] = None,
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
+             midbin_ticks: bool = True,
              **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
@@ -269,8 +270,12 @@ class Matrix():
         masked = np.ma.array(self.values, mask=mask)
 
         lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
+        if midbin_ticks:
+            ax.xaxis.set_major_locator(MeshLocator(self.Eg))
+            ax.tick_params(axis='x', rotation=40)
+            ax.yaxis.set_major_locator(MeshLocator(self.Ex))
         # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
+        #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
@@ -851,75 +856,36 @@ class Vector():
         else:
             return Vector(vector_transformed, E=self.E)
 
+class MeshLocator(ticker.Locator):
+    def __init__(self, locs, nbins=10):
+        'place ticks on the i-th data points where (i-offset)%base==0'
+        self.locs = locs
+        self.nbins = nbins
 
-def fix_pcolormesh_ticks(axis, xvalues: np.ndarray,
-                         yvalues: np.ndarray) -> None:
-    """ Shifts the ticks of ax to closest values in x/yvalues
+    def __call__(self):
+        """Return the locations of the ticks"""
+        vmin, vmax = self.axis.get_view_interval()
+        return self.tick_values(vmin, vmax)
 
-    If x/yvalues are the range along x and y bins of ax, the
-    ticks of ax will be shifted to the closest elements in
-    x/yvalues plus half a step, making the ticks end up in
-    mid bins.
-    The reason this is necessary is that pcolormesh sometimes
-    places the ticks mid-bin, sometimes on the edges.
+    def tick_values(self, vmin, vmax):
 
-    Args:
-        ax: The pcolormesh axis
-        xvalues: Values along the x axis
-        yvalues: Values along the y axis
-    Returns:
-        Nothing. Modifies the axis inplace
-    TODO: Replace with matplotlib.ticker.<Locator>
-          None of the standard tickers solve the problem.
-          Need to subclass matplotlib.ticker.Locator to
-          implement this ticking scheme.
-    """
-    # Shift all bins by ΔE/2 to get the ticks right
-    if len(axis.get_xticks()) > len(xvalues):
-        axis.set_xticks(xvalues)
-    elif len(xvalues) < 20:
-        ticks = fix_bin_ticks(axis.get_xticks(), xvalues)
-        axis.set_xticks(ticks)
+        if vmax < vmin:
+            vmin, vmax = vmax, vmin
 
-    if len(axis.get_yticks()) > len(yvalues):
-        axis.set_yticks(yvalues)
-    elif len(yvalues) < 20:
-        ticks = fix_bin_ticks(axis.get_yticks(), yvalues)
-        axis.set_yticks(ticks)
+        if vmin == vmax:
+            vmin -= 1
+            vmax += 1
 
+        dmin, dmax = self.axis.get_data_interval()
 
-def fix_bin_ticks(ticks: Sequence[float],
-                  values: np.ndarray) -> List[float]:
-    """ Finds the elements in values[-2] closest to ticks
-
-    Is a helper function for fix_pcolormesh_ticks. The
-    result is ticks that are equidistant along an axis
-    positioned mid bin
-
-    Args:
-        ticks: The ticks suggested by plt.pcolormesh
-        values: The actual values along the axis
-    Returns:
-        The values in values closest to ticks
-
-    """
-    first, second = 0, 0
-    i = 0
-    while first == second:
-        first = np.argmin(np.abs(values - ticks[i]))
-        second = np.argmin(np.abs(values - ticks[i+1]))
-        i += 1
-
-    step = second - first
-    new_ticks: List[float] = []
-    i = first
-    while len(new_ticks) < len(values):
-        tick = values[i]
-        if tick > values[-1]:
-            break
-        new_ticks.append(tick)
-        i += step
-        if i >= len(values):
-            break
-    return new_ticks
-
+        imin = np.abs(self.locs - vmin).argmin()
+        imax = np.abs(self.locs - vmax).argmin()
+        step = max(int(np.ceil((imax-imin) / self.nbins)), 1)
+        ticks = self.locs[imin:imax+1:step]
+        if vmax - vmin > 0.8*(dmax - dmin) and imax-imin > 20:
+            # Round to the nearest "nicest" number
+            # TODO Could be improved by taking vmin into account
+            i = min(int(np.log10(abs(self.locs[imax]))), 2)
+            i = max(i, 1)
+            ticks = np.unique(np.around(ticks, -i))
+        return self.raise_if_exceeds(ticks)
