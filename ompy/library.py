@@ -34,6 +34,9 @@ from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 import matplotlib
 from itertools import product
+from typing import Optional, Iterable, Union, List
+import tarfile
+from pathlib import Path
 
 import ompy as om
 
@@ -196,34 +199,34 @@ def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
 
 
-def E_array_from_calibration(a0, a1, N=None, E_max=None):
+def E_array_from_calibration(a0: float, a1: float, *,
+                             N: Optional[int] = None,
+                             E_max: Optional[float] = None) -> np.ndarray:
     """
     Return an array of lower-bin-edge energy values corresponding to the
     specified calibration.
 
     Args:
-        a0, a1 (float): Calibration coefficients; E = a0 + a1*i
+        a0, a1: Calibration coefficients; E = a0 + a1*i
         either
-            N (int): Number of bins
+            N: Number of bins
         or
-            E_max (float): Max energy. Array is constructed to ensure last bin
-                           covers E_max. In other words,
-                           E_array[-1] >= E_max - a1
+            E_max: Max energy. Array is constructed to ensure last bin
+                 covers E_max. In other words,
+                 E_array[-1] >= E_max - a1
     Returns:
-        E_array (np.ndarray): Array of lower-bin-edge energy values
+        E: Array of lower-bin-edge energy values
     """
-    E_array = None
     if E_max is not None and N is not None:
-        raise Exception("Cannot give both N and E_max -- must choose one")
-    if N is not None:
-        E_array = np.linspace(a0, a0+a1*(N-1), N)
-    elif E_max is not None:
-        N = int(np.ceil((E_max - a0)/a1))
-        E_array = np.linspace(a0, a0+a1*(N-1), N)
-    else:
-        raise Exception("Either N or E_max must be given")
+        raise ValueError("Cannot give both N and E_max -- must choose one")
 
-    return E_array
+    if N is not None:
+        return np.linspace(a0, a0+a1*(N-1), N)
+    elif E_max is not None:
+        N = int(np.round((E_max - a0)/a1)) + 1
+        return np.linspace(a0, a0+a1*(N-1), N)
+    else:
+        raise ValueError("Either N or E_max must be given")
 
 
 def fill_negative(matrix, window_size):
@@ -527,13 +530,42 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     # Loop over the data and create a `Text` for each "pixel".
     # Change the text's color depending on the data.
     texts = []
-    dx = matrix.Ex[1] - matrix.Ex[0]
-    dg = matrix.Eg[1] - matrix.Eg[0]
     for j, i in product(*map(range, matrix.shape)):
-        x = matrix.Eg[i] + dg/2
-        y = matrix.Ex[j] + dx/2
+        x = matrix.Eg[i]
+        y = matrix.Ex[j]
         kw.update(color=textcolors[int(im.norm(matrix.values[i, j]) > threshold)])
         text = im.axes.text(y, x, valfmt(matrix.values[i, j], None), **kw)
         texts.append(text)
 
     return texts
+
+def save_numpy(objects: Union[np.ndarray, Iterable[np.ndarray]],
+               path: Union[str, Path]) -> None:
+    if isinstance(path, str):
+        path = Path(path)
+
+    tarpath = str(path) if path.suffix == '.tar' else str(path) + '.tar'
+
+    tar = tarfile.open(tarpath, 'w')
+    for num, object in enumerate(objects):
+        npath = Path(str(path) + str(num) + '.npy')
+        np.save(npath, object)
+        tar.add(npath)
+        npath.unlink()
+    tar.close()
+
+
+def load_numpy(path: Union[str, Path]) -> List[np.ndarray]:
+    if isinstance(path, str):
+        path = Path(path)
+
+    tarpath = str(path) if path.suffix == '.tar' else str(path) + '.tar'
+
+    tar = tarfile.open(tarpath)
+    objects = []
+    for name in tar.getnames():
+        tar.extract(name)
+        objects.append(np.load(name))
+        Path(name).unlink()
+    return objects
+

@@ -106,20 +106,10 @@ class FitRhoT:
         self.check_input(matrix, std, Ex_min, Eg_min)
 
         # To be filled later
-        self.firstgen: Optional[Matrix] = None
-        self.firstgen_std: Optional[Matrix] = None
-        self.Pfit = None
-
-        self.dE_max_res = None
-        self.dE_resolution = None
+        self.Pfit: Optional[Matrix] = None
 
         # Prepare fit
-        # need to calculate detector resolution for recalibration
-        self.calc_resolution(Ex_array=firstgen.Ex)
         self.firstgen, self.firstgen_std = self.recalibrate_and_cut(matrix, std)
-        return
-        # resolution might change slightly after rebinning
-        self.calc_resolution(Ex_array=self.firstgen.Ex)
 
     def check_input(self, matrix: Matrix, std: Matrix, Ex_min: float, Eg_min: float):
         """Checks input
@@ -205,20 +195,20 @@ class FitRhoT:
         Eg_min = self.Eg_min
         Ex_max = self.Ex_max
         bin_width_out = self.bin_width_out
+        dE_resolution = lib.diagonal_resolution(self.firstgen.Ex)
 
-        Enld_array = lib.E_array_from_calibration(a0=-self.dE_max_res,
-                                                  a1=bin_width_out,
-                                                  E_max=Ex_max-Eg_min)
-        Enld_array -= bin_width_out/2
-        Ex_array = self.firstgen.Ex
-        Eg_array = self.firstgen.Eg
+        Enld = lib.E_array_from_calibration(a0=-dE_resolution.max(),
+                                            a1=bin_width_out,
+                                            E_max=Ex_max-Eg_min)
+        Ex = self.firstgen.Ex
+        Eg = self.firstgen.Eg
 
         result = rsg.decompose_matrix(self.firstgen.values,
                                       self.firstgen_std.values,
-                                      Emid_Eg=Eg_array+bin_width_out/2,
-                                      Emid_nld=Enld_array+bin_width_out/2,
-                                      Emid_Ex=Ex_array+bin_width_out/2,
-                                      dE_resolution=self.dE_resolution,
+                                      Emid_Eg=Eg,
+                                      Emid_nld=Enld,
+                                      Emid_Ex=Ex,
+                                      dE_resolution=dE_resolution,
                                       p0=p0,
                                       method=self.method,
                                       options=self.options,
@@ -230,8 +220,8 @@ class FitRhoT:
         else:
             rho_fit, T_fit, z_array = result
 
-        rho = Vector(rho_fit, Enld_array)
-        T = Vector(T_fit, Eg_array)
+        rho = Vector(rho_fit, Enld)
+        T = Vector(T_fit, Eg)
 
         # - rho and T shall be Vector() instances
         self.rho = rho
@@ -240,35 +230,17 @@ class FitRhoT:
         # save "bestfit"
         z_array = None
         if use_z:
-            z_array = z(Ex_array+bin_width_out/2, Eg_array+bin_width_out/2,
+            z_array = z(Ex, Eg,
                         # TODO implement custom spin_dist_par here:
                         spin_dist_par=spin_dist_par)
         else:
-            z_array = np.ones((len(Ex_array), len(Eg_array)))
+            z_array = np.ones((len(Ex), len(Eg)))
         Pfit = rsg.PfromRhoT(rho_fit, T_fit,
-                             len(Ex_array),
-                             Emid_Eg=Eg_array+bin_width_out/2,
-                             Emid_nld=Enld_array+bin_width_out/2,
-                             Emid_Ex=Ex_array+bin_width_out/2,
-                             dE_resolution=self.dE_resolution,
+                             len(Ex),
+                             Emid_Eg=Eg,
+                             Emid_nld=Enld,
+                             Emid_Ex=Ex,
+                             dE_resolution=dE_resolution,
                              z_array_in=z_array)
-        self.Pfit = Matrix(values=Pfit, Ex=Ex_array, Eg=Eg_array)
-
-    def calc_resolution(self, Ex_array):
-        """ Calculate Ex-dependent detector resolution (sum of sqroot)
-
-        Args:
-            Ex_array (np.array): Excitation energy bin array
-        """
-        # Assume constant particle resolution:
-        dE_particle = DE_PARTICLE
-        # Interpolate the gamma resolution linearly:
-        Eg_array = Ex_array + self.bin_width_out/2
-        dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
-                    * (Ex_array - 1000)) + DE_GAMMA_1MEV
-
-        dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
-
-        self.dE_max_res = np.max(dE_resolution)
-        self.dE_resolution = dE_resolution
-        return dE_resolution
+        self.Pfit = Matrix(values=Pfit, Ex=Ex, Eg=Eg)
+        assert self.Pfit is not None

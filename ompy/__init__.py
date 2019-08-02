@@ -18,3 +18,4 @@ from .compton_subtraction_method import *
 from .gauss_smoothing import *
 from .firstgeneration import *
 from .hooks import *
+from .extractor import Extractor

@@ -24,9 +24,12 @@ setup(name='OMpy',
                             ],
                             compiler_directives={'language_level': "3"}),
       install_requires=[
+          'cython',
           'numpy',
           'matplotlib',
           'termtables',
-          'pymultinest'
+          'pymultinest',
+          'scipy',
+          'uncertainties'
       ]
       )

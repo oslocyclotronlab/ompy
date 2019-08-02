@@ -34,14 +34,14 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from tabulate import tabulate
 from matplotlib import ticker
+from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
 from .library import (mama_read, mama_write, div0, fill_negative,
-                      diagonal_resolution)
+                      diagonal_resolution, save_numpy, load_numpy)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
 
@@ -784,81 +784,94 @@ def to_values_axis(axis: Any) -> int:
     return (axis + 1) % 2
 
 
-
 class Vector():
-    def __init__(self, values=None, E=None):
-        self.values = values
-        self.E = E
+    def __init__(self, values: Optional[Iterable[float]] = None,
+                 E: Optional[Iterable[float]] = None,
+                 path: Optional[Union[str, Path]] = None):
+        if values is None and E is not None:
+            self.E = np.asarray(E, dtype=float)
+            self.values = np.zeros_like(E)
+        elif values is not None and E is None:
+            self.values = np.asarray(values, dtype=float)
+            self.E = np.arange(0.5, len(self.values), 1)
+        elif values is None and E is None:
+            self.values = np.zeros(1)
+            self.E = np.zeros(1)
+        else:
+            self.values = np.asarray(values, dtype=float)
+            self.E = np.asarray(values, dtype=float)
+        if path is not None:
+            self.load(path)
+        self.verify_integrity()
+
+    def verify_integrity(self):
+        """ Verify the internal consistency of the vector
+
+        Raises:
+            AssertionError if any test fails
+        """
+        assert self.values is not None
+        assert self.E is not None
+        assert self.E.shape == self.values.shape
 
     def calibration(self):
         """Calculate and return the calibration coefficients of the energy axes
         """
-        calibration = None
-        if (self.values is not None and self.E is not None):
-            calibration = {
-                           # Formatted as "a{axis}{power of E}"
-                           "a0": self.E[0],
-                           "a1": self.E[1]-self.E[0],
-                          }
-        else:
-            raise RuntimeError("calibration() called on empty Vector instance")
+        #  Formatted as "a{axis}{power of E}"
+        calibration = {"a0": self.E[0],
+                       "a1": self.E[1]-self.E[0]}
         return calibration
 
-    def plot(self, ax=None, yscale="linear", ylim=None, xlim=None,
-             title=None, label=None):
+    def plot(self, ax: Optional[Any] = None,
+             scale: str = 'linear', **kwargs) -> Tuple[Any, Any]:
         if ax is None:
-            f, ax = plt.subplots(1, 1)
+            fig, ax = plt.subplots(1, 1)
 
-        # Plot with middle-bin energy values:
-        E_midbin = self.E + self.calibration()["a1"]/2
-        if label is None:
-            ax.plot(E_midbin, self.values)
-        elif isinstance(label, str):
-            ax.plot(E_midbin, self.values, label=label)
-        else:
-            raise ValueError("Keyword label must be None or string, but is",
-                             label)
-
-        ax.set_yscale(yscale)
-        if ylim is not None:
-            ax.set_ylim(ylim)
-        if xlim is not None:
-            ax.set_xlim(xlim)
-        if title is not None:
-            ax.set_title(title)
+        ax.step(self.E, self.values, where='mid', **kwargs)
+        ax.xaxis.set_major_locator(MeshLocator(self.E))
+        ax.set_yscale(scale)
         if ax is None:
             plt.show()
-        return True
+        return fig, ax
 
-    def save(self, fname):
+    def save(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
+        """ Save to a file of specified format
+
+        Raises:
+            ValueError if the filetype is not supported
         """
-        Save vector to mama file
+        filetype = filetype.lower()
+        if filetype == 'numpy':
+            save_numpy([self.values, self.E], path)
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
+
+
+    def load(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
+        """ Load vector from specified format
         """
-        raise NotImplementedError("Not implemented yet")
+        filetype = filetype.lower()
+        if filetype == 'numpy':
+            self.values, self.E = load_numpy(path)
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
 
         return None
 
-    def load(self, fname):
-        """
-        Load vector from mama file
-        """
-        raise NotImplementedError("Not implemented yet")
-
-        return None
-
-    def transform(self, const=1, alpha=0, implicit=False):
+    def transform(self, const=1, alpha=0, in_place=True) -> Optional[Vector]:
         """
         Return a transformed version of the vector:
         vector -> const * vector * exp(alpha*E_array)
         """
-        E_array_midbin = self.E + self.calibration()["a1"]/2
         vector_transformed = (const * self.values
-                              * np.exp(alpha*E_array_midbin)
+                              * np.exp(alpha*self.E)
                               )
-        if implicit:
-            self.values= vector_transformed
-        else:
+        if not in_place:
             return Vector(vector_transformed, E=self.E)
+
+        self.values = vector_transformed
+        return None
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):
