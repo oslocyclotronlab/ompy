@@ -122,4 +122,6 @@ GRTAGS
 ompy/rebin.c
 ompy/rebin.html
 
+tags
+
 notebooks/**/

@@ -1,2 +1,4 @@
 data/* text
 *.m linguist-detectable=false
+notebooks filter=lfs diff=lfs merge=lfs -text
+data filter=lfs diff=lfs merge=lfs -text
