@@ -1,6 +1,5 @@
 # Oslo Method Python - OMpy
-![Travis CI](https://travis-ci.com/Caronthir/oslo_method_python.svg?token=oq37SFt93PBk5sCGgATJ&branch=master)
-
+![Travis CI](https://travis-ci.org/oslocyclotronlab/ompy.svg?branch=master)
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
 
 <p align="center">

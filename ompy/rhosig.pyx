@@ -29,6 +29,7 @@ from scipy.optimize import minimize
 from uncertainties import unumpy
 
 from .spinfunctions import SpinFunctions
+from .matrix import Matrix
 
 cimport cython
 cimport numpy as np
@@ -98,20 +99,21 @@ def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):
     return z
 
 
-def decompose_matrix(P_in, P_err,
-                     Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
+def decompose_matrix(matrix: Matrix, std: Matrix,
+                     Eg: np.ndarray, nld: np.ndarray,
+                     Ex: np.ndarray, dE_resolution: np.ndarray,
                      p0=None,
                      method="Powell", options={'disp': True},
                      fill_value=0,
                      use_z=False,
                      spin_dist_par=None):
-    """ routine for the decomposition of the first generations spectrum P_in
+    """ Decompose first generation matrix into nld and transmission coefficient
 
     Parameters:
     -----------
-    P_in : ndarray
+    matrix : ndarray
         First generations matrix to be decomposed
-    Emid_Eg, Emid_nld, Emid_Ex : ndarray
+    Eg, nld, Ex : ndarray
         Array of middle-bin values for Eg, nld and Ex
     method : str
         minimization method
@@ -137,31 +139,21 @@ def decompose_matrix(P_in, P_err,
                         `z-factor`is returned, too
 
     """
-    print("attempt decomposition")
-
     # protect input arrays
-    P_in = np.copy(P_in)
-    P_err = np.copy(P_err)
-    Emid_Eg = np.copy(Emid_Eg)
+    matrix = np.copy(matrix.values)
+    std = np.copy(std.values)
 
-    Nbins_Ex, Nbins_T = np.shape(P_in)
+    Nbins_Ex, Nbins_T = np.shape(matrix)
     Nbins_rho = Nbins_T
 
-    # manipulation to try to improve the fit
-    # TODO: imporvement might be to look for elements = 0 only in the trangle Ex<Eg
-    #        + automate what value should be filled. Maybe 1/10 of smallest value in matrix?
-    # if fill_value!=0:
-    #   P_in[np.where(P_in == 0)] = fill_value # fill holes with a really small number
-    #   P_in = np.tril(P_in,k=Nbins_T - Nbins_rho) # set lower triangle to 0 -- due to array form <-> where Eg>Ex
-
-    P_in, P_err = normalize(P_in, P_err)
+    matrix, std = normalize(matrix, std)
 
     # Addition 20190329 to add z factor:
     z_array = None
     if use_z is False:
         z_array = np.ones((Nbins_Ex, Nbins_T))
     elif use_z is True:
-        z_array = z_from_spin_dist(Emid_Ex, Emid_Eg,
+        z_array = z_from_spin_dist(Ex, Eg,
                                    spin_dist_par=spin_dist_par)
     else:
         z_array = use_z
@@ -173,27 +165,16 @@ def decompose_matrix(P_in, P_err,
     if p0 is None:
         T0 = np.zeros(Nbins_T)     # inigial guess for T  following
         for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
-            T0[i_Eg] = np.sum(P_in[:,i_Eg]) # no need for i_start; we trimmed the matrix already
+            T0[i_Eg] = np.sum(matrix[:,i_Eg]) # no need for i_start; we trimmed the matrix already
 
         p0 = np.append(rho0,T0) # create 1D array of the initial guess
 
     # minimization
     res = minimize(objfun1D, x0=p0,
-                   args=(P_in, P_err,
-                         Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array),
+                   args=(matrix, std,
+                         Eg, nld, Ex, dE_resolution, z_array),
                    method=method,
                    options=options)
-    # further optimization: eg through higher tolderaced xtol and ftol
-    # different other methods tried:
-    # res = minimize(objfun1D, x0=p0, args=P_in,
-    #   options={'disp': True})
-    # res = minimize(objfun1D, x0=p0, args=P_in, method="L-BFGS-B",
-    #   options={'disp': True}) # does a bad job when you include the weightings
-    # res = minimize(objfun1D, x0=p0, args=P_in, method="Nelder-Mead",
-    #   options={'disp': True}) # does a bad job
-    # res = minimize(objfun1D, x0=p0, args=P_in, method="BFGS",
-    #   options={'disp': True}) # does a bad job
-
     p_fit = res.x
 
     rho_fit, T_fit = rhoTfrom1D(p_fit, Nbins_rho)

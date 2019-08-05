@@ -19,3 +19,4 @@ from .gauss_smoothing import *
 from .firstgeneration import *
 from .hooks import *
 from .extractor import Extractor
+from .setable import Setable
