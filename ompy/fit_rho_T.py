@@ -34,7 +34,6 @@ from . import library as lib
 from . import rebin as rebin
 from . import rhosig as rsg
 from .rebin import rebin_2D
-from .constants import *
 from .matrix import Matrix
 from .matrix import Vector
 import copy
@@ -46,11 +45,6 @@ import logging
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
-
-# Define constants from constants.py as global vars
-global DE_PARTICLE
-global DE_GAMMA_1MEV
-global DE_GAMMA_8MEV
 
 
 class FitRhoT:
@@ -203,11 +197,11 @@ class FitRhoT:
         Ex = self.firstgen.Ex
         Eg = self.firstgen.Eg
 
-        result = rsg.decompose_matrix(self.firstgen.values,
-                                      self.firstgen_std.values,
-                                      Emid_Eg=Eg,
-                                      Emid_nld=Enld,
-                                      Emid_Ex=Ex,
+        result = rsg.decompose_matrix(self.firstgen,
+                                      self.firstgen_std,
+                                      Eg=Eg,
+                                      nld=Enld,
+                                      Ex=Ex,
                                       dE_resolution=dE_resolution,
                                       p0=p0,
                                       method=self.method,

@@ -799,7 +799,7 @@ class Vector():
             self.E = np.zeros(1)
         else:
             self.values = np.asarray(values, dtype=float)
-            self.E = np.asarray(values, dtype=float)
+            self.E = np.asarray(E, dtype=float)
         if path is not None:
             self.load(path)
         self.verify_integrity()
@@ -858,7 +858,7 @@ class Vector():
 
         return None
 
-    def transform(self, const=1, alpha=0, in_place=True) -> Optional[Vector]:
+    def transform(self, const=1, alpha=0, inplace=True) -> Optional[Vector]:
         """
         Return a transformed version of the vector:
         vector -> const * vector * exp(alpha*E_array)
@@ -866,11 +866,10 @@ class Vector():
         vector_transformed = (const * self.values
                               * np.exp(alpha*self.E)
                               )
-        if not in_place:
+        if not inplace:
             return Vector(vector_transformed, E=self.E)
 
         self.values = vector_transformed
-        return None
 
 
 class MeshLocator(ticker.Locator):

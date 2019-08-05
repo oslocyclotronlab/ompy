@@ -543,12 +543,13 @@ def save_numpy(objects: Union[np.ndarray, Iterable[np.ndarray]],
                path: Union[str, Path]) -> None:
     if isinstance(path, str):
         path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     tarpath = str(path) if path.suffix == '.tar' else str(path) + '.tar'
 
     tar = tarfile.open(tarpath, 'w')
     for num, object in enumerate(objects):
-        npath = Path(str(path) + str(num) + '.npy')
+        npath = Path(str(path)[:-len(path.suffix)] + str(num) + '.npy')
         np.save(npath, object)
         tar.add(npath)
         npath.unlink()
