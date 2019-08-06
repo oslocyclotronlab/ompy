@@ -11,7 +11,7 @@ class Extractor:
     def __init__(self, ensemble: Optional[Ensemble] = None):
         self.ensemble = ensemble
         self._path = Path('extraction_ensemble')
-        self.num_fits = 10 if ensemble is None else ensemble.size
+        self.size = 10 if ensemble is None else ensemble.size
         self.bin_width = 120
         self.regenerate = False
         self.method = 'Powell'
@@ -24,13 +24,13 @@ class Extractor:
         elif self.ensemble is None:
             raise ValueError("ensemble must be given")
 
-        assert self.ensemble.size >= self.num_fits, "Ensemble is too small"
+        assert self.ensemble.size >= self.size, "Ensemble is too small"
 
         rhos = []
         gsfs = []
-        for i in range(self.num_fits):
-            rho_path = self.save_path / f'rho_{i}.tar'
-            gsf_path = self.save_path / f'gsf_{i}.tar'
+        for i in range(self.size):
+            rho_path = self.save_path / f'rho_{i}.npy'
+            gsf_path = self.save_path / f'gsf_{i}.npy'
             if rho_path.exists() and gsf_path.exists() and not self.regenerate:
                 rhos.append(Vector(path=rho_path))
                 gsfs.append(Vector(path=gsf_path))
@@ -55,12 +55,29 @@ class Extractor:
         gsf = fit.T.values / (2*np.pi*(fit.T.E)**3)
         return fit.rho, Vector(gsf, fit.T.E)
 
+    def load(self, path: Optional[Union[str, Path]] = None) -> None:
+        if path is not None:
+            path = Path(path)
+        else:
+            path = self.save_path
+
+        self.rho = []
+        self.gsf = []
+        for fname in path.glob("rho[0-9]*.*"):
+            self.rho.append(Vector(path=fname))
+
+        for fname in path.glob("gsf[0-9]*.*"):
+            self.gsf.append(Vector(path=fname))
+
+        assert len(self.rho) == len(self.gsf)
+        self.size = len(self.rho)
+
     def plot(self, ax: Optional[Any] = None, scale: str = 'log'):
         if ax is None:
             fig, ax = plt.subplots(1, 2)
         for rho, gsf in zip(self.rho, self.gsf):
-            ax[0].plot(rho.E, rho.values, color='k', alpha=1/self.num_fits)
-            ax[1].plot(gsf.E, gsf.values, color='k', alpha=1/self.num_fits)
+            ax[0].plot(rho.E, rho.values, color='k', alpha=1/self.size)
+            ax[1].plot(gsf.E, gsf.values, color='k', alpha=1/self.size)
 
         ax[0].errorbar(rho.E, self.rho_mean(), yerr=self.rho_std(), fmt='o', ms=1)
         ax[1].errorbar(gsf.E, self.gsf_mean(), yerr=self.gsf_std(), fmt='o', ms=1)

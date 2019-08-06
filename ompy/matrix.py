@@ -41,7 +41,8 @@ from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
 from .library import (mama_read, mama_write, div0, fill_negative,
-                      diagonal_resolution, save_numpy, load_numpy)
+                      diagonal_resolution, save_numpy_1D, load_numpy_1D,
+                      save_numpy_2D, load_numpy_2D, save_tar, load_tar)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
 
@@ -99,7 +100,7 @@ class Matrix():
                  Eg: Optional[np.ndarray] = None,
                  Ex: Optional[np.ndarray] = None,
                  std: Optional[np.ndarray] = None,
-                 filename: Optional[str] = None,
+                 path: Optional[Union[str, Path]] = None,
                  shape: Optional[Tuple[int, int]] = None,
                  state: Union[str, MatrixState] = 'raw'):
         """
@@ -131,8 +132,8 @@ class Matrix():
         self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
         self.std = std
 
-        if filename is not None:
-            self.load(filename)
+        if path is not None:
+            self.load(path)
         self.verify_integrity()
 
         self.state = state
@@ -185,18 +186,46 @@ class Matrix():
             if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
 
-    def load(self, filename: str) -> None:
-        """ Load matrix from mama file
-
-        Args:
-            filename: Path to mama file
+    def load(self, path: Union[str, Path],
+             filetype: Optional[str] = None) -> None:
+        """ Load vector from specified format
         """
-        # Load matrix from file:
-        matrix, Eg, Ex = mama_read(filename)
-        self.values = matrix
-        self.Eg = Eg
-        self.Ex = Ex
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
+        filetype = filetype.lower()
+
+        if filetype == 'numpy':
+            self.values, self.Eg, self.Ex = load_numpy_2D(path)
+        elif filetype == 'tar':
+            self.values, self.Eg, self.Eg = load_tar(path)
+        elif filetype == 'mama':
+            matrix, Eg, Ex = mama_read(path)
+            self.values = matrix
+            self.Eg = Eg
+            self.Ex = Ex
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
+
+        return None
+
+    def save(self, path: Union[str, Path], filetype: Optional[str] = None):
+        """Save matrix to mama file
+        """
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
+        filetype = filetype.lower()
+
+        if filetype == 'numpy':
+            save_numpy_2D(self.values, self.Eg, self.Ex, path)
+        elif filetype == 'tar':
+            save_tar([self.values, self.Eg, self.Ex], path)
+        elif filetype == 'mama':
+            mama_write(self, path, comment="Made by Oslo Method Python")
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
 
     def calibration(self) -> Dict[str, np.ndarray]:
         """ Calculates the calibration coefficients of the energy axes
@@ -399,11 +428,6 @@ class Matrix():
         for col in range(self.shape[1]):
             print('──', end='')
         print('')
-
-    def save(self, fname):
-        """Save matrix to mama file
-        """
-        mama_write(self, fname, comment="Made by Oslo Method Python")
 
     def cut(self, axis: Union[int, str],
             Emin: Optional[float] = None,
@@ -834,27 +858,41 @@ class Vector():
             plt.show()
         return fig, ax
 
-    def save(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
+    def save(self, path: Union[str, Path],
+             filetype: Optional[str] = None) -> None:
         """ Save to a file of specified format
 
         Raises:
             ValueError if the filetype is not supported
         """
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
         if filetype == 'numpy':
-            save_numpy([self.values, self.E], path)
+            save_numpy_1D(self.values, self.E, path)
+        elif filetype == 'tar':
+            save_tar([self.values, self.E], path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
 
-    def load(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
+    def load(self, path: Union[str, Path],
+             filetype: Optional[str] = None) -> None:
         """ Load vector from specified format
         """
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
+
         if filetype == 'numpy':
-            self.values, self.E = load_numpy(path)
+            self.values, self.E = load_numpy_1D(path)
+        elif filetype == 'tar':
+            self.values, self.E = load_tar(path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
+        self.verify_integrity()
 
         return None
 
@@ -870,6 +908,18 @@ class Vector():
             return Vector(vector_transformed, E=self.E)
 
         self.values = vector_transformed
+
+
+def filetype_from_suffix(path: Path) -> str:
+    suffix = path.suffix
+    if suffix == '.tar':
+        return 'tar'
+    elif suffix == '.npy':
+        return 'numpy'
+    elif suffix == '.m':
+        return 'mama'
+    else:
+        raise ValueError(f"Unsupported filetype {suffix}")
 
 
 class MeshLocator(ticker.Locator):

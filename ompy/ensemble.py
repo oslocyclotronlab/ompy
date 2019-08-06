@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import os
 import numpy as np
 import logging
-from typing import Callable, Union, List
+import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Callable, Union, List, Optional
 from .matrix import Matrix
 from .unfolder import Unfolder
 
@@ -61,14 +63,55 @@ class Ensemble:
 
     TODO: Separate each step - generation, unfolded, firstgening?
     """
-    def __init__(self, raw: Matrix, save_path: str = "ensemble"):
-        self.raw: Matrix = raw
-        self.save_path: str = save_path
-        self.unfolder: Callable[[Matrix], Matrix] = None
-        self.first_generation_method: Callable[[Matrix], [Matrix]] = None
+    def __init__(self, raw: Optional[Matrix] = None, save_path: Union[str, Path] = "ensemble"):
+        self.raw: Optional[Matrix] = raw
+        self.save_path: Path = Path(save_path)
+        self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
+        self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0
+
         if not os.path.exists(self.save_path):
             os.mkdir(self.save_path)
+
+        self.std_raw: Optional[Matrix] = None
+        self.std_unfolded: Optional[Matrix] = None
+        self.std_firstgen: Optional[Matrix] = None
+
+        self.raw_ensemble: Optional[Matrix] = None
+        self.unfolded_ensemble: Optional[Matrix] = None
+        self.firstgen_ensemble: Optional[Matrix] = None
+
+    def load(self, path: Optional[Union[str, Path]] = None):
+        if path is not None:
+            path = Path(path)
+        else:
+            path = self.save_path
+
+        self.raw = Matrix(path=path / 'raw.npy')
+        self.firstgen = Matrix(path=path / 'firstgen.npy')
+        raws = list(path.glob("raw_[0-9]*.*"))
+        unfolds = list(path.glob("unfolded_[0-9]*.*"))
+        firsts = list(path.glob("firstgen_[0-9]*.*"))
+        assert len(raws) == len(unfolds) == len(firsts)
+        assert len(raws) > 0
+        self.size = len(raws)
+
+        self.raw_ensemble = np.empty((self.size, *self.raw.shape))
+        self.unfolded_ensemble = np.empty_like(self.raw_ensemble)
+        self.firstgen_ensemble = np.empty_like(self.raw_ensemble)
+
+        for i, raw in enumerate(raws):
+            self.raw_ensemble[i, :, :] = Matrix(path=raw).values
+
+        for i, unfolded in enumerate(unfolds):
+            self.unfolded_ensemble[i, :, :] = Matrix(path=unfolded).values
+
+        for i, firstgen in enumerate(firsts):
+            self.firstgen_ensemble[i, :, :] = Matrix(path=firstgen).values
+
+        self.std_raw = Matrix(path=path / 'raw_std.npy')
+        self.std_unfolded = Matrix(path=path / 'unfolded_std.npy')
+        self.std_firstgen = Matrix(path=path / 'firstgen_std.npy')
 
     def generate(self, number: int, method: str = 'poisson',
                  regenerate: bool = False) -> None:
@@ -85,6 +128,8 @@ class Ensemble:
             regenerate: Whether to use already generated files (False) or
                 generate them all anew (True).
         """
+        assert self.raw is not None, "Set the raw matrix"
+
         self.size = number
         self.regenerate = regenerate
         raw_ensemble = np.zeros((number, *self.raw.shape))
@@ -94,7 +139,6 @@ class Ensemble:
         for step in range(number):
             LOG.info(f"Generating {step}")
             raw = self.generate_raw(step, method)
-            # raw = self.raw
             unfolded = self.unfold(step, raw)
             firstgen = self.first_generation(step, unfolded)
 
@@ -107,21 +151,23 @@ class Ensemble:
             self.firstgen = firstgen
             firstgen_ensemble[step, :, :] = firstgen.values
 
+        self.raw.save(self.save_path / 'raw.npy')
+        self.firstgen.save(self.save_path / 'firstgen.npy')
         # Calculate standard deviation
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         raw_std = Matrix(raw_ensemble_std, self.raw.Eg, self.raw.Ex,
                          state='std')
-        self.save(raw_std, "raw.m")
+        raw_std.save(self.save_path / "raw_std.npy")
 
         unfolded_ensemble_std = np.std(unfolded_ensemble, axis=0)
         unfolded_std = Matrix(unfolded_ensemble_std, self.raw.Eg,
                               self.raw.Ex, state='std')
-        self.save(unfolded_std, "unfolded_std.m")
+        unfolded_std.save(self.save_path / "unfolded_std.npy")
 
         firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
         firstgen_std = Matrix(firstgen_ensemble_std, self.firstgen.Eg,
                               self.firstgen.Ex, state='std')
-        self.save(firstgen_std, "first_std.m")
+        firstgen_std.save(self.save_path / "firstgen_std.npy")
 
         self.std_raw = raw_std
         self.std_unfolded = unfolded_std
@@ -143,8 +189,8 @@ class Ensemble:
             The generated matrix
         """
         LOG.debug(f"Generating raw ensemble {step}")
-        path = os.path.join(self.save_path, f"raw_{step}.m")
-        raw = self.load(path)
+        path = os.path.join(self.save_path, f"raw_{step}.npy")
+        raw = self.load_matrix(path)
         if raw is None:
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
@@ -168,8 +214,8 @@ class Ensemble:
             The unfolded matrix
         """
         LOG.debug(f"Unfolding raw {step}")
-        path = os.path.join(self.save_path, f"unfolded_{step}.m")
-        unfolded = self.load(path)
+        path = os.path.join(self.save_path, f"unfolded_{step}.npy")
+        unfolded = self.load_matrix(path)
         if unfolded is None:
             LOG.debug("Unfolding matrix")
             unfolded = self.unfolder(raw)
@@ -187,8 +233,8 @@ class Ensemble:
             The resulting matrix
         """
         LOG.debug(f"Performing first generation on unfolded {step}")
-        path = os.path.join(self.save_path, f"firstgen_{step}.m")
-        firstgen = self.load(path)
+        path = os.path.join(self.save_path, f"firstgen_{step}.npy")
+        firstgen = self.load_matrix(path)
         if firstgen is None:
             LOG.debug("Calculating first generation matrix")
             firstgen = self.first_generation_method(unfolded)
@@ -217,17 +263,7 @@ class Ensemble:
         perturbed = np.random.poisson(std)
         return perturbed
 
-    def save(self, matrix: Matrix, name: str):
-        """Save the matrix to the save folder
-
-        Args:
-            matrix: The matrix to save
-            name: The name of the file relative to self.save_path
-        """
-        path = os.path.join(self.save_path, name)
-        matrix.save(path)
-
-    def load(self, path: str) -> Union[Matrix, None]:
+    def load_matrix(self, path: str) -> Union[Matrix, None]:
         """Check if file exists and should not be regenerated
 
         Args:
@@ -237,7 +273,7 @@ class Ensemble:
         """
         if os.path.isfile(path) and not self.regenerate:
             LOG.debug(f"Loading {path}")
-            return Matrix(filename=path)
+            return Matrix(path=path)
 
     def get_raw(self, index: Union[int, List[int]]) -> Union[Matrix,
                                                              List[Matrix]]:
@@ -306,3 +342,13 @@ class Ensemble:
         return Matrix(self.firstgen_ensemble[index],
                       self.firstgen.Eg,
                       self.firstgen.Ex, state='firstgen')
+
+    def plot(self):
+        fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)
+        self.std_raw.plot(ax=ax[0], title='Raw')
+        self.std_unfolded.plot(ax=ax[1], title='Unfolded')
+        self.std_firstgen.plot(ax=ax[2], title='First Generation')
+        ax[1].set_ylabel(None)
+        ax[2].set_ylabel(None)
+        fig.suptitle("Standard Deviation")
+        return fig, ax
