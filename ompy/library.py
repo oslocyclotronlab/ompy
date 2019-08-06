@@ -34,7 +34,7 @@ from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 import matplotlib
 from itertools import product
-from typing import Optional, Iterable, Union, List
+from typing import Optional, Iterable, Union, List, Tuple
 import tarfile
 from pathlib import Path
 
@@ -539,8 +539,8 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
 
     return texts
 
-def save_numpy(objects: Union[np.ndarray, Iterable[np.ndarray]],
-               path: Union[str, Path]) -> None:
+def save_tar(objects: Union[np.ndarray, Iterable[np.ndarray]],
+             path: Union[str, Path]) -> None:
     if isinstance(path, str):
         path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -556,7 +556,7 @@ def save_numpy(objects: Union[np.ndarray, Iterable[np.ndarray]],
     tar.close()
 
 
-def load_numpy(path: Union[str, Path]) -> List[np.ndarray]:
+def load_tar(path: Union[str, Path]) -> List[np.ndarray]:
     if isinstance(path, str):
         path = Path(path)
 
@@ -569,4 +569,28 @@ def load_numpy(path: Union[str, Path]) -> List[np.ndarray]:
         objects.append(np.load(name))
         Path(name).unlink()
     return objects
+
+def save_numpy_2D(matrix: np.ndarray, Eg: np.ndarray,
+                  Ex: np.ndarray, path: Union[str, Path]):
+    mat = np.empty((matrix.shape[0] + 1, matrix.shape[1] + 1))
+    mat[0, 1:] = Eg
+    mat[1:, 0] = Ex
+    mat[1:, 1:] = matrix
+    np.save(path, mat)
+
+def load_numpy_2D(path: Union[str, Path]
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    mat = np.load(path)
+    return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
+
+def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
+    mat = np.load(path)
+    half = int(mat.shape[0]/2)
+    return mat[:half], mat[half:]
+
+def save_numpy_1D(values: np.ndarray, E: np.ndarray,
+                  path: Union[str, Path]) -> None:
+    mat = np.append(values, E)
+    assert mat % 2 == 0
+    np.save(path, mat)
 

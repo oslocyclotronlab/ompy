@@ -160,13 +160,13 @@ class Unfolder:
         LOG.debug((f"Cutting matrix from {self.raw.shape}"
                    f" to {self.r.shape}"))
 
-    def load_response(self, filename: str) -> None:
+    def load_response(self, path: str) -> None:
         """Load the response matrix
 
         Args:
-            filename: The path to the response matrix
+            path: The path to the response matrix
         """
-        response = Matrix(filename=filename)
+        response = Matrix(path=path)
         self.R = response.values
         self.R_calibration_array = response.calibration_array()
 

@@ -202,7 +202,7 @@ class FitRhoT:
                                       Eg=Eg,
                                       nld=Enld,
                                       Ex=Ex,
-                                      dE_resolution=dE_resolution,
+                                      resolution=dE_resolution,
                                       p0=p0,
                                       method=self.method,
                                       options=self.options,

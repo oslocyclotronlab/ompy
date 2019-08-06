@@ -20,7 +20,7 @@ def list_examples():
 
 def load_example_raw(name: str) -> Matrix:
     path = get_path(EXAMPLES[name]['raw'])
-    return Matrix(filename=path)
+    return Matrix(path=path)
 
 
 def disjoint_rows(shape: Tuple[int, int]) -> Matrix:

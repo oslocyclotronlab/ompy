@@ -30,6 +30,7 @@ from uncertainties import unumpy
 
 from .spinfunctions import SpinFunctions
 from .matrix import Matrix
+from .library import div0
 
 cimport cython
 cimport numpy as np
@@ -99,9 +100,9 @@ def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):
     return z
 
 
-def decompose_matrix(matrix: Matrix, std: Matrix,
+def decompose_matrix(matrix: Matrix, std: Matrix, *,
                      Eg: np.ndarray, nld: np.ndarray,
-                     Ex: np.ndarray, dE_resolution: np.ndarray,
+                     Ex: np.ndarray, resolution: np.ndarray,
                      p0=None,
                      method="Powell", options={'disp': True},
                      fill_value=0,
@@ -140,13 +141,14 @@ def decompose_matrix(matrix: Matrix, std: Matrix,
 
     """
     # protect input arrays
-    matrix = np.copy(matrix.values)
+    values = np.copy(matrix.values)
     std = np.copy(std.values)
 
     Nbins_Ex, Nbins_T = np.shape(matrix)
     Nbins_rho = Nbins_T
 
-    matrix, std = normalize(matrix, std)
+
+    values, std = normalize(values, std)
 
     # Addition 20190329 to add z factor:
     z_array = None
@@ -157,22 +159,20 @@ def decompose_matrix(matrix: Matrix, std: Matrix,
                                    spin_dist_par=spin_dist_par)
     else:
         z_array = use_z
-    assert (z_array is not None), "z_array should be set"
+
+    assert z_array is not None, "z_array should be set"
 
     # initial guesses
-    rho0 = np.ones(Nbins_rho)
+    rho0 = np.ones(Nbins_T)
 
     if p0 is None:
-        T0 = np.zeros(Nbins_T)     # inigial guess for T  following
-        for i_Eg in range(Nbins_T): # eq(6) in Schiller2000
-            T0[i_Eg] = np.sum(matrix[:,i_Eg]) # no need for i_start; we trimmed the matrix already
-
-        p0 = np.append(rho0,T0) # create 1D array of the initial guess
+        T0 = values.sum(axis=0)
+        p0 = np.append(rho0, T0)
 
     # minimization
     res = minimize(objfun1D, x0=p0,
                    args=(matrix, std,
-                         Eg, nld, Ex, dE_resolution, z_array),
+                         Eg, nld, Ex, resolution, z_array),
                    method=method,
                    options=options)
     p_fit = res.x
@@ -184,20 +184,16 @@ def decompose_matrix(matrix: Matrix, std: Matrix,
     else:
         return rho_fit, T_fit, z_array
 
-def normalize(P_in, P_err=0):
-    ##############
-    u_oslo_matrix = unumpy.uarray(P_in, P_err)
+def normalize(values, std=0):
+    matrix = unumpy.uarray(values, std)
 
     # normalize each Ex row to 1 (-> get decay probability)
-    for i, normalization in enumerate(np.sum(u_oslo_matrix,axis=1)):
-        try:
-            u_oslo_matrix[i,:] /= normalization
-        except ZeroDivisionError:
-            u_oslo_matrix[i,:]=0
-    P_in_norm = unumpy.nominal_values(u_oslo_matrix)
-    P_err_norm = unumpy.std_devs(u_oslo_matrix)
+    for i, total in enumerate(matrix.sum(axis=1)):
+        matrix[i, :] = div0(matrix[i, :], total)
+    values = unumpy.nominal_values(matrix)
+    std = unumpy.std_devs(matrix)
 
-    return P_in_norm, P_err_norm
+    return values, std
 
 def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):
     """
