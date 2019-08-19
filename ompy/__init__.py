@@ -20,3 +20,6 @@ from .firstgeneration import *
 from .hooks import *
 from .extractor import Extractor
 from .setable import Setable
+from .filehandling import *
+from .action import Action
+from .decomposition import *

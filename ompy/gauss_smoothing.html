@@ -382,7 +382,7 @@ body.cython { font-family: courier; font-size: 12; }
 </pre><pre class="cython line score-0">&#xA0;<span class="">003</span>: <span class="k">cimport</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span></pre>
 <pre class="cython line score-19" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">004</span>: <span class="k">from</span> <span class="nn">scipy.interpolate</span> <span class="k">import</span> <span class="n">interp1d</span><span class="c">#, interp2d</span></pre>
 <pre class='cython code score-19 '>
-  /* "ompy/gauss_smoothing.pyx":4
+  /* "gauss_smoothing.pyx":4
  * import numpy as np
  * cimport numpy as np
  * from scipy.interpolate import interp1d#, interp2d             # &lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
@@ -438,10 +438,10 @@ body.cython { font-family: courier; font-size: 12; }
 <pre class="cython line score-0">&#xA0;<span class="">011</span>: </pre>
 <pre class="cython line score-73" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">012</span>: <span class="k">def</span> <span class="nf">gaussian</span><span class="p">(</span><span class="n">double</span><span class="p">[:]</span> <span class="n">Emids</span><span class="p">,</span> <span class="n">double</span> <span class="n">mu</span><span class="p">,</span> <span class="n">double</span> <span class="n">sigma</span><span class="p">):</span></pre>
 <pre class='cython code score-73 '>/* Python wrapper */
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_1gaussian(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_15gauss_smoothing_gaussian[] = "\n    Returns a normalized Gaussian supported on Emids.\n\n    NB! All arguments (Emids, mu and sigma) must have the\n    same units. In OMpy the default unit is keV.\n\n    Args:\n        Emids (array, double): Array of energies to evaluate\n                               (center bin calibration)\n        mu (double): Centroid\n        sigma (double): Standard deviation\n    Returns:\n        gaussian_array (array, double): Array of gaussian\n        distribution values matching Emids.\n    ";
-static PyMethodDef __pyx_mdef_4ompy_15gauss_smoothing_1gaussian = {"gaussian", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_15gauss_smoothing_1gaussian, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_15gauss_smoothing_gaussian};
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_1gaussian(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_15gauss_smoothing_1gaussian(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_15gauss_smoothing_gaussian[] = "\n    Returns a normalized Gaussian supported on Emids.\n\n    NB! All arguments (Emids, mu and sigma) must have the\n    same units. In OMpy the default unit is keV.\n\n    Args:\n        Emids (array, double): Array of energies to evaluate\n                               (center bin calibration)\n        mu (double): Centroid\n        sigma (double): Standard deviation\n    Returns:\n        gaussian_array (array, double): Array of gaussian\n        distribution values matching Emids.\n    ";
+static PyMethodDef __pyx_mdef_15gauss_smoothing_1gaussian = {"gaussian", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_15gauss_smoothing_1gaussian, METH_VARARGS|METH_KEYWORDS, __pyx_doc_15gauss_smoothing_gaussian};
+static PyObject *__pyx_pw_15gauss_smoothing_1gaussian(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_Emids = { 0, 0, { 0 }, { 0 }, { 0 } };
   double __pyx_v_mu;
   double __pyx_v_sigma;
@@ -500,18 +500,18 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_1gaussian(PyObject *__pyx_self
   __pyx_L5_argtuple_error:;
   <span class='pyx_c_api'>__Pyx_RaiseArgtupleInvalid</span>("gaussian", 1, 3, 3, <span class='py_macro_api'>PyTuple_GET_SIZE</span>(__pyx_args)); <span class='error_goto'>__PYX_ERR(0, 12, __pyx_L3_error)</span>
   __pyx_L3_error:;
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gaussian", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gaussian", __pyx_clineno, __pyx_lineno, __pyx_filename);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_gaussian(__pyx_self, __pyx_v_Emids, __pyx_v_mu, __pyx_v_sigma);
+  __pyx_r = __pyx_pf_15gauss_smoothing_gaussian(__pyx_self, __pyx_v_Emids, __pyx_v_mu, __pyx_v_sigma);
 
   /* function exit code */
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_Emids, double __pyx_v_mu, double __pyx_v_sigma) {
+static PyObject *__pyx_pf_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_Emids, double __pyx_v_mu, double __pyx_v_sigma) {
   PyObject *__pyx_v_gaussian_array = NULL;
   __Pyx_memviewslice __pyx_v_gaussian_array_view = { 0, 0, { 0 }, { 0 }, { 0 } };
   double __pyx_v_prefactor;
@@ -529,7 +529,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObjec
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_5);
   __PYX_XDEC_MEMVIEW(&amp;__pyx_t_6, 1);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_7);
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gaussian", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gaussian", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_gaussian_array);
@@ -544,7 +544,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObjec
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__31);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__31);
 /* … */
-  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_4ompy_15gauss_smoothing_1gaussian, NULL, __pyx_n_s_ompy_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 12, __pyx_L1_error)</span>
+  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_15gauss_smoothing_1gaussian, NULL, __pyx_n_s_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 12, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_d, __pyx_n_s_gaussian, __pyx_t_1) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 12, __pyx_L1_error)</span>
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_1); __pyx_t_1 = 0;
@@ -737,10 +737,10 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_gaussian(CYTHON_UNUSED PyObjec
 <pre class="cython line score-0">&#xA0;<span class="">046</span>: </pre>
 <pre class="cython line score-79" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">047</span>: <span class="k">def</span> <span class="nf">gauss_smoothing</span><span class="p">(</span><span class="n">double</span><span class="p">[:]</span> <span class="n">vector_in</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="n">E_array</span><span class="p">,</span></pre>
 <pre class='cython code score-79 '>/* Python wrapper */
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_15gauss_smoothing_2gauss_smoothing[] = "\n    Function which smooths an array of counts by a Gaussian\n    of full-width-half-maximum FWHM. Preserves number of counts.\n    Args:\n        vector_in (array, double): Array of inbound counts to be smoothed\n        E_array (array, double): Array with energy calibration of vector_in, in\n                                 lower-bin-edge calibration\n        fwhm_divE_array (array, double): The full-width-half-maximum value to\n                                    smooth by, in percent of the energy. Note\n                                    well that this means that fwhm =\n                                    fwhm_divE/100 * E_array gives you the\n                                    absolute FWHM.\n        truncate (double, optional): The window width of the Gaussian that is\n                                     used to smoothe, in units of sigma.\n                                     Defaults to 3.\n\n    Returns:\n        vector_out: Array of smoothed counts\n\n    ";
-static PyMethodDef __pyx_mdef_4ompy_15gauss_smoothing_3gauss_smoothing = {"gauss_smoothing", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_15gauss_smoothing_2gauss_smoothing};
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_15gauss_smoothing_2gauss_smoothing[] = "\n    Function which smooths an array of counts by a Gaussian\n    of full-width-half-maximum FWHM. Preserves number of counts.\n    Args:\n        vector_in (array, double): Array of inbound counts to be smoothed\n        E_array (array, double): Array with energy calibration of vector_in, in\n                                 lower-bin-edge calibration\n        fwhm_divE_array (array, double): The full-width-half-maximum value to\n                                    smooth by, in percent of the energy. Note\n                                    well that this means that fwhm =\n                                    fwhm_divE/100 * E_array gives you the\n                                    absolute FWHM.\n        truncate (double, optional): The window width of the Gaussian that is\n                                     used to smoothe, in units of sigma.\n                                     Defaults to 3.\n\n    Returns:\n        vector_out: Array of smoothed counts\n\n    ";
+static PyMethodDef __pyx_mdef_15gauss_smoothing_3gauss_smoothing = {"gauss_smoothing", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_15gauss_smoothing_3gauss_smoothing, METH_VARARGS|METH_KEYWORDS, __pyx_doc_15gauss_smoothing_2gauss_smoothing};
+static PyObject *__pyx_pw_15gauss_smoothing_3gauss_smoothing(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   __Pyx_memviewslice __pyx_v_vector_in = { 0, 0, { 0 }, { 0 }, { 0 } };
   PyArrayObject *__pyx_v_E_array = 0;
   __Pyx_memviewslice __pyx_v_fwhm_divE_array = { 0, 0, { 0 }, { 0 }, { 0 } };
@@ -817,12 +817,12 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__p
   __pyx_L5_argtuple_error:;
   <span class='pyx_c_api'>__Pyx_RaiseArgtupleInvalid</span>("gauss_smoothing", 0, 3, 4, <span class='py_macro_api'>PyTuple_GET_SIZE</span>(__pyx_args)); <span class='error_goto'>__PYX_ERR(0, 47, __pyx_L3_error)</span>
   __pyx_L3_error:;
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!<span class='pyx_c_api'>__Pyx_ArgTypeTest</span>(((PyObject *)__pyx_v_E_array), __pyx_ptype_5numpy_ndarray, 1, "E_array", 0))) <span class='error_goto'>__PYX_ERR(0, 47, __pyx_L1_error)</span>
-  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(__pyx_self, __pyx_v_vector_in, __pyx_v_E_array, __pyx_v_fwhm_divE_array, __pyx_v_truncate);
+  __pyx_r = __pyx_pf_15gauss_smoothing_2gauss_smoothing(__pyx_self, __pyx_v_vector_in, __pyx_v_E_array, __pyx_v_fwhm_divE_array, __pyx_v_truncate);
 
   /* function exit code */
   goto __pyx_L0;
@@ -833,8 +833,8 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_3gauss_smoothing(PyObject *__p
   return __pyx_r;
 }
 /* … */
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, PyArrayObject *__pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array, double __pyx_v_truncate) {
-  struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_cur_scope;
+static PyObject *__pyx_pf_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_vector_in, PyArrayObject *__pyx_v_E_array, __Pyx_memviewslice __pyx_v_fwhm_divE_array, double __pyx_v_truncate) {
+  struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_cur_scope;
   __Pyx_memviewslice __pyx_v_vector_in_view = { 0, 0, { 0 }, { 0 }, { 0 } };
   PyObject *__pyx_v_vector_out = NULL;
   PyObject *__pyx_v_find_truncation_indices = 0;
@@ -848,9 +848,9 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   PyObject *__pyx_r = NULL;
   <span class='refnanny'>__Pyx_RefNannyDeclarations</span>
   <span class='refnanny'>__Pyx_RefNannySetupContext</span>("gauss_smoothing", 0);
-  __pyx_cur_scope = (struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *)__pyx_tp_new_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing(__pyx_ptype_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing, __pyx_empty_tuple, NULL);
+  __pyx_cur_scope = (struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *)__pyx_tp_new_15gauss_smoothing___pyx_scope_struct__gauss_smoothing(__pyx_ptype_15gauss_smoothing___pyx_scope_struct__gauss_smoothing, __pyx_empty_tuple, NULL);
   if (unlikely(!__pyx_cur_scope)) {
-    __pyx_cur_scope = ((struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *)Py_None);
+    __pyx_cur_scope = ((struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *)Py_None);
     <span class='pyx_macro_api'>__Pyx_INCREF</span>(Py_None);
     <span class='error_goto'>__PYX_ERR(0, 47, __pyx_L1_error)</span>
   } else {
@@ -864,7 +864,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_7);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_8);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_9);
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __PYX_XDEC_MEMVIEW(&amp;__pyx_v_vector_in_view, 1);
@@ -888,13 +888,13 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_2gauss_smoothing(CYTHON_UNUSED
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__33);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__33);
 /* … */
-  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_4ompy_15gauss_smoothing_3gauss_smoothing, NULL, __pyx_n_s_ompy_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 47, __pyx_L1_error)</span>
+  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_15gauss_smoothing_3gauss_smoothing, NULL, __pyx_n_s_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 47, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_d, __pyx_n_s_gauss_smoothing, __pyx_t_1) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 47, __pyx_L1_error)</span>
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_codeobj__34 = (PyObject*)<span class='pyx_c_api'>__Pyx_PyCode_New</span>(4, 0, 17, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__33, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_gauss_smoothing, 47, __pyx_empty_bytes);<span class='error_goto'> if (unlikely(!__pyx_codeobj__34)) __PYX_ERR(0, 47, __pyx_L1_error)</span>
 /* … */
-struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing {
+struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing {
   PyObject_HEAD
   double __pyx_v_a0;
   double __pyx_v_a1;
@@ -1017,7 +1017,7 @@ struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing {
 </pre><pre class="cython line score-0">&#xA0;<span class="">087</span>:     <span class="c"># cdef double[:] vector_out_view = vector_out</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">088</span>: </pre>
 <pre class="cython line score-108" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">089</span>:     <span class="k">def</span> <span class="nf">find_truncation_indices</span><span class="p">(</span><span class="n">double</span> <span class="n">E_centroid_current</span><span class="p">,</span></pre>
-<pre class='cython code score-108 '>static PyObject *__pyx_pf_4ompy_15gauss_smoothing_6__defaults__(CYTHON_UNUSED PyObject *__pyx_self) {
+<pre class='cython code score-108 '>static PyObject *__pyx_pf_15gauss_smoothing_6__defaults__(CYTHON_UNUSED PyObject *__pyx_self) {
   PyObject *__pyx_r = NULL;
   <span class='refnanny'>__Pyx_RefNannyDeclarations</span>
   <span class='refnanny'>__Pyx_RefNannySetupContext</span>("__defaults__", 0);
@@ -1045,7 +1045,7 @@ struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing {
   __pyx_L1_error:;
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_1);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_2);
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.__defaults__", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.__defaults__", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   <span class='refnanny'>__Pyx_XGIVEREF</span>(__pyx_r);
@@ -1054,9 +1054,9 @@ struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing {
 }
 
 /* Python wrapper */
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4ompy_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices = {"find_truncation_indices", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices = {"find_truncation_indices", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   double __pyx_v_E_centroid_current;
   double __pyx_v_sigma_current;
   double __pyx_v_truncate;
@@ -1123,20 +1123,20 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_15gauss_smoothing_1find_trunca
   __pyx_L5_argtuple_error:;
   <span class='pyx_c_api'>__Pyx_RaiseArgtupleInvalid</span>("find_truncation_indices", 0, 2, 3, <span class='py_macro_api'>PyTuple_GET_SIZE</span>(__pyx_args)); <span class='error_goto'>__PYX_ERR(0, 89, __pyx_L3_error)</span>
   __pyx_L3_error:;
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing.find_truncation_indices", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing.find_truncation_indices", __pyx_clineno, __pyx_lineno, __pyx_filename);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncation_indices(__pyx_self, __pyx_v_E_centroid_current, __pyx_v_sigma_current, __pyx_v_truncate);
+  __pyx_r = __pyx_pf_15gauss_smoothing_15gauss_smoothing_find_truncation_indices(__pyx_self, __pyx_v_E_centroid_current, __pyx_v_sigma_current, __pyx_v_truncate);
 
   /* function exit code */
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncation_indices(PyObject *__pyx_self, double __pyx_v_E_centroid_current, double __pyx_v_sigma_current, double __pyx_v_truncate) {
-  struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_cur_scope;
-  struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_outer_scope;
+static PyObject *__pyx_pf_15gauss_smoothing_15gauss_smoothing_find_truncation_indices(PyObject *__pyx_self, double __pyx_v_E_centroid_current, double __pyx_v_sigma_current, double __pyx_v_truncate) {
+  struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_cur_scope;
+  struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *__pyx_outer_scope;
   double __pyx_v_E_cut_low;
   PyObject *__pyx_v_i_cut_low = NULL;
   double __pyx_v_E_cut_high;
@@ -1144,7 +1144,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncat
   PyObject *__pyx_r = NULL;
   <span class='refnanny'>__Pyx_RefNannyDeclarations</span>
   <span class='refnanny'>__Pyx_RefNannySetupContext</span>("find_truncation_indices", 0);
-  __pyx_outer_scope = (struct __pyx_obj_4ompy_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *) <span class='pyx_c_api'>__Pyx_CyFunction_GetClosure</span>(__pyx_self);
+  __pyx_outer_scope = (struct __pyx_obj_15gauss_smoothing___pyx_scope_struct__gauss_smoothing *) <span class='pyx_c_api'>__Pyx_CyFunction_GetClosure</span>(__pyx_self);
   __pyx_cur_scope = __pyx_outer_scope;
 /* … */
   /* function exit code */
@@ -1154,7 +1154,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncat
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_5);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_6);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_9);
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing.find_truncation_indices", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing.find_truncation_indices", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_i_cut_low);
@@ -1168,14 +1168,14 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncat
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__3);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__3);
 /* … */
-  __pyx_t_9 = <span class='pyx_c_api'>__Pyx_CyFunction_NewEx</span>(&amp;__pyx_mdef_4ompy_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices, 0, __pyx_n_s_gauss_smoothing_locals_find_trun, ((PyObject*)__pyx_cur_scope), __pyx_n_s_ompy_gauss_smoothing, __pyx_d, ((PyObject *)__pyx_codeobj__4));<span class='error_goto'> if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 89, __pyx_L1_error)</span>
+  __pyx_t_9 = <span class='pyx_c_api'>__Pyx_CyFunction_NewEx</span>(&amp;__pyx_mdef_15gauss_smoothing_15gauss_smoothing_1find_truncation_indices, 0, __pyx_n_s_gauss_smoothing_locals_find_trun, ((PyObject*)__pyx_cur_scope), __pyx_n_s_gauss_smoothing, __pyx_d, ((PyObject *)__pyx_codeobj__4));<span class='error_goto'> if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 89, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_9);
   if (!<span class='pyx_c_api'>__Pyx_CyFunction_InitDefaults</span>(__pyx_t_9, sizeof(__pyx_defaults), 0)) <span class='error_goto'>__PYX_ERR(0, 89, __pyx_L1_error)</span>
   __pyx_codeobj__4 = (PyObject*)<span class='pyx_c_api'>__Pyx_PyCode_New</span>(3, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__3, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_gauss_smoothing_pyx, __pyx_n_s_find_truncation_indices, 89, __pyx_empty_bytes);<span class='error_goto'> if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 89, __pyx_L1_error)</span>
 </pre><pre class="cython line score-0">&#xA0;<span class="">090</span>:                                 <span class="n">double</span> <span class="n">sigma_current</span><span class="p">,</span></pre>
 <pre class="cython line score-4" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">091</span>:                                 <span class="n">double</span> <span class="n">truncate</span><span class="o">=</span><span class="n">truncate</span><span class="p">):</span></pre>
 <pre class='cython code score-4 '>  <span class='pyx_c_api'>__Pyx_CyFunction_Defaults</span>(__pyx_defaults, __pyx_t_9)-&gt;__pyx_arg_truncate = __pyx_v_truncate;
-  <span class='pyx_c_api'>__Pyx_CyFunction_SetDefaultsGetter</span>(__pyx_t_9, __pyx_pf_4ompy_15gauss_smoothing_6__defaults__);
+  <span class='pyx_c_api'>__Pyx_CyFunction_SetDefaultsGetter</span>(__pyx_t_9, __pyx_pf_15gauss_smoothing_6__defaults__);
   __pyx_v_find_truncation_indices = __pyx_t_9;
   __pyx_t_9 = 0;
 </pre><pre class="cython line score-0" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">092</span>:         <span class="n">E_cut_low</span> <span class="o">=</span> <span class="n">E_centroid_current</span> <span class="o">-</span> <span class="n">truncate</span> <span class="o">*</span> <span class="n">sigma_current</span></pre>
@@ -1507,9 +1507,9 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_15gauss_smoothing_find_truncat
 <pre class="cython line score-0">&#xA0;<span class="">121</span>: </pre>
 <pre class="cython line score-51" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">122</span>: <span class="k">def</span> <span class="nf">gauss_smoothing_matrix</span><span class="p">(</span><span class="n">matrix_in</span><span class="p">,</span> <span class="n">E_array</span><span class="p">,</span></pre>
 <pre class='cython code score-51 '>/* Python wrapper */
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4ompy_15gauss_smoothing_5gauss_smoothing_matrix = {"gauss_smoothing_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_15gauss_smoothing_5gauss_smoothing_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_15gauss_smoothing_5gauss_smoothing_matrix = {"gauss_smoothing_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_15gauss_smoothing_5gauss_smoothing_matrix, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_15gauss_smoothing_5gauss_smoothing_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_matrix_in = 0;
   PyObject *__pyx_v_E_array = 0;
   PyObject *__pyx_v_fwhm_array = 0;
@@ -1568,18 +1568,18 @@ static PyObject *__pyx_pw_4ompy_15gauss_smoothing_5gauss_smoothing_matrix(PyObje
   __pyx_L5_argtuple_error:;
   <span class='pyx_c_api'>__Pyx_RaiseArgtupleInvalid</span>("gauss_smoothing_matrix", 1, 3, 3, <span class='py_macro_api'>PyTuple_GET_SIZE</span>(__pyx_args)); <span class='error_goto'>__PYX_ERR(0, 122, __pyx_L3_error)</span>
   __pyx_L3_error:;
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(__pyx_self, __pyx_v_matrix_in, __pyx_v_E_array, __pyx_v_fwhm_array);
+  __pyx_r = __pyx_pf_15gauss_smoothing_4gauss_smoothing_matrix(__pyx_self, __pyx_v_matrix_in, __pyx_v_E_array, __pyx_v_fwhm_array);
 
   /* function exit code */
   <span class='refnanny'>__Pyx_RefNannyFinishContext</span>();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix_in, PyObject *__pyx_v_E_array, PyObject *__pyx_v_fwhm_array) {
+static PyObject *__pyx_pf_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix_in, PyObject *__pyx_v_E_array, PyObject *__pyx_v_fwhm_array) {
   int __pyx_v_i;
   PyObject *__pyx_v_matrix_out = NULL;
   PyObject *__pyx_r = NULL;
@@ -1593,7 +1593,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_3);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_4);
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_t_9);
-  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("ompy.gauss_smoothing.gauss_smoothing_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  <span class='pyx_c_api'>__Pyx_AddTraceback</span>("gauss_smoothing.gauss_smoothing_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   <span class='pyx_macro_api'>__Pyx_XDECREF</span>(__pyx_v_matrix_out);
@@ -1606,7 +1606,7 @@ static PyObject *__pyx_pf_4ompy_15gauss_smoothing_4gauss_smoothing_matrix(CYTHON
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_tuple__35);
   <span class='refnanny'>__Pyx_GIVEREF</span>(__pyx_tuple__35);
 /* … */
-  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_4ompy_15gauss_smoothing_5gauss_smoothing_matrix, NULL, __pyx_n_s_ompy_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 122, __pyx_L1_error)</span>
+  __pyx_t_1 = PyCFunction_NewEx(&amp;__pyx_mdef_15gauss_smoothing_5gauss_smoothing_matrix, NULL, __pyx_n_s_gauss_smoothing);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 122, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_d, __pyx_n_s_gauss_smoothing_matrix, __pyx_t_1) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 122, __pyx_L1_error)</span>
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_1); __pyx_t_1 = 0;

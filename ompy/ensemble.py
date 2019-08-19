@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Callable, Union, List, Optional
 from .matrix import Matrix
 from .unfolder import Unfolder
+from .action import Action
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -62,6 +63,10 @@ class Ensemble:
         firstgen_ensemble (np.ndarray): The entire firstgen ensemble.
 
     TODO: Separate each step - generation, unfolded, firstgening?
+    TODO: Incoporate Extractor to provide an ensemble of nld and gsf.
+    TODO: Clean up
+    TODO: (Re)generation with book keeping is a recurring pattern.
+        Try to abstract it away.
     """
     def __init__(self, raw: Optional[Matrix] = None, save_path: Union[str, Path] = "ensemble"):
         self.raw: Optional[Matrix] = raw
@@ -69,6 +74,9 @@ class Ensemble:
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0
+        self.action_raw = Action('matrix')
+        self.action_unfolded = Action('matrix')
+        self.action_firstgen = Action('matrix')
 
         if not os.path.exists(self.save_path):
             os.mkdir(self.save_path)
@@ -129,6 +137,8 @@ class Ensemble:
                 generate them all anew (True).
         """
         assert self.raw is not None, "Set the raw matrix"
+        assert self.unfolder is not None, "Set unfolder"
+        assert self.first_generation_method is not None, "Set first generation method"
 
         self.size = number
         self.regenerate = regenerate
@@ -151,6 +161,7 @@ class Ensemble:
             self.firstgen = firstgen
             firstgen_ensemble[step, :, :] = firstgen.values
 
+        # TODO Move this to a save step
         self.raw.save(self.save_path / 'raw.npy')
         self.firstgen.save(self.save_path / 'firstgen.npy')
         # Calculate standard deviation
@@ -201,6 +212,7 @@ class Ensemble:
                 raise ValueError(f"Method {method} is not supported")
             raw = Matrix(values, Eg=self.raw.Eg, Ex=self.raw.Ex)
             raw.save(path)
+        self.action_raw.act_on(raw)
         return raw
 
     def unfold(self, step: int, raw: Matrix) -> Matrix:
@@ -220,6 +232,7 @@ class Ensemble:
             LOG.debug("Unfolding matrix")
             unfolded = self.unfolder(raw)
             unfolded.save(path)
+        self.action_unfolded.act_on(unfolded)
         return unfolded
 
     def first_generation(self, step: int, unfolded: Matrix) -> Matrix:
@@ -239,6 +252,7 @@ class Ensemble:
             LOG.debug("Calculating first generation matrix")
             firstgen = self.first_generation_method(unfolded)
             firstgen.save(path)
+        self.action_firstgen.act_on(firstgen)
         return firstgen
 
     def generate_gaussian(self) -> np.ndarray:
