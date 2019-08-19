@@ -147,7 +147,6 @@ def decompose_matrix(matrix: Matrix, std: Matrix, *,
     Nbins_Ex, Nbins_T = np.shape(matrix)
     Nbins_rho = Nbins_T
 
-
     values, std = normalize(values, std)
 
     # Addition 20190329 to add z factor:

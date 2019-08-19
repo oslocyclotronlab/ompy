@@ -40,11 +40,12 @@ from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
-from .library import (mama_read, mama_write, div0, fill_negative,
-                      diagonal_resolution, save_numpy_1D, load_numpy_1D,
-                      save_numpy_2D, load_numpy_2D, save_tar, load_tar)
+from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
+                           save_numpy_2D, load_numpy_2D, save_tar, load_tar)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
+from .decomposition import index
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -86,7 +87,6 @@ class Matrix():
         Ex: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
-        mask: A boolean array for cutting the array
     TODO:
         * Find a way to handle units
         * Synchronize cuts. When a cut is made along one axis,
@@ -137,7 +137,6 @@ class Matrix():
         self.verify_integrity()
 
         self.state = state
-        self.mask = None
 
     def verify_integrity(self):
         """ Runs checks to verify internal structure
@@ -499,25 +498,32 @@ class Matrix():
         else:
             return Matrix(values_cut, Eg=Eg, Ex=Ex)
 
-    def cut_diagonal(self, E1: Iterable[float] = None,
-                     E2: Iterable[float] = None,
-                     inplace: bool = True) -> Union[None, Any]:
+    def cut_like(self, other, inplace=True) -> Optional[Matrix]:
+        if inplace:
+            self.cut('Ex', other.Ex.min(), other.Ex.max())
+            self.cut('Eg', other.Eg.min(), other.Eg.max())
+        else:
+            out = self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=False)
+            assert out is not None
+            out.cut('Eg', other.Eg.min(), other.Eg.max())
+            return out
+
+    def cut_diagonal(self, E1: Optional[Iterable[float]] = None,
+                     E2: Optional[Iterable[float]] = None,
+                     inplace: bool = True) -> Optional[Matrix]:
         """Cut away counts to the right of a diagonal line defined by indices
 
         If no limits are provided, an automatic cut will be made.
         Args:
-            E1 (optional): First point of intercept, ordered as Ex, Eg
-            E2 (optional): Second point of intercept
-            inplace (optional): Whether the operation should be applied to the
+            E1: First point of intercept, ordered as Ex, Eg
+            E2: Second point of intercept
+            inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
         Returns:
             The matrix with counts above diagonal removed if not inplace.
         """
         if E1 is None and E2 is None:
-            dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg)).reshape(self.shape)
-            Eg, Ex = np.meshgrid(self.Eg, self.Ex)
-            mask = np.zeros_like(self.values, dtype=bool)
-            mask[Eg >= Ex + dEg] = True
+            mask = self.diagonal_mask()
         elif E1 is None or E2 is None:
             raise ValueError("If either E1 or E2 is specified, "
                              "both must be specified and have same type")
@@ -525,11 +531,9 @@ class Matrix():
             mask = self.line_mask(E1, E2)
 
         if inplace:
-            self.mask = mask
             self.values[mask] = 0.0
         else:
             matrix = copy.deepcopy(self)
-            matrix.mask = mask
             matrix.values[mask] = 0.0
             return matrix
 
@@ -565,30 +569,43 @@ class Matrix():
         mask = np.where(j_mesh < line(i_mesh), True, False)
         return mask
 
-    def diagonal_mask(self, Ex_min: float, Ex_max: float,
-                      Eg_min: float) -> np.ndarray:
-        """Create a trapezoidal mask delimited by the diagonal of the matrix
+    def trapezoid(self, Ex_min: float, Ex_max: float,
+                  Eg_min: float, Eg_max: Optional[float] = None,
+                  inplace: bool = True) -> Optional[Matrix]:
+        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
             Ex_max: The top edge of the trapezoid
             Eg_min: The left edge of the trapezoid
+            #Eg_max: The right edge of the trapezoid used for defining the
+            #    diagonal. If not set, the diagonal will be found by
+            #    using the last nonzeros of each row.
         Returns:
-            The boolean array with counts below the line set to False
-        TODO: Is this function necessary?
+            Cut matrix if 'inplace' is True
         """
-        raise NotImplementedError()
         # Transform to index basis
-        iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
-        iEg_min = self.index_Ex(Eg_min)
+        if Eg_max is not None:
+            raise NotImplementedError()
 
-        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
-        Ex_cut = self.Ex[(self.Ex > Ex_min) & (self.Ex < Ex_max)]
-        dEg = np.repeat(diagonal_resolution, len(self.Ex)).reshape(self.shape)
-        mask = np.zeros_like(self.values, dtype=bool)
-        mask[(Ex_min < Ex) & (Ex < Ex_max) & (Eg < Ex + dEg)] = True
+        for i, j in reversed(list(self.diagonal_elements())):
+            if self.Ex[i] <= Ex_max:
+                Eg_max = self.Eg[j]
+                break
 
-        return mask
+        iEx = (Ex_min < self.Ex) & (self.Ex < Ex_max)
+        iEg = (Eg_min < self.Eg) & (self.Eg < Eg_max)
+        indicies = np.ix_(iEx, iEg)
+        #mask = np.zeros_like(self.values, dtype=bool)
+        #mask[indicies] = True
+        if inplace:
+            self.values = self.values[indicies]
+            self.Ex = self.Ex[iEx]
+            self.Eg = self.Eg[iEg]
+        else:
+            return Matrix(values=self.values[indicies], Ex=self.Ex[iEx],
+                          Eg=self.Eg[iEg])
+
 
     def rebin(self, axis: Union[int, str],
               edges: Optional[Sequence[float]] = None,
@@ -650,6 +667,28 @@ class Matrix():
             else:
                 return Matrix(Eg=self.Eg, Ex=edges, values=rebinned)
 
+    def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
+        """ Iterates over the last non-zero elements
+
+        Args:
+            mat: The matrix to iterate over
+        Yields:
+            Indicies (i, j) over the last non-zero (=diagonal)
+            elements.
+        """
+        return diagonal_elements(self.values)
+
+    def diagonal_resolution(self) -> np.ndarray:
+        return diagonal_resolution(self.Ex)
+
+    def diagonal_mask(self) -> np.ndarray:
+        dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg))
+        dEg = dEg.reshape(self.shape)
+        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
+        mask = np.zeros_like(self.values, dtype=bool)
+        mask[Eg >= Ex + dEg] = True
+        return mask
+
     def fill_negative(self, window_size):
         self.values = fill_negative(self.values, window_size)
 
@@ -663,11 +702,13 @@ class Matrix():
 
     def index_Eg(self, E: float) -> int:
         """ Returns the closest index corresponding to the Eg value """
-        return np.abs(self.Eg - E).argmin()
+        return index(self.Eg, E)
+        # return np.abs(self.Eg - E).argmin()
 
     def index_Ex(self, E: float) -> int:
         """ Returns the closest index corresponding to the Ex value """
-        return np.abs(self.Ex - E).argmin()
+        return index(self.Ex, E)
+        #return np.abs(self.Ex - E).argmin()
 
     def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
         """ Returns the closest indices corresponding to the Eg value"""
@@ -719,6 +760,7 @@ class Matrix():
         self.Eg -= dEg
 
     def to_mid_bin(self):
+        """ Transform Eg and Ex from lower bin to mid bin """
         dEx = (self.Ex[1] - self.Ex[0])/2
         dEg = (self.Eg[1] - self.Eg[0])/2
         self.Ex += dEx

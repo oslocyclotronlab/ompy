@@ -29,12 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import logging
 import warnings
-from typing import Iterable
+from typing import Iterable, Optional
+from scipy.ndimage import gaussian_filter1d
+from copy import copy
 from .library import div0
 from .matrix import Matrix
 from .matrixstate import MatrixState
-from scipy.ndimage import gaussian_filter1d
-from copy import copy
+from .setable import Setable
 
 
 LOG = logging.getLogger(__name__)
@@ -58,44 +59,37 @@ class Unfolder:
                       uⁱ = uⁱ⁻¹ + (r - fⁱ⁻¹)
     until fⁱ≈r.
 
+    Note that no actions are performed on the matrices; they must already
+    be cut into the desired size.
+
     Attributes:
         raw (Matrix): The Matrix to unfold
         num_iter (int): The number of iterations to perform
-        Ex_min (float): The lower Ex limit on the energy trapezoidal cut
-        Ex_max (float): The upper Ex limit on the energy trapezoidal cut
-        Eg_min (float): The lower Eg limit on the energy trapezoidal cut
-        Eg_max (float): The upper Eg limit on the energy trapezoidal cut
-        mask (boolean ndarray): Masks everything below the diagonal to false
+        zeroes (boolean ndarray): Masks everything below the diagonal to false
         r (Matrix): The trapezoidal cut raw Matrix
         R (Matrix): The response matrix
         weight_fluctuation (float):
         minimum_iterations (int):
-        mask_points (Tuple[Tuple[Float, Float]]): Two points of form
-            (Eg, Ex) for cutting the diagonal of the matrix. Used for
-             creating self.mask.
 
+    TODO: There is the possibility for wrong results if the response
+       and the matrix are not rebinned the same. Another question that
+       arises is *when* are two binnings equal? What is equal enough?
     """
-    def __init__(self):
+    def __init__(self, num_iter: int = 33, response: Optional[Matrix] = None):
         """Unfolds the gamma-detector response of a spectrum
 
         Args:
-            raw: the raw matrix to unfold, an instance of Matrix()
-        Returns:
-            unfolded -- the unfolded matrix as an instance of Matrix()
-
+            num_iter: The number of iterations to perform.j
+            reponse: The response Matrix R to use in unfolding.
         TODO:
             - Fix the compton subtraction method implementation.
         """
         self.num_iter: int = 33
         self.weight_fluctuation = 0.2
         self.minimum_iterations = 3
-        self.mask_points = None
-
-        # Used by properties to update Ex and Eg
-        self._Ex_min: float = None
-        self._Ex_max: float = None
-        self._Eg_min: float = None
-        self._Eg_max: float = None
+        self.zeroes: Optional[np.ndarray] = None
+        self._param = 5
+        self._R: Optional[Matrix] = response
 
     def __call__(self, matrix: Matrix) -> Matrix:
         """ Wrapper for self.apply() """
@@ -113,11 +107,13 @@ class Unfolder:
         if self.raw.state != MatrixState.RAW:
             warnings.warn("Trying to unfold matrix that is not raw")
 
+        assert self.R is not None, "Response R must be set"
+
         LOG.debug("Comparing calibration of raw against response:"
                   f"\n{self.raw.calibration()}"
-                  f"\n{self.R_calibration_array}")
+                  f"\n{self.R.calibration()}")
         calibration_diff = self.raw.calibration_array() -\
-            self.R_calibration_array
+            self.R.calibration_array()
         eps = 1e-3
         if not (np.abs(calibration_diff[2:]) < eps).all():
             raise AssertionError(("Calibration mismatch: "
@@ -125,63 +121,21 @@ class Unfolder:
                                   "\nEnsure that the raw matrix and"
                                   " calibration matrix are cut equally."))
 
-        LOG.debug(("Using energy values:"
-                   f"\nEg_min: {self.Eg_min}"
-                   f"\nEg_max: {self.Eg_max}"
-                   f"\nEx_min: {self.Ex_min}"
-                   f"\nEx_max: {self.Ex_max}"))
+        # TODO: Warn if the Matrix is not diagonal
+        # raise AttributeError("Call cut_diagonal() before unfolding")
 
-        # Set limits for excitation and gamma energy bins to
-        # be considered for unfolding.
-        # Use index 0 of array as lower limit instead of energy because
-        # it can be negative!
-        iEx_min, iEx_max = 0, self.raw.index_Ex(self.Ex_max)
-        iEg_min, iEg_max = 0, self.raw.index_Eg(self.Eg_max)
+        self.r = self.raw.values
+        # TODO Use the arbitrary diagonal mask instead
+        self.zeroes = self.raw.diagonal_mask()
 
-        # Create slices and cut the matrices to appropriate shape
-        # +1 as the slice goes up to but not including
-        Egslice = slice(iEg_min, iEg_max+1)
-        Exslice = slice(iEx_min, iEx_max+1)
-
-        if self.mask_points is not None:
-            self.mask = self.raw.line_mask(*self.mask_points)
-        elif self.raw.mask is not None:
-            self.mask = self.raw.mask
-        else:
-            raise AttributeError("Call cut_diagonal() before unfolding")
-
-        self.r = self.raw.values[Exslice, Egslice]
-        self.mask = self.mask[Exslice, Egslice]
-        self.R = self.R[Egslice, Egslice]
-        self.Eg = self.raw.Eg[Egslice]
-        self.Ex = self.raw.Ex[Exslice]
-
-        LOG.debug(f"Exslice: {Exslice}\nEgslice: {Egslice}")
-        LOG.debug((f"Cutting matrix from {self.raw.shape}"
-                   f" to {self.r.shape}"))
-
-    def load_response(self, path: str) -> None:
-        """Load the response matrix
-
-        Args:
-            path: The path to the response matrix
-        """
-        response = Matrix(path=path)
-        self.R = response.values
-        self.R_calibration_array = response.calibration_array()
-
-    def cut_diagonal(self, E1: Iterable[float], E2: Iterable[float]):
-        """Diagonal cut to be applied to the matrix
-
-        TODO: Copy the cut if pre-existent on the raw matrix.
-        """
-        self.mask_points = (E1, E2)
-
-    def apply(self, raw: Matrix) -> np.ndarray:
+    def apply(self, raw: Matrix,
+              response: Optional[Matrix] = None) -> Matrix:
         """Run unfolding
 
         TODO: Use better criteria for terminating
         """
+        if response is not None:
+            self.R = response
 
         self.raw = copy(raw)
         # Set up the arrays
@@ -211,8 +165,8 @@ class Unfolder:
         for iEx in range(self.r.shape[0]):
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
 
-        unfolded[self.mask] = 0
-        unfolded = Matrix(unfolded, Eg=self.Eg, Ex=self.Ex)
+        #unfolded[self.zeroes] = 0  # Is this redundant?
+        unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
 
         # These two lines feel out of place
@@ -231,10 +185,11 @@ class Unfolder:
         """
         if step > 0:
             unfolded = unfolded + (self.r - folded)
-        folded = unfolded@self.R
+        folded = unfolded@self.R.values
 
         # Suppress everything below the diagonal
-        folded[self.mask] = 0.0
+        # *Why* is this necessary? Where does the off-diagonals come from?
+        folded[self.zeroes] = 0.0
 
         return unfolded, folded
 
@@ -255,7 +210,7 @@ class Unfolder:
         Returns a column vector of fluctuations in each Ex bin
         """
 
-        a1 = self.Eg[1] - self.Eg[0]
+        a1 = self.raw.Eg[1] - self.raw.Eg[0]
         counts_matrix_smoothed = gaussian_filter1d(
             counts, sigma=sigma * a1, axis=1)
         fluctuations = np.sum(
@@ -285,33 +240,10 @@ class Unfolder:
         return best_iteration
 
     @property
-    def Ex_min(self):
-        return self._Ex_min if self._Ex_min is not None else self.raw.Ex[0]
+    def R(self) -> Matrix:
+        return self._R
 
-    @Ex_min.setter
-    def Ex_min(self, value: float):
-        self._Ex_min = value
-
-    @property
-    def Ex_max(self):
-        return self._Ex_max if self._Ex_max is not None else self.raw.Ex[-1]
-
-    @Ex_max.setter
-    def Ex_max(self, value: float):
-        self._Ex_max = value
-
-    @property
-    def Eg_min(self):
-        return self._Eg_min if self._Eg_min is not None else self.raw.Eg[0]
-
-    @Eg_min.setter
-    def Eg_min(self, value: float):
-        self._Eg_min = value
-
-    @property
-    def Eg_max(self):
-        return self._Eg_max if self._Eg_max is not None else self.raw.Eg[-1]
-
-    @Eg_max.setter
-    def Eg_max(self, value: float):
-        self._Eg_max = value
+    @R.setter
+    def R(self, response: Matrix) -> None:
+        # TODO Make setable
+        self._R = response

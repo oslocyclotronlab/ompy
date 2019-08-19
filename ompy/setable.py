@@ -1,6 +1,10 @@
 import warnings
 
 class Setable:
+    """
+
+    TODO: Something is fishy
+    """
     def __init__(self, fget, fset=None):
         self.fget = fget
         self.fset = fset
