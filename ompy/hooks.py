@@ -1,6 +1,6 @@
 import inspect
 from .matrix import Matrix
-from typing import Callable, Any, Optional, List
+from typing import Callable, Any, List
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize

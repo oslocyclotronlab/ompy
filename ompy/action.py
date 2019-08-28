@@ -1,6 +1,5 @@
-from typing import Union
+from typing import Union, List, Iterable, Any, Callable
 from .matrix import Matrix, Vector
-from copy import copy
 
 
 class Action:
@@ -23,12 +22,32 @@ class Action:
             if callable(obj):
                 setattr(self, name, wrap(self, name))
 
-    def act_on(self, target: Union[Matrix, Vector]):
+    def act_on(self, target: Union[Matrix, Vector]) -> List[Any]:
+        ret_vals: List[Any] = []
         for func, args, kwargs in self.calls:
-            getattr(target, func)(*args, **kwargs)
+            ret = getattr(target, func)(*args, **kwargs)
+            ret_vals.append(ret)
+        return ret_vals
+
+    def map(self, collection: Iterable[Union[Matrix, Vector]]) -> List[List[Any]]:
+        ret_vals: List[List[Any]] = []
+        for member in collection:
+            ret = self.act_on(member)
+            ret_vals.append(ret)
+        return ret_vals
 
 
-def wrap(self, name):
+def wrap(self, name: str) -> Callable:
+    """ Saves the function call and arguments for later use
+
+    Returns an instance of self to allow for dot chaining
+
+    Args:
+        name: The name of the callable
+    Returns:
+        The wrapped function
+    """
     def wrapper(*args, **kwargs):
         self.calls.append([name, args, kwargs])
+        return self
     return wrapper
