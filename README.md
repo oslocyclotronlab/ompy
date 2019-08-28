@@ -2,6 +2,7 @@
 ![Version](https://img.shields.io/badge/version-0.3-informational?style=flat-square)
 ![Travis (.org)](https://img.shields.io/travis/oslocyclotronlab/ompy?style=flat-square)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square)
+[![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
 
 <p align="center">
@@ -25,10 +26,9 @@
 
 NB! This repo is currently under development. Many things do not work correctly.
 =======
-Concept DOI: [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
-(to last *published* version; the *master* branch may be ahead of the *published* version)
 
 If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary.
+The DOI is to last *published* version; the *master* branch may be ahead of the *published* version.
 
 # OMpy
 

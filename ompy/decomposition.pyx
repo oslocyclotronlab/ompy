@@ -9,18 +9,24 @@ DTYPE=np.float64
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def nld_gsf_product(double[::1] nld, double[::1] T, double[::1] resolution,
-                    double[::1] E_nld, double[::1] Eg, double[::1] Ex):
+def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
+                  double[::1] E_nld, double[::1] Eg, double[::1] Ex):
     """ Computes first generation matrix from nld and gSF
 
     Uses the equation
-           P(Ex, Eγ) ∝ ρ(Ex-Eγ)·f(Eγ)
+           P(Ex, Eγ) ∝ ρ(Ex-Eγ)·T(Eγ)
 
-    Uses the energy resolution to only perform the product up to
+    The energy resolution is exploited to only perform the product up to
     the diagonal, and employs multithreading along each
     row.
 
     Args:
+        nld: Nuclear level density
+        T: Transmission coefficients
+        resolution: The resolution at each bin of Eg
+        E_nld: The energy array for the nuclear level density
+        Eg: The gamma energy
+        Ex: The excitation energy
 
     Returns:
         The first generation matrix
@@ -44,16 +50,25 @@ def nld_gsf_product(double[::1] nld, double[::1] T, double[::1] resolution,
             i_E_nld = _index(E_nld, E_f)
             firstgen_view[i_Ex, i_Eg] = nld[i_E_nld] * T[i_Eg]
             i_Eg = i_Eg + 1
+
+    # We want probabilities
+    normalize(firstgen_view)
     return firstgen
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
 cdef int _index(double[:] array, double element) nogil: 
-    """ Finds the index of element in the array
+    """ Finds the index of the closest element in the array
 
     Unsafe.
     9 times faster than np.abs(array - element).argmin()
+
+    Args:
+        array: The array to index
+        element: The element to find
+    Returns:
+        The index (int) to the closest element in the array.
     """
     cdef:
         int i = 0
@@ -72,10 +87,16 @@ cdef int _index(double[:] array, double element) nogil:
 @cython.wraparound(False)
 @cython.embedsignature(True)
 def index(double[:] array, double element): 
-    """ Finds the index of element in the array
+    """ Finds the index of the closest element in the array
 
     Unsafe.
     9 times faster than np.abs(array - element).argmin()
+
+    Args:
+        array: The array to index
+        element: The element to find
+    Returns:
+        The index (int) to the closest element in the array.
     """
     cdef:
         int i = 0
@@ -93,12 +114,65 @@ def index(double[:] array, double element):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
+def chisquare_diagonal_with_zero(double[:, ::1] fact, double[:, ::1] fit,
+              double[:, ::1] std, double[::1] resolution,
+              double[::1] Eg, double[::1] Ex):
+    """ Computes χ² of two matrices
+
+    Exploits the diagonal resolution to do less computation
+
+    Args:
+        fact: The true matrix
+        fit: The candidate matrix
+        std: The standard deviation of the fit/fact
+        resolution: Array describing the resolution at
+            each element of the gamma energy Eg
+        Eg: The gamma energy
+        Ex: The excitation energy
+    Returns:
+        The value of χ²
+    """
+
+    cdef:
+        double chi = 0.0
+        double Eg_max
+        double dEg = (Eg[1]-Eg[0])/2
+        Py_ssize_t num_Eg = len(Eg)
+        Py_ssize_t num_Ex = len(Ex)
+        int i, j
+
+    for i in range(num_Ex):# prange(num_Ex, nogil=True, schedule='static'):
+        Eg_max = Ex[i] + resolution[i] + dEg
+        for j in range(num_Eg):
+            if Eg[j] > Eg_max:
+                break
+            if std[i, j] == 0:
+                chi = chi + (fact[i, j] - fit[i, j])**2
+            else:
+                chi = chi + (fact[i, j] - fit[i, j])**2/std[i, j]**2
+    return chi
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
 def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
               double[:, ::1] std, double[::1] resolution,
               double[::1] Eg, double[::1] Ex):
     """ Computes χ² of two matrices
 
     Exploits the diagonal resolution to do less computation
+
+    Args:
+        fact: The true matrix
+        fit: The candidate matrix
+        std: The standard deviation of the fit/fact
+        resolution: Array describing the resolution at
+            each element of the gamma energy Eg
+        Eg: The gamma energy
+        Ex: The excitation energy
+    Returns:
+        The value of χ²
     """
 
     cdef:
@@ -126,8 +200,15 @@ def chisquare(double[:, ::1] fact, double[:, ::1] fit,
               double[:, ::1] std):
     """ Computes χ² of two matrices
 
-    """
+    Exploits the diagonal resolution to do less computation
 
+    Args:
+        fact: The true matrix
+        fit: The candidate matrix
+        std: The standard deviation of the fit/fact
+    Returns:
+        The value of χ²
+    """
     cdef:
         double chi = 0.0
         Py_ssize_t num_Eg = fact.shape[1]
@@ -140,3 +221,25 @@ def chisquare(double[:, ::1] fact, double[:, ::1] fit,
                 continue
             chi = chi + (fact[i, j] - fit[i, j])**2/std[i, j]**2
     return chi
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.embedsignature(True)
+def normalize(double[:, ::1] matrix):
+    """ Row-normalizes the matrix
+
+    Args:
+        matrix: The matrix to normalize
+    """
+    cdef:
+        Py_ssize_t num_rows = matrix.shape[0]
+        Py_ssize_t num_cols = matrix.shape[1]
+        double total
+        double[:, ::1] view = matrix
+        int row, col
+    for row in range(num_rows):
+        total = 0.0
+        for col in range(num_cols):
+            total += view[row, col]
+        for col in range(num_cols):
+            view[row, col] = view[row, col]/total

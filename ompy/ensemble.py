@@ -27,14 +27,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-import os
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
-from pathlib import Path
+from tqdm import tqdm
 from typing import Callable, Union, List, Optional
+from pathlib import Path
 from .matrix import Matrix
-from .unfolder import Unfolder
 from .action import Action
 
 LOG = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ class Ensemble:
 
     Attributes:
         raw (Matrix): The raw matrix used as model for the ensemble.
-        save_path (str): The path used for saving the generated matrices.
+        path (str): The path used for saving the generated matrices.
         unfolder (Unfolder): An instance of Unfolder which is used in
             the unfolding of the generated matrices. Only has to support
             obj.unfold(raw: Matrix).
@@ -61,25 +60,38 @@ class Ensemble:
         std_firstgen (Matrix): The computed standard deviation of the
             first generation method matrices.
         firstgen_ensemble (np.ndarray): The entire firstgen ensemble.
+        action_raw (Action[Matrix]): An arbitrary action to apply to each
+            generated raw matrix. Defaults to NOP.
+        action_unfolded (Action[Matrix]): An arbitrary action to apply to each
+            generated unfolded matrix. Defaults to NOP.
+        action_firstgen (Action[Matrix]): An arbitrary action to apply to each
+            generated firstgen matrix. Defaults to NOP.
+
 
     TODO: Separate each step - generation, unfolded, firstgening?
-    TODO: Incoporate Extractor to provide an ensemble of nld and gsf.
-    TODO: Clean up
     TODO: (Re)generation with book keeping is a recurring pattern.
         Try to abstract it away.
     """
-    def __init__(self, raw: Optional[Matrix] = None, save_path: Union[str, Path] = "ensemble"):
+    def __init__(self, raw: Optional[Matrix] = None,
+                 path: Union[str, Path] = None):
+        """ Sets up attributes and loads a saved ensemble if provided.
+
+        Args:
+            raw: The model matrix to peturbate. Can be provided later
+                in generate().
+            path: The path where to save the ensemble. If set,
+                the ensemble will try to load from the path, but will
+                fail *silently* if it is unable to. It is recommended to call
+                load([path]) explicitly.
+        """
         self.raw: Optional[Matrix] = raw
-        self.save_path: Path = Path(save_path)
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0
+        self.regenerate = False
         self.action_raw = Action('matrix')
         self.action_unfolded = Action('matrix')
         self.action_firstgen = Action('matrix')
-
-        if not os.path.exists(self.save_path):
-            os.mkdir(self.save_path)
 
         self.std_raw: Optional[Matrix] = None
         self.std_unfolded: Optional[Matrix] = None
@@ -89,19 +101,36 @@ class Ensemble:
         self.unfolded_ensemble: Optional[Matrix] = None
         self.firstgen_ensemble: Optional[Matrix] = None
 
-    def load(self, path: Optional[Union[str, Path]] = None):
         if path is not None:
-            path = Path(path)
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True)
+            try:
+                self.load()
+            except AssertionError:
+                pass
         else:
-            path = self.save_path
+            # Should the ensemble always try to load?
+            self.path = Path('ensemble')
+            self.path.mkdir(exist_ok=True)
+
+    def load(self, path: Optional[Union[str, Path]] = None):
+        """ Loads a saved ensamble
+
+        Currently only supports '.npy' format.
+
+        Args:
+            path: The path to the ensemble directory. If the
+                value is None, 'self.path' will be used.
+        """
+        path = path if path is not None else self.path
 
         self.raw = Matrix(path=path / 'raw.npy')
         self.firstgen = Matrix(path=path / 'firstgen.npy')
         raws = list(path.glob("raw_[0-9]*.*"))
         unfolds = list(path.glob("unfolded_[0-9]*.*"))
         firsts = list(path.glob("firstgen_[0-9]*.*"))
-        assert len(raws) == len(unfolds) == len(firsts)
-        assert len(raws) > 0
+        assert len(raws) == len(unfolds) == len(firsts), "Corrupt ensemble"
+        assert len(raws) > 0, "Found no saved ensemble members"
         self.size = len(raws)
 
         self.raw_ensemble = np.empty((self.size, *self.raw.shape))
@@ -146,7 +175,7 @@ class Ensemble:
         unfolded_ensemble = np.zeros_like(raw_ensemble)
         firstgen_ensemble = np.zeros_like(raw_ensemble)
 
-        for step in range(number):
+        for step in tqdm(range(number)):
             LOG.info(f"Generating {step}")
             raw = self.generate_raw(step, method)
             unfolded = self.unfold(step, raw)
@@ -162,23 +191,23 @@ class Ensemble:
             firstgen_ensemble[step, :, :] = firstgen.values
 
         # TODO Move this to a save step
-        self.raw.save(self.save_path / 'raw.npy')
-        self.firstgen.save(self.save_path / 'firstgen.npy')
+        self.raw.save(self.path / 'raw.npy')
+        self.firstgen.save(self.path / 'firstgen.npy')
         # Calculate standard deviation
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         raw_std = Matrix(raw_ensemble_std, self.raw.Eg, self.raw.Ex,
                          state='std')
-        raw_std.save(self.save_path / "raw_std.npy")
+        raw_std.save(self.path / "raw_std.npy")
 
         unfolded_ensemble_std = np.std(unfolded_ensemble, axis=0)
         unfolded_std = Matrix(unfolded_ensemble_std, self.raw.Eg,
                               self.raw.Ex, state='std')
-        unfolded_std.save(self.save_path / "unfolded_std.npy")
+        unfolded_std.save(self.path / "unfolded_std.npy")
 
         firstgen_ensemble_std = np.std(firstgen_ensemble, axis=0)
         firstgen_std = Matrix(firstgen_ensemble_std, self.firstgen.Eg,
                               self.firstgen.Ex, state='std')
-        firstgen_std.save(self.save_path / "firstgen_std.npy")
+        firstgen_std.save(self.path / "firstgen_std.npy")
 
         self.std_raw = raw_std
         self.std_unfolded = unfolded_std
@@ -200,7 +229,7 @@ class Ensemble:
             The generated matrix
         """
         LOG.debug(f"Generating raw ensemble {step}")
-        path = os.path.join(self.save_path, f"raw_{step}.npy")
+        path = self.path / f"raw_{step}.npy"
         raw = self.load_matrix(path)
         if raw is None:
             LOG.debug(f"(Re)generating {path} using {method} process")
@@ -226,7 +255,7 @@ class Ensemble:
             The unfolded matrix
         """
         LOG.debug(f"Unfolding raw {step}")
-        path = os.path.join(self.save_path, f"unfolded_{step}.npy")
+        path = self.path / f"unfolded_{step}.npy"
         unfolded = self.load_matrix(path)
         if unfolded is None:
             LOG.debug("Unfolding matrix")
@@ -246,7 +275,7 @@ class Ensemble:
             The resulting matrix
         """
         LOG.debug(f"Performing first generation on unfolded {step}")
-        path = os.path.join(self.save_path, f"firstgen_{step}.npy")
+        path = self.path / f"firstgen_{step}.npy"
         firstgen = self.load_matrix(path)
         if firstgen is None:
             LOG.debug("Calculating first generation matrix")
@@ -277,7 +306,7 @@ class Ensemble:
         perturbed = np.random.poisson(std)
         return perturbed
 
-    def load_matrix(self, path: str) -> Union[Matrix, None]:
+    def load_matrix(self, path: Union[Path, str]) -> Union[Matrix, None]:
         """Check if file exists and should not be regenerated
 
         Args:
@@ -285,7 +314,8 @@ class Ensemble:
         Returns:
             Matrix if file exists and can be loaded, None otherwise.
         """
-        if os.path.isfile(path) and not self.regenerate:
+        path = Path(path)
+        if path.exists() and not self.regenerate:
             LOG.debug(f"Loading {path}")
             return Matrix(path=path)
 

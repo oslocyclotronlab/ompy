@@ -40,7 +40,8 @@ setup(name='OMpy',
           'termtables',
           'pymultinest',
           'scipy',
-          'uncertainties'
+          'uncertainties',
+          'tqdm'
       ]
       )
 

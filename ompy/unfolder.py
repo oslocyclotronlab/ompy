@@ -165,13 +165,14 @@ class Unfolder:
         for iEx in range(self.r.shape[0]):
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
 
-        #unfolded[self.zeroes] = 0  # Is this redundant?
         unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
 
         # These two lines feel out of place
-        # unfolded.fill_negative(window_size=10)
-        # unfolded.remove_negative()
+        # TODO: What they do and where they should be run is very unclear.
+        #     Fix later.
+        unfolded.fill_negative(window_size=10)
+        unfolded.remove_negative()
         return unfolded
 
     def step(self, unfolded, folded, step):

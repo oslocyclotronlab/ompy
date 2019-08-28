@@ -32,7 +32,7 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Generator, Optional, Union
+from typing import Tuple, Generator, Optional
 from .matrix import Matrix
 from .library import div0
 from .rebin import rebin_2D

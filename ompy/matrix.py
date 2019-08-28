@@ -27,16 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from __future__ import annotations
-import warnings
 import logging
 import copy
-import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib import ticker
 from pathlib import Path
-from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
+from matplotlib.colors import (LogNorm, Normalize, LinearSegmentedColormap,
+                               SymLogNorm)
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
@@ -279,6 +278,8 @@ class Matrix():
             norm = LogNorm(vmin=vmin, vmax=vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
+        elif scale == 'symlog':
+            norm = SymLogNorm(vmin=vmin, vmax=vmax)
         else:
             raise ValueError("Unsupported zscale ", scale)
         # Move all bins down to lower bins
@@ -321,7 +322,7 @@ class Matrix():
 
             cbar.ax.set_ylabel("# counts")
             plt.show()
-        return lines, ax, fig
+        return fig, ax
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
@@ -682,6 +683,7 @@ class Matrix():
         return diagonal_resolution(self.Ex)
 
     def diagonal_mask(self) -> np.ndarray:
+        # TODO Implement an arbitrary diagonal mask
         dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg))
         dEg = dEg.reshape(self.shape)
         Eg, Ex = np.meshgrid(self.Eg, self.Ex)
