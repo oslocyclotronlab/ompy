@@ -24,7 +24,7 @@
 </p>
 <br>
 
-NB! This repo is currently under development. Many things do not work correctly.
+NB! This repo is currently under development. Many features do not work correctly.
 =======
 
 If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary.
@@ -129,7 +129,7 @@ unfolder = om.Unfolder(response=response)
 firstgen = om.FirstGeneration()
 ensemble = om.Ensemble(matrix)
 ensemble.unfolder = unfolder
-om.first_generation_method = firstgen
+ensemble.first_generation_method = firstgen
 ensemble.generate(100)    # Generates 100 perturbated members
 ```
 the generated members are saved to disk and can be retrieved. Unfolded members can be retrieved as `ensemble.get_unfolded(i)`, for example. Their standard deviation is `ensemble.std_unfolded`.

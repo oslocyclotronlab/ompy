@@ -106,14 +106,15 @@ class Extractor:
             raise ValueError("A 'trapezoid' cut must be given'")
         if regenerate is None:
             regenerate = self.regenerate
+        self.path = Path(self.path)  # TODO: Fix
 
         assert self.ensemble.size >= self.size, "Ensemble is too small"
 
         nlds = []
         gsfs = []
         for i in tqdm(range(self.size)):
-            nld_path = self.save_path / f'nld_{i}.npy'
-            gsf_path = self.save_path / f'gsf_{i}.npy'
+            nld_path = self.path / f'nld_{i}.npy'
+            gsf_path = self.path / f'gsf_{i}.npy'
             if nld_path.exists() and gsf_path.exists() and not regenerate:
                 nlds.append(Vector(path=nld_path))
                 gsfs.append(Vector(path=gsf_path))
@@ -249,7 +250,7 @@ class Extractor:
         if path is not None:
             path = Path(path)
         else:
-            path = self.save_path
+            path = Path(self.path)  # TODO: Fix pathing
 
         if not path.exists():
             raise IOError(f"The path {path} does not exist.")
