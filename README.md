@@ -43,9 +43,17 @@ pip install .
 ```
 
 For development it will be more convenient to create symbolic link:
+[You may also try this if you have an emtpy import of `ompy` when trying it from another directory.]
 ```console
-pip3 install -e .
+pip install -e .
 ```
+
+If you had some failed attempts, you might try to uninstall `ompy` before retrying the stepts above:
+```console
+pip uninstall ompy
+```
+
+Note that we require python 3.7 or higher. If your standard `python` and `pip` link to python 2, you may have to use `python3` and `pip3`.
 
 All the functions and classes in the package are available in the main module. You get everything by importing the package
 
@@ -53,14 +61,14 @@ All the functions and classes in the package are available in the main module. Y
 import ompy
 ```
 
-The overarching philosophy is that the package shall be flexible and transparent to use and modify. All of the "steps" in the Oslo method are implemented as classes with a common structure and call signature. If you understand one class, you'll understand them all, making extending the code easy. 
+The overarching philosophy is that the package shall be flexible and transparent to use and modify. All of the "steps" in the Oslo method are implemented as classes with a common structure and call signature. If you understand one class, you'll understand them all, making extending the code easy.
 
 As the Oslo method is a complex method involving dozen of variables which can be daunting for the uninitiated, many class attributes have default values that should give satisfying results. Attributes that _should_ be modified even though it is not strictly necessary to do so will give annoying warnings. The documentation and docstrings give in-depth explanation of each variable and its usage.
 
 ## Matrix manipulation
 The core of the Oslo method involves working with two dimensional spectra often called alfna matrices for obscure reasons.
-<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts 
-along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus. 
+<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts
+along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus.
 
 The two most important utility classes in the package are `Matrix()` and `Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers, typically spectra of counts, along with energy calibration information. Their basic structure is
 ```py
@@ -90,9 +98,9 @@ unfolded = unfolder(matrix)
 ```
 
 ### The response matrix
-At present, the module doesn't contain a method for interpolating response functions. We have written one, but it needs to be cythonized because it's very slow. 
+At present, the module doesn't contain a method for interpolating response functions. We have written one, but it needs to be cythonized because it's very slow.
 
-Because of this, if you want to do unfolding then you need to specify one or two matrices in the keywords `response` and `compton_response`. The first is the response matrix. 
+Because of this, if you want to do unfolding then you need to specify one or two matrices in the keywords `response` and `compton_response`. The first is the response matrix.
 It needs to have the same energy calibration as the gamma-energy axis of the spectrum you're unfolding, and therefore it must be interpolated by MAMA.
 The second is only needed if you want to use the Compton subtraction method (the attribute `use_comptonsubtraction = True`). It is a list of probabilities for full-energy, single escape, double escape, etc., for each gamma-ray energy.
 
@@ -101,13 +109,13 @@ To make the response matrix: Open you raw matrix with MAMA. Type `rm` to make th
 If you want to do the Compton subtraction method (which doesn't work as of February 2019), you need the response parameters. They are automatically written to the file `resp.dat` when you run the `rm` command, but MAMA by default only prints a subset of the energy data points. To fix this, you need to edit the MAMA source file `folding.f` and comment out the line
 
 ```fortran
-IF(RDIM.GT.50)iStep=RDIM/50                  !steps for output 
+IF(RDIM.GT.50)iStep=RDIM/50                  !steps for output
 ```
 
 which in the MAMA version I have is located at about line 1980. Then recompile MAMA.
 
 ## First generation method
-An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987). 
+An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987).
 
 The first generation method is implemented in `FirstGeneration()` whose basic usage is
 
@@ -165,18 +173,18 @@ Not yet implemented.
 
 An important feature of physics programs is the ability to validate that the program works as intended. This can be achieved by either running the program on problems whose solutions are already known,
 or by inspecting the program and confirming that each step is working as expected. OMpy uses both methods. Integration tests are performed both on artificial data satisfying the minimal assumptions required
-of each method (unfold, first generation method, etc.), as well as experimental data which has already been analyzed using other programs (MAMA). 
+of each method (unfold, first generation method, etc.), as well as experimental data which has already been analyzed using other programs (MAMA).
 
 In addition, the methods themselves are written in a way
 which separates the uninteresting "book keeping" of each method, such as constructing arrays and normalizing rows, from the actual interesting steps performing the calculations. All parts of a method, its
-initial set up, progression and tear down, can be separately inspected using the `ompy.hooks` submodule and `logging` framework. This allows the user to not only verify that each method works as intended, 
-but also get a visual understanding of how they work beyond their mere equational forms. 
+initial set up, progression and tear down, can be separately inspected using the `ompy.hooks` submodule and `logging` framework. This allows the user to not only verify that each method works as intended,
+but also get a visual understanding of how they work beyond their mere equational forms.
 
-## Development 
-OMpy is written with modularity in mind. We want it to be as easy as possible for the user to add custom functionality and interface OMpy with other Python packages. For example, 
+## Development
+OMpy is written with modularity in mind. We want it to be as easy as possible for the user to add custom functionality and interface OMpy with other Python packages. For example,
 it may be of interest to try other unfolding algorithms than the one presently implemented. To achieve this,
 one just has to write a wrapper function that has the same input and output structure as the function `Unfolder.__call__()`,
-found in the file `ompy/unfolder.py`. 
+found in the file `ompy/unfolder.py`.
 
 It is our hope and goal that `OMpy` will be used, and we are happy to provide support. Feedback and suggestions are also very welcome. We encourage users who implement new features to share them by opening a pull request in the Github repository.
 
