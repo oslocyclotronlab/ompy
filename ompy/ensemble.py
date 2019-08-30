@@ -122,7 +122,7 @@ class Ensemble:
             path: The path to the ensemble directory. If the
                 value is None, 'self.path' will be used.
         """
-        path = path if path is not None else self.path
+        path = Path(path) if path is not None else Path(self.path)
 
         self.raw = Matrix(path=path / 'raw.npy')
         self.firstgen = Matrix(path=path / 'firstgen.npy')
