@@ -34,6 +34,7 @@ from tqdm import tqdm
 from typing import Callable, Union, List, Optional
 from pathlib import Path
 from .matrix import Matrix
+from .rebin import rebin_2D
 from .action import Action
 
 LOG = logging.getLogger(__name__)
@@ -283,6 +284,61 @@ class Ensemble:
             firstgen.save(path)
         self.action_firstgen.act_on(firstgen)
         return firstgen
+
+    def rebin(self, out_array: np.ndarray, member: str) -> None:
+        """ Rebins the first generations matrixes and recals std
+
+        Args:
+           axis: Which axis to rebin, "Eg" or "Ex"
+           out_array: Lower-bin-edge energy calibration of output
+                      matrix along rebin axis
+           member: which member to rebin, currently only FG available
+
+
+        """
+        if member != 'firstgen':
+            raise NotImplementedError("Not implemented for raw and unfolding "
+                                      "yet. if done, need to redo unfolding "
+                                      "and/or first gen method")
+
+        ensemble = self.firstgen_ensemble
+        matrix = self.firstgen
+
+        do_Ex = not np.array_equal(out_array, matrix.Ex)
+        do_Eg = not np.array_equal(out_array, matrix.Eg)
+        if (not do_Ex) and (not do_Eg):
+            return
+
+        rebinned = np.zeros((self.size, out_array.size, out_array.size))
+        for i in tqdm(range(self.size)):
+            values = ensemble[i]
+            if do_Ex:
+                values = rebin_2D(values, edges_in=matrix.Ex,
+                                  edges_out=out_array, axis=0)
+            if do_Eg:
+                values = rebin_2D(values, edges_in=matrix.Eg,
+                                  edges_out=out_array, axis=1)
+            rebinned[i] = values
+
+        # correct fg matrix (different attribute) and axis
+        values = matrix.values
+        if do_Ex:
+            values = rebin_2D(values, edges_in=matrix.Ex,
+                              edges_out=out_array, axis=0)
+        if do_Eg:
+            values = rebin_2D(values, edges_in=matrix.Eg,
+                              edges_out=out_array, axis=1)
+        matrix = Matrix(values, out_array, out_array)
+
+        # recalculate std
+        firstgen_ensemble_std = np.std(rebinned, axis=0)
+        firstgen_std = Matrix(firstgen_ensemble_std, matrix.Eg,
+                              matrix.Ex, state='std')
+        firstgen_std.save(self.path / "firstgen_std.npy")
+
+        self.firstgen = matrix
+        self.firstgen_ensemble = rebinned
+        self.std_firstgen = firstgen_std
 
     def generate_gaussian(self) -> np.ndarray:
         """Generates an array with Gaussian perturbations of self.raw
