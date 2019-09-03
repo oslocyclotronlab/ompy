@@ -2,6 +2,7 @@
 from setuptools import setup, Extension
 from pkg_resources import get_build_platform
 import numpy
+import os
 
 try:
     from Cython.Build import cythonize
@@ -13,16 +14,25 @@ except ImportError:
 # build me (i.e. compile Cython modules) for testing in this directory using
 # python setup.py build_ext --inplace
 
+# some machines have difficulties with OpenMP
+openmp = os.getenv("ompy_OpenMP")
+if openmp in (None, True, "True", "true"):
+    openmp = True
+elif openmp in (False, "False", "false"):
+    openmp = False
+    print("Building without OpenMP")
+else:
+    raise ValueError("Env var ompy_OpenMP must be either True or False "
+                     "(or not set); use eg. 'export ompy_OpenMP=False'")
+fname = "ompy/decomposition.c"  # otherwise it may not recompile
+if os.path.exists(fname):
+    os.remove(fname)
 
-platform = get_build_platform()
-
-extra_compile_args = ["-O3", "-ffast-math", "-march=native",
-                      "-fopenmp"]
-extra_link_args = ["-fopenmp"]
-# openmp has problems with mac as of 09/2019. Attempt to fix
-if "mac" in platform:
-    extra_compile_args.insert(-1, "-Xpreprocessor")
-    extra_link_args.insert(-1, "-Xpreprocessor")
+extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
+extra_link_args = []
+if openmp:
+    extra_compile_args.insert(-1, "-fopenmp")
+    extra_link_args.insert(-1, "-fopenmp")
 
 ext_modules = [
         Extension("ompy.decomposition",
@@ -47,6 +57,7 @@ setup(name='OMpy',
       py_modules=['ompy'],
       ext_modules=cythonize(ext_modules,
                             compiler_directives={'language_level': "3"},
+                            compile_time_env={"OPENMP": openmp}
                             ),
       zip_safe=False,
       install_requires=[
