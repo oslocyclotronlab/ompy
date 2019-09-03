@@ -917,6 +917,8 @@ class Vector():
             save_numpy_1D(self.values, self.E, path)
         elif filetype == 'tar':
             save_tar([self.values, self.E], path)
+        elif filetype == 'mama':
+            mama_write(self, path, comment="Made by Oslo Method Python")
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -934,6 +936,8 @@ class Vector():
             self.values, self.E = load_numpy_1D(path)
         elif filetype == 'tar':
             self.values, self.E = load_tar(path)
+        elif filetype == 'mama':
+            self.values, self.E = mama_read(path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
@@ -952,6 +956,23 @@ class Vector():
             return Vector(vector_transformed, E=self.E)
 
         self.values = vector_transformed
+
+    def index(self, E: float) -> int:
+        """ Returns the closest index corresponding to the E value """
+        return index(self.E, E)
+
+    def indices(self, E: Iterable[float]) -> np.ndarray:
+        """ Returns the closest indices corresponding to the E value"""
+        indices = [self.index_E(e) for e in E]
+        return np.array(indices)
+
+    @property
+    def counts(self) -> float:
+        return self.values.sum()
+
+    @property
+    def shape(self) -> Tuple[int]:
+        return self.values.shape
 
 
 def filetype_from_suffix(path: Path) -> str:

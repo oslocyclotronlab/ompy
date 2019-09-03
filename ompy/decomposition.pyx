@@ -1,7 +1,12 @@
 cimport cython
 cimport numpy as cnp
 import numpy as np
-from cython.parallel import prange
+
+IF OPENMP:
+    from cython.parallel import prange
+ELSE:
+    pass
+
 
 ctypedef cnp.float64_t DTYPE_t
 DTYPE=np.float64
@@ -42,14 +47,25 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
     firstgen = np.zeros((num_Ex, num_Eg), dtype=DTYPE)
     cdef double[:, ::1] firstgen_view = firstgen
 
-    for i_Ex in prange(num_Ex, nogil=True, schedule='static'):
-        Eg_max = Ex[i_Ex] + resolution[i_Ex] + dEg
-        i_Eg = 0
-        while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
-            E_f = Ex[i_Ex] - Eg[i_Eg]
-            i_E_nld = _index(E_nld, E_f)
-            firstgen_view[i_Ex, i_Eg] = nld[i_E_nld] * T[i_Eg]
-            i_Eg = i_Eg + 1
+    # Remember to change both loops simultaneously
+    IF OPENMP:
+        for i_Ex in prange(num_Ex, nogil=True, schedule='static'):
+            Eg_max = Ex[i_Ex] + resolution[i_Ex] + dEg
+            i_Eg = 0
+            while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
+                E_f = Ex[i_Ex] - Eg[i_Eg]
+                i_E_nld = _index(E_nld, E_f)
+                firstgen_view[i_Ex, i_Eg] = nld[i_E_nld] * T[i_Eg]
+                i_Eg = i_Eg + 1
+    ELSE:
+        for i_Ex in range(num_Ex):
+            Eg_max = Ex[i_Ex] + resolution[i_Ex] + dEg
+            i_Eg = 0
+            while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
+                E_f = Ex[i_Ex] - Eg[i_Eg]
+                i_E_nld = _index(E_nld, E_f)
+                firstgen_view[i_Ex, i_Eg] = nld[i_E_nld] * T[i_Eg]
+                i_Eg = i_Eg + 1
 
     # We want probabilities
     normalize(firstgen_view)
@@ -58,7 +74,7 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-cdef int _index(double[:] array, double element) nogil: 
+cdef int _index(double[:] array, double element) nogil:
     """ Finds the index of the closest element in the array
 
     Unsafe.
@@ -86,7 +102,7 @@ cdef int _index(double[:] array, double element) nogil:
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def index(double[:] array, double element): 
+def index(double[:] array, double element):
     """ Finds the index of the closest element in the array
 
     Unsafe.
