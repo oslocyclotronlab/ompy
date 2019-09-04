@@ -59,6 +59,7 @@ class Extractor:
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
         self.bin_width = 100  # TODO: Make Setable
+        self.E_nld_bin_width = self.bin_width  # TODO: Cleanup
 
         if path is not None:
             self.path = Path(path)
@@ -184,7 +185,7 @@ class Extractor:
             matrix.values, std.values = normalize(matrix, std)
         else:
             matrix.values, _ = normalize(matrix)
-        
+
         if bin_width is not None:
             bin_width = bin_width
         else:
