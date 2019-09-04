@@ -59,7 +59,6 @@ class Extractor:
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
         self.bin_width = 100  # TODO: Make Setable
-        self.E_nld_bin_width = self.bin_width  # TODO: Cleanup
 
         if path is not None:
             self.path = Path(path)
@@ -170,7 +169,7 @@ class Extractor:
                 square error will be used instead of chi square.
             x0: The initial guess for nld and gsf.
             bin_width: The bin width of the energy array of nld.
-                Defaults to self.E_nld_bin_width if None.
+                Defaults to self.bin_width if None.
             product: Whether to return the first generation matrix
                resulting from the product of nld and gsf.
         Returns:
@@ -189,7 +188,7 @@ class Extractor:
         if bin_width is not None:
             bin_width = bin_width
         else:
-            bin_width = self.E_nld_bin_width
+            bin_width = self.bin_width
 
         # Eg and Ex *must* have the same step size for the
         # decomposition to make sense.
@@ -200,7 +199,7 @@ class Extractor:
         resolution = matrix.diagonal_resolution()
         E_nld = np.linspace(-resolution.max(),
                             matrix.Ex.max()-matrix.Eg.min(),
-                            self.E_nld_bin_width)
+                            bin_width)
 
         if x0 is None:
             nld0 = np.ones(E_nld.size)
