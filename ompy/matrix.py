@@ -322,7 +322,7 @@ class Matrix():
 
             cbar.ax.set_ylabel("# counts")
             plt.show()
-        return fig, ax
+        return lines, fig, ax
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
