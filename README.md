@@ -53,7 +53,7 @@ If you had some failed attempts, you might try to uninstall `ompy` before retryi
 pip uninstall ompy
 ```
 
-Note that we require python 3.7 or higher. If your standard `python` and `pip` link to python 2, you may have to use `python3` and `pip3`.
+Note that we require python 3.7 or higher. If your standard `python` and `pip` link to python 2, you may have to use `python3` and `pip3`. If you don't have OpenMP / have problems installing it, you can install without OpenMP. Type `export ompy_OpenMP=False` in the terminal before the setup above. For attempts to solve this issue, see also [#30](https://github.com/oslocyclotronlab/ompy/issues/30).
 
 All the functions and classes in the package are available in the main module. You get everything by importing the package
 
