@@ -330,7 +330,8 @@ class Matrix():
         """ Plots the projection of the matrix along axis
 
         Args:
-            axis: The axis to project onto. Can be 0 or 1.
+            axis: The axis to project onto.
+                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
             Emin: The minimum energy to be summed over.
             Emax: The maximum energy to be summed over.
             ax: The axes object to plot onto.
@@ -393,8 +394,8 @@ class Matrix():
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax+1)
-        selection = self.values[subset, :] if isEx else self.values[:, subset]
-        energy = self.Ex[subset] if isEx else self.Eg[subset]
+        selection = self.values[:, subset] if isEx else self.values[subset, :]
+        energy = self.Ex if isEx else self.Eg
 
         projection = selection.sum(axis=axis)
         if normalize:
@@ -808,7 +809,8 @@ def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
-        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
+              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
     Returns:
         An int describing the axis in the basis of the plot,
         _not_ the values' dimension.
@@ -917,6 +919,8 @@ class Vector():
             save_numpy_1D(self.values, self.E, path)
         elif filetype == 'tar':
             save_tar([self.values, self.E], path)
+        elif filetype == 'mama':
+            mama_write(self, path, comment="Made by Oslo Method Python")
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -934,6 +938,8 @@ class Vector():
             self.values, self.E = load_numpy_1D(path)
         elif filetype == 'tar':
             self.values, self.E = load_tar(path)
+        elif filetype == 'mama':
+            self.values, self.E = mama_read(path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
@@ -952,6 +958,23 @@ class Vector():
             return Vector(vector_transformed, E=self.E)
 
         self.values = vector_transformed
+
+    def index(self, E: float) -> int:
+        """ Returns the closest index corresponding to the E value """
+        return index(self.E, E)
+
+    def indices(self, E: Iterable[float]) -> np.ndarray:
+        """ Returns the closest indices corresponding to the E value"""
+        indices = [self.index_E(e) for e in E]
+        return np.array(indices)
+
+    @property
+    def counts(self) -> float:
+        return self.values.sum()
+
+    @property
+    def shape(self) -> Tuple[int]:
+        return self.values.shape
 
 
 def filetype_from_suffix(path: Path) -> str:

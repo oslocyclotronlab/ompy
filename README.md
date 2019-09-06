@@ -97,22 +97,26 @@ unfolder = om.Unfolder(response=response)
 unfolded = unfolder(matrix)
 ```
 
-### The response matrix
-At present, the module doesn't contain a method for interpolating response functions. We have written one, but it needs to be cythonized because it's very slow.
+### Response matrix
+You have to read in a response matrix from disk. Convert it to have the incident energies on the `Ex` axis (y-axis) and the response on the `Eg` axis. In case you use one of the *usual* setups like OSCAR, files will be provided for you already.
 
-Because of this, if you want to do unfolding then you need to specify one or two matrices in the keywords `response` and `compton_response`. The first is the response matrix.
-It needs to have the same energy calibration as the gamma-energy axis of the spectrum you're unfolding, and therefore it must be interpolated by MAMA.
-The second is only needed if you want to use the Compton subtraction method (the attribute `use_comptonsubtraction = True`). It is a list of probabilities for full-energy, single escape, double escape, etc., for each gamma-ray energy.
+Most accurate results, especially for low energies, are obtained if you provide the response matrix with same binning as the matrix that is to be unfolded. If this is not feasable, you may want to use the "Fan"-method (Guttormsen1996), that is implementet through the `interpolate_response` function. To get an idea of the quality of the interpolaton, have a look at `test_response_function_interpolation.ipynb`.
 
-To make the response matrix: Open you raw matrix with MAMA. Type `rm` to make the response matrix to your specifications. Then type `gr` to load the response matrix into view, and `wr` to write it to disk.
+### Compton subtraction method
+Implementation broked. It worked fine in 9ca2e3ecb5632388b02bb495c81a951390ff8a8c.
 
-If you want to do the Compton subtraction method (which doesn't work as of February 2019), you need the response parameters. They are automatically written to the file `resp.dat` when you run the `rm` command, but MAMA by default only prints a subset of the energy data points. To fix this, you need to edit the MAMA source file `folding.f` and comment out the line
+~~Because of this, if you want to do unfolding then you need to specify one or two matrices in the keywords `response` and `compton_response`. The first is the response matrix.
+The second is only needed if you want to use the Compton subtraction method (the attribute `use_comptonsubtraction = True`). It is a list of probabilities for full-energy, single escape, double escape, etc., for each gamma-ray energy.~~
+
+~~To make the response matrix: Open you raw matrix with MAMA. Type `rm` to make the response matrix to your specifications. Then type `gr` to load the response matrix into view, and `wr` to write it to disk.~~
+
+~~If you want to do the Compton subtraction method (which doesn't work as of February 2019), you need the response parameters. They are automatically written to the file `resp.dat` when you run the `rm` command, but MAMA by default only prints a subset of the energy data points. To fix this, you need to edit the MAMA source file `folding.f` and comment out the line~~
 
 ```fortran
 IF(RDIM.GT.50)iStep=RDIM/50                  !steps for output
 ```
 
-which in the MAMA version I have is located at about line 1980. Then recompile MAMA.
+~~which in the MAMA version I have is located at about line 1980. Then recompile MAMA.~~
 
 ## First generation method
 An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987).
@@ -167,7 +171,7 @@ The resulting nld and gsf are saved to disk and exposed as `extractor.nld` and `
 
 ## Normalization
 
-Not yet implemented.
+Test implementation only through `norm_nld`and `norm_gsf` classes. Do not have the same calling signatures yet.
 
 ## Validation and introspection
 
