@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d#, interp2d
 
 from .rebin import *
 from .library import *
+from .matrix import to_plot_axis
 
 DTYPE = np.float64
 
@@ -119,13 +120,44 @@ def gauss_smoothing(double[:] vector_in, np.ndarray E_array,
     return vector_out
 
 
-def gauss_smoothing_matrix(matrix_in, E_array,
-                           fwhm_array):
+def gauss_smoothing_matrix_1D(matrix_in, E_array,
+                              fwhm_array, abs_or_rel="abs",
+                              axis="Eg"):
+    """ Smooth a matrix with a Gaussian
+
+    Function which smooths an array of counts by a Gaussian
+    of full-width-half-maximum FWHM. Preserves number of counts.
+
+    Args:
+        matrix_in (array, double): Array of inbound counts to be smoothed
+        E_array (array, double): Array with energy calibration of matrix_in, in
+                                 lower-bin-edge calibration
+        fwhm_array (array, double): The full-width-half-maximum
+        abs_or_rel (str): fhwm given absolute, or relative in %
+                          relative: fwhm = fwhm_divE/100 * E_array
+        axis: The axis along which smoothing should happen.
+              Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
+    """
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
 
-    for i in range(matrix_in.shape[0]):
-        matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
-                                           E_array, fwhm_array)
+    if abs_or_rel == "abs":
+        fwhm_array = fwhm_array/E_array * 100
+    elif abs_or_rel == "rel":
+        pass
+    else:
+        ValueError("abs_or_rel must be either abs or rel. Now: ", abs_or_rel)
+
+    axis = to_plot_axis(axis)
+    is_Eg = axis == 0
+
+    if is_Eg:
+        for i in range(matrix_in.shape[0]):
+            matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
+                                               E_array, fwhm_array)
+    else:
+        for i in range(matrix_in.shape[1]):
+            matrix_out[:, i] = gauss_smoothing(matrix_in[:, i],
+                                               E_array, fwhm_array)
 
     return matrix_out

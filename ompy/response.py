@@ -3,6 +3,7 @@
 #     raise Exception("Must be using Python 3")
 import os
 import numpy as np
+import pandas as pd
 # import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d#, interp2d
 
@@ -72,7 +73,7 @@ def two_channel_split(E_centroid, E_array):
     return i_floor, i_ceil, floor_distance
 
 
-def interpolate_response(folderpath, Eout_array, fwhm_abs, return_all=False):
+def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     """ Interpolate response through "Fan"-mathod (Guttormsen1996)
 
     Assumes the source files are in the folder "folderpath",
@@ -84,15 +85,18 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_all=False):
         folderpath: The path to the folder containing Compton spectra and resp.dat
         Eout_array: The desired energies of the output response matrix.
         fwhm_abs: The experimental absolute full-width-half-max at 1.33 MeV.
-        return_all (optional): Returns "all" output, see below
+                  Note: In the article it is recommended to use 1/10 of the
+                  real FWHM for unfolding.
+        return_table (optional): Returns "all" output, see below
 
     Returns:
         response (Matrix): Response matrix with incident energy on the "Ex"
                            axis and the spectral response on the "Eg" axis
+        response_table (Dataframe)
 
     """
-    if return_all not in (True, False):
-        raise ValueError("return_all must be a bool,now {}".format(return_all))
+    if return_table not in (True, False):
+        raise ValueError("return_table must be a bool,now {}".format(return_table))
 
     assert(1e-2 <= fwhm_abs <= 20), "Check the fwhm_abs, probably it's wrong."\
         "\nNormal Oscar≃3, Now: {}".format(fwhm_abs)
@@ -189,7 +193,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_all=False):
 
 
     # == Interpolate the peak structures except Compton, which is handled separately ==
-    f_pcmp = interp1d(Eg_sim_array, pcmp, kind="linear", bounds_error=False, fill_value=0)
+    f_pcmp = interp1d(Eg_sim_array, pcmp, kind="linear", bounds_error=False, fill_value="extrapolate")
     f_pFE = interp1d(Eg_sim_array, pFE, kind="linear", bounds_error=False, fill_value="extrapolate")
     f_pSE = interp1d(Eg_sim_array, pSE, kind="linear", bounds_error=False, fill_value=0)
     f_pDE = interp1d(Eg_sim_array, pDE, kind="linear", bounds_error=False, fill_value=0)
@@ -463,9 +467,19 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_all=False):
 
     response = Matrix(values=R, Eg=Eout_array, Ex=Eout_array)
 
-    if return_all:
+    if return_table:
         # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
-        return response, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
+        response_table = {'E': Eout_array,
+                          'fwhm_abs': fwhm_abs*f_fwhm_rel(Eout_array),
+                          'fwhm_rel': f_fwhm_rel(Eout_array),
+                          'eff_tot': f_Eff_tot(Eout_array),
+                          'pcmp': f_pcmp(Eout_array),
+                          'pFE': f_pFE(Eout_array),
+                          'pSE': f_pSE(Eout_array),
+                          'pDE': f_pDE(Eout_array),
+                          'p511': f_p511(Eout_array)}
+        response_table = pd.DataFrame(data=response_table)
+        return response, response_table
     else:
         return response
 

@@ -63,6 +63,7 @@ setup(name='OMpy',
       install_requires=[
           'cython',
           'numpy',
+          'pandas',
           'matplotlib',
           'termtables',
           'pymultinest',
