@@ -80,7 +80,7 @@ class Unfolder:
             Necessary keys: ["fe", "se", "de", "511"]. Magne's suggestion:
             ``` py
             FWHM_tweak_multiplier = {"fe": 1., "se": 1.1,
-                                     "de": 1.3, "511": 0.9
+                                     "de": 1.3, "511": 0.9}
             ```
 
     TODO: There is the possibility for wrong results if the response

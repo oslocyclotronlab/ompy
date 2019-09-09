@@ -51,6 +51,18 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
+def Emid_to_bin(Emid, a0, a1):
+    """ Fin the bin of Emin, given te calibration (lower bin edge)
+
+    Assumes linear calibration
+    E_lower = a0 + a1 * i
+    Emid = E_lower + a1/2
+    """
+    E_lower = Emid - a1/2
+    i = (E_lower-a0)/a1
+    return int(i)
+
+
 def two_channel_split(E_centroid, E_array):
     """
     When E_centroid is between two bins in E_array, this function
@@ -60,15 +72,19 @@ def two_channel_split(E_centroid, E_array):
     Args:
         E_centroid (double): The energy of the centroid
         E_array (np.array, double): The energy grid to distribute on
+                                    Lower edge calibration.
     """
 
     a0 = E_array[0]
     a1 = E_array[1]-E_array[0]
 
-    i_exact = (E_centroid - a0)/a1 + 0.5
-    i_floor = int(np.floor((E_centroid - a0)/a1 + 0.5))
-    i_ceil = int(np.ceil((E_centroid - a0)/a1 + 0.5))
-    floor_distance = (i_exact - i_floor)
+    # convert to lower edge
+    E_centroid = E_centroid-a1/2
+
+    bin_exact_float = (E_centroid - a0)/a1
+    i_floor = int(np.floor((E_centroid - a0)/a1))
+    i_ceil = int(np.ceil((E_centroid - a0)/a1))
+    floor_distance = (bin_exact_float - i_floor)
 
     return i_floor, i_ceil, floor_distance
 
@@ -98,8 +114,8 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     if return_table not in (True, False):
         raise ValueError("return_table must be a bool,now {}".format(return_table))
 
-    assert(1e-2 <= fwhm_abs <= 20), "Check the fwhm_abs, probably it's wrong."\
-        "\nNormal Oscar≃3, Now: {}".format(fwhm_abs)
+    assert(1e-1 <= fwhm_abs <= 100), "Check the fwhm_abs, probably it's wrong."\
+        "\nNormal Oscar≃30, Now: {}".format(fwhm_abs)
 
     # Define helping variables from input
     N_out = len(Eout_array)
@@ -175,8 +191,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         compton_matrix[i,0:len(cmp_current)] = cmp_current
 
     # print("compton_matrix =", compton_matrix)
-
-
+    # compton_matrix = np.tril(compton_matrix)
 
     # Normalize total spectrum to 1, including FE, SE, etc:
     # Make a vector containing the sums for each step along the Eg_sim dimension:
@@ -198,10 +213,21 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     f_pSE = interp1d(Eg_sim_array, pSE, kind="linear", bounds_error=False, fill_value=0)
     f_pDE = interp1d(Eg_sim_array, pDE, kind="linear", bounds_error=False, fill_value=0)
     f_p511 = interp1d(Eg_sim_array, p511, kind="linear", bounds_error=False, fill_value=0)
-    f_fwhm_rel = interp1d(Eg_sim_array, fwhm_rel, kind="linear", bounds_error=False, fill_value="extrapolate")
+    f_fwhm_rel_perCent_norm = interp1d(Eg_sim_array, fwhm_rel, kind="linear", bounds_error=False, fill_value="extrapolate")
     f_Eff_tot = interp1d(Eg_sim_array, Eff_tot, kind="linear", bounds_error=False, fill_value=0)
 
-    fwhm_abs_array = fwhm_abs*f_fwhm_rel(Eout_array)
+    assert abs(f_fwhm_rel_perCent_norm(1330)-1) < 0.05, \
+        "Response function format not as expected. In the Mama-format, the"\
+        "'f_fwhm_rel_perCent' column denotes the relative fwhm (= fwhm/E)," \
+        "but normalized to 1 at 1.33 MeV."\
+        "Now it is: {} at 1.33 MeV.".format(f_fwhm_rel_perCent_norm(1330))
+    fwhm_rel_1330 = (fwhm_abs/1330*100)
+    f_fwhm_rel_perCent = interp1d(Eg_sim_array, fwhm_rel*fwhm_rel_1330,
+                                  kind="linear",
+                                  bounds_error=False,
+                                  fill_value="extrapolate")
+
+    fwhm_abs_array = Eout_array*f_fwhm_rel_perCent(Eout_array)/100
 
     # DEBUG:
     # print("p511 vector from resp.dat =", p511)
@@ -226,7 +252,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     # indexed by j to match MAMA code:
     # Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
     Egmin = Eout_array[0]
-    i_Egmin = int((Egmin - a0_out)/a1_out + 0.5)
+    i_Egmin = Emid_to_bin(Egmin, a0_out, a1_out)
 
     # Allocate response matrix array:
     R = np.zeros((N_out, N_out))
@@ -240,9 +266,12 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         if E_j < Egmin:
             continue
 
-        # Find maximal energy for current response function, 6*sigma (TODO: is it needed?)
-        Egmax = E_j + 6*fwhm_abs*f_fwhm_rel(E_j)/2.35 #FWHM_rel.max()/2.35
-        i_Egmax = min(int((Egmax - a0_out)/a1_out + 0.5), N_out)
+        # Find maximal energy for current response function,
+        # Changed to 1*sigma, or whatever this means
+        # -> Better if the lowest energies of the simulated spectra are above
+        # the gamma energy to be extrapolatedu
+        Egmax = E_j + 1*fwhm_abs*f_fwhm_rel_perCent_norm(E_j)/2.35 #FWHM_rel.max()/2.35
+        i_Egmax = min(Emid_to_bin(Egmax, a0_out, a1_out), N_out)
         # print("i_Egmax =", i_Egmax)
 
         # MAMA unfolds with 1/10 of real FWHM for convergence reasons.
@@ -280,21 +309,16 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         cmp_high = rebin_1D(cmp_high, Ecmp_array, Eout_array)
         # print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_sim_array[i_g_sim_low], "Eg_high =", Eg_sim_array[i_g_sim_high], flush=True)
 
-        # Fetch corresponding values for full-energy, etc:
-        pFE_low, pSE_low, pDE_low, p511_low = pFE[i_g_sim_low], pSE[i_g_sim_low], pDE[i_g_sim_low], p511[i_g_sim_low]
-        pFE_high, pSE_high, pDE_high, p511_high = pFE[i_g_sim_high], pSE[i_g_sim_high], pDE[i_g_sim_high], p511[i_g_sim_high]
-
-
         # The interpolation is split into energy regions.
         # Below the back-scattering energy Ebsc we interpolate linearly,
         # then we apply the "fan method" (Guttormsen 1996) in the region
         # from Ebsc up to the Compton edge, then linear extrapolation again the rest of the way.
 
         # Get maximal energy by taking 6*sigma above full-energy peak
-        E_low_max = Eg_low + 6*fwhm_abs*f_fwhm_rel(Eg_low)/2.35
-        i_low_max = min(int((E_low_max - a0_out)/a1_out + 0.5), N_out-1)
-        E_high_max = Eg_high + 6*fwhm_abs*f_fwhm_rel(Eg_high)/2.35
-        i_high_max = min(int((E_high_max - a0_out)/a1_out + 0.5), N_out-1)
+        E_low_max = Eg_low + 6*fwhm_abs_array[i_g_sim_low]/2.35
+        i_low_max = min(Emid_to_bin(E_low_max, a0_out, a1_out), N_out-1)
+        E_high_max = Eg_high + 6*fwhm_abs_array[i_g_sim_high]/2.35
+        i_high_max = min(Emid_to_bin(E_high_max, a0_out, a1_out), N_out-1)
         # print("E_low_max =", E_low_max, "E_high_max =", E_high_max, flush=True)
 
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
@@ -305,8 +329,8 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         #     print("Ece =", Ece)
         #     print("Ebsc =", Ebsc)
         # Indices in Eout calibration corresponding to these energies:
-        i_ce_out = min(int((Ece - a0_out)/a1_out + 0.5), i_Egmax)
-        i_bsc_out = max(int((Ebsc - a0_out)/a1_out + 0.5), i_Egmin)
+        i_ce_out = min(Emid_to_bin(Ece, a0_out, a1_out), i_Egmax)
+        i_bsc_out = max(Emid_to_bin(Ebsc, a0_out, a1_out), i_Egmin)
         # print("i_ce_out =", i_ce_out, ", i_bsc_out =", i_bsc_out, ", i_Egmax =", i_Egmax)
 
 
@@ -315,17 +339,21 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
 
 
         # Interpolate one-to-one up to j_bsc_out:
+
         for i in range(0,i_bsc_out):
             R[j,i] = cmp_low[i] + (cmp_high[i]-cmp_low[i])*(E_j - Eg_low)/(Eg_high-Eg_low)
             if R[j,i] < 0:
                 # print("R[{:d},{:d}] = {:.2f}".format(j,i,R[j,i]), flush=True)
                 R[j,i] = 0 # TODO make this faster by indexing at the end
 
+
+
         # Then interpolate with the fan method up to j_ce_out:
         z = 0 # Initialize variable
         i_last = i_bsc_out # Keep track of how far up the fan method goes
         i_low_last = i_bsc_out
         i_high_last = i_bsc_out
+
         for i in range(i_bsc_out, i_ce_out):
             E_i = Eout_array[i] # Energy of current point in interpolated spectrum
             if E_i > 0.1 and E_i < Ece:
@@ -336,12 +364,11 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
                 if theta > 0 and theta < np.pi:
                     # Determine interpolation indices in low and high arrays
                     # by Compton formula
-                    i_low_interp = max(int((E_compton(Eg_low, theta)
-                                            - a0_out)/a1_out + 0.5), i_bsc_out
-                                       )
-                    i_high_interp = min(int((E_compton(Eg_high, theta)
-                                            - a0_out)/a1_out + 0.5), i_high_max
-                                        )
+                    Ecmp_ = E_compton(Eg_low, theta)
+                    i_low_interp = max(Emid_to_bin(Ecmp_, a0_out, a1_out),
+                                       i_bsc_out)
+                    Ecmp_ = E_compton(Eg_high, theta)
+                    i_high_interp = min(Emid_to_bin(Ecmp_, a0_out, a1_out),                i_high_max)
                     FA = (cmp_high[i_high_interp]*corr(Eg_high, theta)
                           - cmp_low[i_low_interp]*corr(Eg_low, theta))
                     FB = cmp_low[i_low_interp]*corr(Eg_low, theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)
@@ -351,14 +378,14 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
                     i_high_last = i_high_interp
 
 
-        R1 = np.copy(R[j, :])
-        # Interpolate 1-to-1 the last distance up to E+3*sigma
+        # Interpolate 1-to-1 the last distance up to E+6*sigma
         # print("i_Egmax =", i_Egmax, "Egmax =", Egmax, ", i_last =", i_last, flush=True)
         # Check if this is needed:
         if i_last >= i_Egmax:
             continue
         s_low = (i_low_max-i_low_last)/(i_Egmax-i_last)
         s_high = (i_high_max-i_high_last)/(i_Egmax-i_last)
+
         for i in range(i_last, i_Egmax):
             i_low_interp = min(int(i_low_last + s_low*(i-i_last) + 0.5), i_low_max)
             i_high_interp = min(int(i_high_last + s_high*(i-i_last) + 0.5), i_high_max)
@@ -367,6 +394,10 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
             # if R[j,i] < 0:
             #     print("R[j,i] =", R[j,i], flush=True)
             #     R[j,i] = 0
+
+        # coorecton below E_sim[0]
+        if E_j < Eg_sim_array[0]:
+            R[j,j+1:]=0
 
         # DEBUG: Plot cmp_low and cmp_high:
         # if 50 < E_j <= 55 or 200 < E_j <= 205 or 500 < E_j <= 505:
@@ -449,6 +480,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         # Do common smoothing of the discrete_peaks array:
         discrete_peaks = gauss_smoothing(discrete_peaks, Eout_array,
                                          fwhm_abs_array)  # Smoothe
+
         R[j, :] += discrete_peaks
 
         # === Finally, normalise the row to unity (probability conservation): ===
@@ -470,8 +502,9 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     if return_table:
         # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
         response_table = {'E': Eout_array,
-                          'fwhm_abs': fwhm_abs*f_fwhm_rel(Eout_array),
-                          'fwhm_rel': f_fwhm_rel(Eout_array),
+                          'fwhm_abs': fwhm_abs_array,
+                          'fwhm_rel_%': f_fwhm_rel_perCent(Eout_array),
+                          'fwhm_rel': f_fwhm_rel_perCent(Eout_array)/100,
                           'eff_tot': f_Eff_tot(Eout_array),
                           'pcmp': f_pcmp(Eout_array),
                           'pFE': f_pFE(Eout_array),

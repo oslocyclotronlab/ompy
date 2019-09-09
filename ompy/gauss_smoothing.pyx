@@ -45,35 +45,32 @@ def gaussian(double[:] Emids, double mu, double sigma):
     return gaussian_array
 
 
-def gauss_smoothing(double[:] vector_in, np.ndarray E_array,
-                    double[:] fwhm_divE_array,
+def gauss_smoothing(double[:] array_in, double[:] E_array,
+                    double[:] fwhm,
                     double truncate=3):
     """
     Function which smooths an array of counts by a Gaussian
     of full-width-half-maximum FWHM. Preserves number of counts.
     Args:
-        vector_in (array, double): Array of inbound counts to be smoothed
-        E_array (array, double): Array with energy calibration of vector_in, in
+        array_in (array, double): Array of inbound counts to be smoothed
+        E_array (array, double): Array with energy calibration of array_in, in
                                  lower-bin-edge calibration
-        fwhm_divE_array (array, double): The full-width-half-maximum value to
-                                    smooth by, in percent of the energy. Note
-                                    well that this means that fwhm =
-                                    fwhm_divE/100 * E_array gives you the
-                                    absolute FWHM.
+        fwhm (array, double): The full-width-half-maximums. Need to be
+                              same size as array_in
         truncate (double, optional): The window width of the Gaussian that is
                                      used to smoothe, in units of sigma.
                                      Defaults to 3.
 
     Returns:
-        vector_out: Array of smoothed counts
+        array_out: Array of smoothed counts
 
     """
-    if not len(vector_in) == len(E_array):
-        raise ValueError("Length mismatch between vector_in and E_array")
-    if not len(vector_in) == len(fwhm_divE_array):
-        raise ValueError("Length mismatch between vector_in and fwhm_divE_array")
+    if not len(array_in) == len(E_array):
+        raise ValueError("Length mismatch between array_in and E_array")
+    if not len(array_in) == len(fwhm):
+        raise ValueError("Length mismatch between array_in and fwhm")
 
-    cdef double[:] vector_in_view = vector_in
+    cdef double[:] array_in_view = array_in
     cdef double a0, a1
 
     # a0_lower_bin_edge = E_array[0]
@@ -84,29 +81,30 @@ def gauss_smoothing(double[:] vector_in, np.ndarray E_array,
     # E_array = E_array + a1/2
     # a0 = E_array[0]
 
-    vector_out = np.zeros(len(vector_in), dtype=DTYPE)
-    # cdef double[:] vector_out_view = vector_out
+    array_out = np.zeros(len(array_in), dtype=DTYPE)
+    # cdef double[:] array_out_view = array_out
 
     def find_truncation_indices(double E_centroid_current,
                                 double sigma_current,
                                 double truncate=truncate):
+        cdef int i_cut_low, i_cut_high
         E_cut_low = E_centroid_current - truncate * sigma_current
         i_cut_low = int((E_cut_low - a0) / a1)
         i_cut_low = max(0, i_cut_low)
         E_cut_high = E_centroid_current + truncate * sigma_current
         i_cut_high = int((E_cut_high - a0) / a1)
-        i_cut_high = max(min(len(vector_in), i_cut_high), i_cut_low+1)
+        i_cut_high = max(min(len(array_in), i_cut_high), i_cut_low+1)
         return i_cut_low, i_cut_high
 
     cdef int i
-    for i in range(len(vector_out)):
-        counts = vector_in_view[i]
+    for i in range(len(array_out)):
+        counts = array_in_view[i]
         if counts > 0:
             E_centroid_current = E_array[i] + a1/2
-            sigma_current = fwhm_divE_array[i]/(2.355*100)*E_centroid_current
+            sigma_current = fwhm[i]/2.355
             i_cut_low, i_cut_high = find_truncation_indices(E_centroid_current,
                                                             sigma_current)
-            pdf = np.zeros(len(vector_in), dtype=DTYPE)
+            pdf = np.zeros(len(array_in), dtype=DTYPE)
             # using lower bin instead of center bin in both E_mid and mu
             # below-> canceles out
             pdf[i_cut_low:i_cut_high] =\
@@ -115,13 +113,13 @@ def gauss_smoothing(double[:] vector_in, np.ndarray E_array,
                          sigma=sigma_current
                          )
             pdf = pdf / np.sum(pdf)
-            vector_out += counts * pdf
+            array_out += counts * pdf
 
-    return vector_out
+    return array_out
 
 
 def gauss_smoothing_matrix_1D(matrix_in, E_array,
-                              fwhm_array, abs_or_rel="abs",
+                              fwhm,
                               axis="Eg"):
     """ Smooth a matrix with a Gaussian
 
@@ -132,7 +130,7 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
         matrix_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of matrix_in, in
                                  lower-bin-edge calibration
-        fwhm_array (array, double): The full-width-half-maximum
+        fwhm (double or array of doubles): The full-width-half-maximums
         abs_or_rel (str): fhwm given absolute, or relative in %
                           relative: fwhm = fwhm_divE/100 * E_array
         axis: The axis along which smoothing should happen.
@@ -141,12 +139,8 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
 
-    if abs_or_rel == "abs":
-        fwhm_array = fwhm_array/E_array * 100
-    elif abs_or_rel == "rel":
-        pass
-    else:
-        ValueError("abs_or_rel must be either abs or rel. Now: ", abs_or_rel)
+    if len(fwhm) == 1:
+        fwhm = np.full_like(matrix_in, fwhm)
 
     axis = to_plot_axis(axis)
     is_Eg = axis == 0
@@ -154,10 +148,10 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
     if is_Eg:
         for i in range(matrix_in.shape[0]):
             matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
-                                               E_array, fwhm_array)
+                                               E_array, fwhm)
     else:
         for i in range(matrix_in.shape[1]):
             matrix_out[:, i] = gauss_smoothing(matrix_in[:, i],
-                                               E_array, fwhm_array)
+                                               E_array, fwhm)
 
     return matrix_out
