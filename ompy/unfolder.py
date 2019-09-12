@@ -31,6 +31,7 @@ import pandas
 import logging
 import warnings
 from typing import Iterable, Optional
+import termtables as tt
 from scipy.ndimage import gaussian_filter1d
 from copy import copy
 from .gauss_smoothing import gauss_smoothing_matrix_1D
@@ -67,7 +68,8 @@ class Unfolder:
 
     Attributes:
         raw (Matrix): The Matrix to unfold
-        num_iter (int): The number of iterations to perform
+        num_iter (int): The number of iterations to perform. The best iteration
+            is then selected based on the `score` method
         zeroes (boolean ndarray): Masks everything below the diagonal to false
         r (Matrix): The trapezoidal cut raw Matrix
         R (Matrix): The response matrix
@@ -94,7 +96,7 @@ class Unfolder:
             num_iter: The number of iterations to perform.j
             reponse: The response Matrix R to use in unfolding.
         """
-        self.num_iter: int = 33
+        self.num_iter = num_iter
         self.weight_fluctuation = 0.2
         self.minimum_iterations = 3
         self.zeroes: Optional[np.ndarray] = None
@@ -178,11 +180,17 @@ class Unfolder:
         unfolded = np.zeros_like(self.r)
         for iEx in range(self.r.shape[0]):
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
-
+        if LOG.level >= logging.DEBUG:
+            print_array = np.column_stack((np.arange(len(self.raw.Ex)),
+                                           self.raw.Ex.astype(int),
+                                           iscores))
+            LOG.debug("Selecting following iterations: \n%s",
+                      tt.to_string(print_array,
+                                   header=('i', 'Ex', 'iteration'))
+                      )
 
         if self.use_compton_subtraction:
             unfolded = self.compton_subtraction(unfolded)
-
 
         unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
