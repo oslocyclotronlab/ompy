@@ -389,8 +389,8 @@ class Matrix():
         isEx = axis == 1
 
         # Determine subset of the other axis to be summed
-        indexE = self.index_Ex if isEx else self.index_Eg
-        rangeE = self.range_Ex if isEx else self.range_Eg
+        indexE = self.index_Eg if isEx else self.index_Ex
+        rangeE = self.range_Eg if isEx else self.range_Ex
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax+1)

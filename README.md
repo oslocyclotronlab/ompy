@@ -103,20 +103,17 @@ You have to read in a response matrix from disk. Convert it to have the incident
 Most accurate results, especially for low energies, are obtained if you provide the response matrix with same binning as the matrix that is to be unfolded. If this is not feasable, you may want to use the "Fan"-method (Guttormsen1996), that is implementet through the `interpolate_response` function. To get an idea of the quality of the interpolaton, have a look at `test_response_function_interpolation.ipynb`.
 
 ### Compton subtraction method
-Implementation broked. It worked fine in 9ca2e3ecb5632388b02bb495c81a951390ff8a8c.
+To use the Compton subtraction method, you need to provide a list of probabilities for full-energy, single escape, double escape, etc, for each gamma-ray energy. This can be obtained from the `interpolate_response` using with `return_table=True`. The unfolder with the compton subtraction method is then called  by
 
-~~Because of this, if you want to do unfolding then you need to specify one or two matrices in the keywords `response` and `compton_response`. The first is the response matrix.
-The second is only needed if you want to use the Compton subtraction method (the attribute `use_comptonsubtraction = True`). It is a list of probabilities for full-energy, single escape, double escape, etc., for each gamma-ray energy.~~
+```
+response, response_tab = om.interpolate_response(folderpath, raw.Eg, FWHM, return_table=True)
 
-~~To make the response matrix: Open you raw matrix with MAMA. Type `rm` to make the response matrix to your specifications. Then type `gr` to load the response matrix into view, and `wr` to write it to disk.~~
-
-~~If you want to do the Compton subtraction method (which doesn't work as of February 2019), you need the response parameters. They are automatically written to the file `resp.dat` when you run the `rm` command, but MAMA by default only prints a subset of the energy data points. To fix this, you need to edit the MAMA source file `folding.f` and comment out the line~~
-
-```fortran
-IF(RDIM.GT.50)iStep=RDIM/50                  !steps for output
+unfolder = om.Unfolder(response=response)
+unfolder.use_compton_subtraction = True
+unfolder.response_tab = response_tab
+unfolded = unfolder(matrix)
 ```
 
-~~which in the MAMA version I have is located at about line 1980. Then recompile MAMA.~~
 
 ## First generation method
 An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987).
