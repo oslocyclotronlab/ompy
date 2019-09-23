@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
+from numpy import ndarray
 from .constants import DE_PARTICLE, DE_GAMMA_8MEV, DE_GAMMA_1MEV
 from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
@@ -240,28 +241,6 @@ def call_model(fun,pars,pars_req):
         return fun(**pars)
     else:
         raise TypeError("Error: Need following arguments for this method: {0}".format(pars_req))
-
-
-def get_discretes(Emids, fname, resolution=0.1):
-    """ Get discrete levels, and smooth by some resolution [MeV]
-    and the bins centers [MeV]
-    For now: Assume linear binning """
-    energies = np.loadtxt(fname)
-    energies /= 1e3  # convert to MeV
-
-    # Emax = energies[-1]
-    # nbins = int(np.ceil(Emax/binsize))
-    # bins = np.linspace(0,Emax,nbins+1)
-    binsize = Emids[1] - Emids[0]
-    bin_edges = np.append(Emids, Emids[-1] + binsize)
-    bin_edges -= binsize / 2
-
-    hist, _ = np.histogram(energies, bins=bin_edges)
-    hist = hist.astype(float) / binsize  # convert to levels/MeV
-
-    from scipy.ndimage import gaussian_filter1d
-    hist_smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
-    return hist_smoothed, hist
 
 
 def tranform_nld_gsf(samples: dict, nld=None, gsf=None,

@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 from scipy.optimize import minimize
 from .ensemble import Ensemble
-from .matrix import Matrix, Vector
+from .matrix import Matrix
+from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .library import div0
 from .action import Action
@@ -286,6 +287,8 @@ class Extractor:
         #                alpha=1/self.size, **kwargs)
         #     ax[1].plot(gsf.E, gsf.values, color='k',
         #                alpha=1/self.size, **kwargs)
+        else:
+            fig = None
 
         ax[0].errorbar(self.nld[0].E, self.nld_mean(), yerr=self.nld_std(),
                        fmt='o', ms=1, lw=1)
@@ -297,7 +300,8 @@ class Extractor:
         if scale == 'log':
             ax[0].set_yscale("log")
             ax[1].set_yscale("log")
-        return ax
+
+        return fig, ax
 
     def nld_mean(self) -> np.ndarray:
         return np.mean([nld.values for nld in self.nld], axis=0)
@@ -310,6 +314,18 @@ class Extractor:
 
     def gsf_std(self) -> np.ndarray:
         return np.std([gsf.values for gsf in self.gsf], axis=0)
+
+    def ensemble_nld(self) -> Vector:
+        energy = self.nld[0].E
+        values = self.nld_mean()
+        std = self.nld_std()
+        return Vector(values=values, E=energy, std=std)
+
+    def ensemble_gsf(self) -> Vector:
+        energy = self.gsf[0].E
+        values = self.gsf_mean()
+        std = self.gsf_std()
+        return Vector(values=values, E=energy, std=std)
 
 def normalize(mat: Matrix, std: Optional[Matrix]):
     matrix = unumpy.uarray(mat.values, std.values if std is not None else None)

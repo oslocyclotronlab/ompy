@@ -10,12 +10,12 @@
         "include_dirs": [
             "/usr/lib/python3.7/site-packages/numpy/core/include"
         ],
-        "name": "rhosig",
+        "name": "ompy.rhosig",
         "sources": [
             "ompy/rhosig.pyx"
         ]
     },
-    "module_name": "rhosig"
+    "module_name": "ompy.rhosig"
 }
 END: Cython Metadata */
 
@@ -609,8 +609,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__rhosig
-#define __PYX_HAVE_API__rhosig
+#define __PYX_HAVE__ompy__rhosig
+#define __PYX_HAVE_API__ompy__rhosig
 /* Early includes */
 #include <string.h>
 #include <stdio.h>
@@ -1894,12 +1894,12 @@ static PyTypeObject *__pyx_ptype_5numpy_ndarray = 0;
 static PyTypeObject *__pyx_ptype_5numpy_ufunc = 0;
 static CYTHON_INLINE char *__pyx_f_5numpy__util_dtypestring(PyArray_Descr *, char *, char *, int *); /*proto*/
 
-/* Module declarations from 'rhosig' */
-#define __Pyx_MODULE_NAME "rhosig"
-extern int __pyx_module_is_main_rhosig;
-int __pyx_module_is_main_rhosig = 0;
+/* Module declarations from 'ompy.rhosig' */
+#define __Pyx_MODULE_NAME "ompy.rhosig"
+extern int __pyx_module_is_main_ompy__rhosig;
+int __pyx_module_is_main_ompy__rhosig = 0;
 
-/* Implementation of 'rhosig' */
+/* Implementation of 'ompy.rhosig' */
 static PyObject *__pyx_builtin_enumerate;
 static PyObject *__pyx_builtin_range;
 static PyObject *__pyx_builtin_ValueError;
@@ -2003,7 +2003,6 @@ static const char __pyx_k_kwargs[] = "kwargs";
 static const char __pyx_k_matrix[] = "matrix";
 static const char __pyx_k_method[] = "method";
 static const char __pyx_k_random[] = "random";
-static const char __pyx_k_rhosig[] = "rhosig";
 static const char __pyx_k_uarray[] = "uarray";
 static const char __pyx_k_unumpy[] = "unumpy";
 static const char __pyx_k_values[] = "values";
@@ -2044,6 +2043,7 @@ static const char __pyx_k_transCoeff[] = "transCoeff";
 static const char __pyx_k_z_array_in[] = "z_array_in";
 static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_distibution[] = "distibution";
+static const char __pyx_k_ompy_rhosig[] = "ompy.rhosig";
 static const char __pyx_k_rho_fit_err[] = "rho_fit_err";
 static const char __pyx_k_spincutPars[] = "spincutPars";
 static const char __pyx_k_true_divide[] = "true_divide";
@@ -2192,6 +2192,7 @@ static PyObject *__pyx_n_s_numpy;
 static PyObject *__pyx_kp_u_numpy_core_multiarray_failed_to;
 static PyObject *__pyx_kp_u_numpy_core_umath_failed_to_impor;
 static PyObject *__pyx_n_s_objfun1D;
+static PyObject *__pyx_n_s_ompy_rhosig;
 static PyObject *__pyx_kp_s_ompy_rhosig_pyx;
 static PyObject *__pyx_n_s_ones;
 static PyObject *__pyx_n_s_options;
@@ -2212,7 +2213,6 @@ static PyObject *__pyx_n_s_rhoTfrom1D;
 static PyObject *__pyx_n_s_rho_fit;
 static PyObject *__pyx_n_s_rho_fit_err;
 static PyObject *__pyx_n_s_rhos;
-static PyObject *__pyx_n_s_rhosig;
 static PyObject *__pyx_n_s_scipy_optimize;
 static PyObject *__pyx_n_s_shape;
 static PyObject *__pyx_n_s_spin_dist;
@@ -2246,19 +2246,19 @@ static PyObject *__pyx_n_s_z_array_in;
 static PyObject *__pyx_kp_u_z_array_should_be_set;
 static PyObject *__pyx_n_s_z_from_spin_dist;
 static PyObject *__pyx_n_s_zeros;
-static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars); /* proto */
-static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par); /* proto */
-static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix, PyObject *__pyx_v_std, PyArrayObject *__pyx_v_Eg, PyArrayObject *__pyx_v_nld, PyArrayObject *__pyx_v_Ex, PyArrayObject *__pyx_v_resolution, PyObject *__pyx_v_p0, PyObject *__pyx_v_method, PyObject *__pyx_v_options, CYTHON_UNUSED PyObject *__pyx_v_fill_value, PyObject *__pyx_v_use_z, PyObject *__pyx_v_spin_dist_par); /* proto */
-static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_values, PyObject *__pyx_v_std); /* proto */
-static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_P_in, PyObject *__pyx_v_P_err, PyObject *__pyx_v_Emid_Eg, PyObject *__pyx_v_Emid_nld, PyObject *__pyx_v_Emid_Ex, PyObject *__pyx_v_N_mc, PyObject *__pyx_v_method, PyObject *__pyx_v_options, PyObject *__pyx_v_fill_value); /* proto */
-static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_x, PyObject *__pyx_v_args); /* proto */
-static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, PyArrayObject *__pyx_v_Pexp, PyArrayObject *__pyx_v_Perr, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyArrayObject *__pyx_v_z_array); /* proto */
-static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, int __pyx_v_Nbins_Ex, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyObject *__pyx_v_type, PyArrayObject *__pyx_v_z_array_in); /* proto */
-static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, PyArrayObject *__pyx_v_b); /* proto */
-static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_x1D, int __pyx_v_Nbins_rho); /* proto */
-static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_array, PyObject *__pyx_v_Emid, PyObject *__pyx_v_Egmin, PyObject *__pyx_v_Exmin, PyObject *__pyx_v_Emax, CYTHON_UNUSED PyObject *__pyx_v_kwargs); /* proto */
-static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars); /* proto */
-static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix, PyObject *__pyx_v_std, PyArrayObject *__pyx_v_Eg, PyArrayObject *__pyx_v_nld, PyArrayObject *__pyx_v_Ex, PyArrayObject *__pyx_v_resolution, PyObject *__pyx_v_p0, PyObject *__pyx_v_method, PyObject *__pyx_v_options, CYTHON_UNUSED PyObject *__pyx_v_fill_value, PyObject *__pyx_v_use_z, PyObject *__pyx_v_spin_dist_par); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_values, PyObject *__pyx_v_std); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_P_in, PyObject *__pyx_v_P_err, PyObject *__pyx_v_Emid_Eg, PyObject *__pyx_v_Emid_nld, PyObject *__pyx_v_Emid_Ex, PyObject *__pyx_v_N_mc, PyObject *__pyx_v_method, PyObject *__pyx_v_options, PyObject *__pyx_v_fill_value); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_x, PyObject *__pyx_v_args); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, PyArrayObject *__pyx_v_Pexp, PyArrayObject *__pyx_v_Perr, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyArrayObject *__pyx_v_z_array); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, int __pyx_v_Nbins_Ex, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyObject *__pyx_v_type, PyArrayObject *__pyx_v_z_array_in); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, PyArrayObject *__pyx_v_b); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_x1D, int __pyx_v_Nbins_rho); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_array, PyObject *__pyx_v_Emid, PyObject *__pyx_v_Egmin, PyObject *__pyx_v_Exmin, PyObject *__pyx_v_Emax, CYTHON_UNUSED PyObject *__pyx_v_kwargs); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars); /* proto */
+static PyObject *__pyx_pf_4ompy_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
 static void __pyx_pf_5numpy_7ndarray_2__releasebuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static PyObject *__pyx_float_3_;
@@ -2310,7 +2310,7 @@ static PyObject *__pyx_codeobj__17;
 static PyObject *__pyx_codeobj__18;
 /* Late includes */
 
-/* "rhosig.pyx":45
+/* "ompy/rhosig.pyx":45
  * # cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -2319,9 +2319,9 @@ static PyObject *__pyx_codeobj__18;
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_6rhosig_1spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_1spin_dist, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_1spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_1spin_dist, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_4ompy_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_Ex = 0;
   PyObject *__pyx_v_J = 0;
   PyObject *__pyx_v_spincutModel = 0;
@@ -2391,18 +2391,18 @@ static PyObject *__pyx_pw_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__p
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("spin_dist", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 45, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_spin_dist(__pyx_self, __pyx_v_Ex, __pyx_v_J, __pyx_v_spincutModel, __pyx_v_spincutPars);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_spin_dist(__pyx_self, __pyx_v_Ex, __pyx_v_J, __pyx_v_spincutModel, __pyx_v_spincutPars);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars) {
+static PyObject *__pyx_pf_4ompy_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars) {
   PyObject *__pyx_r = NULL;
   __Pyx_TraceDeclarations
   __Pyx_RefNannyDeclarations
@@ -2414,7 +2414,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   __Pyx_RefNannySetupContext("spin_dist", 0);
   __Pyx_TraceCall("spin_dist", __pyx_f[0], 45, 0, __PYX_ERR(0, 45, __pyx_L1_error));
 
-  /* "rhosig.pyx":46
+  /* "ompy/rhosig.pyx":46
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -2423,7 +2423,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
  */
   __Pyx_XDECREF(__pyx_r);
 
-  /* "rhosig.pyx":48
+  /* "ompy/rhosig.pyx":48
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -2433,7 +2433,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_SpinFunctions); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
 
-  /* "rhosig.pyx":46
+  /* "ompy/rhosig.pyx":46
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -2445,7 +2445,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_Ex, __pyx_v_Ex) < 0) __PYX_ERR(0, 46, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_J, __pyx_v_J) < 0) __PYX_ERR(0, 46, __pyx_L1_error)
 
-  /* "rhosig.pyx":47
+  /* "ompy/rhosig.pyx":47
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,             # <<<<<<<<<<<<<<
@@ -2454,7 +2454,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_model, __pyx_v_spincutModel) < 0) __PYX_ERR(0, 46, __pyx_L1_error)
 
-  /* "rhosig.pyx":48
+  /* "ompy/rhosig.pyx":48
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -2463,7 +2463,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_pars, __pyx_v_spincutPars) < 0) __PYX_ERR(0, 46, __pyx_L1_error)
 
-  /* "rhosig.pyx":46
+  /* "ompy/rhosig.pyx":46
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -2475,7 +2475,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":48
+  /* "ompy/rhosig.pyx":48
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -2504,7 +2504,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":45
+  /* "ompy/rhosig.pyx":45
  * # cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -2518,7 +2518,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
-  __Pyx_AddTraceback("rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -2527,7 +2527,7 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
   return __pyx_r;
 }
 
-/* "rhosig.pyx":51
+/* "ompy/rhosig.pyx":51
  * 
  * 
  * def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -2536,9 +2536,9 @@ static PyObject *__pyx_pf_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, 
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_6rhosig_3z = {"z", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_3z, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_3z = {"z", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_3z, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_4ompy_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_Exarr = 0;
   PyArrayObject *__pyx_v_Egarr = 0;
   PyObject *__pyx_v_spin_dist_par = 0;
@@ -2601,13 +2601,13 @@ static PyObject *__pyx_pw_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args,
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("z", 0, 2, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 51, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.z", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.z", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Exarr), __pyx_ptype_5numpy_ndarray, 1, "Exarr", 0))) __PYX_ERR(0, 51, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Egarr), __pyx_ptype_5numpy_ndarray, 1, "Egarr", 0))) __PYX_ERR(0, 51, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_2z(__pyx_self, __pyx_v_Exarr, __pyx_v_Egarr, __pyx_v_spin_dist_par);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_2z(__pyx_self, __pyx_v_Exarr, __pyx_v_Egarr, __pyx_v_spin_dist_par);
 
   /* function exit code */
   goto __pyx_L0;
@@ -2618,7 +2618,7 @@ static PyObject *__pyx_pw_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args,
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par) {
+static PyObject *__pyx_pf_4ompy_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par) {
   PyArrayObject *__pyx_v_z = 0;
   float __pyx_v_inner_sum;
   PyObject *__pyx_v_Jfs = 0;
@@ -2665,7 +2665,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __Pyx_TraceCall("z", __pyx_f[0], 51, 0, __PYX_ERR(0, 51, __pyx_L1_error));
   __Pyx_INCREF(__pyx_v_spin_dist_par);
 
-  /* "rhosig.pyx":63
+  /* "ompy/rhosig.pyx":63
  *     # If no spin distribution parameters are specified, use some defaults:
  *     # (TODO: This could be made nicer, but let's get some use experience first)
  *     if spin_dist_par is None:             # <<<<<<<<<<<<<<
@@ -2676,7 +2676,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __pyx_t_2 = (__pyx_t_1 != 0);
   if (__pyx_t_2) {
 
-    /* "rhosig.pyx":66
+    /* "ompy/rhosig.pyx":66
  *         spin_dist_par = {
  *             # some dummy values:
  *             "spincutModel": "EB05",             # <<<<<<<<<<<<<<
@@ -2687,7 +2687,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
     __Pyx_GOTREF(__pyx_t_3);
     if (PyDict_SetItem(__pyx_t_3, __pyx_n_u_spincutModel, __pyx_n_u_EB05) < 0) __PYX_ERR(0, 66, __pyx_L1_error)
 
-    /* "rhosig.pyx":67
+    /* "ompy/rhosig.pyx":67
  *             # some dummy values:
  *             "spincutModel": "EB05",
  *             "spincutPars": {"mass": 164, "NLDa": 25.16, "Eshift": 0.12},             # <<<<<<<<<<<<<<
@@ -2705,7 +2705,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
     __Pyx_DECREF_SET(__pyx_v_spin_dist_par, __pyx_t_3);
     __pyx_t_3 = 0;
 
-    /* "rhosig.pyx":63
+    /* "ompy/rhosig.pyx":63
  *     # If no spin distribution parameters are specified, use some defaults:
  *     # (TODO: This could be made nicer, but let's get some use experience first)
  *     if spin_dist_par is None:             # <<<<<<<<<<<<<<
@@ -2714,7 +2714,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
  */
   }
 
-  /* "rhosig.pyx":71
+  /* "ompy/rhosig.pyx":71
  *         }
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],             # <<<<<<<<<<<<<<
@@ -2729,7 +2729,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __pyx_t_4 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_Jmax); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 71, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
 
-  /* "rhosig.pyx":72
+  /* "ompy/rhosig.pyx":72
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],
  *                                      spin_dist_par["Jmax"]+1)             # <<<<<<<<<<<<<<
@@ -2794,7 +2794,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   }
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "rhosig.pyx":71
+  /* "ompy/rhosig.pyx":71
  *         }
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],             # <<<<<<<<<<<<<<
@@ -2805,7 +2805,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __pyx_v_Js = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":74
+  /* "ompy/rhosig.pyx":74
  *                                      spin_dist_par["Jmax"]+1)
  * 
  *     z = np.zeros((len(Exarr), len(Egarr)))             # <<<<<<<<<<<<<<
@@ -2851,7 +2851,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __pyx_v_z = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":76
+  /* "ompy/rhosig.pyx":76
  *     z = np.zeros((len(Exarr), len(Egarr)))
  * 
  *     for i_Ex, Ex in enumerate(Exarr):             # <<<<<<<<<<<<<<
@@ -2904,7 +2904,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
     __pyx_v_i_Ex = __pyx_t_8;
     __pyx_t_8 = (__pyx_t_8 + 1);
 
-    /* "rhosig.pyx":77
+    /* "ompy/rhosig.pyx":77
  * 
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):             # <<<<<<<<<<<<<<
@@ -2957,7 +2957,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
       __pyx_v_i_Eg = __pyx_t_13;
       __pyx_t_13 = (__pyx_t_13 + 1);
 
-      /* "rhosig.pyx":78
+      /* "ompy/rhosig.pyx":78
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:             # <<<<<<<<<<<<<<
@@ -2967,7 +2967,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
       __pyx_t_2 = (((__pyx_v_Ex - __pyx_v_Eg) <= 0.0) != 0);
       if (__pyx_t_2) {
 
-        /* "rhosig.pyx":79
+        /* "ompy/rhosig.pyx":79
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:
  *                 continue             # <<<<<<<<<<<<<<
@@ -2976,7 +2976,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
  */
         goto __pyx_L6_continue;
 
-        /* "rhosig.pyx":78
+        /* "ompy/rhosig.pyx":78
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:             # <<<<<<<<<<<<<<
@@ -2985,7 +2985,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
  */
       }
 
-      /* "rhosig.pyx":80
+      /* "ompy/rhosig.pyx":80
  *             if Ex-Eg <= 0:
  *                 continue
  *             for ji in Js:             # <<<<<<<<<<<<<<
@@ -3035,7 +3035,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
         __pyx_v_ji = __pyx_t_18;
 
-        /* "rhosig.pyx":81
+        /* "ompy/rhosig.pyx":81
  *                 continue
  *             for ji in Js:
  *                 if ji==0:             # <<<<<<<<<<<<<<
@@ -3045,7 +3045,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __pyx_t_2 = ((__pyx_v_ji == 0) != 0);
         if (__pyx_t_2) {
 
-          /* "rhosig.pyx":82
+          /* "ompy/rhosig.pyx":82
  *             for ji in Js:
  *                 if ji==0:
  *                     Jfs = [1]             # <<<<<<<<<<<<<<
@@ -3060,7 +3060,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           __Pyx_XDECREF_SET(__pyx_v_Jfs, ((PyObject*)__pyx_t_7));
           __pyx_t_7 = 0;
 
-          /* "rhosig.pyx":81
+          /* "ompy/rhosig.pyx":81
  *                 continue
  *             for ji in Js:
  *                 if ji==0:             # <<<<<<<<<<<<<<
@@ -3070,7 +3070,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           goto __pyx_L11;
         }
 
-        /* "rhosig.pyx":84
+        /* "ompy/rhosig.pyx":84
  *                     Jfs = [1]
  *                 else:
  *                     Jfs = [ji-1, ji, ji+1]             # <<<<<<<<<<<<<<
@@ -3100,7 +3100,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         }
         __pyx_L11:;
 
-        /* "rhosig.pyx":87
+        /* "ompy/rhosig.pyx":87
  *                 # assume g_pop propto g_int
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,             # <<<<<<<<<<<<<<
@@ -3116,7 +3116,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_ji); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 87, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_20);
 
-        /* "rhosig.pyx":88
+        /* "ompy/rhosig.pyx":88
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,
  *                                           spin_dist_par["spincutModel"],             # <<<<<<<<<<<<<<
@@ -3126,7 +3126,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __pyx_t_21 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_spincutModel); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 88, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_21);
 
-        /* "rhosig.pyx":89
+        /* "ompy/rhosig.pyx":89
  *                 g_pop = 1./2. * spin_dist(Ex, ji,
  *                                           spin_dist_par["spincutModel"],
  *                                           spin_dist_par["spincutPars"]             # <<<<<<<<<<<<<<
@@ -3195,7 +3195,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         }
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-        /* "rhosig.pyx":87
+        /* "ompy/rhosig.pyx":87
  *                 # assume g_pop propto g_int
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,             # <<<<<<<<<<<<<<
@@ -3210,7 +3210,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
         __pyx_v_g_pop = __pyx_t_12;
 
-        /* "rhosig.pyx":91
+        /* "ompy/rhosig.pyx":91
  *                                           spin_dist_par["spincutPars"]
  *                                           )
  *                 inner_sum = 0             # <<<<<<<<<<<<<<
@@ -3219,7 +3219,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
  */
         __pyx_v_inner_sum = 0.0;
 
-        /* "rhosig.pyx":92
+        /* "ompy/rhosig.pyx":92
  *                                           )
  *                 inner_sum = 0
  *                 for jf in Jfs:             # <<<<<<<<<<<<<<
@@ -3239,7 +3239,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
           __pyx_v_jf = __pyx_t_18;
 
-          /* "rhosig.pyx":94
+          /* "ompy/rhosig.pyx":94
  *                 for jf in Jfs:
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,             # <<<<<<<<<<<<<<
@@ -3257,7 +3257,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_jf); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 94, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_20);
 
-          /* "rhosig.pyx":95
+          /* "ompy/rhosig.pyx":95
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
  *                                              spin_dist_par["spincutModel"],             # <<<<<<<<<<<<<<
@@ -3267,7 +3267,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           __pyx_t_7 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_spincutModel); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 95, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_7);
 
-          /* "rhosig.pyx":96
+          /* "ompy/rhosig.pyx":96
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
  *                                              spin_dist_par["spincutModel"],
  *                                              spin_dist_par["spincutPars"]             # <<<<<<<<<<<<<<
@@ -3336,7 +3336,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           }
           __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-          /* "rhosig.pyx":94
+          /* "ompy/rhosig.pyx":94
  *                 for jf in Jfs:
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,             # <<<<<<<<<<<<<<
@@ -3355,7 +3355,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
           __Pyx_DECREF(__pyx_t_24); __pyx_t_24 = 0;
           __pyx_v_inner_sum = __pyx_t_12;
 
-          /* "rhosig.pyx":92
+          /* "ompy/rhosig.pyx":92
  *                                           )
  *                 inner_sum = 0
  *                 for jf in Jfs:             # <<<<<<<<<<<<<<
@@ -3365,7 +3365,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         }
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-        /* "rhosig.pyx":99
+        /* "ompy/rhosig.pyx":99
  *                                              )
  *                     # print(spin_dist(Ex-Eg, jf))
  *                 z[i_Ex, i_Eg] += g_pop * inner_sum             # <<<<<<<<<<<<<<
@@ -3396,7 +3396,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
         __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
         __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-        /* "rhosig.pyx":80
+        /* "ompy/rhosig.pyx":80
  *             if Ex-Eg <= 0:
  *                 continue
  *             for ji in Js:             # <<<<<<<<<<<<<<
@@ -3406,7 +3406,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
       }
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-      /* "rhosig.pyx":77
+      /* "ompy/rhosig.pyx":77
  * 
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):             # <<<<<<<<<<<<<<
@@ -3417,7 +3417,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
     }
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
 
-    /* "rhosig.pyx":76
+    /* "ompy/rhosig.pyx":76
  *     z = np.zeros((len(Exarr), len(Egarr)))
  * 
  *     for i_Ex, Ex in enumerate(Exarr):             # <<<<<<<<<<<<<<
@@ -3427,7 +3427,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   }
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":100
+  /* "ompy/rhosig.pyx":100
  *                     # print(spin_dist(Ex-Eg, jf))
  *                 z[i_Ex, i_Eg] += g_pop * inner_sum
  *     return z             # <<<<<<<<<<<<<<
@@ -3439,7 +3439,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __pyx_r = ((PyObject *)__pyx_v_z);
   goto __pyx_L0;
 
-  /* "rhosig.pyx":51
+  /* "ompy/rhosig.pyx":51
  * 
  * 
  * def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -3463,7 +3463,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   __Pyx_XDECREF(__pyx_t_24);
   __Pyx_XDECREF(__pyx_t_26);
   __Pyx_XDECREF(__pyx_t_27);
-  __Pyx_AddTraceback("rhosig.z", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.z", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_z);
@@ -3476,7 +3476,7 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
   return __pyx_r;
 }
 
-/* "rhosig.pyx":103
+/* "ompy/rhosig.pyx":103
  * 
  * 
  * def decompose_matrix(matrix: Matrix, std: Matrix, *,             # <<<<<<<<<<<<<<
@@ -3485,10 +3485,10 @@ static PyObject *__pyx_pf_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, PyArray
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_4decompose_matrix[] = " Decompose first generation matrix into nld and transmission coefficient\n\n    Parameters:\n    -----------\n    matrix : ndarray\n        First generations matrix to be decomposed\n    Eg, nld, Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n    p0 (np.ndarray, optional):\n        Initial guess for nld and transmission coefficient. See `FitRhoT.fit()`\n    use_z (bool or np.ndarray, optional):\n        See `FitRhoT.fit`; if not `False`, the created z-factor array\n        will be returned.\n    spin_dist_par (dict, optional):\n        Dict of spin-parity paramters to create the `z-factor`, see\n        See `FitRhoT.fit`\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld\n    T_fit: ndarray\n        fitted transmission coefficient\n    z_array (optional): If `use_z` is not `False`, the array for the\n                        `z-factor`is returned, too\n\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_5decompose_matrix = {"decompose_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_5decompose_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_4decompose_matrix};
-static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_4decompose_matrix[] = " Decompose first generation matrix into nld and transmission coefficient\n\n    Parameters:\n    -----------\n    matrix : ndarray\n        First generations matrix to be decomposed\n    Eg, nld, Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n    p0 (np.ndarray, optional):\n        Initial guess for nld and transmission coefficient. See `FitRhoT.fit()`\n    use_z (bool or np.ndarray, optional):\n        See `FitRhoT.fit`; if not `False`, the created z-factor array\n        will be returned.\n    spin_dist_par (dict, optional):\n        Dict of spin-parity paramters to create the `z-factor`, see\n        See `FitRhoT.fit`\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld\n    T_fit: ndarray\n        fitted transmission coefficient\n    z_array (optional): If `use_z` is not `False`, the array for the\n                        `z-factor`is returned, too\n\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_5decompose_matrix = {"decompose_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_5decompose_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_4decompose_matrix};
+static PyObject *__pyx_pw_4ompy_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_matrix = 0;
   PyObject *__pyx_v_std = 0;
   PyArrayObject *__pyx_v_Eg = 0;
@@ -3508,7 +3508,7 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
     static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_matrix,&__pyx_n_s_std,&__pyx_n_s_Eg,&__pyx_n_s_nld,&__pyx_n_s_Ex,&__pyx_n_s_resolution,&__pyx_n_s_p0,&__pyx_n_s_method,&__pyx_n_s_options,&__pyx_n_s_fill_value,&__pyx_n_s_use_z,&__pyx_n_s_spin_dist_par,0};
     PyObject* values[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
 
-    /* "rhosig.pyx":106
+    /* "ompy/rhosig.pyx":106
  *                      Eg: np.ndarray, nld: np.ndarray,
  *                      Ex: np.ndarray, resolution: np.ndarray,
  *                      p0=None,             # <<<<<<<<<<<<<<
@@ -3520,7 +3520,7 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
     values[8] = __pyx_k__3;
     values[9] = ((PyObject *)__pyx_int_0);
 
-    /* "rhosig.pyx":109
+    /* "ompy/rhosig.pyx":109
  *                      method="Powell", options={'disp': True},
  *                      fill_value=0,
  *                      use_z=False,             # <<<<<<<<<<<<<<
@@ -3529,7 +3529,7 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
  */
     values[10] = ((PyObject *)Py_False);
 
-    /* "rhosig.pyx":110
+    /* "ompy/rhosig.pyx":110
  *                      fill_value=0,
  *                      use_z=False,
  *                      spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -3610,7 +3610,7 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("decompose_matrix", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 103, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.decompose_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.decompose_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
@@ -3618,9 +3618,9 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_nld), __pyx_ptype_5numpy_ndarray, 1, "nld", 0))) __PYX_ERR(0, 104, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Ex), __pyx_ptype_5numpy_ndarray, 1, "Ex", 0))) __PYX_ERR(0, 105, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_resolution), __pyx_ptype_5numpy_ndarray, 1, "resolution", 0))) __PYX_ERR(0, 105, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_4decompose_matrix(__pyx_self, __pyx_v_matrix, __pyx_v_std, __pyx_v_Eg, __pyx_v_nld, __pyx_v_Ex, __pyx_v_resolution, __pyx_v_p0, __pyx_v_method, __pyx_v_options, __pyx_v_fill_value, __pyx_v_use_z, __pyx_v_spin_dist_par);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_4decompose_matrix(__pyx_self, __pyx_v_matrix, __pyx_v_std, __pyx_v_Eg, __pyx_v_nld, __pyx_v_Ex, __pyx_v_resolution, __pyx_v_p0, __pyx_v_method, __pyx_v_options, __pyx_v_fill_value, __pyx_v_use_z, __pyx_v_spin_dist_par);
 
-  /* "rhosig.pyx":103
+  /* "ompy/rhosig.pyx":103
  * 
  * 
  * def decompose_matrix(matrix: Matrix, std: Matrix, *,             # <<<<<<<<<<<<<<
@@ -3637,7 +3637,7 @@ static PyObject *__pyx_pw_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObje
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix, PyObject *__pyx_v_std, PyArrayObject *__pyx_v_Eg, PyArrayObject *__pyx_v_nld, PyArrayObject *__pyx_v_Ex, PyArrayObject *__pyx_v_resolution, PyObject *__pyx_v_p0, PyObject *__pyx_v_method, PyObject *__pyx_v_options, CYTHON_UNUSED PyObject *__pyx_v_fill_value, PyObject *__pyx_v_use_z, PyObject *__pyx_v_spin_dist_par) {
+static PyObject *__pyx_pf_4ompy_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_matrix, PyObject *__pyx_v_std, PyArrayObject *__pyx_v_Eg, PyArrayObject *__pyx_v_nld, PyArrayObject *__pyx_v_Ex, PyArrayObject *__pyx_v_resolution, PyObject *__pyx_v_p0, PyObject *__pyx_v_method, PyObject *__pyx_v_options, CYTHON_UNUSED PyObject *__pyx_v_fill_value, PyObject *__pyx_v_use_z, PyObject *__pyx_v_spin_dist_par) {
   PyObject *__pyx_v_values = NULL;
   PyObject *__pyx_v_Nbins_Ex = NULL;
   PyObject *__pyx_v_Nbins_T = NULL;
@@ -3666,7 +3666,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_INCREF(__pyx_v_std);
   __Pyx_INCREF(__pyx_v_p0);
 
-  /* "rhosig.pyx":144
+  /* "ompy/rhosig.pyx":144
  *     """
  *     # protect input arrays
  *     values = np.copy(matrix.values)             # <<<<<<<<<<<<<<
@@ -3699,7 +3699,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_values = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":145
+  /* "ompy/rhosig.pyx":145
  *     # protect input arrays
  *     values = np.copy(matrix.values)
  *     std = np.copy(std.values)             # <<<<<<<<<<<<<<
@@ -3732,7 +3732,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_DECREF_SET(__pyx_v_std, __pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":147
+  /* "ompy/rhosig.pyx":147
  *     std = np.copy(std.values)
  * 
  *     Nbins_Ex, Nbins_T = np.shape(matrix)             # <<<<<<<<<<<<<<
@@ -3810,7 +3810,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_Nbins_T = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":148
+  /* "ompy/rhosig.pyx":148
  * 
  *     Nbins_Ex, Nbins_T = np.shape(matrix)
  *     Nbins_rho = Nbins_T             # <<<<<<<<<<<<<<
@@ -3820,7 +3820,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_INCREF(__pyx_v_Nbins_T);
   __pyx_v_Nbins_rho = __pyx_v_Nbins_T;
 
-  /* "rhosig.pyx":150
+  /* "ompy/rhosig.pyx":150
  *     Nbins_rho = Nbins_T
  * 
  *     values, std = normalize(values, std)             # <<<<<<<<<<<<<<
@@ -3925,7 +3925,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_DECREF_SET(__pyx_v_std, __pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "rhosig.pyx":153
+  /* "ompy/rhosig.pyx":153
  * 
  *     # Addition 20190329 to add z factor:
  *     z_array = None             # <<<<<<<<<<<<<<
@@ -3935,7 +3935,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_INCREF(Py_None);
   __pyx_v_z_array = Py_None;
 
-  /* "rhosig.pyx":154
+  /* "ompy/rhosig.pyx":154
  *     # Addition 20190329 to add z factor:
  *     z_array = None
  *     if use_z is False:             # <<<<<<<<<<<<<<
@@ -3946,7 +3946,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_t_8 = (__pyx_t_7 != 0);
   if (__pyx_t_8) {
 
-    /* "rhosig.pyx":155
+    /* "ompy/rhosig.pyx":155
  *     z_array = None
  *     if use_z is False:
  *         z_array = np.ones((Nbins_Ex, Nbins_T))             # <<<<<<<<<<<<<<
@@ -3985,7 +3985,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __Pyx_DECREF_SET(__pyx_v_z_array, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "rhosig.pyx":154
+    /* "ompy/rhosig.pyx":154
  *     # Addition 20190329 to add z factor:
  *     z_array = None
  *     if use_z is False:             # <<<<<<<<<<<<<<
@@ -3995,7 +3995,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     goto __pyx_L7;
   }
 
-  /* "rhosig.pyx":156
+  /* "ompy/rhosig.pyx":156
  *     if use_z is False:
  *         z_array = np.ones((Nbins_Ex, Nbins_T))
  *     elif use_z is True:             # <<<<<<<<<<<<<<
@@ -4006,7 +4006,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_t_7 = (__pyx_t_8 != 0);
   if (__pyx_t_7) {
 
-    /* "rhosig.pyx":157
+    /* "ompy/rhosig.pyx":157
  *         z_array = np.ones((Nbins_Ex, Nbins_T))
  *     elif use_z is True:
  *         z_array = z_from_spin_dist(Ex, Eg,             # <<<<<<<<<<<<<<
@@ -4024,7 +4024,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __Pyx_GIVEREF(((PyObject *)__pyx_v_Eg));
     PyTuple_SET_ITEM(__pyx_t_2, 1, ((PyObject *)__pyx_v_Eg));
 
-    /* "rhosig.pyx":158
+    /* "ompy/rhosig.pyx":158
  *     elif use_z is True:
  *         z_array = z_from_spin_dist(Ex, Eg,
  *                                    spin_dist_par=spin_dist_par)             # <<<<<<<<<<<<<<
@@ -4035,7 +4035,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __Pyx_GOTREF(__pyx_t_4);
     if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_spin_dist_par, __pyx_v_spin_dist_par) < 0) __PYX_ERR(0, 158, __pyx_L1_error)
 
-    /* "rhosig.pyx":157
+    /* "ompy/rhosig.pyx":157
  *         z_array = np.ones((Nbins_Ex, Nbins_T))
  *     elif use_z is True:
  *         z_array = z_from_spin_dist(Ex, Eg,             # <<<<<<<<<<<<<<
@@ -4050,7 +4050,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __Pyx_DECREF_SET(__pyx_v_z_array, __pyx_t_3);
     __pyx_t_3 = 0;
 
-    /* "rhosig.pyx":156
+    /* "ompy/rhosig.pyx":156
  *     if use_z is False:
  *         z_array = np.ones((Nbins_Ex, Nbins_T))
  *     elif use_z is True:             # <<<<<<<<<<<<<<
@@ -4060,7 +4060,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     goto __pyx_L7;
   }
 
-  /* "rhosig.pyx":160
+  /* "ompy/rhosig.pyx":160
  *                                    spin_dist_par=spin_dist_par)
  *     else:
  *         z_array = use_z             # <<<<<<<<<<<<<<
@@ -4073,7 +4073,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   }
   __pyx_L7:;
 
-  /* "rhosig.pyx":162
+  /* "ompy/rhosig.pyx":162
  *         z_array = use_z
  * 
  *     assert z_array is not None, "z_array should be set"             # <<<<<<<<<<<<<<
@@ -4090,7 +4090,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   }
   #endif
 
-  /* "rhosig.pyx":165
+  /* "ompy/rhosig.pyx":165
  * 
  *     # initial guesses
  *     rho0 = np.ones(Nbins_T)             # <<<<<<<<<<<<<<
@@ -4120,7 +4120,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_rho0 = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":167
+  /* "ompy/rhosig.pyx":167
  *     rho0 = np.ones(Nbins_T)
  * 
  *     if p0 is None:             # <<<<<<<<<<<<<<
@@ -4131,7 +4131,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_t_8 = (__pyx_t_7 != 0);
   if (__pyx_t_8) {
 
-    /* "rhosig.pyx":168
+    /* "ompy/rhosig.pyx":168
  * 
  *     if p0 is None:
  *         T0 = values.sum(axis=0)             # <<<<<<<<<<<<<<
@@ -4150,7 +4150,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __pyx_v_T0 = __pyx_t_4;
     __pyx_t_4 = 0;
 
-    /* "rhosig.pyx":169
+    /* "ompy/rhosig.pyx":169
  *     if p0 is None:
  *         T0 = values.sum(axis=0)
  *         p0 = np.append(rho0, T0)             # <<<<<<<<<<<<<<
@@ -4210,7 +4210,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __Pyx_DECREF_SET(__pyx_v_p0, __pyx_t_4);
     __pyx_t_4 = 0;
 
-    /* "rhosig.pyx":167
+    /* "ompy/rhosig.pyx":167
  *     rho0 = np.ones(Nbins_T)
  * 
  *     if p0 is None:             # <<<<<<<<<<<<<<
@@ -4219,7 +4219,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
  */
   }
 
-  /* "rhosig.pyx":172
+  /* "ompy/rhosig.pyx":172
  * 
  *     # minimization
  *     res = minimize(objfun1D, x0=p0,             # <<<<<<<<<<<<<<
@@ -4239,7 +4239,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_GOTREF(__pyx_t_3);
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_x0, __pyx_v_p0) < 0) __PYX_ERR(0, 172, __pyx_L1_error)
 
-  /* "rhosig.pyx":173
+  /* "ompy/rhosig.pyx":173
  *     # minimization
  *     res = minimize(objfun1D, x0=p0,
  *                    args=(matrix, std,             # <<<<<<<<<<<<<<
@@ -4272,7 +4272,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_args, __pyx_t_2) < 0) __PYX_ERR(0, 172, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":175
+  /* "ompy/rhosig.pyx":175
  *                    args=(matrix, std,
  *                          Eg, nld, Ex, resolution, z_array),
  *                    method=method,             # <<<<<<<<<<<<<<
@@ -4281,7 +4281,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_method, __pyx_v_method) < 0) __PYX_ERR(0, 172, __pyx_L1_error)
 
-  /* "rhosig.pyx":176
+  /* "ompy/rhosig.pyx":176
  *                          Eg, nld, Ex, resolution, z_array),
  *                    method=method,
  *                    options=options)             # <<<<<<<<<<<<<<
@@ -4290,7 +4290,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_options, __pyx_v_options) < 0) __PYX_ERR(0, 172, __pyx_L1_error)
 
-  /* "rhosig.pyx":172
+  /* "ompy/rhosig.pyx":172
  * 
  *     # minimization
  *     res = minimize(objfun1D, x0=p0,             # <<<<<<<<<<<<<<
@@ -4305,7 +4305,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_res = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":177
+  /* "ompy/rhosig.pyx":177
  *                    method=method,
  *                    options=options)
  *     p_fit = res.x             # <<<<<<<<<<<<<<
@@ -4317,7 +4317,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_p_fit = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":179
+  /* "ompy/rhosig.pyx":179
  *     p_fit = res.x
  * 
  *     rho_fit, T_fit = rhoTfrom1D(p_fit, Nbins_rho)             # <<<<<<<<<<<<<<
@@ -4422,7 +4422,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_v_T_fit = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "rhosig.pyx":181
+  /* "ompy/rhosig.pyx":181
  *     rho_fit, T_fit = rhoTfrom1D(p_fit, Nbins_rho)
  * 
  *     if use_z is False:             # <<<<<<<<<<<<<<
@@ -4433,7 +4433,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __pyx_t_7 = (__pyx_t_8 != 0);
   if (__pyx_t_7) {
 
-    /* "rhosig.pyx":182
+    /* "ompy/rhosig.pyx":182
  * 
  *     if use_z is False:
  *         return rho_fit, T_fit             # <<<<<<<<<<<<<<
@@ -4453,7 +4453,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     __pyx_t_2 = 0;
     goto __pyx_L0;
 
-    /* "rhosig.pyx":181
+    /* "ompy/rhosig.pyx":181
  *     rho_fit, T_fit = rhoTfrom1D(p_fit, Nbins_rho)
  * 
  *     if use_z is False:             # <<<<<<<<<<<<<<
@@ -4462,7 +4462,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
  */
   }
 
-  /* "rhosig.pyx":184
+  /* "ompy/rhosig.pyx":184
  *         return rho_fit, T_fit
  *     else:
  *         return rho_fit, T_fit, z_array             # <<<<<<<<<<<<<<
@@ -4487,7 +4487,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
     goto __pyx_L0;
   }
 
-  /* "rhosig.pyx":103
+  /* "ompy/rhosig.pyx":103
  * 
  * 
  * def decompose_matrix(matrix: Matrix, std: Matrix, *,             # <<<<<<<<<<<<<<
@@ -4501,7 +4501,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
-  __Pyx_AddTraceback("rhosig.decompose_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.decompose_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_values);
@@ -4523,7 +4523,7 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
   return __pyx_r;
 }
 
-/* "rhosig.pyx":186
+/* "ompy/rhosig.pyx":186
  *         return rho_fit, T_fit, z_array
  * 
  * def normalize(values, std=0):             # <<<<<<<<<<<<<<
@@ -4532,9 +4532,9 @@ static PyObject *__pyx_pf_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject *__py
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_6rhosig_7normalize = {"normalize", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_7normalize, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_7normalize = {"normalize", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_7normalize, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_4ompy_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_values = 0;
   PyObject *__pyx_v_std = 0;
   PyObject *__pyx_r = 0;
@@ -4586,18 +4586,18 @@ static PyObject *__pyx_pw_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__p
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("normalize", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 186, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.normalize", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.normalize", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_6normalize(__pyx_self, __pyx_v_values, __pyx_v_std);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_6normalize(__pyx_self, __pyx_v_values, __pyx_v_std);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_values, PyObject *__pyx_v_std) {
+static PyObject *__pyx_pf_4ompy_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_values, PyObject *__pyx_v_std) {
   PyObject *__pyx_v_matrix = NULL;
   PyObject *__pyx_v_i = NULL;
   PyObject *__pyx_v_total = NULL;
@@ -4620,7 +4620,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_INCREF(__pyx_v_values);
   __Pyx_INCREF(__pyx_v_std);
 
-  /* "rhosig.pyx":187
+  /* "ompy/rhosig.pyx":187
  * 
  * def normalize(values, std=0):
  *     matrix = unumpy.uarray(values, std)             # <<<<<<<<<<<<<<
@@ -4680,7 +4680,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_v_matrix = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":190
+  /* "ompy/rhosig.pyx":190
  * 
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, total in enumerate(matrix.sum(axis=1)):             # <<<<<<<<<<<<<<
@@ -4748,7 +4748,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
     __pyx_t_1 = __pyx_t_2;
     __pyx_t_2 = 0;
 
-    /* "rhosig.pyx":191
+    /* "ompy/rhosig.pyx":191
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, total in enumerate(matrix.sum(axis=1)):
  *         matrix[i, :] = div0(matrix[i, :], total)             # <<<<<<<<<<<<<<
@@ -4827,7 +4827,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "rhosig.pyx":190
+    /* "ompy/rhosig.pyx":190
  * 
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, total in enumerate(matrix.sum(axis=1)):             # <<<<<<<<<<<<<<
@@ -4838,7 +4838,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":192
+  /* "ompy/rhosig.pyx":192
  *     for i, total in enumerate(matrix.sum(axis=1)):
  *         matrix[i, :] = div0(matrix[i, :], total)
  *     values = unumpy.nominal_values(matrix)             # <<<<<<<<<<<<<<
@@ -4868,7 +4868,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_values, __pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":193
+  /* "ompy/rhosig.pyx":193
  *         matrix[i, :] = div0(matrix[i, :], total)
  *     values = unumpy.nominal_values(matrix)
  *     std = unumpy.std_devs(matrix)             # <<<<<<<<<<<<<<
@@ -4898,7 +4898,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_std, __pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":195
+  /* "ompy/rhosig.pyx":195
  *     std = unumpy.std_devs(matrix)
  * 
  *     return values, std             # <<<<<<<<<<<<<<
@@ -4918,7 +4918,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":186
+  /* "ompy/rhosig.pyx":186
  *         return rho_fit, T_fit, z_array
  * 
  * def normalize(values, std=0):             # <<<<<<<<<<<<<<
@@ -4935,7 +4935,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_XDECREF(__pyx_t_8);
   __Pyx_XDECREF(__pyx_t_9);
   __Pyx_XDECREF(__pyx_t_10);
-  __Pyx_AddTraceback("rhosig.normalize", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.normalize", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_matrix);
@@ -4949,7 +4949,7 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
   return __pyx_r;
 }
 
-/* "rhosig.pyx":197
+/* "ompy/rhosig.pyx":197
  *     return values, std
  * 
  * def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):             # <<<<<<<<<<<<<<
@@ -4958,10 +4958,10 @@ static PyObject *__pyx_pf_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx_self,
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_8decompose_matrix_with_unc[] = "\n    Routine for the decomposition of the first generations spectrum P_in\n    including a simple seach for statistical uncertainties. Perturbes input spectrum N_mc times and finds the mean and stddev. of the resulting fits.\n\n\n    Parameters:\n    -----------\n    P_in : ndarray\n        First generations matrix to be decomposed\n    Emin : ndarray\n        Array of middle-bin values\n    Emid_Eg, Emid_nld, Emid_Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    dE_resolution : nparray\n        Detector resolution\n    N_mc : int\n        Number of iterations for the perturbation\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld (2D: mean, std)\n    T_fit: ndarray\n        fitted transmission coefficient (2D: mean, std)\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_9decompose_matrix_with_unc = {"decompose_matrix_with_unc", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_9decompose_matrix_with_unc, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_8decompose_matrix_with_unc};
-static PyObject *__pyx_pw_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_8decompose_matrix_with_unc[] = "\n    Routine for the decomposition of the first generations spectrum P_in\n    including a simple seach for statistical uncertainties. Perturbes input spectrum N_mc times and finds the mean and stddev. of the resulting fits.\n\n\n    Parameters:\n    -----------\n    P_in : ndarray\n        First generations matrix to be decomposed\n    Emin : ndarray\n        Array of middle-bin values\n    Emid_Eg, Emid_nld, Emid_Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    dE_resolution : nparray\n        Detector resolution\n    N_mc : int\n        Number of iterations for the perturbation\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld (2D: mean, std)\n    T_fit: ndarray\n        fitted transmission coefficient (2D: mean, std)\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_9decompose_matrix_with_unc = {"decompose_matrix_with_unc", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_8decompose_matrix_with_unc};
+static PyObject *__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_P_in = 0;
   PyObject *__pyx_v_P_err = 0;
   PyObject *__pyx_v_Emid_Eg = 0;
@@ -5094,18 +5094,18 @@ static PyObject *__pyx_pw_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_sel
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("decompose_matrix_with_unc", 0, 6, 9, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 197, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.decompose_matrix_with_unc", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.decompose_matrix_with_unc", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_8decompose_matrix_with_unc(__pyx_self, __pyx_v_P_in, __pyx_v_P_err, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_N_mc, __pyx_v_method, __pyx_v_options, __pyx_v_fill_value);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_8decompose_matrix_with_unc(__pyx_self, __pyx_v_P_in, __pyx_v_P_err, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_N_mc, __pyx_v_method, __pyx_v_options, __pyx_v_fill_value);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_P_in, PyObject *__pyx_v_P_err, PyObject *__pyx_v_Emid_Eg, PyObject *__pyx_v_Emid_nld, PyObject *__pyx_v_Emid_Ex, PyObject *__pyx_v_N_mc, PyObject *__pyx_v_method, PyObject *__pyx_v_options, PyObject *__pyx_v_fill_value) {
+static PyObject *__pyx_pf_4ompy_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_P_in, PyObject *__pyx_v_P_err, PyObject *__pyx_v_Emid_Eg, PyObject *__pyx_v_Emid_nld, PyObject *__pyx_v_Emid_Ex, PyObject *__pyx_v_N_mc, PyObject *__pyx_v_method, PyObject *__pyx_v_options, PyObject *__pyx_v_fill_value) {
   CYTHON_UNUSED PyObject *__pyx_v_Nbins_Ex = NULL;
   PyObject *__pyx_v_Nbins_T = NULL;
   PyObject *__pyx_v_Nbins_rho = NULL;
@@ -5137,7 +5137,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_TraceCall("decompose_matrix_with_unc", __pyx_f[0], 197, 0, __PYX_ERR(0, 197, __pyx_L1_error));
   __Pyx_INCREF(__pyx_v_P_in);
 
-  /* "rhosig.pyx":228
+  /* "ompy/rhosig.pyx":228
  *         fitted transmission coefficient (2D: mean, std)
  *     """
  *     P_in=np.copy(P_in)             # <<<<<<<<<<<<<<
@@ -5167,7 +5167,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_DECREF_SET(__pyx_v_P_in, __pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":230
+  /* "ompy/rhosig.pyx":230
  *     P_in=np.copy(P_in)
  * 
  *     Nbins_Ex, Nbins_T = np.shape(P_in)             # <<<<<<<<<<<<<<
@@ -5245,7 +5245,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_Nbins_T = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":231
+  /* "ompy/rhosig.pyx":231
  * 
  *     Nbins_Ex, Nbins_T = np.shape(P_in)
  *     Nbins_rho = Nbins_T             # <<<<<<<<<<<<<<
@@ -5255,7 +5255,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_INCREF(__pyx_v_Nbins_T);
   __pyx_v_Nbins_rho = __pyx_v_Nbins_T;
 
-  /* "rhosig.pyx":232
+  /* "ompy/rhosig.pyx":232
  *     Nbins_Ex, Nbins_T = np.shape(P_in)
  *     Nbins_rho = Nbins_T
  *     rhos = np.zeros((N_mc,Nbins_rho))             # <<<<<<<<<<<<<<
@@ -5294,7 +5294,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_rhos = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":233
+  /* "ompy/rhosig.pyx":233
  *     Nbins_rho = Nbins_T
  *     rhos = np.zeros((N_mc,Nbins_rho))
  *     Ts = np.zeros((N_mc,Nbins_T))             # <<<<<<<<<<<<<<
@@ -5333,7 +5333,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_Ts = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":235
+  /* "ompy/rhosig.pyx":235
  *     Ts = np.zeros((N_mc,Nbins_T))
  * 
  *     for i_mc in range(N_mc):             # <<<<<<<<<<<<<<
@@ -5385,7 +5385,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_XDECREF_SET(__pyx_v_i_mc, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "rhosig.pyx":236
+    /* "ompy/rhosig.pyx":236
  * 
  *     for i_mc in range(N_mc):
  *         P_in_mc = np.random.poisson(np.where(P_in>0, P_in, 0))             # <<<<<<<<<<<<<<
@@ -5475,7 +5475,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_XDECREF_SET(__pyx_v_P_in_mc, __pyx_t_1);
     __pyx_t_1 = 0;
 
-    /* "rhosig.pyx":237
+    /* "ompy/rhosig.pyx":237
  *     for i_mc in range(N_mc):
  *         P_in_mc = np.random.poisson(np.where(P_in>0, P_in, 0))
  *         rhos[i_mc,:], Ts[i_mc,:] = decompose_matrix(P_in_mc, P_err, Emid_Eg,             # <<<<<<<<<<<<<<
@@ -5485,7 +5485,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_GetModuleGlobalName(__pyx_t_1, __pyx_n_s_decompose_matrix); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 237, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
 
-    /* "rhosig.pyx":238
+    /* "ompy/rhosig.pyx":238
  *         P_in_mc = np.random.poisson(np.where(P_in>0, P_in, 0))
  *         rhos[i_mc,:], Ts[i_mc,:] = decompose_matrix(P_in_mc, P_err, Emid_Eg,
  *                                   Emid_nld, Emid_Ex,             # <<<<<<<<<<<<<<
@@ -5510,7 +5510,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_GIVEREF(__pyx_v_Emid_Ex);
     PyTuple_SET_ITEM(__pyx_t_2, 4, __pyx_v_Emid_Ex);
 
-    /* "rhosig.pyx":239
+    /* "ompy/rhosig.pyx":239
  *         rhos[i_mc,:], Ts[i_mc,:] = decompose_matrix(P_in_mc, P_err, Emid_Eg,
  *                                   Emid_nld, Emid_Ex,
  *                                   method=method,             # <<<<<<<<<<<<<<
@@ -5521,7 +5521,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_GOTREF(__pyx_t_4);
     if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_method, __pyx_v_method) < 0) __PYX_ERR(0, 239, __pyx_L1_error)
 
-    /* "rhosig.pyx":240
+    /* "ompy/rhosig.pyx":240
  *                                   Emid_nld, Emid_Ex,
  *                                   method=method,
  *                                   options=options,             # <<<<<<<<<<<<<<
@@ -5530,7 +5530,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
  */
     if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_options, __pyx_v_options) < 0) __PYX_ERR(0, 239, __pyx_L1_error)
 
-    /* "rhosig.pyx":241
+    /* "ompy/rhosig.pyx":241
  *                                   method=method,
  *                                   options=options,
  *                                   fill_value=fill_value)             # <<<<<<<<<<<<<<
@@ -5539,7 +5539,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
  */
     if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_fill_value, __pyx_v_fill_value) < 0) __PYX_ERR(0, 239, __pyx_L1_error)
 
-    /* "rhosig.pyx":237
+    /* "ompy/rhosig.pyx":237
  *     for i_mc in range(N_mc):
  *         P_in_mc = np.random.poisson(np.where(P_in>0, P_in, 0))
  *         rhos[i_mc,:], Ts[i_mc,:] = decompose_matrix(P_in_mc, P_err, Emid_Eg,             # <<<<<<<<<<<<<<
@@ -5620,7 +5620,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
     __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "rhosig.pyx":235
+    /* "ompy/rhosig.pyx":235
  *     Ts = np.zeros((N_mc,Nbins_T))
  * 
  *     for i_mc in range(N_mc):             # <<<<<<<<<<<<<<
@@ -5630,7 +5630,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   }
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":243
+  /* "ompy/rhosig.pyx":243
  *                                   fill_value=fill_value)
  * 
  *     rho_fit = rhos.mean(axis=0)             # <<<<<<<<<<<<<<
@@ -5649,7 +5649,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_rho_fit = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":244
+  /* "ompy/rhosig.pyx":244
  * 
  *     rho_fit = rhos.mean(axis=0)
  *     rho_fit_err = rhos.std(axis=0)             # <<<<<<<<<<<<<<
@@ -5668,7 +5668,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_rho_fit_err = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":245
+  /* "ompy/rhosig.pyx":245
  *     rho_fit = rhos.mean(axis=0)
  *     rho_fit_err = rhos.std(axis=0)
  *     rho_fit = np.c_[rho_fit,rho_fit_err]             # <<<<<<<<<<<<<<
@@ -5695,7 +5695,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_DECREF_SET(__pyx_v_rho_fit, __pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":247
+  /* "ompy/rhosig.pyx":247
  *     rho_fit = np.c_[rho_fit,rho_fit_err]
  * 
  *     T_fit = Ts.mean(axis=0)             # <<<<<<<<<<<<<<
@@ -5714,7 +5714,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_T_fit = __pyx_t_9;
   __pyx_t_9 = 0;
 
-  /* "rhosig.pyx":248
+  /* "ompy/rhosig.pyx":248
  * 
  *     T_fit = Ts.mean(axis=0)
  *     T_fit_err = Ts.std(axis=0)             # <<<<<<<<<<<<<<
@@ -5733,7 +5733,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_v_T_fit_err = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":249
+  /* "ompy/rhosig.pyx":249
  *     T_fit = Ts.mean(axis=0)
  *     T_fit_err = Ts.std(axis=0)
  *     T_fit = np.c_[T_fit,T_fit_err]             # <<<<<<<<<<<<<<
@@ -5760,7 +5760,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_DECREF_SET(__pyx_v_T_fit, __pyx_t_9);
   __pyx_t_9 = 0;
 
-  /* "rhosig.pyx":251
+  /* "ompy/rhosig.pyx":251
  *     T_fit = np.c_[T_fit,T_fit_err]
  * 
  *     return rho_fit, T_fit             # <<<<<<<<<<<<<<
@@ -5780,7 +5780,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __pyx_t_9 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":197
+  /* "ompy/rhosig.pyx":197
  *     return values, std
  * 
  * def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):             # <<<<<<<<<<<<<<
@@ -5798,7 +5798,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   __Pyx_XDECREF(__pyx_t_9);
   __Pyx_XDECREF(__pyx_t_10);
   __Pyx_XDECREF(__pyx_t_12);
-  __Pyx_AddTraceback("rhosig.decompose_matrix_with_unc", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.decompose_matrix_with_unc", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_Nbins_Ex);
@@ -5819,7 +5819,7 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
   return __pyx_r;
 }
 
-/* "rhosig.pyx":254
+/* "ompy/rhosig.pyx":254
  * 
  * 
  * def objfun1D(x, *args):             # <<<<<<<<<<<<<<
@@ -5828,10 +5828,10 @@ static PyObject *__pyx_pf_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED PyObj
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_10objfun1D[] = "\n    1D version of the chi2 function (needed for minimize function)\n    so x has one dimension only, but may be nested to contain rho and T\n\n    Parameters:\n    ----------\n    x: ndarray\n        workaround: 1D representation of the parameters rho and T\n    args: tuple\n        tuple of the fixed parameters needed to completely specify the function\n\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_11objfun1D = {"objfun1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_11objfun1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_10objfun1D};
-static PyObject *__pyx_pw_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_10objfun1D[] = "\n    1D version of the chi2 function (needed for minimize function)\n    so x has one dimension only, but may be nested to contain rho and T\n\n    Parameters:\n    ----------\n    x: ndarray\n        workaround: 1D representation of the parameters rho and T\n    args: tuple\n        tuple of the fixed parameters needed to completely specify the function\n\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_11objfun1D = {"objfun1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_11objfun1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_10objfun1D};
+static PyObject *__pyx_pw_4ompy_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_x = 0;
   PyObject *__pyx_v_args = 0;
   PyObject *__pyx_r = 0;
@@ -5881,11 +5881,11 @@ static PyObject *__pyx_pw_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__p
   __Pyx_RaiseArgtupleInvalid("objfun1D", 0, 1, 1, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 254, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_DECREF(__pyx_v_args); __pyx_v_args = 0;
-  __Pyx_AddTraceback("rhosig.objfun1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.objfun1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_10objfun1D(__pyx_self, __pyx_v_x, __pyx_v_args);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_10objfun1D(__pyx_self, __pyx_v_x, __pyx_v_args);
 
   /* function exit code */
   __Pyx_XDECREF(__pyx_v_args);
@@ -5893,7 +5893,7 @@ static PyObject *__pyx_pw_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__p
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_x, PyObject *__pyx_v_args) {
+static PyObject *__pyx_pf_4ompy_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_x, PyObject *__pyx_v_args) {
   PyObject *__pyx_v_Pexp = NULL;
   PyObject *__pyx_v_Perr = NULL;
   PyObject *__pyx_v_Emid_Eg = NULL;
@@ -5922,7 +5922,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_RefNannySetupContext("objfun1D", 0);
   __Pyx_TraceCall("objfun1D", __pyx_f[0], 254, 0, __PYX_ERR(0, 254, __pyx_L1_error));
 
-  /* "rhosig.pyx":268
+  /* "ompy/rhosig.pyx":268
  *     """
  * 
  *     Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array = args             # <<<<<<<<<<<<<<
@@ -5979,7 +5979,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_v_z_array = __pyx_t_7;
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":269
+  /* "ompy/rhosig.pyx":269
  * 
  *     Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array = args
  *     Pexp = np.asarray(Pexp)             # <<<<<<<<<<<<<<
@@ -6009,7 +6009,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Pexp, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":270
+  /* "ompy/rhosig.pyx":270
  *     Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution, z_array = args
  *     Pexp = np.asarray(Pexp)
  *     Perr = np.asarray(Perr)             # <<<<<<<<<<<<<<
@@ -6039,7 +6039,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Perr, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":271
+  /* "ompy/rhosig.pyx":271
  *     Pexp = np.asarray(Pexp)
  *     Perr = np.asarray(Perr)
  *     Emid_Eg = np.asarray(Emid_Eg)             # <<<<<<<<<<<<<<
@@ -6069,7 +6069,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Emid_Eg, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":272
+  /* "ompy/rhosig.pyx":272
  *     Perr = np.asarray(Perr)
  *     Emid_Eg = np.asarray(Emid_Eg)
  *     Emid_nld = np.asarray(Emid_nld)             # <<<<<<<<<<<<<<
@@ -6099,7 +6099,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Emid_nld, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":273
+  /* "ompy/rhosig.pyx":273
  *     Emid_Eg = np.asarray(Emid_Eg)
  *     Emid_nld = np.asarray(Emid_nld)
  *     Emid_Ex = np.asarray(Emid_Ex)             # <<<<<<<<<<<<<<
@@ -6129,7 +6129,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Emid_Ex, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":274
+  /* "ompy/rhosig.pyx":274
  *     Emid_nld = np.asarray(Emid_nld)
  *     Emid_Ex = np.asarray(Emid_Ex)
  *     dE_resolution = np.asarray(dE_resolution)             # <<<<<<<<<<<<<<
@@ -6159,7 +6159,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_dE_resolution, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":275
+  /* "ompy/rhosig.pyx":275
  *     Emid_Ex = np.asarray(Emid_Ex)
  *     dE_resolution = np.asarray(dE_resolution)
  *     z_array = np.asarray(z_array)             # <<<<<<<<<<<<<<
@@ -6189,7 +6189,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_z_array, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":276
+  /* "ompy/rhosig.pyx":276
  *     dE_resolution = np.asarray(dE_resolution)
  *     z_array = np.asarray(z_array)
  *     Pexp = Pexp.reshape(-1, Pexp.shape[-1])             # <<<<<<<<<<<<<<
@@ -6253,7 +6253,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_DECREF_SET(__pyx_v_Pexp, __pyx_t_7);
   __pyx_t_7 = 0;
 
-  /* "rhosig.pyx":277
+  /* "ompy/rhosig.pyx":277
  *     z_array = np.asarray(z_array)
  *     Pexp = Pexp.reshape(-1, Pexp.shape[-1])
  *     Nbins_Ex, Nbins_T = np.shape(Pexp)             # <<<<<<<<<<<<<<
@@ -6331,7 +6331,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_v_Nbins_T = __pyx_t_5;
   __pyx_t_5 = 0;
 
-  /* "rhosig.pyx":278
+  /* "ompy/rhosig.pyx":278
  *     Pexp = Pexp.reshape(-1, Pexp.shape[-1])
  *     Nbins_Ex, Nbins_T = np.shape(Pexp)
  *     Nbins_rho = Nbins_T             # <<<<<<<<<<<<<<
@@ -6341,7 +6341,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_INCREF(__pyx_v_Nbins_T);
   __pyx_v_Nbins_rho = __pyx_v_Nbins_T;
 
-  /* "rhosig.pyx":279
+  /* "ompy/rhosig.pyx":279
  *     Nbins_Ex, Nbins_T = np.shape(Pexp)
  *     Nbins_rho = Nbins_T
  *     rho, T = rhoTfrom1D(x, Nbins_rho)             # <<<<<<<<<<<<<<
@@ -6446,7 +6446,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_v_T = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "rhosig.pyx":280
+  /* "ompy/rhosig.pyx":280
  *     Nbins_rho = Nbins_T
  *     rho, T = rhoTfrom1D(x, Nbins_rho)
  *     return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,             # <<<<<<<<<<<<<<
@@ -6457,7 +6457,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_n_s_chi2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 280, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
 
-  /* "rhosig.pyx":281
+  /* "ompy/rhosig.pyx":281
  *     rho, T = rhoTfrom1D(x, Nbins_rho)
  *     return chi2(rho, T, Pexp, Perr, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution,
  *                 z_array)             # <<<<<<<<<<<<<<
@@ -6534,7 +6534,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __pyx_t_7 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":254
+  /* "ompy/rhosig.pyx":254
  * 
  * 
  * def objfun1D(x, *args):             # <<<<<<<<<<<<<<
@@ -6551,7 +6551,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   __Pyx_XDECREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_6);
   __Pyx_XDECREF(__pyx_t_7);
-  __Pyx_AddTraceback("rhosig.objfun1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.objfun1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_Pexp);
@@ -6572,7 +6572,7 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
   return __pyx_r;
 }
 
-/* "rhosig.pyx":284
+/* "ompy/rhosig.pyx":284
  * 
  * 
  * def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,             # <<<<<<<<<<<<<<
@@ -6581,10 +6581,10 @@ static PyObject *__pyx_pf_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx_self,
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_12chi2[] = " Chi^2 between experimental and fitted first genration matrix";
-static PyMethodDef __pyx_mdef_6rhosig_13chi2 = {"chi2", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_13chi2, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_12chi2};
-static PyObject *__pyx_pw_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_12chi2[] = " Chi^2 between experimental and fitted first genration matrix";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_13chi2 = {"chi2", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_13chi2, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_12chi2};
+static PyObject *__pyx_pw_4ompy_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_rho = 0;
   PyArrayObject *__pyx_v_T = 0;
   PyArrayObject *__pyx_v_Pexp = 0;
@@ -6709,7 +6709,7 @@ static PyObject *__pyx_pw_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_a
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("chi2", 1, 9, 9, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 284, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.chi2", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.chi2", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
@@ -6722,7 +6722,7 @@ static PyObject *__pyx_pw_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_a
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Emid_Ex), __pyx_ptype_5numpy_ndarray, 1, "Emid_Ex", 0))) __PYX_ERR(0, 285, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_dE_resolution), __pyx_ptype_5numpy_ndarray, 1, "dE_resolution", 0))) __PYX_ERR(0, 286, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_z_array), __pyx_ptype_5numpy_ndarray, 1, "z_array", 0))) __PYX_ERR(0, 286, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_12chi2(__pyx_self, __pyx_v_rho, __pyx_v_T, __pyx_v_Pexp, __pyx_v_Perr, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_dE_resolution, __pyx_v_z_array);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_12chi2(__pyx_self, __pyx_v_rho, __pyx_v_T, __pyx_v_Pexp, __pyx_v_Perr, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_dE_resolution, __pyx_v_z_array);
 
   /* function exit code */
   goto __pyx_L0;
@@ -6733,7 +6733,7 @@ static PyObject *__pyx_pw_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_a
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, PyArrayObject *__pyx_v_Pexp, PyArrayObject *__pyx_v_Perr, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyArrayObject *__pyx_v_z_array) {
+static PyObject *__pyx_pf_4ompy_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, PyArrayObject *__pyx_v_Pexp, PyArrayObject *__pyx_v_Perr, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyArrayObject *__pyx_v_z_array) {
   float __pyx_v_chi2;
   PyArrayObject *__pyx_v_Pfit = 0;
   PyObject *__pyx_v_Nbins_Ex = NULL;
@@ -6758,7 +6758,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __Pyx_RefNannySetupContext("chi2", 0);
   __Pyx_TraceCall("chi2", __pyx_f[0], 284, 0, __PYX_ERR(0, 284, __pyx_L1_error));
 
-  /* "rhosig.pyx":290
+  /* "ompy/rhosig.pyx":290
  *     cdef float chi2
  *     cdef np.ndarray Pfit
  *     if np.any(rho<0) or np.any(T<0): # hack to implement lower boundary             # <<<<<<<<<<<<<<
@@ -6822,7 +6822,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __pyx_L4_bool_binop_done:;
   if (__pyx_t_1) {
 
-    /* "rhosig.pyx":291
+    /* "ompy/rhosig.pyx":291
  *     cdef np.ndarray Pfit
  *     if np.any(rho<0) or np.any(T<0): # hack to implement lower boundary
  *         chi2 = 1e20             # <<<<<<<<<<<<<<
@@ -6831,7 +6831,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
  */
     __pyx_v_chi2 = 1e20;
 
-    /* "rhosig.pyx":290
+    /* "ompy/rhosig.pyx":290
  *     cdef float chi2
  *     cdef np.ndarray Pfit
  *     if np.any(rho<0) or np.any(T<0): # hack to implement lower boundary             # <<<<<<<<<<<<<<
@@ -6841,7 +6841,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
     goto __pyx_L3;
   }
 
-  /* "rhosig.pyx":293
+  /* "ompy/rhosig.pyx":293
  *         chi2 = 1e20
  *     else:
  *         Nbins_Ex, Nbins_T = np.shape(Pexp)             # <<<<<<<<<<<<<<
@@ -6920,7 +6920,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
     __pyx_v_Nbins_T = __pyx_t_3;
     __pyx_t_3 = 0;
 
-    /* "rhosig.pyx":294
+    /* "ompy/rhosig.pyx":294
  *     else:
  *         Nbins_Ex, Nbins_T = np.shape(Pexp)
  *         Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex,             # <<<<<<<<<<<<<<
@@ -6930,7 +6930,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
     __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_PfromRhoT); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 294, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
 
-    /* "rhosig.pyx":295
+    /* "ompy/rhosig.pyx":295
  *         Nbins_Ex, Nbins_T = np.shape(Pexp)
  *         Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex,
  *                          dE_resolution, z_array_in=z_array)             # <<<<<<<<<<<<<<
@@ -6964,7 +6964,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
     __Pyx_GOTREF(__pyx_t_4);
     if (PyDict_SetItem(__pyx_t_4, __pyx_n_s_z_array_in, ((PyObject *)__pyx_v_z_array)) < 0) __PYX_ERR(0, 295, __pyx_L1_error)
 
-    /* "rhosig.pyx":294
+    /* "ompy/rhosig.pyx":294
  *     else:
  *         Nbins_Ex, Nbins_T = np.shape(Pexp)
  *         Pfit = PfromRhoT(rho, T, Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex,             # <<<<<<<<<<<<<<
@@ -6980,7 +6980,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
     __pyx_v_Pfit = ((PyArrayObject *)__pyx_t_5);
     __pyx_t_5 = 0;
 
-    /* "rhosig.pyx":297
+    /* "ompy/rhosig.pyx":297
  *                          dE_resolution, z_array_in=z_array)
  *         # chi^2 = (data - fit)^2 / unc.^2, where unc.^2 = #cnt for Poisson dist.
  *         chi2 = np.sum( div0((Pexp - Pfit)**2,Perr**2))             # <<<<<<<<<<<<<<
@@ -7072,7 +7072,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   }
   __pyx_L3:;
 
-  /* "rhosig.pyx":298
+  /* "ompy/rhosig.pyx":298
  *         # chi^2 = (data - fit)^2 / unc.^2, where unc.^2 = #cnt for Poisson dist.
  *         chi2 = np.sum( div0((Pexp - Pfit)**2,Perr**2))
  *     return chi2             # <<<<<<<<<<<<<<
@@ -7086,7 +7086,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __pyx_t_5 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":284
+  /* "ompy/rhosig.pyx":284
  * 
  * 
  * def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,             # <<<<<<<<<<<<<<
@@ -7104,7 +7104,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __Pyx_XDECREF(__pyx_t_9);
   __Pyx_XDECREF(__pyx_t_10);
   __Pyx_XDECREF(__pyx_t_12);
-  __Pyx_AddTraceback("rhosig.chi2", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.chi2", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_Pfit);
@@ -7116,7 +7116,7 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
   return __pyx_r;
 }
 
-/* "rhosig.pyx":303
+/* "ompy/rhosig.pyx":303
  * @cython.boundscheck(True) # turn off bounds-checking for entire function
  * @cython.wraparound(True)  # turn off negative index wrapping for entire function
  * def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,             # <<<<<<<<<<<<<<
@@ -7125,10 +7125,10 @@ static PyObject *__pyx_pf_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_self, PyA
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_14PfromRhoT[] = " Generate a first gernation matrix P from given nld and T (or gsf)\n    Parameters:\n    -----------\n    rho: ndarray\n        nld\n    T: ndarray, optional\n        transmission coefficient; either this or gsf must be specified\n    gsf: ndarray, optional\n        gamma-ray strength function; either this or gsf must be specified\n    type: string, optional\n        chosen by type= \"transCoeff\" /or/ \"gsfL1\"\n    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:\n        bin number and bin center values\n    Note: rho and T must have the same bin width\n    Returns:\n    --------\n    P: ndarray\n        normalized first generations matrix (sum of each Ex bin = 1)\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_15PfromRhoT = {"PfromRhoT", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_15PfromRhoT, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_14PfromRhoT};
-static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_14PfromRhoT[] = " Generate a first gernation matrix P from given nld and T (or gsf)\n    Parameters:\n    -----------\n    rho: ndarray\n        nld\n    T: ndarray, optional\n        transmission coefficient; either this or gsf must be specified\n    gsf: ndarray, optional\n        gamma-ray strength function; either this or gsf must be specified\n    type: string, optional\n        chosen by type= \"transCoeff\" /or/ \"gsfL1\"\n    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:\n        bin number and bin center values\n    Note: rho and T must have the same bin width\n    Returns:\n    --------\n    P: ndarray\n        normalized first generations matrix (sum of each Ex bin = 1)\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_15PfromRhoT = {"PfromRhoT", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_15PfromRhoT, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_14PfromRhoT};
+static PyObject *__pyx_pw_4ompy_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_rho = 0;
   PyArrayObject *__pyx_v_T = 0;
   int __pyx_v_Nbins_Ex;
@@ -7146,7 +7146,7 @@ static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__
     PyObject* values[9] = {0,0,0,0,0,0,0,0,0};
     values[7] = ((PyObject *)__pyx_n_u_transCoeff);
 
-    /* "rhosig.pyx":306
+    /* "ompy/rhosig.pyx":306
  *               np.ndarray Emid_nld, np.ndarray Emid_Ex,
  *               np.ndarray dE_resolution, type="transCoeff",
  *               np.ndarray z_array_in=None):             # <<<<<<<<<<<<<<
@@ -7267,7 +7267,7 @@ static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("PfromRhoT", 0, 7, 9, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 303, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.PfromRhoT", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.PfromRhoT", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
@@ -7278,9 +7278,9 @@ static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Emid_Ex), __pyx_ptype_5numpy_ndarray, 1, "Emid_Ex", 0))) __PYX_ERR(0, 304, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_dE_resolution), __pyx_ptype_5numpy_ndarray, 1, "dE_resolution", 0))) __PYX_ERR(0, 305, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_z_array_in), __pyx_ptype_5numpy_ndarray, 1, "z_array_in", 0))) __PYX_ERR(0, 306, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_14PfromRhoT(__pyx_self, __pyx_v_rho, __pyx_v_T, __pyx_v_Nbins_Ex, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_dE_resolution, __pyx_v_type, __pyx_v_z_array_in);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_14PfromRhoT(__pyx_self, __pyx_v_rho, __pyx_v_T, __pyx_v_Nbins_Ex, __pyx_v_Emid_Eg, __pyx_v_Emid_nld, __pyx_v_Emid_Ex, __pyx_v_dE_resolution, __pyx_v_type, __pyx_v_z_array_in);
 
-  /* "rhosig.pyx":303
+  /* "ompy/rhosig.pyx":303
  * @cython.boundscheck(True) # turn off bounds-checking for entire function
  * @cython.wraparound(True)  # turn off negative index wrapping for entire function
  * def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,             # <<<<<<<<<<<<<<
@@ -7297,7 +7297,7 @@ static PyObject *__pyx_pw_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, int __pyx_v_Nbins_Ex, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyObject *__pyx_v_type, PyArrayObject *__pyx_v_z_array_in) {
+static PyObject *__pyx_pf_4ompy_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_rho, PyArrayObject *__pyx_v_T, int __pyx_v_Nbins_Ex, PyArrayObject *__pyx_v_Emid_Eg, PyArrayObject *__pyx_v_Emid_nld, PyArrayObject *__pyx_v_Emid_Ex, PyArrayObject *__pyx_v_dE_resolution, PyObject *__pyx_v_type, PyArrayObject *__pyx_v_z_array_in) {
   int __pyx_v_Nbins_T;
   int __pyx_v_i_Ex;
   int __pyx_v_i_Eg;
@@ -7337,7 +7337,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_RefNannySetupContext("PfromRhoT", 0);
   __Pyx_TraceCall("PfromRhoT", __pyx_f[0], 303, 0, __PYX_ERR(0, 303, __pyx_L1_error));
 
-  /* "rhosig.pyx":327
+  /* "ompy/rhosig.pyx":327
  *     """
  * 
  *     cdef int Nbins_T = len(T)             # <<<<<<<<<<<<<<
@@ -7347,7 +7347,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __pyx_t_1 = PyObject_Length(((PyObject *)__pyx_v_T)); if (unlikely(__pyx_t_1 == ((Py_ssize_t)-1))) __PYX_ERR(0, 327, __pyx_L1_error)
   __pyx_v_Nbins_T = __pyx_t_1;
 
-  /* "rhosig.pyx":332
+  /* "ompy/rhosig.pyx":332
  *     cdef double Eg
  *     cdef np.ndarray z_array
  *     if z_array_in is None:             # <<<<<<<<<<<<<<
@@ -7358,7 +7358,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __pyx_t_3 = (__pyx_t_2 != 0);
   if (unlikely(__pyx_t_3)) {
 
-    /* "rhosig.pyx":334
+    /* "ompy/rhosig.pyx":334
  *     if z_array_in is None:
  *         # Don't use any z factor:
  *         raise Exception("Something is wrong with the z array logic. This is hacky code.")             # <<<<<<<<<<<<<<
@@ -7371,7 +7371,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __PYX_ERR(0, 334, __pyx_L1_error)
 
-    /* "rhosig.pyx":332
+    /* "ompy/rhosig.pyx":332
  *     cdef double Eg
  *     cdef np.ndarray z_array
  *     if z_array_in is None:             # <<<<<<<<<<<<<<
@@ -7380,7 +7380,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
  */
   }
 
-  /* "rhosig.pyx":336
+  /* "ompy/rhosig.pyx":336
  *         raise Exception("Something is wrong with the z array logic. This is hacky code.")
  *     else:
  *         z_array = z_array_in             # <<<<<<<<<<<<<<
@@ -7392,7 +7392,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __pyx_v_z_array = __pyx_v_z_array_in;
   }
 
-  /* "rhosig.pyx":339
+  /* "ompy/rhosig.pyx":339
  * 
  *     global Emid_Eg
  *     cdef np.ndarray P = np.zeros((Nbins_Ex,Nbins_T))             # <<<<<<<<<<<<<<
@@ -7436,7 +7436,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __pyx_v_P = ((PyArrayObject *)__pyx_t_4);
   __pyx_t_4 = 0;
 
-  /* "rhosig.pyx":341
+  /* "ompy/rhosig.pyx":341
  *     cdef np.ndarray P = np.zeros((Nbins_Ex,Nbins_T))
  * 
  *     for i_Ex in range(Nbins_Ex):             # <<<<<<<<<<<<<<
@@ -7448,7 +7448,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   for (__pyx_t_11 = 0; __pyx_t_11 < __pyx_t_10; __pyx_t_11+=1) {
     __pyx_v_i_Ex = __pyx_t_11;
 
-    /* "rhosig.pyx":342
+    /* "ompy/rhosig.pyx":342
  * 
  *     for i_Ex in range(Nbins_Ex):
  *         Ex = Emid_Ex[i_Ex]             # <<<<<<<<<<<<<<
@@ -7461,7 +7461,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __pyx_v_Ex = __pyx_t_12;
 
-    /* "rhosig.pyx":343
+    /* "ompy/rhosig.pyx":343
  *     for i_Ex in range(Nbins_Ex):
  *         Ex = Emid_Ex[i_Ex]
  *         Eg_max = Ex + dE_resolution[i_Ex]             # <<<<<<<<<<<<<<
@@ -7479,7 +7479,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __Pyx_XDECREF_SET(__pyx_v_Eg_max, __pyx_t_8);
     __pyx_t_8 = 0;
 
-    /* "rhosig.pyx":344
+    /* "ompy/rhosig.pyx":344
  *         Ex = Emid_Ex[i_Ex]
  *         Eg_max = Ex + dE_resolution[i_Ex]
  *         Nbins = (np.abs(Emid_Eg - Eg_max)).argmin() + 1             # <<<<<<<<<<<<<<
@@ -7534,7 +7534,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __pyx_v_Nbins = __pyx_t_13;
 
-    /* "rhosig.pyx":345
+    /* "ompy/rhosig.pyx":345
  *         Eg_max = Ex + dE_resolution[i_Ex]
  *         Nbins = (np.abs(Emid_Eg - Eg_max)).argmin() + 1
  *         for i_Eg in range(Nbins):             # <<<<<<<<<<<<<<
@@ -7546,7 +7546,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     for (__pyx_t_15 = 0; __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
       __pyx_v_i_Eg = __pyx_t_15;
 
-      /* "rhosig.pyx":346
+      /* "ompy/rhosig.pyx":346
  *         Nbins = (np.abs(Emid_Eg - Eg_max)).argmin() + 1
  *         for i_Eg in range(Nbins):
  *             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]             # <<<<<<<<<<<<<<
@@ -7565,7 +7565,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
       __pyx_v_Ef = __pyx_t_12;
 
-      /* "rhosig.pyx":347
+      /* "ompy/rhosig.pyx":347
  *         for i_Eg in range(Nbins):
  *             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]
  *             i_Ef = (np.abs(Emid_nld-Ef)).argmin()             # <<<<<<<<<<<<<<
@@ -7620,7 +7620,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
       __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
       __pyx_v_i_Ef = __pyx_t_16;
 
-      /* "rhosig.pyx":348
+      /* "ompy/rhosig.pyx":348
  *             Ef = Emid_Ex[i_Ex] - Emid_Eg[i_Eg]
  *             i_Ef = (np.abs(Emid_nld-Ef)).argmin()
  *             P[i_Ex, i_Eg] = rho[i_Ef] * T[i_Eg] * z_array[i_Ex, i_Eg]             # <<<<<<<<<<<<<<
@@ -7670,7 +7670,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
       __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-      /* "rhosig.pyx":350
+      /* "ompy/rhosig.pyx":350
  *             P[i_Ex, i_Eg] = rho[i_Ef] * T[i_Eg] * z_array[i_Ex, i_Eg]
  *             # if input T was a gsf, not transmission coeff: * E^(2L+1)
  *             if type == "gsfL1":             # <<<<<<<<<<<<<<
@@ -7680,7 +7680,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
       __pyx_t_3 = (__Pyx_PyUnicode_Equals(__pyx_v_type, __pyx_n_u_gsfL1, Py_EQ)); if (unlikely(__pyx_t_3 < 0)) __PYX_ERR(0, 350, __pyx_L1_error)
       if (__pyx_t_3) {
 
-        /* "rhosig.pyx":351
+        /* "ompy/rhosig.pyx":351
  *             # if input T was a gsf, not transmission coeff: * E^(2L+1)
  *             if type == "gsfL1":
  *                 Eg = Emid_Eg[i_Eg]             # <<<<<<<<<<<<<<
@@ -7693,7 +7693,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
         __pyx_v_Eg = __pyx_t_12;
 
-        /* "rhosig.pyx":352
+        /* "ompy/rhosig.pyx":352
  *             if type == "gsfL1":
  *                 Eg = Emid_Eg[i_Eg]
  *                 P[i_Ex, i_Eg] *= np.power(Eg,3.)             # <<<<<<<<<<<<<<
@@ -7776,7 +7776,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
         __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-        /* "rhosig.pyx":350
+        /* "ompy/rhosig.pyx":350
  *             P[i_Ex, i_Eg] = rho[i_Ef] * T[i_Eg] * z_array[i_Ex, i_Eg]
  *             # if input T was a gsf, not transmission coeff: * E^(2L+1)
  *             if type == "gsfL1":             # <<<<<<<<<<<<<<
@@ -7787,7 +7787,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     }
   }
 
-  /* "rhosig.pyx":354
+  /* "ompy/rhosig.pyx":354
  *                 P[i_Ex, i_Eg] *= np.power(Eg,3.)
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, normalization in enumerate(np.sum(P, axis=1)):             # <<<<<<<<<<<<<<
@@ -7864,7 +7864,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __pyx_t_8 = __pyx_t_18;
     __pyx_t_18 = 0;
 
-    /* "rhosig.pyx":355
+    /* "ompy/rhosig.pyx":355
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, normalization in enumerate(np.sum(P, axis=1)):
  *         P[i, :] /= normalization             # <<<<<<<<<<<<<<
@@ -7888,7 +7888,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_18); __pyx_t_18 = 0;
 
-    /* "rhosig.pyx":354
+    /* "ompy/rhosig.pyx":354
  *                 P[i_Ex, i_Eg] *= np.power(Eg,3.)
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, normalization in enumerate(np.sum(P, axis=1)):             # <<<<<<<<<<<<<<
@@ -7899,7 +7899,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
 
-  /* "rhosig.pyx":356
+  /* "ompy/rhosig.pyx":356
  *     for i, normalization in enumerate(np.sum(P, axis=1)):
  *         P[i, :] /= normalization
  *     return P             # <<<<<<<<<<<<<<
@@ -7911,7 +7911,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __pyx_r = ((PyObject *)__pyx_v_P);
   goto __pyx_L0;
 
-  /* "rhosig.pyx":303
+  /* "ompy/rhosig.pyx":303
  * @cython.boundscheck(True) # turn off bounds-checking for entire function
  * @cython.wraparound(True)  # turn off negative index wrapping for entire function
  * def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,             # <<<<<<<<<<<<<<
@@ -7928,7 +7928,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_XDECREF(__pyx_t_8);
   __Pyx_XDECREF(__pyx_t_17);
   __Pyx_XDECREF(__pyx_t_18);
-  __Pyx_AddTraceback("rhosig.PfromRhoT", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.PfromRhoT", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_z_array);
@@ -7942,7 +7942,7 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
   return __pyx_r;
 }
 
-/* "rhosig.pyx":360
+/* "ompy/rhosig.pyx":360
  * 
  * 
  * def div0(np.ndarray a, np.ndarray b ):             # <<<<<<<<<<<<<<
@@ -7951,10 +7951,10 @@ static PyObject *__pyx_pf_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__pyx_self
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_16div0[] = " division function designed to ignore / 0,\n    i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] ";
-static PyMethodDef __pyx_mdef_6rhosig_17div0 = {"div0", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_17div0, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_16div0};
-static PyObject *__pyx_pw_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_16div0[] = " division function designed to ignore / 0,\n    i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_17div0 = {"div0", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_17div0, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_16div0};
+static PyObject *__pyx_pw_4ompy_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_a = 0;
   PyArrayObject *__pyx_v_b = 0;
   PyObject *__pyx_r = 0;
@@ -8002,13 +8002,13 @@ static PyObject *__pyx_pw_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_a
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("div0", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 360, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_a), __pyx_ptype_5numpy_ndarray, 1, "a", 0))) __PYX_ERR(0, 360, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_b), __pyx_ptype_5numpy_ndarray, 1, "b", 0))) __PYX_ERR(0, 360, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_16div0(__pyx_self, __pyx_v_a, __pyx_v_b);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_16div0(__pyx_self, __pyx_v_a, __pyx_v_b);
 
   /* function exit code */
   goto __pyx_L0;
@@ -8019,7 +8019,7 @@ static PyObject *__pyx_pw_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_a
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, PyArrayObject *__pyx_v_b) {
+static PyObject *__pyx_pf_4ompy_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_a, PyArrayObject *__pyx_v_b) {
   PyArrayObject *__pyx_v_c = 0;
   PyObject *__pyx_r = NULL;
   __Pyx_TraceDeclarations
@@ -8040,7 +8040,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __Pyx_RefNannySetupContext("div0", 0);
   __Pyx_TraceCall("div0", __pyx_f[0], 360, 0, __PYX_ERR(0, 360, __pyx_L1_error));
 
-  /* "rhosig.pyx":364
+  /* "ompy/rhosig.pyx":364
  *     i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] """
  *     cdef np.ndarray c
  *     with np.errstate(divide='ignore', invalid='ignore'):             # <<<<<<<<<<<<<<
@@ -8092,7 +8092,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
         __Pyx_XGOTREF(__pyx_t_8);
         /*try:*/ {
 
-          /* "rhosig.pyx":365
+          /* "ompy/rhosig.pyx":365
  *     cdef np.ndarray c
  *     with np.errstate(divide='ignore', invalid='ignore'):
  *         c = np.true_divide( a, b )             # <<<<<<<<<<<<<<
@@ -8153,7 +8153,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
           __pyx_v_c = ((PyArrayObject *)__pyx_t_3);
           __pyx_t_3 = 0;
 
-          /* "rhosig.pyx":366
+          /* "ompy/rhosig.pyx":366
  *     with np.errstate(divide='ignore', invalid='ignore'):
  *         c = np.true_divide( a, b )
  *         c[ ~ np.isfinite( c )] = 0  # -inf inf NaN             # <<<<<<<<<<<<<<
@@ -8186,7 +8186,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
           if (unlikely(PyObject_SetItem(((PyObject *)__pyx_v_c), __pyx_t_5, __pyx_int_0) < 0)) __PYX_ERR(0, 366, __pyx_L7_error)
           __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-          /* "rhosig.pyx":364
+          /* "ompy/rhosig.pyx":364
  *     i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] """
  *     cdef np.ndarray c
  *     with np.errstate(divide='ignore', invalid='ignore'):             # <<<<<<<<<<<<<<
@@ -8204,7 +8204,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
         __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
         __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
         /*except:*/ {
-          __Pyx_AddTraceback("rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
+          __Pyx_AddTraceback("ompy.rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
           if (__Pyx_GetException(&__pyx_t_5, &__pyx_t_3, &__pyx_t_2) < 0) __PYX_ERR(0, 364, __pyx_L9_except_error)
           __Pyx_GOTREF(__pyx_t_5);
           __Pyx_GOTREF(__pyx_t_3);
@@ -8267,7 +8267,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
     __pyx_L16:;
   }
 
-  /* "rhosig.pyx":367
+  /* "ompy/rhosig.pyx":367
  *         c = np.true_divide( a, b )
  *         c[ ~ np.isfinite( c )] = 0  # -inf inf NaN
  *     return c             # <<<<<<<<<<<<<<
@@ -8280,7 +8280,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __pyx_r = ((PyObject *)__pyx_v_c);
   goto __pyx_L0;
 
-  /* "rhosig.pyx":360
+  /* "ompy/rhosig.pyx":360
  * 
  * 
  * def div0(np.ndarray a, np.ndarray b ):             # <<<<<<<<<<<<<<
@@ -8294,7 +8294,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_AddTraceback("rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.div0", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_c);
@@ -8304,7 +8304,7 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
   return __pyx_r;
 }
 
-/* "rhosig.pyx":370
+/* "ompy/rhosig.pyx":370
  * 
  * 
  * def rhoTfrom1D(np.ndarray x1D, int Nbins_rho):             # <<<<<<<<<<<<<<
@@ -8313,10 +8313,10 @@ static PyObject *__pyx_pf_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_self, PyA
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_18rhoTfrom1D[] = " split 1D array to who equal length subarrays ";
-static PyMethodDef __pyx_mdef_6rhosig_19rhoTfrom1D = {"rhoTfrom1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_19rhoTfrom1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_18rhoTfrom1D};
-static PyObject *__pyx_pw_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_18rhoTfrom1D[] = " split 1D array to who equal length subarrays ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_19rhoTfrom1D = {"rhoTfrom1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_19rhoTfrom1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_18rhoTfrom1D};
+static PyObject *__pyx_pw_4ompy_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_x1D = 0;
   int __pyx_v_Nbins_rho;
   PyObject *__pyx_r = 0;
@@ -8364,12 +8364,12 @@ static PyObject *__pyx_pw_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *_
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("rhoTfrom1D", 1, 2, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 370, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.rhoTfrom1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.rhoTfrom1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_x1D), __pyx_ptype_5numpy_ndarray, 1, "x1D", 0))) __PYX_ERR(0, 370, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_18rhoTfrom1D(__pyx_self, __pyx_v_x1D, __pyx_v_Nbins_rho);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_18rhoTfrom1D(__pyx_self, __pyx_v_x1D, __pyx_v_Nbins_rho);
 
   /* function exit code */
   goto __pyx_L0;
@@ -8380,7 +8380,7 @@ static PyObject *__pyx_pw_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *_
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_x1D, int __pyx_v_Nbins_rho) {
+static PyObject *__pyx_pf_4ompy_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_x1D, int __pyx_v_Nbins_rho) {
   PyArrayObject *__pyx_v_rho = 0;
   PyArrayObject *__pyx_v_T = 0;
   PyObject *__pyx_r = NULL;
@@ -8391,7 +8391,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   __Pyx_RefNannySetupContext("rhoTfrom1D", 0);
   __Pyx_TraceCall("rhoTfrom1D", __pyx_f[0], 370, 0, __PYX_ERR(0, 370, __pyx_L1_error));
 
-  /* "rhosig.pyx":372
+  /* "ompy/rhosig.pyx":372
  * def rhoTfrom1D(np.ndarray x1D, int Nbins_rho):
  *     """ split 1D array to who equal length subarrays """
  *     cdef np.ndarray rho = x1D[:Nbins_rho]             # <<<<<<<<<<<<<<
@@ -8404,7 +8404,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   __pyx_v_rho = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":373
+  /* "ompy/rhosig.pyx":373
  *     """ split 1D array to who equal length subarrays """
  *     cdef np.ndarray rho = x1D[:Nbins_rho]
  *     cdef np.ndarray T = x1D[Nbins_rho:]             # <<<<<<<<<<<<<<
@@ -8417,7 +8417,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   __pyx_v_T = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":374
+  /* "ompy/rhosig.pyx":374
  *     cdef np.ndarray rho = x1D[:Nbins_rho]
  *     cdef np.ndarray T = x1D[Nbins_rho:]
  *     return rho, T             # <<<<<<<<<<<<<<
@@ -8437,7 +8437,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":370
+  /* "ompy/rhosig.pyx":370
  * 
  * 
  * def rhoTfrom1D(np.ndarray x1D, int Nbins_rho):             # <<<<<<<<<<<<<<
@@ -8448,7 +8448,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
-  __Pyx_AddTraceback("rhosig.rhoTfrom1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.rhoTfrom1D", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_rho);
@@ -8459,7 +8459,7 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
   return __pyx_r;
 }
 
-/* "rhosig.pyx":377
+/* "ompy/rhosig.pyx":377
  * 
  * 
  * def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):             # <<<<<<<<<<<<<<
@@ -8468,10 +8468,10 @@ static PyObject *__pyx_pf_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__pyx_sel
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_20fg_cut_matrix[] = " Make the first generation cuts to the matrix\n    Parameters:\n    -----------\n    array : ndarray\n        2D Array that will be sliced\n    Emid : ndarray\n        Array of bin center energies [Note: up to here assumed symetrix for\n        both axes]\n    Egmin, Exmin, Emax : doubles\n        Lower and higher cuts for the gamma-ray and excitation energy axis\n    kwargs: optional\n        Will be ignored, just for compatibility;\n    Returns:\n    --------\n    array : ndarray\n        Sliced array\n    Emid_Eg : ndarray\n        Bin center energies of the gamma-ray axis\n    Emid_Ex : ndarray\n        Bin center energies of the excitation energy axis\n    Emid_nld : ndarray\n        Bin center energies of the nld once extracted\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_21fg_cut_matrix = {"fg_cut_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_21fg_cut_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_20fg_cut_matrix};
-static PyObject *__pyx_pw_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_20fg_cut_matrix[] = " Make the first generation cuts to the matrix\n    Parameters:\n    -----------\n    array : ndarray\n        2D Array that will be sliced\n    Emid : ndarray\n        Array of bin center energies [Note: up to here assumed symetrix for\n        both axes]\n    Egmin, Exmin, Emax : doubles\n        Lower and higher cuts for the gamma-ray and excitation energy axis\n    kwargs: optional\n        Will be ignored, just for compatibility;\n    Returns:\n    --------\n    array : ndarray\n        Sliced array\n    Emid_Eg : ndarray\n        Bin center energies of the gamma-ray axis\n    Emid_Ex : ndarray\n        Bin center energies of the excitation energy axis\n    Emid_nld : ndarray\n        Bin center energies of the nld once extracted\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_21fg_cut_matrix = {"fg_cut_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_21fg_cut_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_20fg_cut_matrix};
+static PyObject *__pyx_pw_4ompy_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_array = 0;
   PyObject *__pyx_v_Emid = 0;
   PyObject *__pyx_v_Egmin = 0;
@@ -8556,11 +8556,11 @@ static PyObject *__pyx_pw_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject
   __Pyx_RaiseArgtupleInvalid("fg_cut_matrix", 1, 5, 5, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 377, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_DECREF(__pyx_v_kwargs); __pyx_v_kwargs = 0;
-  __Pyx_AddTraceback("rhosig.fg_cut_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.fg_cut_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_20fg_cut_matrix(__pyx_self, __pyx_v_array, __pyx_v_Emid, __pyx_v_Egmin, __pyx_v_Exmin, __pyx_v_Emax, __pyx_v_kwargs);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_20fg_cut_matrix(__pyx_self, __pyx_v_array, __pyx_v_Emid, __pyx_v_Egmin, __pyx_v_Exmin, __pyx_v_Emax, __pyx_v_kwargs);
 
   /* function exit code */
   __Pyx_XDECREF(__pyx_v_kwargs);
@@ -8568,7 +8568,7 @@ static PyObject *__pyx_pw_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_array, PyObject *__pyx_v_Emid, PyObject *__pyx_v_Egmin, PyObject *__pyx_v_Exmin, PyObject *__pyx_v_Emax, CYTHON_UNUSED PyObject *__pyx_v_kwargs) {
+static PyObject *__pyx_pf_4ompy_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_array, PyObject *__pyx_v_Emid, PyObject *__pyx_v_Egmin, PyObject *__pyx_v_Exmin, PyObject *__pyx_v_Emax, CYTHON_UNUSED PyObject *__pyx_v_kwargs) {
   PyObject *__pyx_v_i_Egmin = NULL;
   PyObject *__pyx_v_i_Emax = NULL;
   PyObject *__pyx_v_i_Exmin = NULL;
@@ -8588,7 +8588,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __Pyx_TraceCall("fg_cut_matrix", __pyx_f[0], 377, 0, __PYX_ERR(0, 377, __pyx_L1_error));
   __Pyx_INCREF(__pyx_v_array);
 
-  /* "rhosig.pyx":402
+  /* "ompy/rhosig.pyx":402
  *     """
  * 
  *     np.copy(array)             # <<<<<<<<<<<<<<
@@ -8617,7 +8617,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":405
+  /* "ompy/rhosig.pyx":405
  * 
  *     # Eg
  *     i_Egmin = (np.abs(Emid-Egmin)).argmin()             # <<<<<<<<<<<<<<
@@ -8668,7 +8668,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_i_Egmin = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":406
+  /* "ompy/rhosig.pyx":406
  *     # Eg
  *     i_Egmin = (np.abs(Emid-Egmin)).argmin()
  *     i_Emax = (np.abs(Emid-Emax)).argmin()+1             # <<<<<<<<<<<<<<
@@ -8722,7 +8722,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_i_Emax = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":408
+  /* "ompy/rhosig.pyx":408
  *     i_Emax = (np.abs(Emid-Emax)).argmin()+1
  *     # Ex
  *     i_Exmin = (np.abs(Emid-Exmin)).argmin()             # <<<<<<<<<<<<<<
@@ -8773,7 +8773,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_i_Exmin = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":410
+  /* "ompy/rhosig.pyx":410
  *     i_Exmin = (np.abs(Emid-Exmin)).argmin()
  * 
  *     array = array[i_Exmin:i_Emax,i_Egmin:i_Emax]             # <<<<<<<<<<<<<<
@@ -8798,7 +8798,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __Pyx_DECREF_SET(__pyx_v_array, __pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":411
+  /* "ompy/rhosig.pyx":411
  * 
  *     array = array[i_Exmin:i_Emax,i_Egmin:i_Emax]
  *     Emid_Ex = Emid[i_Exmin:i_Emax]             # <<<<<<<<<<<<<<
@@ -8810,7 +8810,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_Emid_Ex = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":412
+  /* "ompy/rhosig.pyx":412
  *     array = array[i_Exmin:i_Emax,i_Egmin:i_Emax]
  *     Emid_Ex = Emid[i_Exmin:i_Emax]
  *     Emid_Eg = Emid[i_Egmin:i_Emax]             # <<<<<<<<<<<<<<
@@ -8822,7 +8822,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_Emid_Eg = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":413
+  /* "ompy/rhosig.pyx":413
  *     Emid_Ex = Emid[i_Exmin:i_Emax]
  *     Emid_Eg = Emid[i_Egmin:i_Emax]
  *     Emid_nld = Emid[:i_Emax-i_Egmin]             # <<<<<<<<<<<<<<
@@ -8837,7 +8837,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_v_Emid_nld = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":415
+  /* "ompy/rhosig.pyx":415
  *     Emid_nld = Emid[:i_Emax-i_Egmin]
  * 
  *     return array, Emid_Eg, Emid_Ex, Emid_nld             # <<<<<<<<<<<<<<
@@ -8863,7 +8863,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":377
+  /* "ompy/rhosig.pyx":377
  * 
  * 
  * def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):             # <<<<<<<<<<<<<<
@@ -8878,7 +8878,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_AddTraceback("rhosig.fg_cut_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.fg_cut_matrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_i_Egmin);
@@ -8894,7 +8894,7 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
   return __pyx_r;
 }
 
-/* "rhosig.pyx":417
+/* "ompy/rhosig.pyx":417
  *     return array, Emid_Eg, Emid_Ex, Emid_nld
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -8903,10 +8903,10 @@ static PyObject *__pyx_pf_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *__pyx_
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_22spin_dist[] = " See `SpinFunctions` ";
-static PyMethodDef __pyx_mdef_6rhosig_23spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_23spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_22spin_dist};
-static PyObject *__pyx_pw_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_22spin_dist[] = " See `SpinFunctions` ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_23spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_23spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_22spin_dist};
+static PyObject *__pyx_pw_4ompy_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_Ex = 0;
   PyObject *__pyx_v_J = 0;
   PyObject *__pyx_v_spincutModel = 0;
@@ -8976,18 +8976,18 @@ static PyObject *__pyx_pw_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("spin_dist", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 417, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_6rhosig_22spin_dist(__pyx_self, __pyx_v_Ex, __pyx_v_J, __pyx_v_spincutModel, __pyx_v_spincutPars);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_22spin_dist(__pyx_self, __pyx_v_Ex, __pyx_v_J, __pyx_v_spincutModel, __pyx_v_spincutPars);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars) {
+static PyObject *__pyx_pf_4ompy_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_Ex, PyObject *__pyx_v_J, PyObject *__pyx_v_spincutModel, PyObject *__pyx_v_spincutPars) {
   PyObject *__pyx_r = NULL;
   __Pyx_TraceDeclarations
   __Pyx_RefNannyDeclarations
@@ -8999,7 +8999,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_RefNannySetupContext("spin_dist", 0);
   __Pyx_TraceCall("spin_dist", __pyx_f[0], 417, 0, __PYX_ERR(0, 417, __pyx_L1_error));
 
-  /* "rhosig.pyx":419
+  /* "ompy/rhosig.pyx":419
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     """ See `SpinFunctions` """
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -9008,7 +9008,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
  */
   __Pyx_XDECREF(__pyx_r);
 
-  /* "rhosig.pyx":421
+  /* "ompy/rhosig.pyx":421
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -9018,7 +9018,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_GetModuleGlobalName(__pyx_t_2, __pyx_n_s_SpinFunctions); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 419, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
 
-  /* "rhosig.pyx":419
+  /* "ompy/rhosig.pyx":419
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     """ See `SpinFunctions` """
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -9030,7 +9030,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_Ex, __pyx_v_Ex) < 0) __PYX_ERR(0, 419, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_J, __pyx_v_J) < 0) __PYX_ERR(0, 419, __pyx_L1_error)
 
-  /* "rhosig.pyx":420
+  /* "ompy/rhosig.pyx":420
  *     """ See `SpinFunctions` """
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,             # <<<<<<<<<<<<<<
@@ -9039,7 +9039,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_model, __pyx_v_spincutModel) < 0) __PYX_ERR(0, 419, __pyx_L1_error)
 
-  /* "rhosig.pyx":421
+  /* "ompy/rhosig.pyx":421
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -9048,7 +9048,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
  */
   if (PyDict_SetItem(__pyx_t_3, __pyx_n_s_pars, __pyx_v_spincutPars) < 0) __PYX_ERR(0, 419, __pyx_L1_error)
 
-  /* "rhosig.pyx":419
+  /* "ompy/rhosig.pyx":419
  * def spin_dist(Ex, J, spincutModel, spincutPars):
  *     """ See `SpinFunctions` """
  *     return SpinFunctions(Ex=Ex, J=J,             # <<<<<<<<<<<<<<
@@ -9060,7 +9060,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":421
+  /* "ompy/rhosig.pyx":421
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  *                          pars=spincutPars).distibution()             # <<<<<<<<<<<<<<
@@ -9089,7 +9089,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "rhosig.pyx":417
+  /* "ompy/rhosig.pyx":417
  *     return array, Emid_Eg, Emid_Ex, Emid_nld
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -9103,7 +9103,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
   __Pyx_XDECREF(__pyx_t_4);
-  __Pyx_AddTraceback("rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XGIVEREF(__pyx_r);
@@ -9112,7 +9112,7 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
   return __pyx_r;
 }
 
-/* "rhosig.pyx":424
+/* "ompy/rhosig.pyx":424
  * 
  * 
  * def z_from_spin_dist(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -9121,10 +9121,10 @@ static PyObject *__pyx_pf_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__pyx_self
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_6rhosig_24z_from_spin_dist[] = "\n    Create a array for the *z-factor*, a spin-parity dependent factor\n    that *might* have be missing the in previous implementation of the\n    Oslo Method.\n    ";
-static PyMethodDef __pyx_mdef_6rhosig_25z_from_spin_dist = {"z_from_spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_6rhosig_25z_from_spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_6rhosig_24z_from_spin_dist};
-static PyObject *__pyx_pw_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_4ompy_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_4ompy_6rhosig_24z_from_spin_dist[] = "\n    Create a array for the *z-factor*, a spin-parity dependent factor\n    that *might* have be missing the in previous implementation of the\n    Oslo Method.\n    ";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_25z_from_spin_dist = {"z_from_spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_25z_from_spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_24z_from_spin_dist};
+static PyObject *__pyx_pw_4ompy_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_Exarr = 0;
   PyArrayObject *__pyx_v_Egarr = 0;
   PyObject *__pyx_v_spin_dist_par = 0;
@@ -9187,13 +9187,13 @@ static PyObject *__pyx_pw_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObj
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("z_from_spin_dist", 0, 2, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 424, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("rhosig.z_from_spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.z_from_spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Exarr), __pyx_ptype_5numpy_ndarray, 1, "Exarr", 0))) __PYX_ERR(0, 424, __pyx_L1_error)
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_Egarr), __pyx_ptype_5numpy_ndarray, 1, "Egarr", 0))) __PYX_ERR(0, 424, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6rhosig_24z_from_spin_dist(__pyx_self, __pyx_v_Exarr, __pyx_v_Egarr, __pyx_v_spin_dist_par);
+  __pyx_r = __pyx_pf_4ompy_6rhosig_24z_from_spin_dist(__pyx_self, __pyx_v_Exarr, __pyx_v_Egarr, __pyx_v_spin_dist_par);
 
   /* function exit code */
   goto __pyx_L0;
@@ -9204,7 +9204,7 @@ static PyObject *__pyx_pw_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObj
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par) {
+static PyObject *__pyx_pf_4ompy_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_Exarr, PyArrayObject *__pyx_v_Egarr, PyObject *__pyx_v_spin_dist_par) {
   PyArrayObject *__pyx_v_z = 0;
   float __pyx_v_inner_sum;
   PyObject *__pyx_v_Jfs = 0;
@@ -9251,7 +9251,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __Pyx_TraceCall("z_from_spin_dist", __pyx_f[0], 424, 0, __PYX_ERR(0, 424, __pyx_L1_error));
   __Pyx_INCREF(__pyx_v_spin_dist_par);
 
-  /* "rhosig.pyx":441
+  /* "ompy/rhosig.pyx":441
  *     # If no spin distribution parameters are specified, use some defaults:
  *     # (TODO: This could be made nicer, but let's get some use experience first)
  *     if spin_dist_par is None:             # <<<<<<<<<<<<<<
@@ -9262,7 +9262,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __pyx_t_2 = (__pyx_t_1 != 0);
   if (__pyx_t_2) {
 
-    /* "rhosig.pyx":444
+    /* "ompy/rhosig.pyx":444
  *         spin_dist_par = {
  *             # some dummy values:
  *             "spincutModel": "EB05",             # <<<<<<<<<<<<<<
@@ -9273,7 +9273,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
     __Pyx_GOTREF(__pyx_t_3);
     if (PyDict_SetItem(__pyx_t_3, __pyx_n_u_spincutModel, __pyx_n_u_EB05) < 0) __PYX_ERR(0, 444, __pyx_L1_error)
 
-    /* "rhosig.pyx":445
+    /* "ompy/rhosig.pyx":445
  *             # some dummy values:
  *             "spincutModel": "EB05",
  *             "spincutPars": {"mass": 164, "NLDa": 25.16, "Eshift": 0.12},             # <<<<<<<<<<<<<<
@@ -9291,7 +9291,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
     __Pyx_DECREF_SET(__pyx_v_spin_dist_par, __pyx_t_3);
     __pyx_t_3 = 0;
 
-    /* "rhosig.pyx":441
+    /* "ompy/rhosig.pyx":441
  *     # If no spin distribution parameters are specified, use some defaults:
  *     # (TODO: This could be made nicer, but let's get some use experience first)
  *     if spin_dist_par is None:             # <<<<<<<<<<<<<<
@@ -9300,7 +9300,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
  */
   }
 
-  /* "rhosig.pyx":449
+  /* "ompy/rhosig.pyx":449
  *         }
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],             # <<<<<<<<<<<<<<
@@ -9315,7 +9315,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __pyx_t_4 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_Jmax); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 449, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
 
-  /* "rhosig.pyx":450
+  /* "ompy/rhosig.pyx":450
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],
  *                                      spin_dist_par["Jmax"]+1)             # <<<<<<<<<<<<<<
@@ -9380,7 +9380,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   }
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "rhosig.pyx":449
+  /* "ompy/rhosig.pyx":449
  *         }
  * 
  *     cdef np.ndarray Js = np.linspace(0, spin_dist_par["Jmax"],             # <<<<<<<<<<<<<<
@@ -9391,7 +9391,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __pyx_v_Js = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":452
+  /* "ompy/rhosig.pyx":452
  *                                      spin_dist_par["Jmax"]+1)
  * 
  *     z = np.zeros((len(Exarr), len(Egarr)))             # <<<<<<<<<<<<<<
@@ -9437,7 +9437,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __pyx_v_z = ((PyArrayObject *)__pyx_t_3);
   __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":454
+  /* "ompy/rhosig.pyx":454
  *     z = np.zeros((len(Exarr), len(Egarr)))
  * 
  *     for i_Ex, Ex in enumerate(Exarr):             # <<<<<<<<<<<<<<
@@ -9490,7 +9490,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
     __pyx_v_i_Ex = __pyx_t_8;
     __pyx_t_8 = (__pyx_t_8 + 1);
 
-    /* "rhosig.pyx":455
+    /* "ompy/rhosig.pyx":455
  * 
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):             # <<<<<<<<<<<<<<
@@ -9543,7 +9543,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
       __pyx_v_i_Eg = __pyx_t_13;
       __pyx_t_13 = (__pyx_t_13 + 1);
 
-      /* "rhosig.pyx":456
+      /* "ompy/rhosig.pyx":456
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:             # <<<<<<<<<<<<<<
@@ -9553,7 +9553,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
       __pyx_t_2 = (((__pyx_v_Ex - __pyx_v_Eg) <= 0.0) != 0);
       if (__pyx_t_2) {
 
-        /* "rhosig.pyx":457
+        /* "ompy/rhosig.pyx":457
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:
  *                 continue             # <<<<<<<<<<<<<<
@@ -9562,7 +9562,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
  */
         goto __pyx_L6_continue;
 
-        /* "rhosig.pyx":456
+        /* "ompy/rhosig.pyx":456
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):
  *             if Ex-Eg <= 0:             # <<<<<<<<<<<<<<
@@ -9571,7 +9571,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
  */
       }
 
-      /* "rhosig.pyx":458
+      /* "ompy/rhosig.pyx":458
  *             if Ex-Eg <= 0:
  *                 continue
  *             for ji in Js:             # <<<<<<<<<<<<<<
@@ -9621,7 +9621,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
         __pyx_v_ji = __pyx_t_18;
 
-        /* "rhosig.pyx":459
+        /* "ompy/rhosig.pyx":459
  *                 continue
  *             for ji in Js:
  *                 if ji==0:             # <<<<<<<<<<<<<<
@@ -9631,7 +9631,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __pyx_t_2 = ((__pyx_v_ji == 0) != 0);
         if (__pyx_t_2) {
 
-          /* "rhosig.pyx":460
+          /* "ompy/rhosig.pyx":460
  *             for ji in Js:
  *                 if ji==0:
  *                     Jfs = [1]             # <<<<<<<<<<<<<<
@@ -9646,7 +9646,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           __Pyx_XDECREF_SET(__pyx_v_Jfs, ((PyObject*)__pyx_t_7));
           __pyx_t_7 = 0;
 
-          /* "rhosig.pyx":459
+          /* "ompy/rhosig.pyx":459
  *                 continue
  *             for ji in Js:
  *                 if ji==0:             # <<<<<<<<<<<<<<
@@ -9656,7 +9656,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           goto __pyx_L11;
         }
 
-        /* "rhosig.pyx":462
+        /* "ompy/rhosig.pyx":462
  *                     Jfs = [1]
  *                 else:
  *                     Jfs = [ji-1, ji, ji+1]             # <<<<<<<<<<<<<<
@@ -9686,7 +9686,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         }
         __pyx_L11:;
 
-        /* "rhosig.pyx":465
+        /* "ompy/rhosig.pyx":465
  *                 # assume g_pop propto g_int
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,             # <<<<<<<<<<<<<<
@@ -9702,7 +9702,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_ji); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 465, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_20);
 
-        /* "rhosig.pyx":466
+        /* "ompy/rhosig.pyx":466
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,
  *                                           spin_dist_par["spincutModel"],             # <<<<<<<<<<<<<<
@@ -9712,7 +9712,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __pyx_t_21 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_spincutModel); if (unlikely(!__pyx_t_21)) __PYX_ERR(0, 466, __pyx_L1_error)
         __Pyx_GOTREF(__pyx_t_21);
 
-        /* "rhosig.pyx":467
+        /* "ompy/rhosig.pyx":467
  *                 g_pop = 1./2. * spin_dist(Ex, ji,
  *                                           spin_dist_par["spincutModel"],
  *                                           spin_dist_par["spincutPars"]             # <<<<<<<<<<<<<<
@@ -9781,7 +9781,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         }
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-        /* "rhosig.pyx":465
+        /* "ompy/rhosig.pyx":465
  *                 # assume g_pop propto g_int
  *                 # TODO: should the 1/2 be there?
  *                 g_pop = 1./2. * spin_dist(Ex, ji,             # <<<<<<<<<<<<<<
@@ -9796,7 +9796,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
         __pyx_v_g_pop = __pyx_t_12;
 
-        /* "rhosig.pyx":469
+        /* "ompy/rhosig.pyx":469
  *                                           spin_dist_par["spincutPars"]
  *                                           )
  *                 inner_sum = 0             # <<<<<<<<<<<<<<
@@ -9805,7 +9805,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
  */
         __pyx_v_inner_sum = 0.0;
 
-        /* "rhosig.pyx":470
+        /* "ompy/rhosig.pyx":470
  *                                           )
  *                 inner_sum = 0
  *                 for jf in Jfs:             # <<<<<<<<<<<<<<
@@ -9825,7 +9825,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
           __pyx_v_jf = __pyx_t_18;
 
-          /* "rhosig.pyx":472
+          /* "ompy/rhosig.pyx":472
  *                 for jf in Jfs:
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,             # <<<<<<<<<<<<<<
@@ -9843,7 +9843,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           __pyx_t_20 = __Pyx_PyInt_From_int(__pyx_v_jf); if (unlikely(!__pyx_t_20)) __PYX_ERR(0, 472, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_20);
 
-          /* "rhosig.pyx":473
+          /* "ompy/rhosig.pyx":473
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
  *                                              spin_dist_par["spincutModel"],             # <<<<<<<<<<<<<<
@@ -9853,7 +9853,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           __pyx_t_7 = __Pyx_PyObject_Dict_GetItem(__pyx_v_spin_dist_par, __pyx_n_u_spincutModel); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 473, __pyx_L1_error)
           __Pyx_GOTREF(__pyx_t_7);
 
-          /* "rhosig.pyx":474
+          /* "ompy/rhosig.pyx":474
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,
  *                                              spin_dist_par["spincutModel"],
  *                                              spin_dist_par["spincutPars"]             # <<<<<<<<<<<<<<
@@ -9922,7 +9922,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           }
           __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-          /* "rhosig.pyx":472
+          /* "ompy/rhosig.pyx":472
  *                 for jf in Jfs:
  *                     # TODO: should the 1/2 be there?
  *                     inner_sum += 1./2. * spin_dist(Ex-Eg, jf,             # <<<<<<<<<<<<<<
@@ -9941,7 +9941,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
           __Pyx_DECREF(__pyx_t_24); __pyx_t_24 = 0;
           __pyx_v_inner_sum = __pyx_t_12;
 
-          /* "rhosig.pyx":470
+          /* "ompy/rhosig.pyx":470
  *                                           )
  *                 inner_sum = 0
  *                 for jf in Jfs:             # <<<<<<<<<<<<<<
@@ -9951,7 +9951,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         }
         __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-        /* "rhosig.pyx":477
+        /* "ompy/rhosig.pyx":477
  *                                              )
  *                     # print(spin_dist(Ex-Eg, jf))
  *                 z[i_Ex, i_Eg] += g_pop * inner_sum             # <<<<<<<<<<<<<<
@@ -9981,7 +9981,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
         __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
         __Pyx_DECREF(__pyx_t_22); __pyx_t_22 = 0;
 
-        /* "rhosig.pyx":458
+        /* "ompy/rhosig.pyx":458
  *             if Ex-Eg <= 0:
  *                 continue
  *             for ji in Js:             # <<<<<<<<<<<<<<
@@ -9991,7 +9991,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
       }
       __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-      /* "rhosig.pyx":455
+      /* "ompy/rhosig.pyx":455
  * 
  *     for i_Ex, Ex in enumerate(Exarr):
  *         for i_Eg, Eg in enumerate(Egarr):             # <<<<<<<<<<<<<<
@@ -10002,7 +10002,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
     }
     __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
 
-    /* "rhosig.pyx":454
+    /* "ompy/rhosig.pyx":454
  *     z = np.zeros((len(Exarr), len(Egarr)))
  * 
  *     for i_Ex, Ex in enumerate(Exarr):             # <<<<<<<<<<<<<<
@@ -10012,7 +10012,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   }
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "rhosig.pyx":478
+  /* "ompy/rhosig.pyx":478
  *                     # print(spin_dist(Ex-Eg, jf))
  *                 z[i_Ex, i_Eg] += g_pop * inner_sum
  *     return z             # <<<<<<<<<<<<<<
@@ -10022,7 +10022,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __pyx_r = ((PyObject *)__pyx_v_z);
   goto __pyx_L0;
 
-  /* "rhosig.pyx":424
+  /* "ompy/rhosig.pyx":424
  * 
  * 
  * def z_from_spin_dist(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -10046,7 +10046,7 @@ static PyObject *__pyx_pf_6rhosig_24z_from_spin_dist(CYTHON_UNUSED PyObject *__p
   __Pyx_XDECREF(__pyx_t_24);
   __Pyx_XDECREF(__pyx_t_26);
   __Pyx_XDECREF(__pyx_t_27);
-  __Pyx_AddTraceback("rhosig.z_from_spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("ompy.rhosig.z_from_spin_dist", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF((PyObject *)__pyx_v_z);
@@ -12696,6 +12696,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_kp_u_numpy_core_multiarray_failed_to, __pyx_k_numpy_core_multiarray_failed_to, sizeof(__pyx_k_numpy_core_multiarray_failed_to), 0, 1, 0, 0},
   {&__pyx_kp_u_numpy_core_umath_failed_to_impor, __pyx_k_numpy_core_umath_failed_to_impor, sizeof(__pyx_k_numpy_core_umath_failed_to_impor), 0, 1, 0, 0},
   {&__pyx_n_s_objfun1D, __pyx_k_objfun1D, sizeof(__pyx_k_objfun1D), 0, 0, 1, 1},
+  {&__pyx_n_s_ompy_rhosig, __pyx_k_ompy_rhosig, sizeof(__pyx_k_ompy_rhosig), 0, 0, 1, 1},
   {&__pyx_kp_s_ompy_rhosig_pyx, __pyx_k_ompy_rhosig_pyx, sizeof(__pyx_k_ompy_rhosig_pyx), 0, 0, 1, 0},
   {&__pyx_n_s_ones, __pyx_k_ones, sizeof(__pyx_k_ones), 0, 0, 1, 1},
   {&__pyx_n_s_options, __pyx_k_options, sizeof(__pyx_k_options), 0, 0, 1, 1},
@@ -12716,7 +12717,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_rho_fit, __pyx_k_rho_fit, sizeof(__pyx_k_rho_fit), 0, 0, 1, 1},
   {&__pyx_n_s_rho_fit_err, __pyx_k_rho_fit_err, sizeof(__pyx_k_rho_fit_err), 0, 0, 1, 1},
   {&__pyx_n_s_rhos, __pyx_k_rhos, sizeof(__pyx_k_rhos), 0, 0, 1, 1},
-  {&__pyx_n_s_rhosig, __pyx_k_rhosig, sizeof(__pyx_k_rhosig), 0, 0, 1, 1},
   {&__pyx_n_s_scipy_optimize, __pyx_k_scipy_optimize, sizeof(__pyx_k_scipy_optimize), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
   {&__pyx_n_s_spin_dist, __pyx_k_spin_dist, sizeof(__pyx_k_spin_dist), 0, 0, 1, 1},
@@ -12767,7 +12767,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "rhosig.pyx":191
+  /* "ompy/rhosig.pyx":191
  *     # normalize each Ex row to 1 (-> get decay probability)
  *     for i, total in enumerate(matrix.sum(axis=1)):
  *         matrix[i, :] = div0(matrix[i, :], total)             # <<<<<<<<<<<<<<
@@ -12778,7 +12778,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_slice__6);
   __Pyx_GIVEREF(__pyx_slice__6);
 
-  /* "rhosig.pyx":334
+  /* "ompy/rhosig.pyx":334
  *     if z_array_in is None:
  *         # Don't use any z factor:
  *         raise Exception("Something is wrong with the z array logic. This is hacky code.")             # <<<<<<<<<<<<<<
@@ -12789,7 +12789,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__12);
   __Pyx_GIVEREF(__pyx_tuple__12);
 
-  /* "rhosig.pyx":364
+  /* "ompy/rhosig.pyx":364
  *     i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] """
  *     cdef np.ndarray c
  *     with np.errstate(divide='ignore', invalid='ignore'):             # <<<<<<<<<<<<<<
@@ -12877,7 +12877,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__25);
   __Pyx_GIVEREF(__pyx_tuple__25);
 
-  /* "rhosig.pyx":45
+  /* "ompy/rhosig.pyx":45
  * # cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -12889,7 +12889,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__27);
   __pyx_codeobj_ = (PyObject*)__Pyx_PyCode_New(4, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__27, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_spin_dist, 45, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj_)) __PYX_ERR(0, 45, __pyx_L1_error)
 
-  /* "rhosig.pyx":51
+  /* "ompy/rhosig.pyx":51
  * 
  * 
  * def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -12901,7 +12901,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__28);
   __pyx_codeobj__2 = (PyObject*)__Pyx_PyCode_New(3, 0, 14, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__28, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_z, 51, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__2)) __PYX_ERR(0, 51, __pyx_L1_error)
 
-  /* "rhosig.pyx":103
+  /* "ompy/rhosig.pyx":103
  * 
  * 
  * def decompose_matrix(matrix: Matrix, std: Matrix, *,             # <<<<<<<<<<<<<<
@@ -12913,7 +12913,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__29);
   __pyx_codeobj__4 = (PyObject*)__Pyx_PyCode_New(2, 10, 23, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__29, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_decompose_matrix, 103, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__4)) __PYX_ERR(0, 103, __pyx_L1_error)
 
-  /* "rhosig.pyx":186
+  /* "ompy/rhosig.pyx":186
  *         return rho_fit, T_fit, z_array
  * 
  * def normalize(values, std=0):             # <<<<<<<<<<<<<<
@@ -12925,7 +12925,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__30);
   __pyx_codeobj__5 = (PyObject*)__Pyx_PyCode_New(2, 0, 5, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__30, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_normalize, 186, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__5)) __PYX_ERR(0, 186, __pyx_L1_error)
 
-  /* "rhosig.pyx":197
+  /* "ompy/rhosig.pyx":197
  *     return values, std
  * 
  * def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):             # <<<<<<<<<<<<<<
@@ -12937,7 +12937,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__31);
   __pyx_codeobj__8 = (PyObject*)__Pyx_PyCode_New(9, 0, 20, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__31, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_decompose_matrix_with_unc, 197, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__8)) __PYX_ERR(0, 197, __pyx_L1_error)
 
-  /* "rhosig.pyx":254
+  /* "ompy/rhosig.pyx":254
  * 
  * 
  * def objfun1D(x, *args):             # <<<<<<<<<<<<<<
@@ -12949,7 +12949,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__32);
   __pyx_codeobj__9 = (PyObject*)__Pyx_PyCode_New(1, 0, 14, 0, CO_OPTIMIZED|CO_NEWLOCALS|CO_VARARGS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__32, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_objfun1D, 254, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__9)) __PYX_ERR(0, 254, __pyx_L1_error)
 
-  /* "rhosig.pyx":284
+  /* "ompy/rhosig.pyx":284
  * 
  * 
  * def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,             # <<<<<<<<<<<<<<
@@ -12961,7 +12961,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__33);
   __pyx_codeobj__10 = (PyObject*)__Pyx_PyCode_New(9, 0, 13, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__33, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_chi2, 284, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__10)) __PYX_ERR(0, 284, __pyx_L1_error)
 
-  /* "rhosig.pyx":303
+  /* "ompy/rhosig.pyx":303
  * @cython.boundscheck(True) # turn off bounds-checking for entire function
  * @cython.wraparound(True)  # turn off negative index wrapping for entire function
  * def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,             # <<<<<<<<<<<<<<
@@ -12973,7 +12973,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__34);
   __pyx_codeobj__11 = (PyObject*)__Pyx_PyCode_New(9, 0, 22, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__34, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_PfromRhoT, 303, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__11)) __PYX_ERR(0, 303, __pyx_L1_error)
 
-  /* "rhosig.pyx":360
+  /* "ompy/rhosig.pyx":360
  * 
  * 
  * def div0(np.ndarray a, np.ndarray b ):             # <<<<<<<<<<<<<<
@@ -12985,7 +12985,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__35);
   __pyx_codeobj__13 = (PyObject*)__Pyx_PyCode_New(2, 0, 3, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__35, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_div0, 360, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__13)) __PYX_ERR(0, 360, __pyx_L1_error)
 
-  /* "rhosig.pyx":370
+  /* "ompy/rhosig.pyx":370
  * 
  * 
  * def rhoTfrom1D(np.ndarray x1D, int Nbins_rho):             # <<<<<<<<<<<<<<
@@ -12997,7 +12997,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__36);
   __pyx_codeobj__15 = (PyObject*)__Pyx_PyCode_New(2, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__36, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_rhoTfrom1D, 370, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__15)) __PYX_ERR(0, 370, __pyx_L1_error)
 
-  /* "rhosig.pyx":377
+  /* "ompy/rhosig.pyx":377
  * 
  * 
  * def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):             # <<<<<<<<<<<<<<
@@ -13009,7 +13009,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__37);
   __pyx_codeobj__16 = (PyObject*)__Pyx_PyCode_New(5, 0, 12, 0, CO_OPTIMIZED|CO_NEWLOCALS|CO_VARKEYWORDS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__37, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_fg_cut_matrix, 377, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__16)) __PYX_ERR(0, 377, __pyx_L1_error)
 
-  /* "rhosig.pyx":417
+  /* "ompy/rhosig.pyx":417
  *     return array, Emid_Eg, Emid_Ex, Emid_nld
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
@@ -13021,7 +13021,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_GIVEREF(__pyx_tuple__38);
   __pyx_codeobj__17 = (PyObject*)__Pyx_PyCode_New(4, 0, 4, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__38, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_ompy_rhosig_pyx, __pyx_n_s_spin_dist, 417, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__17)) __PYX_ERR(0, 417, __pyx_L1_error)
 
-  /* "rhosig.pyx":424
+  /* "ompy/rhosig.pyx":424
  * 
  * 
  * def z_from_spin_dist(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
@@ -13319,14 +13319,14 @@ if (!__Pyx_RefNanny) {
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main_rhosig) {
+  if (__pyx_module_is_main_ompy__rhosig) {
     if (PyObject_SetAttr(__pyx_m, __pyx_n_s_name, __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "rhosig")) {
-      if (unlikely(PyDict_SetItemString(modules, "rhosig", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "ompy.rhosig")) {
+      if (unlikely(PyDict_SetItemString(modules, "ompy.rhosig", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -13348,7 +13348,7 @@ if (!__Pyx_RefNanny) {
   #endif
   __Pyx_TraceCall("__Pyx_PyMODINIT_FUNC PyInit_rhosig(void)", __pyx_f[0], 1, 0, __PYX_ERR(0, 1, __pyx_L1_error));
 
-  /* "rhosig.pyx":26
+  /* "ompy/rhosig.pyx":26
  * 
  * 
  * import numpy as np             # <<<<<<<<<<<<<<
@@ -13360,7 +13360,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_np, __pyx_t_1) < 0) __PYX_ERR(0, 26, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":27
+  /* "ompy/rhosig.pyx":27
  * 
  * import numpy as np
  * import matplotlib.pyplot as plt             # <<<<<<<<<<<<<<
@@ -13378,7 +13378,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_plt, __pyx_t_2) < 0) __PYX_ERR(0, 27, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":28
+  /* "ompy/rhosig.pyx":28
  * import numpy as np
  * import matplotlib.pyplot as plt
  * from scipy.optimize import minimize             # <<<<<<<<<<<<<<
@@ -13399,7 +13399,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":29
+  /* "ompy/rhosig.pyx":29
  * import matplotlib.pyplot as plt
  * from scipy.optimize import minimize
  * from uncertainties import unumpy             # <<<<<<<<<<<<<<
@@ -13420,7 +13420,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":31
+  /* "ompy/rhosig.pyx":31
  * from uncertainties import unumpy
  * 
  * from .spinfunctions import SpinFunctions             # <<<<<<<<<<<<<<
@@ -13441,7 +13441,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":32
+  /* "ompy/rhosig.pyx":32
  * 
  * from .spinfunctions import SpinFunctions
  * from .matrix import Matrix             # <<<<<<<<<<<<<<
@@ -13462,7 +13462,7 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "rhosig.pyx":33
+  /* "ompy/rhosig.pyx":33
  * from .spinfunctions import SpinFunctions
  * from .matrix import Matrix
  * from .library import div0             # <<<<<<<<<<<<<<
@@ -13483,31 +13483,31 @@ if (!__Pyx_RefNanny) {
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":45
+  /* "ompy/rhosig.pyx":45
  * # cdef np.ndarray Js = np.array([3, 4, 5]) # Hacky test of beta-Oslo spin range. No effect?
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
  *     return SpinFunctions(Ex=Ex, J=J,
  *                          model=spincutModel,
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_1spin_dist, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_1spin_dist, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_spin_dist, __pyx_t_1) < 0) __PYX_ERR(0, 45, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":51
+  /* "ompy/rhosig.pyx":51
  * 
  * 
  * def z(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
  *     cdef np.ndarray z
  *     cdef float inner_sum
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_3z, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 51, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_3z, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 51, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_z, __pyx_t_1) < 0) __PYX_ERR(0, 51, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":107
+  /* "ompy/rhosig.pyx":107
  *                      Ex: np.ndarray, resolution: np.ndarray,
  *                      p0=None,
  *                      method="Powell", options={'disp': True},             # <<<<<<<<<<<<<<
@@ -13521,31 +13521,31 @@ if (!__Pyx_RefNanny) {
   __Pyx_GIVEREF(__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":103
+  /* "ompy/rhosig.pyx":103
  * 
  * 
  * def decompose_matrix(matrix: Matrix, std: Matrix, *,             # <<<<<<<<<<<<<<
  *                      Eg: np.ndarray, nld: np.ndarray,
  *                      Ex: np.ndarray, resolution: np.ndarray,
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_5decompose_matrix, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 103, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_5decompose_matrix, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 103, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_decompose_matrix, __pyx_t_1) < 0) __PYX_ERR(0, 103, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":186
+  /* "ompy/rhosig.pyx":186
  *         return rho_fit, T_fit, z_array
  * 
  * def normalize(values, std=0):             # <<<<<<<<<<<<<<
  *     matrix = unumpy.uarray(values, std)
  * 
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_7normalize, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 186, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_7normalize, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 186, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_normalize, __pyx_t_1) < 0) __PYX_ERR(0, 186, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":197
+  /* "ompy/rhosig.pyx":197
  *     return values, std
  * 
  * def decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method="Powell", options={'disp': True}, fill_value=0):             # <<<<<<<<<<<<<<
@@ -13558,108 +13558,108 @@ if (!__Pyx_RefNanny) {
   __pyx_k__7 = __pyx_t_1;
   __Pyx_GIVEREF(__pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_9decompose_matrix_with_unc, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 197, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_9decompose_matrix_with_unc, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 197, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_decompose_matrix_with_unc, __pyx_t_1) < 0) __PYX_ERR(0, 197, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":254
+  /* "ompy/rhosig.pyx":254
  * 
  * 
  * def objfun1D(x, *args):             # <<<<<<<<<<<<<<
  *     """
  *     1D version of the chi2 function (needed for minimize function)
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_11objfun1D, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 254, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_11objfun1D, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 254, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_objfun1D, __pyx_t_1) < 0) __PYX_ERR(0, 254, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":284
+  /* "ompy/rhosig.pyx":284
  * 
  * 
  * def chi2(np.ndarray rho, np.ndarray T, np.ndarray Pexp, np.ndarray Perr,             # <<<<<<<<<<<<<<
  *          np.ndarray Emid_Eg, np.ndarray Emid_nld, np.ndarray Emid_Ex,
  *          np.ndarray dE_resolution, np.ndarray z_array):
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_13chi2, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 284, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_13chi2, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 284, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_chi2, __pyx_t_1) < 0) __PYX_ERR(0, 284, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":303
+  /* "ompy/rhosig.pyx":303
  * @cython.boundscheck(True) # turn off bounds-checking for entire function
  * @cython.wraparound(True)  # turn off negative index wrapping for entire function
  * def PfromRhoT(np.ndarray rho, np.ndarray T, int Nbins_Ex, np.ndarray Emid_Eg,             # <<<<<<<<<<<<<<
  *               np.ndarray Emid_nld, np.ndarray Emid_Ex,
  *               np.ndarray dE_resolution, type="transCoeff",
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_15PfromRhoT, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 303, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_15PfromRhoT, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 303, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_PfromRhoT, __pyx_t_1) < 0) __PYX_ERR(0, 303, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":360
+  /* "ompy/rhosig.pyx":360
  * 
  * 
  * def div0(np.ndarray a, np.ndarray b ):             # <<<<<<<<<<<<<<
  *     """ division function designed to ignore / 0,
  *     i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] """
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_17div0, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 360, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_17div0, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 360, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_div0, __pyx_t_1) < 0) __PYX_ERR(0, 360, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":370
+  /* "ompy/rhosig.pyx":370
  * 
  * 
  * def rhoTfrom1D(np.ndarray x1D, int Nbins_rho):             # <<<<<<<<<<<<<<
  *     """ split 1D array to who equal length subarrays """
  *     cdef np.ndarray rho = x1D[:Nbins_rho]
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_19rhoTfrom1D, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 370, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_19rhoTfrom1D, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 370, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_rhoTfrom1D, __pyx_t_1) < 0) __PYX_ERR(0, 370, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":377
+  /* "ompy/rhosig.pyx":377
  * 
  * 
  * def fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs):             # <<<<<<<<<<<<<<
  *     """ Make the first generation cuts to the matrix
  *     Parameters:
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_21fg_cut_matrix, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 377, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_21fg_cut_matrix, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 377, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_fg_cut_matrix, __pyx_t_1) < 0) __PYX_ERR(0, 377, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":417
+  /* "ompy/rhosig.pyx":417
  *     return array, Emid_Eg, Emid_Ex, Emid_nld
  * 
  * def spin_dist(Ex, J, spincutModel, spincutPars):             # <<<<<<<<<<<<<<
  *     """ See `SpinFunctions` """
  *     return SpinFunctions(Ex=Ex, J=J,
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_23spin_dist, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 417, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_23spin_dist, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 417, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_spin_dist, __pyx_t_1) < 0) __PYX_ERR(0, 417, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":424
+  /* "ompy/rhosig.pyx":424
  * 
  * 
  * def z_from_spin_dist(np.ndarray Exarr, np.ndarray Egarr, spin_dist_par=None):             # <<<<<<<<<<<<<<
  *     """
  *     Create a array for the *z-factor*, a spin-parity dependent factor
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_6rhosig_25z_from_spin_dist, NULL, __pyx_n_s_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 424, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_4ompy_6rhosig_25z_from_spin_dist, NULL, __pyx_n_s_ompy_rhosig); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 424, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_z_from_spin_dist, __pyx_t_1) < 0) __PYX_ERR(0, 424, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "rhosig.pyx":1
+  /* "ompy/rhosig.pyx":1
  * # -*- coding: utf-8 -*-             # <<<<<<<<<<<<<<
  * # cython: profile=True
  * """
@@ -13686,11 +13686,11 @@ if (!__Pyx_RefNanny) {
   __Pyx_XDECREF(__pyx_t_2);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init rhosig", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init ompy.rhosig", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     Py_CLEAR(__pyx_m);
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init rhosig");
+    PyErr_SetString(PyExc_ImportError, "init ompy.rhosig");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();

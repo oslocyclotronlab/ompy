@@ -1,5 +1,6 @@
 from typing import Union, List, Iterable, Any, Callable
-from .matrix import Matrix, Vector
+from .matrix import Matrix
+from .vector import Vector
 
 
 class Action:

@@ -5,7 +5,7 @@ import numpy as np
 
 @pytest.fixture()
 def Si28():
-    return om.load_example_raw('Si28')
+    return om.example_raw('Si28')
 
 
 @pytest.mark.parametrize(

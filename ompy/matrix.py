@@ -34,14 +34,14 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib import ticker
 from pathlib import Path
-from matplotlib.colors import (LogNorm, Normalize, LinearSegmentedColormap,
-                               SymLogNorm)
+from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
 from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
 from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
-                           save_numpy_2D, load_numpy_2D, save_tar, load_tar)
+                           save_numpy_2D, load_numpy_2D, save_tar, load_tar, 
+                           filetype_from_suffix)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
 from .decomposition import index
@@ -278,8 +278,6 @@ class Matrix():
             norm = LogNorm(vmin=vmin, vmax=vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
-        elif scale == 'symlog':
-            norm = SymLogNorm(vmin=vmin, vmax=vmax)
         else:
             raise ValueError("Unsupported zscale ", scale)
         # Move all bins down to lower bins
@@ -322,7 +320,7 @@ class Matrix():
 
             cbar.ax.set_ylabel("# counts")
             plt.show()
-        return lines, fig, ax
+        return lines, ax, fig
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
@@ -850,141 +848,6 @@ def to_values_axis(axis: Any) -> int:
     if axis == 2:
         return axis
     return (axis + 1) % 2
-
-
-class Vector():
-    def __init__(self, values: Optional[Iterable[float]] = None,
-                 E: Optional[Iterable[float]] = None,
-                 path: Optional[Union[str, Path]] = None):
-        if values is None and E is not None:
-            self.E = np.asarray(E, dtype=float)
-            self.values = np.zeros_like(E)
-        elif values is not None and E is None:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.arange(0.5, len(self.values), 1)
-        elif values is None and E is None:
-            self.values = np.zeros(1)
-            self.E = np.zeros(1)
-        else:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.asarray(E, dtype=float)
-        if path is not None:
-            self.load(path)
-        self.verify_integrity()
-
-    def verify_integrity(self):
-        """ Verify the internal consistency of the vector
-
-        Raises:
-            AssertionError if any test fails
-        """
-        assert self.values is not None
-        assert self.E is not None
-        assert self.E.shape == self.values.shape
-
-    def calibration(self):
-        """Calculate and return the calibration coefficients of the energy axes
-        """
-        #  Formatted as "a{axis}{power of E}"
-        calibration = {"a0": self.E[0],
-                       "a1": self.E[1]-self.E[0]}
-        return calibration
-
-    def plot(self, ax: Optional[Any] = None,
-             scale: str = 'linear', **kwargs) -> Tuple[Any, Any]:
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-
-        ax.step(self.E, self.values, where='mid', **kwargs)
-        ax.xaxis.set_major_locator(MeshLocator(self.E))
-        ax.set_yscale(scale)
-        if ax is None:
-            plt.show()
-        return fig, ax
-
-    def save(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
-        """ Save to a file of specified format
-
-        Raises:
-            ValueError if the filetype is not supported
-        """
-        path = Path(path) if isinstance(path, str) else path
-        if filetype is None:
-            filetype = filetype_from_suffix(path)
-        filetype = filetype.lower()
-        if filetype == 'numpy':
-            save_numpy_1D(self.values, self.E, path)
-        elif filetype == 'tar':
-            save_tar([self.values, self.E], path)
-        elif filetype == 'mama':
-            mama_write(self, path, comment="Made by Oslo Method Python")
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
-
-
-    def load(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
-        """ Load vector from specified format
-        """
-        path = Path(path) if isinstance(path, str) else path
-        if filetype is None:
-            filetype = filetype_from_suffix(path)
-        filetype = filetype.lower()
-
-        if filetype == 'numpy':
-            self.values, self.E = load_numpy_1D(path)
-        elif filetype == 'tar':
-            self.values, self.E = load_tar(path)
-        elif filetype == 'mama':
-            self.values, self.E = mama_read(path)
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
-        self.verify_integrity()
-
-        return None
-
-    def transform(self, const=1, alpha=0, inplace=True) -> Optional[Vector]:
-        """
-        Return a transformed version of the vector:
-        vector -> const * vector * exp(alpha*E_array)
-        """
-        vector_transformed = (const * self.values
-                              * np.exp(alpha*self.E)
-                              )
-        if not inplace:
-            return Vector(vector_transformed, E=self.E)
-
-        self.values = vector_transformed
-
-    def index(self, E: float) -> int:
-        """ Returns the closest index corresponding to the E value """
-        return index(self.E, E)
-
-    def indices(self, E: Iterable[float]) -> np.ndarray:
-        """ Returns the closest indices corresponding to the E value"""
-        indices = [self.index_E(e) for e in E]
-        return np.array(indices)
-
-    @property
-    def counts(self) -> float:
-        return self.values.sum()
-
-    @property
-    def shape(self) -> Tuple[int]:
-        return self.values.shape
-
-
-def filetype_from_suffix(path: Path) -> str:
-    suffix = path.suffix
-    if suffix == '.tar':
-        return 'tar'
-    elif suffix == '.npy':
-        return 'numpy'
-    elif suffix == '.m':
-        return 'mama'
-    else:
-        raise ValueError(f"Unsupported filetype {suffix}")
 
 
 class MeshLocator(ticker.Locator):
