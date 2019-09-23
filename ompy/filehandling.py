@@ -3,6 +3,8 @@ from pathlib import Path
 import tarfile
 import time
 import numpy as np
+from numpy import ndarray
+from scipy.ndimage import gaussian_filter1d
 
 # from .matrix import Matrix
 
@@ -266,3 +268,44 @@ def save_numpy_1D(values: np.ndarray, E: np.ndarray,
     mat = np.append(values, E)
     assert mat.size % 2 == 0
     np.save(path, mat)
+
+
+def filetype_from_suffix(path: Path) -> str:
+    suffix = path.suffix
+    if suffix == '.tar':
+        return 'tar'
+    elif suffix == '.npy':
+        return 'numpy'
+    elif suffix == '.m':
+        return 'mama'
+    else:
+        raise ValueError(f"Unsupported filetype {suffix}")
+
+
+def load_discrete(path: Union[str, Path], energy: ndarray,
+                  resolution: float = 0.1) -> Tuple[ndarray, ndarray]:
+    """ Load discrete levels and apply smoothing
+
+    Assumes linear equdistant binning
+
+    Args:
+        path: The file to load
+        energy: The binning to use
+        resolution: The resolution to apply to the gaussian smoothing
+    Returns:
+        The binned energies and the smoothed binning
+    """
+    energies = np.loadtxt(path)
+    energies /= 1e3  # convert to MeV
+
+    binsize = energy[1] - energy[0]
+    bin_edges = np.append(energy, energy[-1] + binsize)
+    bin_edges -= binsize / 2
+
+    hist, _ = np.histogram(energies, bins=bin_edges)
+    hist = hist.astype(float) / binsize  # convert to levels/MeV
+
+    smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
+    return hist, smoothed
+
+

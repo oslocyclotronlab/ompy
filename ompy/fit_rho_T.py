@@ -35,16 +35,12 @@ from . import rebin as rebin
 from . import rhosig as rsg
 from .rebin import rebin_2D
 from .matrix import Matrix
-from .matrix import Vector
+from .vector import Vector
 import copy
 import numpy as np
 from scipy.optimize import minimize
 from typing import Optional, Any, Union, Dict, Tuple
-import logging
 
-
-LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
 
 
 class FitRhoT:

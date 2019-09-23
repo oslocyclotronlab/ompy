@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d#, interp2d
 from .rebin import *
 from .library import *
 from .gauss_smoothing import gauss_smoothing
+from .matrix import Matrix
 
 DTYPE = np.float64
 
@@ -259,8 +260,8 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
         cmp_low = cmp_matrix[i_g_sim_low,:]
         cmp_high = cmp_matrix[i_g_sim_high,:]
         # These need to be recalibrated from Ecmp_array to Eout_array:
-        cmp_low = rebin(cmp_low, Ecmp_array, Eout_array)
-        cmp_high = rebin(cmp_high, Ecmp_array, Eout_array)
+        cmp_low = rebin_1D(cmp_low, Ecmp_array, Eout_array)
+        cmp_high = rebin_1D(cmp_high, Ecmp_array, Eout_array)
         # print("Eout_array[{:d}] = {:.1f}".format(j, E_j), "Eg_low =", Eg_sim_array[i_g_sim_low], "Eg_high =", Eg_sim_array[i_g_sim_high], flush=True)
 
         # Fetch corresponding values for full-energy, etc:
@@ -471,8 +472,8 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs):
     # ax.legend()
     # plt.show()
 
-    # Put R into Matrix object:
-    response = Matrix(matrix=R, E0_array=Eout_array, E1_array=Eout_array)
+    # Put R into Matrix object
+    response = Matrix(values=R, Eg=Eout_array, Ex=Eout_array)
     
     # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
     return response, f_fwhm_rel(Eout_array), f_Eff_tot(Eout_array), f_pcmp(Eout_array), f_pFE(Eout_array), f_pSE(Eout_array), f_pDE(Eout_array), f_p511(Eout_array)
