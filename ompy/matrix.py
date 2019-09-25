@@ -328,7 +328,8 @@ class Matrix():
         """ Plots the projection of the matrix along axis
 
         Args:
-            axis: The axis to project onto. Can be 0 or 1.
+            axis: The axis to project onto.
+                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
             Emin: The minimum energy to be summed over.
             Emax: The maximum energy to be summed over.
             ax: The axes object to plot onto.
@@ -386,13 +387,13 @@ class Matrix():
         isEx = axis == 1
 
         # Determine subset of the other axis to be summed
-        indexE = self.index_Ex if isEx else self.index_Eg
-        rangeE = self.range_Ex if isEx else self.range_Eg
+        indexE = self.index_Eg if isEx else self.index_Ex
+        rangeE = self.range_Eg if isEx else self.range_Ex
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax+1)
-        selection = self.values[subset, :] if isEx else self.values[:, subset]
-        energy = self.Ex[subset] if isEx else self.Eg[subset]
+        selection = self.values[:, subset] if isEx else self.values[subset, :]
+        energy = self.Ex if isEx else self.Eg
 
         projection = selection.sum(axis=axis)
         if normalize:
@@ -806,7 +807,8 @@ def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
-        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
+              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
     Returns:
         An int describing the axis in the basis of the plot,
         _not_ the values' dimension.
