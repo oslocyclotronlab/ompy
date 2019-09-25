@@ -1,9 +1,8 @@
 language: python
-python:
-    - "3.7"
+python: 3.7
 before_install:
     - pip install cython
-    - sudo apt-get install python-{scipy,numpy,matplotlib,progressbar} ipython libblas{3,-dev} liblapack{3,-dev} libatlas{3-base,-dev} cmake build-essential git gfortran
+    - sudo apt-get install python-{scipy,numpy,matplotlib,pandas,progressbar} ipython libblas{3,-dev} liblapack{3,-dev} libatlas{3-base,-dev} cmake build-essential git gfortran
     - git clone https://github.com/JohannesBuchner/MultiNest.git
     - cd MultiNest/build/ && cmake .. && make && cd ../../
     - export LD_LIBRARY_PATH=$(pwd)/MultiNest/lib/:$LD_LIBRARY_PATH

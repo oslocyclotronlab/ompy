@@ -46,8 +46,9 @@ class NormNLD:
         self.nld_norm = None  # Normalized nld
         self.discretes = None
 
-        if np.max(self.nld[:, 0] > 1000):
+        if np.any(self.nld[:, 0] > 1000):
             warnings.warn("Are you sure that all input is in MeV, not keV?")
+            raise RuntimeError("What it said^")
 
         if method is "2points":
             pars_req = {"nldE1", "nldE2"}

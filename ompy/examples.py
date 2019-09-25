@@ -3,9 +3,9 @@ from typing import Tuple, Union
 from .matrix import Matrix
 import numpy as np
 
-EXAMPLES = {'Dy164': {'raw': "../../data/Dy164_raw.m",
+EXAMPLES = {'dy164': {'raw': "../../data/Dy164_raw.m",
                       'response': "../../data/Dy164_response_matrix.m"},
-            'Si28': {'raw': "../../data/Si28_raw_matrix_compressed.m"}
+            'si28': {'raw': "../../data/Si28_raw_matrix_compressed.m"}
             }
 DATAPATH = os.path.abspath(__file__)
 
@@ -18,9 +18,16 @@ def list_examples():
     return list(EXAMPLES.keys())
 
 
-def load_example_raw(name: str) -> Matrix:
+def example_raw(name: str) -> Matrix:
+    name = name.lower()
     path = get_path(EXAMPLES[name]['raw'])
-    return Matrix(filename=path)
+    return Matrix(path=path)
+
+
+def example_response(name: str) -> Matrix:
+    name = name.lower()
+    path = get_path(EXAMPLES[name]['response'])
+    return Matrix(path=path)
 
 
 def disjoint_rows(shape: Tuple[int, int]) -> Matrix:

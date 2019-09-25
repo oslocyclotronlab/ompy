@@ -32,10 +32,11 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Generator, Optional, Union
+from typing import Tuple, Generator, Optional
 from .matrix import Matrix
 from .library import div0
 from .rebin import rebin_2D
+from .action import Action
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -66,6 +67,8 @@ class FirstGeneration:
         self.multiplicity_estimation = 'statistical'
         self.use_slide: bool = False
 
+        self.action = Action('matrix')
+
     def __call__(self, matrix: Matrix) -> Matrix:
         """ Wrapper for self.apply() """
         return self.apply(matrix)
@@ -80,6 +83,7 @@ class FirstGeneration:
             The first generation matrix
         """
         matrix = copy.deepcopy(unfolded)
+        self.action.act_on(matrix)
         # We don't want negative energies
         matrix.cut('Ex', Emin=0.0)
 
@@ -200,6 +204,7 @@ class FirstGeneration:
         Eg, Ex = np.meshgrid(matrix.Eg, matrix.Ex)
         Ex_prime = Ex * self.statistical_ratio
         if self.use_slide:
+            # TODO np.clip is much more elegant
             slide = np.minimum(np.maximum(Ex_prime,
                                           self.statistical_lower),
                                self.statistical_upper)
@@ -247,7 +252,7 @@ class FirstGeneration:
         γ is the length of the row from 0 Eγ to the diagonal.
         """
         H = np.zeros(matrix.shape)
-        for i, j in diagonal_elements(matrix):
+        for i, j in matrix.diagonal_elements():
             H[i, :j] = 1/max(1, j)
         return H
 
@@ -263,22 +268,6 @@ class FirstGeneration:
             raise ValueError("Expected multiplicity estimation to"
                              " be either 'statistical' or 'total'")
 
-
-def diagonal_elements(mat: Matrix) -> Generator[Tuple[int, int], None, None]:
-    """ Iterates over the last non-zero elements
-
-    Args:
-        mat: The matrix to iterate over
-    Yields:
-        Indicies (i, j) over the last non-zero (=diagonal)
-        elements.
-    """
-    Ny = mat.shape[1]
-    for i, row in enumerate(mat.values):
-        for j, col in enumerate(reversed(row)):
-            if col != 0.0:
-                yield i, Ny-j
-                break
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:

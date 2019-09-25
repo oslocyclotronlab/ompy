@@ -1,6 +1,7 @@
 import inspect
-from .matrix import Matrix
-from typing import Callable, Any, Optional, List
+from typing import Callable, Any, List
+from ..matrix import Matrix
+from ..vector import Vector
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize
@@ -24,7 +25,7 @@ def plot_hook(func, condition: Callable[[Any], bool] = lambda i: True):
 
         names = return_var_names(func)
         for i, item in enumerate(res):
-            if isinstance(item, Matrix):
+            if isinstance(item, (Matrix, Vector)):
                 item.plot()
             elif isinstance(item, np.ndarray):
                 fig, ax = plt.subplots()
