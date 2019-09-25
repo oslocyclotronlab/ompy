@@ -6,11 +6,10 @@ import pymultinest
 import os
 import numpy as np
 
-from .norm_nld import NormNLD
 from .norm_gsf import NormGSF
 
 
-def run_nld_2regions(p0, chi2_args):
+def run_nld_2regions(p0, chi2_args, errfn):
     """
     Run multinest for the nld normalization on two regions:
     Discrete levels at low energy and nld(Sn) (or model) at high energies
@@ -72,7 +71,7 @@ def run_nld_2regions(p0, chi2_args):
             print("Cube 3:", cp)
 
     def loglike(cube, ndim, nparams):
-        chi2 = NormNLD.chi2_disc_ext(cube, *chi2_args)
+        chi2 = errfn(cube, *chi2_args)
         loglikelihood = -0.5 * chi2
         return loglikelihood
 

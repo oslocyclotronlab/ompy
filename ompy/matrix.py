@@ -27,10 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from __future__ import annotations
-import warnings
 import logging
 import copy
-import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -40,10 +38,13 @@ from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
 from .matrixstate import MatrixState
-from .library import (mama_read, mama_write, div0, fill_negative,
-                      diagonal_resolution, save_numpy, load_numpy)
+from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
+                           save_numpy_2D, load_numpy_2D, save_tar, load_tar, 
+                           filetype_from_suffix)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
+from .decomposition import index
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -85,7 +86,6 @@ class Matrix():
         Ex: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
-        mask: A boolean array for cutting the array
     TODO:
         * Find a way to handle units
         * Synchronize cuts. When a cut is made along one axis,
@@ -99,7 +99,7 @@ class Matrix():
                  Eg: Optional[np.ndarray] = None,
                  Ex: Optional[np.ndarray] = None,
                  std: Optional[np.ndarray] = None,
-                 filename: Optional[str] = None,
+                 path: Optional[Union[str, Path]] = None,
                  shape: Optional[Tuple[int, int]] = None,
                  state: Union[str, MatrixState] = 'raw'):
         """
@@ -131,12 +131,11 @@ class Matrix():
         self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
         self.std = std
 
-        if filename is not None:
-            self.load(filename)
+        if path is not None:
+            self.load(path)
         self.verify_integrity()
 
         self.state = state
-        self.mask = None
 
     def verify_integrity(self):
         """ Runs checks to verify internal structure
@@ -185,18 +184,46 @@ class Matrix():
             if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
 
-    def load(self, filename: str) -> None:
-        """ Load matrix from mama file
-
-        Args:
-            filename: Path to mama file
+    def load(self, path: Union[str, Path],
+             filetype: Optional[str] = None) -> None:
+        """ Load vector from specified format
         """
-        # Load matrix from file:
-        matrix, Eg, Ex = mama_read(filename)
-        self.values = matrix
-        self.Eg = Eg
-        self.Ex = Ex
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
+        filetype = filetype.lower()
+
+        if filetype == 'numpy':
+            self.values, self.Eg, self.Ex = load_numpy_2D(path)
+        elif filetype == 'tar':
+            self.values, self.Eg, self.Eg = load_tar(path)
+        elif filetype == 'mama':
+            matrix, Eg, Ex = mama_read(path)
+            self.values = matrix
+            self.Eg = Eg
+            self.Ex = Ex
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
+
+        return None
+
+    def save(self, path: Union[str, Path], filetype: Optional[str] = None):
+        """Save matrix to mama file
+        """
+        path = Path(path) if isinstance(path, str) else path
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
+        filetype = filetype.lower()
+
+        if filetype == 'numpy':
+            save_numpy_2D(self.values, self.Eg, self.Ex, path)
+        elif filetype == 'tar':
+            save_tar([self.values, self.Eg, self.Ex], path)
+        elif filetype == 'mama':
+            mama_write(self, path, comment="Made by Oslo Method Python")
+        else:
+            raise ValueError(f"Unknown filetype {filetype}")
 
     def calibration(self) -> Dict[str, np.ndarray]:
         """ Calculates the calibration coefficients of the energy axes
@@ -301,7 +328,8 @@ class Matrix():
         """ Plots the projection of the matrix along axis
 
         Args:
-            axis: The axis to project onto. Can be 0 or 1.
+            axis: The axis to project onto.
+                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
             Emin: The minimum energy to be summed over.
             Emax: The maximum energy to be summed over.
             ax: The axes object to plot onto.
@@ -359,13 +387,13 @@ class Matrix():
         isEx = axis == 1
 
         # Determine subset of the other axis to be summed
-        indexE = self.index_Ex if isEx else self.index_Eg
-        rangeE = self.range_Ex if isEx else self.range_Eg
+        indexE = self.index_Eg if isEx else self.index_Ex
+        rangeE = self.range_Eg if isEx else self.range_Ex
         imin = indexE(Emin) if Emin is not None else rangeE[0]
         imax = indexE(Emax) if Emax is not None else rangeE[-1]
         subset = slice(imin, imax+1)
-        selection = self.values[subset, :] if isEx else self.values[:, subset]
-        energy = self.Ex[subset] if isEx else self.Eg[subset]
+        selection = self.values[:, subset] if isEx else self.values[subset, :]
+        energy = self.Ex if isEx else self.Eg
 
         projection = selection.sum(axis=axis)
         if normalize:
@@ -399,11 +427,6 @@ class Matrix():
         for col in range(self.shape[1]):
             print('──', end='')
         print('')
-
-    def save(self, fname):
-        """Save matrix to mama file
-        """
-        mama_write(self, fname, comment="Made by Oslo Method Python")
 
     def cut(self, axis: Union[int, str],
             Emin: Optional[float] = None,
@@ -475,25 +498,32 @@ class Matrix():
         else:
             return Matrix(values_cut, Eg=Eg, Ex=Ex)
 
-    def cut_diagonal(self, E1: Iterable[float] = None,
-                     E2: Iterable[float] = None,
-                     inplace: bool = True) -> Union[None, Any]:
+    def cut_like(self, other, inplace=True) -> Optional[Matrix]:
+        if inplace:
+            self.cut('Ex', other.Ex.min(), other.Ex.max())
+            self.cut('Eg', other.Eg.min(), other.Eg.max())
+        else:
+            out = self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=False)
+            assert out is not None
+            out.cut('Eg', other.Eg.min(), other.Eg.max())
+            return out
+
+    def cut_diagonal(self, E1: Optional[Iterable[float]] = None,
+                     E2: Optional[Iterable[float]] = None,
+                     inplace: bool = True) -> Optional[Matrix]:
         """Cut away counts to the right of a diagonal line defined by indices
 
         If no limits are provided, an automatic cut will be made.
         Args:
-            E1 (optional): First point of intercept, ordered as Ex, Eg
-            E2 (optional): Second point of intercept
-            inplace (optional): Whether the operation should be applied to the
+            E1: First point of intercept, ordered as Ex, Eg
+            E2: Second point of intercept
+            inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
         Returns:
             The matrix with counts above diagonal removed if not inplace.
         """
         if E1 is None and E2 is None:
-            dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg)).reshape(self.shape)
-            Eg, Ex = np.meshgrid(self.Eg, self.Ex)
-            mask = np.zeros_like(self.values, dtype=bool)
-            mask[Eg >= Ex + dEg] = True
+            mask = self.diagonal_mask()
         elif E1 is None or E2 is None:
             raise ValueError("If either E1 or E2 is specified, "
                              "both must be specified and have same type")
@@ -501,11 +531,9 @@ class Matrix():
             mask = self.line_mask(E1, E2)
 
         if inplace:
-            self.mask = mask
             self.values[mask] = 0.0
         else:
             matrix = copy.deepcopy(self)
-            matrix.mask = mask
             matrix.values[mask] = 0.0
             return matrix
 
@@ -541,30 +569,43 @@ class Matrix():
         mask = np.where(j_mesh < line(i_mesh), True, False)
         return mask
 
-    def diagonal_mask(self, Ex_min: float, Ex_max: float,
-                      Eg_min: float) -> np.ndarray:
-        """Create a trapezoidal mask delimited by the diagonal of the matrix
+    def trapezoid(self, Ex_min: float, Ex_max: float,
+                  Eg_min: float, Eg_max: Optional[float] = None,
+                  inplace: bool = True) -> Optional[Matrix]:
+        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
             Ex_max: The top edge of the trapezoid
             Eg_min: The left edge of the trapezoid
+            #Eg_max: The right edge of the trapezoid used for defining the
+            #    diagonal. If not set, the diagonal will be found by
+            #    using the last nonzeros of each row.
         Returns:
-            The boolean array with counts below the line set to False
-        TODO: Is this function necessary?
+            Cut matrix if 'inplace' is True
         """
-        raise NotImplementedError()
         # Transform to index basis
-        iEx_min, iEx_max = self.indices_Eg([Ex_min, Ex_max])
-        iEg_min = self.index_Ex(Eg_min)
+        if Eg_max is not None:
+            raise NotImplementedError()
 
-        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
-        Ex_cut = self.Ex[(self.Ex > Ex_min) & (self.Ex < Ex_max)]
-        dEg = np.repeat(diagonal_resolution, len(self.Ex)).reshape(self.shape)
-        mask = np.zeros_like(self.values, dtype=bool)
-        mask[(Ex_min < Ex) & (Ex < Ex_max) & (Eg < Ex + dEg)] = True
+        for i, j in reversed(list(self.diagonal_elements())):
+            if self.Ex[i] <= Ex_max:
+                Eg_max = self.Eg[j]
+                break
 
-        return mask
+        iEx = (Ex_min < self.Ex) & (self.Ex < Ex_max)
+        iEg = (Eg_min < self.Eg) & (self.Eg < Eg_max)
+        indicies = np.ix_(iEx, iEg)
+        #mask = np.zeros_like(self.values, dtype=bool)
+        #mask[indicies] = True
+        if inplace:
+            self.values = self.values[indicies]
+            self.Ex = self.Ex[iEx]
+            self.Eg = self.Eg[iEg]
+        else:
+            return Matrix(values=self.values[indicies], Ex=self.Ex[iEx],
+                          Eg=self.Eg[iEg])
+
 
     def rebin(self, axis: Union[int, str],
               edges: Optional[Sequence[float]] = None,
@@ -626,6 +667,29 @@ class Matrix():
             else:
                 return Matrix(Eg=self.Eg, Ex=edges, values=rebinned)
 
+    def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
+        """ Iterates over the last non-zero elements
+
+        Args:
+            mat: The matrix to iterate over
+        Yields:
+            Indicies (i, j) over the last non-zero (=diagonal)
+            elements.
+        """
+        return diagonal_elements(self.values)
+
+    def diagonal_resolution(self) -> np.ndarray:
+        return diagonal_resolution(self.Ex)
+
+    def diagonal_mask(self) -> np.ndarray:
+        # TODO Implement an arbitrary diagonal mask
+        dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg))
+        dEg = dEg.reshape(self.shape)
+        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
+        mask = np.zeros_like(self.values, dtype=bool)
+        mask[Eg >= Ex + dEg] = True
+        return mask
+
     def fill_negative(self, window_size):
         self.values = fill_negative(self.values, window_size)
 
@@ -639,11 +703,13 @@ class Matrix():
 
     def index_Eg(self, E: float) -> int:
         """ Returns the closest index corresponding to the Eg value """
-        return np.abs(self.Eg - E).argmin()
+        return index(self.Eg, E)
+        # return np.abs(self.Eg - E).argmin()
 
     def index_Ex(self, E: float) -> int:
         """ Returns the closest index corresponding to the Ex value """
-        return np.abs(self.Ex - E).argmin()
+        return index(self.Ex, E)
+        #return np.abs(self.Ex - E).argmin()
 
     def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
         """ Returns the closest indices corresponding to the Eg value"""
@@ -695,6 +761,7 @@ class Matrix():
         self.Eg -= dEg
 
     def to_mid_bin(self):
+        """ Transform Eg and Ex from lower bin to mid bin """
         dEx = (self.Ex[1] - self.Ex[0])/2
         dEg = (self.Eg[1] - self.Eg[0])/2
         self.Ex += dEx
@@ -740,7 +807,8 @@ def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
-        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
+              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
     Returns:
         An int describing the axis in the basis of the plot,
         _not_ the values' dimension.
@@ -782,94 +850,6 @@ def to_values_axis(axis: Any) -> int:
     if axis == 2:
         return axis
     return (axis + 1) % 2
-
-
-class Vector():
-    def __init__(self, values: Optional[Iterable[float]] = None,
-                 E: Optional[Iterable[float]] = None,
-                 path: Optional[Union[str, Path]] = None):
-        if values is None and E is not None:
-            self.E = np.asarray(E, dtype=float)
-            self.values = np.zeros_like(E)
-        elif values is not None and E is None:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.arange(0.5, len(self.values), 1)
-        elif values is None and E is None:
-            self.values = np.zeros(1)
-            self.E = np.zeros(1)
-        else:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.asarray(E, dtype=float)
-        if path is not None:
-            self.load(path)
-        self.verify_integrity()
-
-    def verify_integrity(self):
-        """ Verify the internal consistency of the vector
-
-        Raises:
-            AssertionError if any test fails
-        """
-        assert self.values is not None
-        assert self.E is not None
-        assert self.E.shape == self.values.shape
-
-    def calibration(self):
-        """Calculate and return the calibration coefficients of the energy axes
-        """
-        #  Formatted as "a{axis}{power of E}"
-        calibration = {"a0": self.E[0],
-                       "a1": self.E[1]-self.E[0]}
-        return calibration
-
-    def plot(self, ax: Optional[Any] = None,
-             scale: str = 'linear', **kwargs) -> Tuple[Any, Any]:
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-
-        ax.step(self.E, self.values, where='mid', **kwargs)
-        ax.xaxis.set_major_locator(MeshLocator(self.E))
-        ax.set_yscale(scale)
-        if ax is None:
-            plt.show()
-        return fig, ax
-
-    def save(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
-        """ Save to a file of specified format
-
-        Raises:
-            ValueError if the filetype is not supported
-        """
-        filetype = filetype.lower()
-        if filetype == 'numpy':
-            save_numpy([self.values, self.E], path)
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
-
-
-    def load(self, path: Union[str, Path], filetype: str = 'numpy') -> None:
-        """ Load vector from specified format
-        """
-        filetype = filetype.lower()
-        if filetype == 'numpy':
-            self.values, self.E = load_numpy(path)
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
-
-        return None
-
-    def transform(self, const=1, alpha=0, inplace=True) -> Optional[Vector]:
-        """
-        Return a transformed version of the vector:
-        vector -> const * vector * exp(alpha*E_array)
-        """
-        vector_transformed = (const * self.values
-                              * np.exp(alpha*self.E)
-                              )
-        if not inplace:
-            return Vector(vector_transformed, E=self.E)
-
-        self.values = vector_transformed
 
 
 class MeshLocator(ticker.Locator):

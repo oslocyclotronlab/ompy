@@ -1,8 +1,5 @@
 * Notes
 ** Matrix
-*** Fix plotting to be more flexible and uniform
-*** Choosing points for cutting the diagonal is a pain. Automate it.
-
 **** Set number of sigma out
 **** Eksitasjon høyst neutron separation energy (+ litt for spinn restriksjon)
 **** Nedre tilstanden er øyemål, men skal ikke innholde diskrete verdier
@@ -11,30 +8,23 @@
 *** TODO Fix matrix cut diagonal
 
 *** Implement automatic unit conversion
+** Bevege grensene for trapezoidal cut for å finne området
+der endringer ikke lenger endrer nld og gsf i stor grad, dvs, stabilt.
+** Propager usikkerhet i responsmatrisen
+** Hvordan skal usikkerheten i matrisen propageres til
+nld og gsf?
+** Fiks MAMA-fil for kompatibilitet
+** Lag en bedre oppsett for å validere koden
+** Fiks Compton-subtraction
+** Valider unfolding og first generation method
+** Implementer normaliseringen
+** Implementer shape-metoden for nld
+** Fiks README og legg til advarsler om beta-versjon
 ** Integrer normaliseringskoden
 ** Skriv om gammanormaliseringen til en klasse
-** Merge Jørgens repo
-** Skriv docstrings
-** Legg til operasjonshistorie til Matrix for å
-forsikre seg at to matriser er like hvis man skal gjøre operasjoner på dem.
-Kan kopiere historier ved f.eks. A.apply_operations(B)
-** Endre design til å bli mer lazy?
-Isteden for at operasjonsklassene tar inn en matrise før operasjoner spesifiseres,
-kan man spesifisere operasjonene først for å så anvende disse på andre matriser.
-F.eks. 
-unfolder = Unfolder()
-unfolder.make_mask(min, max)
-unfolder.load_response(filename)
-unfolded1 = unfolder.unfold(mat1)
-unfolded2 = unfolder.unfold(mat2)
-** Something fishy is going on with the reshaping
-Suspect a 1 off error
-** TODO Fiks projeksion og plotting
-** TODO Fiks indeksering
 ** TODO Gjør kalibrering på en smartere måte
 ** TODO Gjør Poisson perturbering på signal og bakgrunn separat hvis nok
 informasjon er oppgitt av brukeren.
-** TODO Lag en perfekt matrise ved å gange sammen nivå og styrkefunk
 * Mystifystiske ting
 ** Hvorfor er raw squisha?
 ** Hvorfor er noen counts negative og mange float?

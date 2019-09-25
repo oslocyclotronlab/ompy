@@ -35,16 +35,12 @@ from . import rebin as rebin
 from . import rhosig as rsg
 from .rebin import rebin_2D
 from .matrix import Matrix
-from .matrix import Vector
+from .vector import Vector
 import copy
 import numpy as np
 from scipy.optimize import minimize
 from typing import Optional, Any, Union, Dict, Tuple
-import logging
 
-
-LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
 
 
 class FitRhoT:
@@ -127,6 +123,10 @@ class FitRhoT:
 
     def recalibrate_and_cut(self, matrix: Matrix, std: Matrix) -> Tuple[Matrix, Matrix]:
         """
+
+
+
+
         Set calibration & cuts [Ex_min:Ex_max, Eg_min:Eg_max] for input matrix.
         """
         E_min = min(self.Eg_min, self.Ex_min)
@@ -202,7 +202,7 @@ class FitRhoT:
                                       Eg=Eg,
                                       nld=Enld,
                                       Ex=Ex,
-                                      dE_resolution=dE_resolution,
+                                      resolution=dE_resolution,
                                       p0=p0,
                                       method=self.method,
                                       options=self.options,
