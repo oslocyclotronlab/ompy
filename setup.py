@@ -66,14 +66,14 @@ builtins.__OMPY_SETUP__ = True
 
 def get_version_info():
     # Adding the git rev number needs to be done inside write_version_py(),
-    # otherwise the import of numpy.version messes up the build under Python 3.
+    # otherwise the import of ompy.version messes up the build under Python 3.
     FULLVERSION = VERSION
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
     elif os.path.exists('ompy/version.py'):
         # must be a source distribution, use existing version file
         try:
-            from numpy.version import git_revision as GIT_REVISION
+            from ompy.version import git_revision as GIT_REVISION
         except ImportError:
             raise ImportError("Unable to import git_revision. Try removing "
                               "ompy/version.py and the build directory "
