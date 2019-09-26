@@ -1,5 +1,29 @@
+# Version control taken from numpy
+# We first need to detect if we're being called as part of the ompy setup
+# procedure itself in a reliable manner.
+try:
+    __OMPY_SETUP__
+except NameError:
+    __OMPY_SETUP__ = False
+
+if __OMPY_SETUP__:
+    import sys
+    sys.stderr.write('Running from ompy source directory.\n')
+else:
+    try:
+        from ompy.rebin import *
+    except ImportError:
+        msg = """Error importing ompy: you should not try to import ompy from
+        its source directory; please exit the ompy source tree, and relaunch
+        your python interpreter from there."""
+        raise ImportError(msg)
+    from .version import git_revision as __git_revision__
+    from .version import version as __version__
+    from .version import full_version as __full_version__
+
+
 # Simply import all functions and classes from all files to make them available
-# at the package level:
+# at the package level
 from .library import *
 from .rebin import *
 from .spinfunctions import *

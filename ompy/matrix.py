@@ -40,7 +40,7 @@ from typing import (Dict, Iterable, Any, Union, Tuple,
 from .matrixstate import MatrixState
 from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
 from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
-                           save_numpy_2D, load_numpy_2D, save_tar, load_tar, 
+                           save_numpy_2D, load_numpy_2D, save_tar, load_tar,
                            filetype_from_suffix)
 from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .rebin import rebin_2D
@@ -62,23 +62,24 @@ class Matrix():
     y-direction and M is columns going in the x-direction, the "x-dimension"
     of the matrix has the same shape as the Ex array (Excitation axis)
 
-              Diagonal Ex=Eγ │
-                             v
-    a y E │██████▓▓██████▓▓▓█░   ░
-    x   x │██ █████▓████████░   ░░
-    i a   │█████████████▓▓░░░░░
-    s x i │███▓████▓████░░░░░ ░░░░
-      i n │███████████░░░░   ░░░░░
-    1 s d │███▓█████░░   ░░░░ ░░░░ <-- "Folded" counts
-        e │███████▓░░░░░░░░░░░░░░░
-        x │█████░     ░░░░ ░░  ░░
-          │███░░░░░░░░ ░░░░░░  ░░░
-        N │█▓░░  ░░░  ░░░░░  ░░░░░
-          └───────────────────────
-                Eγ, index M
-                x axis
-                axis 0 of plot
-                axis 1 of matrix
+    .. parsed-literal::
+                   Diagonal Ex=Eγ
+                                  v
+         a y E │██████▓▓██████▓▓▓█░   ░
+         x   x │██ █████▓████████░   ░░
+         i a   │█████████████▓▓░░░░░
+         s x i │███▓████▓████░░░░░ ░░░░
+           i n │███████████░░░░   ░░░░░
+         1 s d │███▓█████░░   ░░░░ ░░░░ <-- "Folded" counts
+             e │███████▓░░░░░░░░░░░░░░░
+             x │█████░     ░░░░ ░░  ░░
+               │███░░░░░░░░ ░░░░░░  ░░░
+             N │█▓░░  ░░░  ░░░░░  ░░░░░
+               └───────────────────────
+                     Eγ, index M
+                     x axis
+                     axis 0 of plot
+                     axis 1 of matrix
 
     Attributes:
         matrix: 2D matrix storing the counting data
@@ -86,12 +87,14 @@ class Matrix():
         Ex: The excitation energy along the y-axis
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
+
+
     TODO:
-        * Find a way to handle units
-        * Synchronize cuts. When a cut is made along one axis,
+        - Find a way to handle units
+        - Synchronize cuts. When a cut is made along one axis,
           such as values[min:max, :] = 0, make cuts to the
           other relevant variables
-        * Make values, Ex and Eg to properties so that
+        - Make values, Ex and Eg to properties so that
           the integrity of the matrix can be ensured.
     """
     def __init__(self,
@@ -109,7 +112,8 @@ class Matrix():
 
         For initializing one can give values, [Ex, Eg] arrays,
         a filename for loading a saved matrix or a shape
-        for initialzing it with zero entries..
+        for initialzing it with zero entries.
+
         """
 
         if shape is not None and values is not None:
