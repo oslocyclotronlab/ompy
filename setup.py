@@ -140,6 +140,7 @@ ext_modules = [
         Extension("ompy.rhosig", ["ompy/rhosig.pyx"], include_dirs=[numpy.get_include()])
         ]
 
+install_requires = numpy.loadtxt("requirements.txt", dtype="str").tolist()
 setup(name='OMpy',
       version=get_version_info()[0],
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
@@ -154,16 +155,6 @@ setup(name='OMpy',
                             compile_time_env={"OPENMP": openmp}
                             ),
       zip_safe=False,
-      install_requires=[
-          'cython',
-          'numpy',
-          'pandas',
-          'matplotlib',
-          'termtables',
-          'pymultinest',
-          'scipy',
-          'uncertainties',
-          'tqdm'
-      ]
+      install_requires=install_requires
       )
 
