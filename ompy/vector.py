@@ -89,10 +89,7 @@ class Vector():
         Returns:
             The figure and axis used.
         """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-        else:
-            fig = None
+        fig, ax = plt.subplots() if ax is None else (None, ax)
 
         ax.step(self.E, self.values, where='mid', **kwargs)
         #ax.xaxis.set_major_locator(MeshLocator(self.E))
