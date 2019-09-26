@@ -55,9 +55,11 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx_automodapi.smart_resolver',
               'sphinx.ext.autosectionlabel',
               'recommonmark',
+              'nbsphinx',
+              'nbsphinx_link'
+              # 'notebook_sphinxext'
               # 'sphinxcontrib.katex',
               # 'sphinx_numfig',
-              # 'notebook_sphinxext']
               ]
 
 # autodoc_mock_imports = ["pymultinest"]
@@ -76,7 +78,7 @@ master_doc = 'index'
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 # source_suffix = ['.rst', '.md']
-source_suffix = [".rst", ".md"]
+source_suffix = [".rst", ".md", ".ipynb"]
 
 # -- Options for HTML output -------------------------------------------------
 

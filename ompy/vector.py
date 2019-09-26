@@ -89,11 +89,10 @@ class Vector():
         Returns:
             The figure and axis used.
         """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
+        fig, ax = plt.subplots() if ax is None else (None, ax)
 
         ax.step(self.E, self.values, where='mid', **kwargs)
-        ax.xaxis.set_major_locator(MeshLocator(self.E))
+        #ax.xaxis.set_major_locator(MeshLocator(self.E))
         ax.set_yscale(scale)
         ax.set_xlabel("Energy")
         ax.set_ylabel("# counts")
@@ -165,7 +164,7 @@ class Vector():
             std = relative_uncertainty * transformed
         if not inplace:
             if self.std is not None:
-                return Vector(transformed, self.E, std=std)
+                return Vector(transformed, E=self.E, std=std)
             return Vector(transformed, E=self.E)
 
         self.values = transformed

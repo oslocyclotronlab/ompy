@@ -4,6 +4,7 @@ import inspect
 import termtables as tt
 import json
 import pymultinest
+import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
 from pathlib import Path
 from numpy import ndarray
@@ -107,6 +108,11 @@ class Normalizer:
         # Optimize using multinest
         popt, samples = self.optimize(args, guess)
 
+        self.nld_parameters = popt
+        self.samples = samples
+
+        return popt, samples
+
     def initial_guess(self, limit_low: Tuple[float, float],
                       limit_high: Tuple[float, float]
                       ) -> Tuple[Tuple[float, float, float, float],
@@ -133,12 +139,12 @@ class Normalizer:
         LOG.debug("Using spin %s", spinstring)
 
         nld_low = self.nld.cut(*limit_low, inplace=False)
-        self.discrete.cut(*limit_low)
+        discrete = self.discrete.cut(*limit_low, inplace=False)
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
         # We don't want to send unecessary parameters to the minimizer
         model = lambda *args, **kwargs: self.model(*args, **kwargs, spin=self.spin)
-        args = (nld_low, nld_high, self.discrete, model)
+        args = (nld_low, nld_high, discrete, model)
         res = differential_evolution(errfn, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
@@ -234,6 +240,31 @@ class Normalizer:
 
         return popt, samples
 
+    def plot(self, ax: Any = None) -> Tuple[Any, Any]:
+        """ Plot the NLD, discrete levels and result of normalization
+
+		Args:
+    		ax: The matplotlib axis to plot onto
+    	Returns:
+        	The figure and axis created if no ax is supplied.
+        """
+        if ax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig = None
+
+        self.nld.plot(ax=ax, label='NLD')
+        transformed = self.nld.transform(self.nld_parameters['A'][0],
+                                         self.nld_parameters['alpha'][0],
+                                         inplace=False)
+        transformed.plot(ax=ax, label='Transformed')
+        self.discrete.plot(ax=ax, label='Discrete levels')
+        ax.set_yscale('log')
+        if fig is not None:
+            fig.legend(loc=9, ncol=3, frameon=False)
+
+        return fig, ax
+
     def reset(self, variable: Any) -> Any:
         """ Ensures `variable` is not None
 
@@ -245,10 +276,9 @@ class Normalizer:
             ValueError if both variable and
             self.variable are None.
         """
-        name = retrieve_name(variable)
+        name = _retrieve_name(variable)
         if variable is None:
             self_variable = getattr(self, name)
-            print(variable, name)
             if self_variable is None:
                 raise ValueError(f"`{name}` must be set")
             return self_variable
@@ -412,10 +442,20 @@ def Sn_from_D0(D0, Sn, J_target,
     nld = 1 / (summe * D0 * 1e-6)
     return [Sn, nld]
 
-def retrieve_name(var: Any) -> str:
-    """ Finds the source-code name of `var` """
-    callers_local_vars = inspect.currentframe().f_back.f_back.f_locals.items()
-    for name, value in callers_local_vars:
-        if value is var:
-            print(callers_local_vars)
-            return name
+def _retrieve_name(var: Any) -> str:
+    """ Finds the source-code name of `var`
+
+	NOTE: Only call from self.reset.
+
+	Args:
+    	var: The variable to retrieve the name of.
+    Returns:
+        The variable's name.
+    """
+    # Retrieve the line of the source code of the third frame.
+    # The 0th frame is the current function, the 1st frame is the
+    # calling function and the second is the calling function's caller.
+    line = inspect.stack()[2].code_context[0].strip()
+    # The name to use is the name given in self.reset(...)
+    name = line.split('(')[1].split(')')[0].strip()
+    return name

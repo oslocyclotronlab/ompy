@@ -21,6 +21,7 @@ git clone https://github.com/oslocyclotronlab/ompy/
     ``` bash
    conda install --file requirements.txt
    ```
+ - Many examples are written with [jupyter notebooks](https://jupyter.org/install), so you probably want to install this, too.
 
 ### OMpy package
 
@@ -54,7 +55,7 @@ Note that we require python 3.7 or higher. If your standard `python` and `pip` l
 #### OpenMP / MAC
 If you don't have OpenMP / have problems installing it, you can install without OpenMP. Type `export ompy_OpenMP=False` in the terminal before the setup above. For attempts to solve this issue, see also [#30](https://github.com/oslocyclotronlab/ompy/issues/30).
 
-## General usage
+### General usage
 All the functions and classes in the package are available in the main module. You get everything by importing the package
 
 ```py
