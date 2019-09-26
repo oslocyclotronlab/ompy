@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from pkg_resources import get_build_platform
 import numpy
+import subprocess
 import os
+import builtins
 
 try:
     from Cython.Build import cythonize
@@ -13,6 +15,97 @@ except ImportError:
 
 # build me (i.e. compile Cython modules) for testing in this directory using
 # python setup.py build_ext --inplace
+
+# Version rutine taken from numpy
+MAJOR = 0
+MINOR = 4
+MICRO = 0
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
+
+
+# Return the git revision as a string
+def git_version():
+    def _minimal_ext_cmd(cmd):
+        # construct minimal environment
+        env = {}
+        for k in ['SYSTEMROOT', 'PATH', 'HOME']:
+            v = os.environ.get(k)
+            if v is not None:
+                env[k] = v
+        # LANGUAGE is used on win32
+        env['LANGUAGE'] = 'C'
+        env['LANG'] = 'C'
+        env['LC_ALL'] = 'C'
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=env)
+        return out
+
+    try:
+        out = _minimal_ext_cmd(['git', 'rev-parse', 'HEAD'])
+        GIT_REVISION = out.strip().decode('ascii')
+    except (subprocess.SubprocessError, OSError):
+        GIT_REVISION = "Unknown"
+
+    if not GIT_REVISION:
+        # this shouldn't happen but apparently can (see gh-8512)
+        GIT_REVISION = "Unknown"
+
+    return GIT_REVISION
+
+# BEFORE importing setuptools, remove MANIFEST. Otherwise it may not be
+# properly updated when the contents of directories change (true for distutils,
+# not sure about setuptools).
+if os.path.exists('MANIFEST'):
+    os.remove('MANIFEST')
+
+# This is a bit hackish: we are setting a global variable so that the main
+# ompy __init__ can detect if it is being loaded by the setup routine, to
+# avoid attempting to load components that aren't built yet.  While ugly, it's
+# a lot more robust than what was previously being used.
+builtins.__OMPY_SETUP__ = True
+
+
+def get_version_info():
+    # Adding the git rev number needs to be done inside write_version_py(),
+    # otherwise the import of numpy.version messes up the build under Python 3.
+    FULLVERSION = VERSION
+    if os.path.exists('.git'):
+        GIT_REVISION = git_version()
+    elif os.path.exists('ompy/version.py'):
+        # must be a source distribution, use existing version file
+        try:
+            from numpy.version import git_revision as GIT_REVISION
+        except ImportError:
+            raise ImportError("Unable to import git_revision. Try removing "
+                              "ompy/version.py and the build directory "
+                              "before building.")
+    else:
+        GIT_REVISION = "Unknown"
+
+    FULLVERSION += '.dev0+' + GIT_REVISION[:7]
+
+    return FULLVERSION, GIT_REVISION
+
+
+def write_version_py(filename='ompy/version.py'):
+    cnt = """
+# THIS FILE IS GENERATED FROM OMPY SETUP.PY
+#
+short_version = '%(version)s'
+version = '%(version)s'
+full_version = '%(full_version)s'
+git_revision = '%(git_revision)s'
+"""
+    FULLVERSION, GIT_REVISION = get_version_info()
+
+    a = open(filename, 'w')
+    try:
+        a.write(cnt % {'version': VERSION,
+                       'full_version': FULLVERSION,
+                       'git_revision': GIT_REVISION})
+    finally:
+        a.close()
+write_version_py()
+
 
 # some machines have difficulties with OpenMP
 openmp = os.getenv("ompy_OpenMP")
@@ -48,15 +141,16 @@ ext_modules = [
         ]
 
 setup(name='OMpy',
-      version='0.3',
+      version=get_version_info()[0],
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
       author_email=("jorgenem@gmail.com, "
                     "fabio.zeiser@fys.uio.no, "
                     "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
-      py_modules=['ompy'],
+      packages=find_packages(),
       ext_modules=cythonize(ext_modules,
-                            compiler_directives={'language_level': "3"},
+                            compiler_directives={'language_level': "3",
+                                                 'embedsignature': True},
                             compile_time_env={"OPENMP": openmp}
                             ),
       zip_safe=False,
