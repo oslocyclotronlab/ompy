@@ -1,0 +1,9 @@
+ cython
+ numpy
+ pandas
+ matplotlib
+ termtables
+ pymultinest
+ scipy
+ uncertainties
+ tqdm
