@@ -61,6 +61,7 @@ git clone https://github.com/oslocyclotronlab/ompy/
     ``` bash
    conda install --file requirements.txt
    ```
+ - Many examples are written with [jupyter notebooks](https://jupyter.org/install), so you probably want to install this, too.
 
 ### OMpy package
 

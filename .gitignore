@@ -119,9 +119,10 @@ GGTAGS
 GPATH
 GRTAGS
 
-ompy/rebin.c
-ompy/rebin.html
+# ompy/rebin.c
+ompy/*.html
 
 tags
 
 notebooks/**/
+docs/source/api/**/
