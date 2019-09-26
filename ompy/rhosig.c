@@ -2320,7 +2320,8 @@ static PyObject *__pyx_codeobj__18;
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4ompy_6rhosig_1spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_1spin_dist, METH_VARARGS|METH_KEYWORDS, 0};
+static char __pyx_doc_4ompy_6rhosig_spin_dist[] = "spin_dist(Ex, J, spincutModel, spincutPars)";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_1spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_1spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_spin_dist};
 static PyObject *__pyx_pw_4ompy_6rhosig_1spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_Ex = 0;
   PyObject *__pyx_v_J = 0;
@@ -2537,7 +2538,8 @@ static PyObject *__pyx_pf_4ompy_6rhosig_spin_dist(CYTHON_UNUSED PyObject *__pyx_
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4ompy_6rhosig_3z = {"z", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_3z, METH_VARARGS|METH_KEYWORDS, 0};
+static char __pyx_doc_4ompy_6rhosig_2z[] = "z(ndarray Exarr, ndarray Egarr, spin_dist_par=None)";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_3z = {"z", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_3z, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_2z};
 static PyObject *__pyx_pw_4ompy_6rhosig_3z(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_Exarr = 0;
   PyArrayObject *__pyx_v_Egarr = 0;
@@ -3486,7 +3488,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_2z(CYTHON_UNUSED PyObject *__pyx_self, P
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_4decompose_matrix[] = " Decompose first generation matrix into nld and transmission coefficient\n\n    Parameters:\n    -----------\n    matrix : ndarray\n        First generations matrix to be decomposed\n    Eg, nld, Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n    p0 (np.ndarray, optional):\n        Initial guess for nld and transmission coefficient. See `FitRhoT.fit()`\n    use_z (bool or np.ndarray, optional):\n        See `FitRhoT.fit`; if not `False`, the created z-factor array\n        will be returned.\n    spin_dist_par (dict, optional):\n        Dict of spin-parity paramters to create the `z-factor`, see\n        See `FitRhoT.fit`\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld\n    T_fit: ndarray\n        fitted transmission coefficient\n    z_array (optional): If `use_z` is not `False`, the array for the\n                        `z-factor`is returned, too\n\n    ";
+static char __pyx_doc_4ompy_6rhosig_4decompose_matrix[] = "decompose_matrix(matrix: Matrix, std: Matrix, *, ndarray Eg: np.ndarray, ndarray nld: np.ndarray, ndarray Ex: np.ndarray, ndarray resolution: np.ndarray, p0=None, method=u'Powell', options={u'disp': True}, fill_value=0, use_z=False, spin_dist_par=None)\n Decompose first generation matrix into nld and transmission coefficient\n\n    Parameters:\n    -----------\n    matrix : ndarray\n        First generations matrix to be decomposed\n    Eg, nld, Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n    p0 (np.ndarray, optional):\n        Initial guess for nld and transmission coefficient. See `FitRhoT.fit()`\n    use_z (bool or np.ndarray, optional):\n        See `FitRhoT.fit`; if not `False`, the created z-factor array\n        will be returned.\n    spin_dist_par (dict, optional):\n        Dict of spin-parity paramters to create the `z-factor`, see\n        See `FitRhoT.fit`\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld\n    T_fit: ndarray\n        fitted transmission coefficient\n    z_array (optional): If `use_z` is not `False`, the array for the\n                        `z-factor`is returned, too\n\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_5decompose_matrix = {"decompose_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_5decompose_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_4decompose_matrix};
 static PyObject *__pyx_pw_4ompy_6rhosig_5decompose_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_matrix = 0;
@@ -4533,7 +4535,8 @@ static PyObject *__pyx_pf_4ompy_6rhosig_4decompose_matrix(CYTHON_UNUSED PyObject
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_4ompy_6rhosig_7normalize = {"normalize", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_7normalize, METH_VARARGS|METH_KEYWORDS, 0};
+static char __pyx_doc_4ompy_6rhosig_6normalize[] = "normalize(values, std=0)";
+static PyMethodDef __pyx_mdef_4ompy_6rhosig_7normalize = {"normalize", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_7normalize, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_6normalize};
 static PyObject *__pyx_pw_4ompy_6rhosig_7normalize(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_values = 0;
   PyObject *__pyx_v_std = 0;
@@ -4959,7 +4962,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_6normalize(CYTHON_UNUSED PyObject *__pyx
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_8decompose_matrix_with_unc[] = "\n    Routine for the decomposition of the first generations spectrum P_in\n    including a simple seach for statistical uncertainties. Perturbes input spectrum N_mc times and finds the mean and stddev. of the resulting fits.\n\n\n    Parameters:\n    -----------\n    P_in : ndarray\n        First generations matrix to be decomposed\n    Emin : ndarray\n        Array of middle-bin values\n    Emid_Eg, Emid_nld, Emid_Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    dE_resolution : nparray\n        Detector resolution\n    N_mc : int\n        Number of iterations for the perturbation\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld (2D: mean, std)\n    T_fit: ndarray\n        fitted transmission coefficient (2D: mean, std)\n    ";
+static char __pyx_doc_4ompy_6rhosig_8decompose_matrix_with_unc[] = "decompose_matrix_with_unc(P_in, P_err, Emid_Eg, Emid_nld, Emid_Ex, N_mc, method=u'Powell', options={u'disp': True}, fill_value=0)\n\n    Routine for the decomposition of the first generations spectrum P_in\n    including a simple seach for statistical uncertainties. Perturbes input spectrum N_mc times and finds the mean and stddev. of the resulting fits.\n\n\n    Parameters:\n    -----------\n    P_in : ndarray\n        First generations matrix to be decomposed\n    Emin : ndarray\n        Array of middle-bin values\n    Emid_Eg, Emid_nld, Emid_Ex : ndarray\n        Array of middle-bin values for Eg, nld and Ex\n    dE_resolution : nparray\n        Detector resolution\n    N_mc : int\n        Number of iterations for the perturbation\n    method : str\n        minimization method\n    options : dict\n        minimization methods\n    fill_value : currently unused\n\n    Returns:\n    --------\n    rho_fit: ndarray\n        fitted nld (2D: mean, std)\n    T_fit: ndarray\n        fitted transmission coefficient (2D: mean, std)\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_9decompose_matrix_with_unc = {"decompose_matrix_with_unc", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_8decompose_matrix_with_unc};
 static PyObject *__pyx_pw_4ompy_6rhosig_9decompose_matrix_with_unc(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_P_in = 0;
@@ -5829,7 +5832,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_8decompose_matrix_with_unc(CYTHON_UNUSED
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_10objfun1D[] = "\n    1D version of the chi2 function (needed for minimize function)\n    so x has one dimension only, but may be nested to contain rho and T\n\n    Parameters:\n    ----------\n    x: ndarray\n        workaround: 1D representation of the parameters rho and T\n    args: tuple\n        tuple of the fixed parameters needed to completely specify the function\n\n    ";
+static char __pyx_doc_4ompy_6rhosig_10objfun1D[] = "objfun1D(x, *args)\n\n    1D version of the chi2 function (needed for minimize function)\n    so x has one dimension only, but may be nested to contain rho and T\n\n    Parameters:\n    ----------\n    x: ndarray\n        workaround: 1D representation of the parameters rho and T\n    args: tuple\n        tuple of the fixed parameters needed to completely specify the function\n\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_11objfun1D = {"objfun1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_11objfun1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_10objfun1D};
 static PyObject *__pyx_pw_4ompy_6rhosig_11objfun1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_x = 0;
@@ -6582,7 +6585,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_10objfun1D(CYTHON_UNUSED PyObject *__pyx
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_12chi2[] = " Chi^2 between experimental and fitted first genration matrix";
+static char __pyx_doc_4ompy_6rhosig_12chi2[] = "chi2(ndarray rho, ndarray T, ndarray Pexp, ndarray Perr, ndarray Emid_Eg, ndarray Emid_nld, ndarray Emid_Ex, ndarray dE_resolution, ndarray z_array)\n Chi^2 between experimental and fitted first genration matrix";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_13chi2 = {"chi2", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_13chi2, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_12chi2};
 static PyObject *__pyx_pw_4ompy_6rhosig_13chi2(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_rho = 0;
@@ -7126,7 +7129,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_12chi2(CYTHON_UNUSED PyObject *__pyx_sel
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_14PfromRhoT[] = " Generate a first gernation matrix P from given nld and T (or gsf)\n    Parameters:\n    -----------\n    rho: ndarray\n        nld\n    T: ndarray, optional\n        transmission coefficient; either this or gsf must be specified\n    gsf: ndarray, optional\n        gamma-ray strength function; either this or gsf must be specified\n    type: string, optional\n        chosen by type= \"transCoeff\" /or/ \"gsfL1\"\n    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:\n        bin number and bin center values\n    Note: rho and T must have the same bin width\n    Returns:\n    --------\n    P: ndarray\n        normalized first generations matrix (sum of each Ex bin = 1)\n    ";
+static char __pyx_doc_4ompy_6rhosig_14PfromRhoT[] = "PfromRhoT(ndarray rho, ndarray T, int Nbins_Ex, ndarray Emid_Eg, ndarray Emid_nld, ndarray Emid_Ex, ndarray dE_resolution, type=u'transCoeff', ndarray z_array_in=None)\n Generate a first gernation matrix P from given nld and T (or gsf)\n    Parameters:\n    -----------\n    rho: ndarray\n        nld\n    T: ndarray, optional\n        transmission coefficient; either this or gsf must be specified\n    gsf: ndarray, optional\n        gamma-ray strength function; either this or gsf must be specified\n    type: string, optional\n        chosen by type= \"transCoeff\" /or/ \"gsfL1\"\n    Nbins_Ex, Emid_Eg, Emid_nld, Emid_Ex, dE_resolution:\n        bin number and bin center values\n    Note: rho and T must have the same bin width\n    Returns:\n    --------\n    P: ndarray\n        normalized first generations matrix (sum of each Ex bin = 1)\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_15PfromRhoT = {"PfromRhoT", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_15PfromRhoT, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_14PfromRhoT};
 static PyObject *__pyx_pw_4ompy_6rhosig_15PfromRhoT(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_rho = 0;
@@ -7952,7 +7955,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_14PfromRhoT(CYTHON_UNUSED PyObject *__py
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_16div0[] = " division function designed to ignore / 0,\n    i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] ";
+static char __pyx_doc_4ompy_6rhosig_16div0[] = "div0(ndarray a, ndarray b)\n division function designed to ignore / 0,\n    i.e. div0( [-1, 0, 1], 0 ) -> [0, 0, 0] ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_17div0 = {"div0", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_17div0, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_16div0};
 static PyObject *__pyx_pw_4ompy_6rhosig_17div0(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_a = 0;
@@ -8314,7 +8317,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_16div0(CYTHON_UNUSED PyObject *__pyx_sel
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_18rhoTfrom1D[] = " split 1D array to who equal length subarrays ";
+static char __pyx_doc_4ompy_6rhosig_18rhoTfrom1D[] = "rhoTfrom1D(ndarray x1D, int Nbins_rho)\n split 1D array to who equal length subarrays ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_19rhoTfrom1D = {"rhoTfrom1D", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_19rhoTfrom1D, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_18rhoTfrom1D};
 static PyObject *__pyx_pw_4ompy_6rhosig_19rhoTfrom1D(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_x1D = 0;
@@ -8469,7 +8472,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_18rhoTfrom1D(CYTHON_UNUSED PyObject *__p
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_20fg_cut_matrix[] = " Make the first generation cuts to the matrix\n    Parameters:\n    -----------\n    array : ndarray\n        2D Array that will be sliced\n    Emid : ndarray\n        Array of bin center energies [Note: up to here assumed symetrix for\n        both axes]\n    Egmin, Exmin, Emax : doubles\n        Lower and higher cuts for the gamma-ray and excitation energy axis\n    kwargs: optional\n        Will be ignored, just for compatibility;\n    Returns:\n    --------\n    array : ndarray\n        Sliced array\n    Emid_Eg : ndarray\n        Bin center energies of the gamma-ray axis\n    Emid_Ex : ndarray\n        Bin center energies of the excitation energy axis\n    Emid_nld : ndarray\n        Bin center energies of the nld once extracted\n    ";
+static char __pyx_doc_4ompy_6rhosig_20fg_cut_matrix[] = "fg_cut_matrix(array, Emid, Egmin, Exmin, Emax, **kwargs)\n Make the first generation cuts to the matrix\n    Parameters:\n    -----------\n    array : ndarray\n        2D Array that will be sliced\n    Emid : ndarray\n        Array of bin center energies [Note: up to here assumed symetrix for\n        both axes]\n    Egmin, Exmin, Emax : doubles\n        Lower and higher cuts for the gamma-ray and excitation energy axis\n    kwargs: optional\n        Will be ignored, just for compatibility;\n    Returns:\n    --------\n    array : ndarray\n        Sliced array\n    Emid_Eg : ndarray\n        Bin center energies of the gamma-ray axis\n    Emid_Ex : ndarray\n        Bin center energies of the excitation energy axis\n    Emid_nld : ndarray\n        Bin center energies of the nld once extracted\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_21fg_cut_matrix = {"fg_cut_matrix", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_21fg_cut_matrix, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_20fg_cut_matrix};
 static PyObject *__pyx_pw_4ompy_6rhosig_21fg_cut_matrix(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_array = 0;
@@ -8904,7 +8907,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_20fg_cut_matrix(CYTHON_UNUSED PyObject *
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_22spin_dist[] = " See `SpinFunctions` ";
+static char __pyx_doc_4ompy_6rhosig_22spin_dist[] = "spin_dist(Ex, J, spincutModel, spincutPars)\n See `SpinFunctions` ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_23spin_dist = {"spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_23spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_22spin_dist};
 static PyObject *__pyx_pw_4ompy_6rhosig_23spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_Ex = 0;
@@ -9122,7 +9125,7 @@ static PyObject *__pyx_pf_4ompy_6rhosig_22spin_dist(CYTHON_UNUSED PyObject *__py
 
 /* Python wrapper */
 static PyObject *__pyx_pw_4ompy_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_4ompy_6rhosig_24z_from_spin_dist[] = "\n    Create a array for the *z-factor*, a spin-parity dependent factor\n    that *might* have be missing the in previous implementation of the\n    Oslo Method.\n    ";
+static char __pyx_doc_4ompy_6rhosig_24z_from_spin_dist[] = "z_from_spin_dist(ndarray Exarr, ndarray Egarr, spin_dist_par=None)\n\n    Create a array for the *z-factor*, a spin-parity dependent factor\n    that *might* have be missing the in previous implementation of the\n    Oslo Method.\n    ";
 static PyMethodDef __pyx_mdef_4ompy_6rhosig_25z_from_spin_dist = {"z_from_spin_dist", (PyCFunction)(void*)(PyCFunctionWithKeywords)__pyx_pw_4ompy_6rhosig_25z_from_spin_dist, METH_VARARGS|METH_KEYWORDS, __pyx_doc_4ompy_6rhosig_24z_from_spin_dist};
 static PyObject *__pyx_pw_4ompy_6rhosig_25z_from_spin_dist(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_Exarr = 0;
