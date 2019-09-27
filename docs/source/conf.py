@@ -56,7 +56,7 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.autosectionlabel',
               'recommonmark',
               'nbsphinx',
-              'nbsphinx_link'
+              'nbsphinx_link',
               # 'notebook_sphinxext'
               # 'sphinxcontrib.katex',
               # 'sphinx_numfig',

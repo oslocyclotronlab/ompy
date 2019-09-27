@@ -3,3 +3,4 @@ sphinx-automodapi
 nbsphinx
 nbsphinx-link
 mock
+ipython
