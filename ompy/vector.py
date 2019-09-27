@@ -1,4 +1,5 @@
 from __future__ import annotations
+import copy
 from typing import Optional, Iterable, Union, Any, Tuple
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -79,13 +80,17 @@ class Vector():
         return calibration
 
     def plot(self, ax: Optional[Any] = None,
-             scale: str = 'linear', **kwargs) -> Tuple[Any, Any]:
+             scale: str = 'linear',
+             xlabel: Optional[str] = "Energy",
+             ylabel: Optional[str] = None, **kwargs) -> Tuple[Any, Any]:
         """ Plots the vector as a step graph
 
         Args:
             ax: The axis to plot onto.
             scale: The scale to use. Can be `linear`, `log`
                 `symlog` or `logit`.
+            xlabel (optional, str): Label on x-axis. Default is `"Energy"`.
+            ylabel (optional, str): Label on y-axis. Default is `None`.
         Returns:
             The figure and axis used.
         """
@@ -94,8 +99,8 @@ class Vector():
         ax.step(self.E, self.values, where='mid', **kwargs)
         #ax.xaxis.set_major_locator(MeshLocator(self.E))
         ax.set_yscale(scale)
-        ax.set_xlabel("Energy")
-        ax.set_ylabel("# counts")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
 
         if self.std is not None:
             # TODO: Fix color
@@ -229,6 +234,10 @@ class Vector():
             self.std = std
         else:
             return Vector(values=values, E=E, std=std)
+
+    def copy(self) -> Vector:
+        """ Return a copy of the matrix """
+        return copy.deepcopy(self)
 
     def index(self, E) -> int:
         """ Returns the closest index corresponding to the E value """

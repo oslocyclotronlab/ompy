@@ -82,7 +82,7 @@ class FirstGeneration:
         Returns:
             The first generation matrix
         """
-        matrix = copy.deepcopy(unfolded)
+        matrix = unfolded.copy()
         self.action.act_on(matrix)
         # We don't want negative energies
         matrix.cut('Ex', Emin=0.0)

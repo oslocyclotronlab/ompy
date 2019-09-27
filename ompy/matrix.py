@@ -256,6 +256,8 @@ class Matrix():
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
              midbin_ticks: bool = True,
+             xlabel: Optional[str] = None,
+             ylabel: Optional[str] = None,
              **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
@@ -267,6 +269,8 @@ class Matrix():
                 if number of counts > 1000
             vmin: Minimum value for coloring in scaling
             vmax Maximum value for coloring in scaling
+            xlabel (optional, str): Label on x-axis. Default see source.
+            ylabel (optional, str): Label on y-axis. Default see source.
         Returns:
             The ax used for plotting
         Raises:
@@ -309,8 +313,14 @@ class Matrix():
         #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
-        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+        if xlabel is None:
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+        else:
+            ax.set_xlabel(xlabel)
+        if ylabel is None:
+            ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+        else:
+            ax.set_ylabel(ylabel)
 
         if fig is not None:
             if vmin is not None and vmax is not None:
@@ -322,13 +332,15 @@ class Matrix():
             else:
                 cbar = fig.colorbar(lines, ax=ax)
 
-            cbar.ax.set_ylabel("# counts")
+            # cbar.ax.set_ylabel("# counts")
             plt.show()
         return lines, ax, fig
 
     def plot_projection(self, axis: int, Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
-                        normalize: bool = False, **kwargs) -> Any:
+                        normalize: bool = False,
+                        xlabel: Optional[str] = "Energy",
+                        ylabel: Optional[str] = None, **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
         Args:
@@ -338,6 +350,8 @@ class Matrix():
             Emax: The maximum energy to be summed over.
             ax: The axes object to plot onto.
             normalize: Whether or not to normalize the counts.
+            xlabel (optional, str): Label on x-axis. See source.
+            ylabel (optional, str): Label on y-axis. Default is `None`.
         Raises:
             ValueError: If axis is not in [0, 1]
         Returns:
@@ -360,10 +374,9 @@ class Matrix():
         else:
             ax.step(energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        if normalize:
-            ax.set_ylabel(r"$\# counts/\Sigma \# counts $")
-        else:
-            ax.set_ylabel(r"$ \# counts $")
+        if xlabel is not None:  # overwrite the above
+            ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
 
         return ax
 
@@ -670,6 +683,10 @@ class Matrix():
                 return Matrix(Eg=edges, Ex=self.Ex, values=rebinned)
             else:
                 return Matrix(Eg=self.Eg, Ex=edges, values=rebinned)
+
+    def copy(self) -> Matrix:
+        """ Return a copy of the matrix """
+        return copy.deepcopy(self)
 
     def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
         """ Iterates over the last non-zero elements

@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-from copy import deepcopy
 from uncertainties import unumpy
 from tqdm import tqdm
 from pathlib import Path
@@ -11,7 +10,6 @@ from .ensemble import Ensemble
 from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
-from .library import div0
 from .action import Action
 
 
@@ -40,13 +38,16 @@ class Extractor:
         options (dict): The scipy.minimization options to use.
         nld (list[Vector]): The nuclear level densities extracted.
         gsf (list[Vector]): The gamma strength functions extracted.
-        trapezoid (Action[Matrix]): The Action cutting the matrices of the Ensemble
+        trapezoid (Action[Matrix]): The Action cutting the matrices of the
+            Ensemble
            into the desired shape where from the nld and gsf will
            be extracted from.
 
-    TODO: If path is given, it tries to load. If path is later set,
-        it is not created. This is a very common pattern. Consider
-        superclassing the disk book-keeping
+    TODO:
+        - If path is given, it tries to load. If path is later set,
+          it is not created. This is a very common pattern. Consider
+          superclassing the disk book-keeping.
+        - Make bin_width setable
     """
     def __init__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None,
@@ -59,7 +60,7 @@ class Extractor:
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
-        self.bin_width = 100  # TODO: Make Setable
+        self.bin_width = None  # TODO: Make Setable
 
         if path is not None:
             self.path = Path(path)
@@ -143,8 +144,8 @@ class Extractor:
         """
         assert self.ensemble is not None
         assert self.trapezoid is not None
-        matrix = self.ensemble.get_firstgen(num)
-        std = deepcopy(self.ensemble.std_firstgen)
+        matrix = self.ensemble.get_firstgen(num).copy()
+        std = self.ensemble.std_firstgen.copy()
         self.trapezoid.act_on(matrix)
         self.trapezoid.act_on(std)
         nld, gsf = self.decompose(matrix, std)
@@ -169,7 +170,8 @@ class Extractor:
                 be the same size as the matrix. If no std is provided,
                 square error will be used instead of chi square.
             x0: The initial guess for nld and gsf.
-            bin_width: The bin width of the energy array of nld.
+            bin_width: NOT YET IMPLEMENTED!
+                The bin width of the energy array of nld.
                 Defaults to self.bin_width if None.
             product: Whether to return the first generation matrix
                resulting from the product of nld and gsf.
@@ -178,11 +180,16 @@ class Extractor:
             as Vectors.
             Optionally returns nld*γSF if product is True
 
+        Todo:
+            Implement automatic rebinning if bin_width is given(?)
+
         """
         if std is not None:
             assert matrix.shape == std.shape
             std.values = std.values.copy(order='C')
             matrix.values, std.values = normalize(matrix, std)
+            matrix.Ex = matrix.Ex.copy(order='C')
+            matrix.Eg = matrix.Eg.copy(order='C')
         else:
             matrix.values, _ = normalize(matrix)
 
@@ -190,17 +197,25 @@ class Extractor:
             bin_width = bin_width
         else:
             bin_width = self.bin_width
+        if bin_width is not None:
+            raise NotImplementedError("Bin-width cannot be set yet."
+                                      "Rebin upfront.")
 
         # Eg and Ex *must* have the same step size for the
         # decomposition to make sense.
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
-        assert dEx == dEg, "Ex and Eg must have the same step size"
+        assert dEx == dEg, \
+            "Ex and Eg must have the same bin width. Currently they have"\
+            f"dEx: {dEx:.1f} and dEg: {dEg:.1f}. You have to rebin.\n"\
+            "The `ensemble` class has a `rebin` method."
+        bin_width = dEx
 
+        # create nld energy array
         resolution = matrix.diagonal_resolution()
-        E_nld = np.linspace(-resolution.max(),
-                            matrix.Ex.max()-matrix.Eg.min(),
-                            bin_width)
+        Emin = -resolution.max()
+        Emax = matrix.Ex.max()-matrix.Eg.min()
+        E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width))
 
         if x0 is None:
             nld0 = np.ones(E_nld.size)
@@ -326,6 +341,7 @@ class Extractor:
         values = self.gsf_mean()
         std = self.gsf_std()
         return Vector(values=values, E=energy, std=std)
+
 
 def normalize(mat: Matrix, std: Optional[Matrix]):
     matrix = unumpy.uarray(mat.values, std.values if std is not None else None)

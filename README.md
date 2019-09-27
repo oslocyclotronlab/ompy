@@ -28,14 +28,16 @@
 
 This is `ompy`, the Oslo method in python. It contains all the functionality needed to go from a raw coincidence matrix, via unfolding and the first-generation method, to fitting a level density and gamma-ray strength function. It also supports uncertainty propagation by Monte Carlo.
 
-This is a short introduction, see more at https://ompy.readthedocs.io/
+**This is a short introduction, see more at https://ompy.readthedocs.io/**
 
-### NB! This repo is currently under development. Many features do not work correctly.
+**NB! This repo is currently under development. Many features do not work correctly.**
 
 ## Citing
 If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary. The DOI is to last *published* version; the *master* branch may be ahead of the *published* version.
 
 The full version (including the git commit) can also be obtained from `ompy.__full_version__` after installation.
+
+An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with complete uncertainty propagation](https://arxiv.org/abs/1904.13248).
 
 
 ## Installation
@@ -106,110 +108,9 @@ The overarching philosophy is that the package shall be flexible and transparent
 
 As the Oslo method is a complex method involving dozen of variables which can be daunting for the uninitiated, many class attributes have default values that should give satisfying results. Attributes that _should_ be modified even though it is not strictly necessary to do so will give annoying warnings. The documentation and docstrings give in-depth explanation of each variable and its usage.
 
-## Matrix manipulation
-The core of the Oslo method involves working with two dimensional spectra often called alfna matrices for obscure reasons.
-<sup>1</sup> Starting with a raw matrix of $E_x$-$E_\gamma$ coincidences, you typically want to unfold the counts
-along the gamma-energy axis and then apply the first-generation method to obtain the matrix of first-generation, or primary, gamma rays from the decaying nucleus.
-
-The two most important utility classes in the package are `Matrix()` and `Vector()`. They are used to store matrices (2D) or vectors (1D) of numbers, typically spectra of counts, along with energy calibration information. Their basic structure is
-```py
-mat = ompy.Matrix()
-mat.values  # A 2D numpy array
-mat.Ex      # Array of mid-bin-edge energy values for axis 0 (i.e. the row axis, or y axis)
-mat.Eg      # Array of mid-bin-edge energy values for axis 1 (i.e. the column axis, or x axis)
-
-vec = ompy.Vector()
-vec.values  # A 1D numpy array
-vec.E       # Array of mid-bin-edge energy values for the single axis
-```
-
-As these underpin the entire package, they contain many useful functions to make life easier. Loading and saving to several formats, plotting, projections, rebinning and cutting, to mention a few.
-See the documentation for an exhaustive list.
-
-
-## Unfolding
-An implementation of the unfolding method presented in Guttormsen et al., Nuclear Instruments and Methods in Physics Research A 374 (1996).
-The functionality is provided by `Unfolder()` whose basic usage is
-
-```py
-matrix = om.Matrix(...)
-response = om.Matrix(path=...)
-unfolder = om.Unfolder(response=response)
-unfolded = unfolder(matrix)
-```
-
-### Response matrix
-You have to read in a response matrix from disk. Convert it to have the incident energies on the `Ex` axis (y-axis) and the response on the `Eg` axis. In case you use one of the *usual* setups like OSCAR, files will be provided for you already.
-
-Most accurate results, especially for low energies, are obtained if you provide the response matrix with same binning as the matrix that is to be unfolded. If this is not feasable, you may want to use the "Fan"-method (Guttormsen1996), that is implementet through the `interpolate_response` function. To get an idea of the quality of the interpolaton, have a look at `test_response_function_interpolation.ipynb`.
-
-### Compton subtraction method
-To use the Compton subtraction method, you need to provide a list of probabilities for full-energy, single escape, double escape, etc, for each gamma-ray energy. This can be obtained from the `interpolate_response` using with `return_table=True`. The unfolder with the compton subtraction method is then called  by
-
-```
-response, response_tab = om.interpolate_response(folderpath, raw.Eg, FWHM, return_table=True)
-
-unfolder = om.Unfolder(response=response)
-unfolder.use_compton_subtraction = True
-unfolder.response_tab = response_tab
-unfolded = unfolder(matrix)
-```
-
-
-## First generation method
-An implementation of the first generation method present in Guttormsen, Ramsøy and Rekstad, Nuclear Instruments and Methods in Physics Research A 255 (1987).
-
-The first generation method is implemented in `FirstGeneration()` whose basic usage is
-
-```py
-unfolded = unfolder(matrix)
-firstgen = om.FirstGeneration()
-primary = firstgen(unfolded)
-```
-
-## Ensemble
-
-To estimate the uncertainty in the Oslo method, we can generate an ensemble of perturbated matrices from an initial matrix. The class `Ensemble()` provides this
-feature. Its basic usage is
-
-```py
-matrix = om.Matrix(...)
-response = om.Matrix(path=...)
-unfolder = om.Unfolder(response=response)
-firstgen = om.FirstGeneration()
-ensemble = om.Ensemble(matrix)
-ensemble.unfolder = unfolder
-ensemble.first_generation_method = firstgen
-ensemble.generate(100)    # Generates 100 perturbated members
-```
-the generated members are saved to disk and can be retrieved. Unfolded members can be retrieved as `ensemble.get_unfolded(i)`, for example. Their standard deviation is `ensemble.std_unfolded`.
-
-## Nuclear level density and gamma strength function
-
-After matrix has been cut, unfolded and firstgen'd, perhaps ensembled, its nuclear level density (nld) and gamma strength function ($\gamma$SF) can be extracted using the
-`Extractor()` class. For a single matrix, its usage is
-
-```py
-primary = firstgen(unfolded)
-cutout = primary.trapezoid(Ex_min=..., Ex_max=..., Eg_min=..., inplace=False)
-extractor = om.Extractor()
-nld, gsf = extractor.decompose(cutout)
-```
-When extracting nld and gsf from an ensemble, a trapezoidal cutout must be performed on each ensemble member. This is achieved by `Action()` which allows for delayed function calls on
-matrices and vectors.
-```py
-ensemble.generate(100)
-trapezoid_cut = om.Action('matrix')
-trapezoid_cut.trapezoid(Ex_min=..., Ex_max=..., Eg_min=...)
-extractor = Extractor()
-extractor.trapezoid = trapezoid_cut
-extractor.extract_from(ensemble)
-```
-The resulting nld and gsf are saved to disk and exposed as `extractor.nld` and `extractor.gsf`.
-
 ## Normalization
 
-Test implementation only through `norm_nld`and `norm_gsf` classes. Do not have the same calling signatures yet.
+Still working on a nice interface for the implementation. Test implementation only through `norm_nld`and `norm_gsf` classes. Do not have the same calling signatures yet.
 
 ## Validation and introspection
 
@@ -230,8 +131,6 @@ found in the file `ompy/unfolder.py`.
 
 It is our hope and goal that `OMpy` will be used, and we are happy to provide support. Feedback and suggestions are also very welcome. We encourage users who implement new features to share them by opening a pull request in the Github repository.
 
-
-<sup>1</sup>It stands for alfa-natrium, and comes from the fact that the outgoing projectile hitting the excitation energy detector SiRi used to be exclusively alpha particles and that the gamma-detector array CACTUS consisted of NaI scintillators.
 
 ## Credits
 The contributors of this project are Jørgen Eriksson Midtbø, Fabio Zeiser and Erlend Lima.
