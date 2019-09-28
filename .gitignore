@@ -119,7 +119,7 @@ GGTAGS
 GPATH
 GRTAGS
 
-# ompy/rebin.c
+ompy/*.c
 ompy/*.html
 
 tags

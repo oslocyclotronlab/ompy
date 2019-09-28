@@ -3,9 +3,10 @@ from typing import Tuple, Union
 from .matrix import Matrix
 import numpy as np
 
-EXAMPLES = {'dy164': {'raw': "../../data/Dy164_raw.m",
-                      'response': "../../data/Dy164_response_matrix.m"},
-            'si28': {'raw': "../../data/Si28_raw_matrix_compressed.m"}
+EXAMPLES = {'dy164': {'raw': "../../example_data/Dy164_raw.m",
+                      # 'response': "../../data/Dy164_response_matrix.m"
+                      },
+            'si28': {'raw': "../../example_data/Si28_raw_matrix_compressed.m"}
             }
 DATAPATH = os.path.abspath(__file__)
 

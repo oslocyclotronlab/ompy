@@ -43,8 +43,13 @@ An article describing the implementation more detailled will follow shortly. A d
 ## Installation
 Start off by downloading ompy:
 ``` bash
-git clone https://github.com/oslocyclotronlab/ompy/
+git clone --recurse https://github.com/oslocyclotronlab/ompy/
 ```
+where the `--recurse` flag specifies, that all submodules shall be downloaded as well.
+
+**NB: Read this if you have cloned the repo before October 2019:**
+We cleaned the repository from old comits clogging the repo (big data files that should never have been there). Unfortunetely, this has the sideeffect that the history had to be rewritten: Previous commits now have a different SHA1. If you need anything from the previous repo, see [ompy_Archive_Sept2019](https://github.com/oslocyclotronlab/ompy_Archive_Sept2019). This will unfortunately also destroy references in issues.
+The simplest way to get the new repo is to rerun the installation instructions below.
 
 ### Dependencies
  - Get and compile MultiNest (use the cmake version from https://github.com/JohannesBuchner/MultiNest). The goal is to create lib/libmultinest.so
