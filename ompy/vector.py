@@ -9,6 +9,7 @@ from .filehandling import (load_numpy_1D, save_numpy_1D, filetype_from_suffix,
                            load_tar, save_tar)
 from .matrix import MeshLocator
 from .decomposition import index
+from .library import div0
 
 
 class Vector():
@@ -192,14 +193,17 @@ class Vector():
             other = other.values
         squared_error = (self.values - other)**2
         if self.std is not None:
-            error = squared_error / self.std**2
+            if std is not None:
+                sigmasq = self.std**2 + std**2
+            else:
+                sigmasq = self.std**2
         else:
-            error = squared_error
+            if std is not None:
+                sigmasq = std**2
+            else:
+                sigmasq = 1
 
-        if std is not None:
-            # The std overwrites the std of self.
-            error = squared_error / std**2
-
+        error = div0(squared_error, sigmasq)
         return error.sum()
 
     def cut(self, Emin: Optional[float] = None,
