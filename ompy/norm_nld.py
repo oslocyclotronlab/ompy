@@ -10,7 +10,9 @@ import warnings
 
 
 class NormNLD:
-    """ Normalize nld according to nld' = nld * A * np.exp(alpha * Ex)
+    """ Old Class, will be deleted soon.
+
+    Normalize nld according to nld' = nld * A * np.exp(alpha * Ex)
     Note: This is the transformation eq (3), Schiller2000
 
     Parameters:

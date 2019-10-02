@@ -8,7 +8,7 @@ functions.
 """
 
 class SpinFunctions:
-    """ Get different spin distributions, spin cuts (...)
+    """ Calculates spin distributions, spin cuts (...)
 
     Args:
         Ex : double or dnarray

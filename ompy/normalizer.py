@@ -27,7 +27,7 @@ class Normalizer:
     def __init__(self, *, extractor: Optional[Extractor] = None,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Vector] = None) -> None:
-        """ Inits the class
+        """ Normalizes nld ang gSF.
 
         The prefered syntax is Normalizer(extractor=...) or Normalizer(nld=...)
         If neither is given, the nld must be explicity be set later by:
@@ -36,6 +36,12 @@ class Normalizer:
         or:
             normalizer.normalize(..., nld=nld)
             normalizer.normalize(..., extractor=extractor)
+
+        Note:
+            Normalizes nld/gsf according to
+                nld' = nld * A * np.exp(alpha * Ex), and
+                gsf' = gsf * B * np.exp(alpha * Eg)
+            Note: This is the transformation eq (3), Schiller2000
 
         Args:
             extractor: The extractor to use get nld from
