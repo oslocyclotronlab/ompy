@@ -56,7 +56,11 @@ class FitRhoT:
                  regularizer: float = 0,
                  options={'disp': True}):
         """
+        OLD FILE -- to be deleted; replaced by `Extractor`
         Class Wrapper for fit of the firstgen spectrum to the product of transmission coeff T and level density rho
+
+        Note: We just keep this class until the decomposition has been checked
+        and double checked. Now replaced by `Extractor`
 
         Args:
             firstgen: The first-generation matrix.
