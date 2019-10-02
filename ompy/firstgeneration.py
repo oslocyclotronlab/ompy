@@ -32,8 +32,9 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Generator, Optional
+from typing import Tuple, Generator, Optional, Union
 from .matrix import Matrix
+from .vector import Vector
 from .library import div0
 from .rebin import rebin_2D
 from .action import Action
@@ -44,26 +45,60 @@ logging.captureWarnings(True)
 
 class FirstGeneration:
     def __init__(self):
+        """First generation method from Guttormsen et al. (NIM 1987).
+
+        Note:
+            Attributes need to be set only if the respective method
+            (statistical / total) multiplicity estimation is used.
+
+        Attributes:
+            num_iterations (int): Number of iterations the first
+                generations method is applied.
+            multiplicity_estimation (str): Select which method should be used
+                for the multiplicity estimation. Can be either "statistical",
+                or "total". Default is "statistical".
+
+            statistical_upper (float): Threshold for upper limit in
+                `statistical` multiplicity estimation. Defaults to 430 keV.
+            statistical_lower (float): Threshold for lower limit in
+                `statistical` multiplicity estimation.  Defaults to 200 keV.
+            statistical_ratio (float): Ratio in  in
+                `statistical` multiplicity estimation.  Defaults to 0.3.
+            Ex_entry_shift (float): Shift applied to the energy in
+                `statistical` multiplicity estimation.  Defaults to 200 keV.
+                TODO: Unknown how to pick. Magne described a manual method
+                by looking at the known low energy states.
+            Ex_entry_statistical (float): Average entry point in ground band
+                for statistical multiplicity in statistical multiplicity
+                estimation.  Defaults to 300 keV.
+            use_slide (bool): Use sliding Ex ratio (?). Default: None.
+
+
+            Ex_entry_total (float): Average entry point in ground band for
+                `total` multiplicity estimation.  Defaults to 0 keV.
+
+            action (Action): Placeholder if an `Action` should be applied. This
+                cut for example be a "cut" of the `Ex` bins to consider.
+
+            valley_correction (opional, Vector): See `step` method.
+                Default: None.
+
+        TODO:
+            - Clean up where attributes are set for the respective methods.
+        """
+
         self.statistical_upper = 430.0  # MAMA ThresSta
         self.statistical_lower = 200.0  # MAMA ThresTot
         self.statistical_ratio = 0.3    # MAMA ThresRatio
 
-        # Shift applied to the energy.
-        # TODO: Unknown how to pick. Magne described a manual method
-        # by looking at the known low energy states
         self.Ex_entry_shift = 200.0
-
-        # Average entry point in ground band for
-        # statistical multiplicity
         self.Ex_entry_statistical = 300.0  # MAMA ExEntry0s
 
-        # Average entry point in ground band for
-        # total multiplicity
         self.Ex_entry_total = 0.0          # MAMA ExEntry0t
 
         self.num_iterations = 10
 
-        self.valley_collection: Optional[np.ndarray] = None
+        self.valley_correction: Optional[np.ndarray] = None
         self.multiplicity_estimation = 'statistical'
         self.use_slide: bool = False
 
@@ -87,10 +122,13 @@ class FirstGeneration:
         # We don't want negative energies
         matrix.cut('Ex', Emin=0.0)
 
+        valley_correction = self.cut_valley_correction(matrix)
+
         H, W, normalization = self.setup(matrix)
         for iteration in range(self.num_iterations):
             H_old = np.copy(H)
-            H, W = self.step(iteration, H, W, normalization, matrix)
+            H, W = self.step(iteration, H, W, normalization, matrix,
+                             valley_correction)
 
             diff = np.max(np.abs(H - H_old))
             LOG.info("iter %i/%i: ε = %g", iteration+1,
@@ -113,10 +151,11 @@ class FirstGeneration:
 
         return H, W, normalization
 
-
     def step(self, iteration: int, H_old: np.ndarray,
              W_old: np.ndarray, N: np.ndarray,
-             matrix: Matrix) -> Tuple[np.ndarray, np.ndarray]:
+             matrix: Matrix,
+             valley_correction: Optional[np.ndarray] = None)\
+            -> Tuple[np.ndarray, np.ndarray]:
         """ An iteration step in the first generation method
 
         The most interesting part of the first generation method.
@@ -128,6 +167,9 @@ class FirstGeneration:
             W_old: The previous weights
             N: The normalization
             matrix: The matrix the method is applied to
+            valley_correction (optional, np.ndarray): Array of weight factors
+                for each Ex bin that can be used to manually "turn
+                off" /decrease the influence of very large peaks in the method.
         """
         H = rebin_2D(H_old, matrix.Eg, matrix.Ex, 1)
         W = np.zeros_like(H)
@@ -144,7 +186,10 @@ class FirstGeneration:
         # Normalize each row to unity
         W = normalize_rows(W)
 
-        G = (N * W) @ matrix.values
+        if valley_correction is None:
+            G = (N * W) @ matrix.values
+        else:
+            G = (N * W * valley_correction) @ matrix.values
         H = matrix.values - G
         return H, W
 
@@ -256,6 +301,34 @@ class FirstGeneration:
             H[i, :j] = 1/max(1, j)
         return H
 
+    def cut_valley_correction(self, matrix: Matrix):
+        """ Cut valley correction Ex axis if neccessary.
+
+        Ensures valley correction has the same Ex axis as the matrix
+        it will be used with.
+
+        Args:
+            matrix (Matrix): Matrix that the valley correction will be used
+                with.
+        Returns:
+            valley_correction (None or np.ndarray): None if
+                self.valley_correction is None. Otherwise a np.ndarray with the
+                same length as matrix.Ex.
+
+            """
+        valley_correction = self.valley_correction
+        if valley_correction is None:
+            return None
+
+        if not isinstance(valley_correction, Vector):
+            raise TypeError("`valley_correction` must be a vector.")
+        valley_correction.copy()
+        valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max())
+        assert (valley_correction.E == matrix.Ex).all(), \
+            "valley correction matrix must have the same Ex array as matrix."
+
+        return valley_correction.values
+
     @property
     def multiplicity_estimation(self) -> str:
         return self._multiplicity_estimation
@@ -267,7 +340,6 @@ class FirstGeneration:
         else:
             raise ValueError("Expected multiplicity estimation to"
                              " be either 'statistical' or 'total'")
-
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:
