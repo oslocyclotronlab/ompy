@@ -3,7 +3,7 @@ from enum import IntEnum, unique
 
 @unique
 class MatrixState(IntEnum):
-    """ Simple enumeration to keep track of matrix states """
+    """ State machine for matrix states by simple enumeration """
     RAW = 1
     UNFOLDED = 2
     FIRST_GENERATION = 3

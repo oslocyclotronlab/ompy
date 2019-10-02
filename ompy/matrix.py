@@ -51,7 +51,7 @@ logging.captureWarnings(True)
 
 
 class Matrix():
-    """ Class for high level manipulation of counts and energy axes
+    """ Stores 2d array with energy axes (a matrix).
 
     Stores matrices along with calibration and energy axis arrays. Performs
     several integrity checks to verify that the arrays makes sense in relation

@@ -16,7 +16,7 @@ class Vector():
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
                  std: Optional[Iterable[float]] = None):
-        """ Create a vector
+        """ Stores 1d array with energy axes (a vector)
 
         An empty initalization defaults to one bin with zero values.
         An initalization with only `values` creates an energy binning

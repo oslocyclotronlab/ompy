@@ -2,8 +2,9 @@ import warnings
 
 class Setable:
     """
-
-    TODO: Something is fishy
+    [unused]Placeholder for parameters to be set (?)
+    TODO:
+        Something is fishy
     """
     def __init__(self, fget, fset=None):
         self.fget = fget

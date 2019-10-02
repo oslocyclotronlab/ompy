@@ -14,7 +14,9 @@ from . import library as lib
 
 
 class NormGSF:
-    """ Normalize GSF to <Gg>
+    """ Old class -- Normalize GSF to <Gg>
+
+    Note: Will be deleted soon
 
     Attributes:
     -----------
