@@ -234,12 +234,11 @@ class Matrix():
 
         Returns: The calibration coefficients in a dictionary.
         """
-        # Formatted as "a{axis}{power of E}"
         calibration = {
-            "a00": self.Ex[0],
-            "a01": self.Ex[1]-self.Ex[0],
-            "a10": self.Eg[0],
-            "a11": self.Eg[1]-self.Eg[0],
+            "a0x": self.Ex[0],
+            "a1x": self.Ex[1]-self.Ex[0],
+            "a0y": self.Eg[0],
+            "a1y": self.Eg[1]-self.Eg[0],
         }
         return calibration
 

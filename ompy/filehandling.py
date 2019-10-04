@@ -15,9 +15,10 @@ def mama_read(filename):
     # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
     # and 1-D arrays of lower-bin-edge calibrated x and y values for plotting
     # and similar.
-    matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1)
+    matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1,
+                           encoding="latin-1")
     cal = {}
-    with open(filename, 'r') as datafile:
+    with open(filename, 'r', encoding='latin-1') as datafile:
         calibration_line = datafile.readlines()[6].split(",")
         if len(calibration_line) == 4:
             ndim = 1
@@ -132,11 +133,11 @@ def mama_write2D(mat, filename, comment=""):
     # Calculate calibration coefficients.
     calibration = mat.calibration()
     cal = {
-        "a0x": calibration['a00'],
-        "a1x": calibration['a01'],
+        "a0x": calibration['a0y'],
+        "a1x": calibration['a1y'],
         "a2x": 0,
-        "a0y": calibration['a10'],
-        "a1y": calibration['a11'],
+        "a0y": calibration['a0x'],
+        "a1y": calibration['a1x'],
         "a2y": 0
     }
     # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
