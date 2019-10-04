@@ -5,11 +5,13 @@ import termtables as tt
 import json
 import pymultinest
 import matplotlib.pyplot as plt
+import re
+import warnings
 from contextlib import redirect_stdout
 from pathlib import Path
 from numpy import ndarray
 from scipy.optimize import differential_evolution
-from typing import Optional, Sequence, Tuple, Any, Union, Callable, Dict
+from typing import Optional, Sequence, Tuple, Any, Union, Callable, Dict, List
 from scipy.stats import halfnorm
 from .extractor import Extractor
 from .vector import Vector
@@ -24,9 +26,58 @@ TupleDict = Dict[str, Tuple[float, float]]
 
 
 class Normalizer:
+    """ Normalizes NLD to empirical data
+
+    Takes empirical data in form of an array of discrete levels,
+    neutron separation energy Sn, a model to estimate what the
+    NLD is at Sn, and several parameters for the model as well
+    as bounds on normalization parameters.
+
+    The user can provide either an nld Vector or an instance of an
+    Extractor when normalizing. If an Extractor is provided,
+    each member will be normalized.
+
+    As a consequence of a complex problem, this class has a complex
+    interface. Much of the book-keeping associated with normalization
+    has been automated, but there is still a lot of settings and
+    parameters for the user to take care of. Some default values
+    has been seen, but the user must be _EXTREMELY_ careful when 
+    evaluating the output.
+
+    Attributes:
+        discrete (Vector): The discrete NLD at lower energies. [MeV]
+        nld (Vector): The NLD to normalize. Gets converted to [MeV] from [keV]
+            when the property is set.
+        D0 (Tuple[float, float]): The (mean, std) average resonance
+            spacing from s waves [eV]
+        extractor (Extractor): An optional Extractor instance. The
+            nld members will all be normalized.
+        bounds (Dict[str, Tuple[float, float]): The bounds on each of
+            the parameters. Its keys are 'A', 'alpha', 'T', and 'D0'. The
+            values are on the form (min, max).
+        spin (Dict[str, Any]): The parameters to be used in the spin
+            distribution model. Its keys are 'spincutModel', 'spincutPars',
+            'J_target', 'Gg' and 'Sn'.
+        model (Callable[..., ndarray]): The model to use at high energies
+            to estimate the NLD. Defaults to constant temperature model.
+        curried_model (Callable[..., ndarray]): Same as model, but
+            curried with the spin distribution parameters to reduce
+            book keeping. Is set by initial_guess(), _NOT_ the user.
+        multinest_path (Path): Where to save the multinest output.
+            defaults to 'multinest'.
+        nld_parameters (Dict[str, Tuple[float, float]]): The
+            result of the optimization. The keys are 'A', 'alpha',
+            'T' and 'D0' with values on the form (mean, std).
+        nld_transformed (List[Vector]): Contains the transformed nld using
+            optimized variables.
+        use_smoothed_levels (bool): Flag for whether to smooth histogram
+            over discrete levels when loading from file. Defaults to True.
+        path (Path): The path the transformed vectors to.
+    """
     def __init__(self, *, extractor: Optional[Extractor] = None,
                  nld: Optional[Vector] = None,
-                 discrete: Optional[Vector] = None) -> None:
+                 discrete: Optional[Vector] = None, 
+                 path: Optional[Union[str, Path]] = None) -> None:
         """ Normalizes nld ang gSF.
 
         The prefered syntax is Normalizer(extractor=...) or Normalizer(nld=...)
@@ -48,12 +99,13 @@ class Normalizer:
             nld: The nuclear level density vector to normalize.
             discrete: The discrete level density at low energies to
                 normalize to.
+            path: If set, tries to load vectors from path.
         """
         # Create the private variables
         self._discrete = None
         self._nld = None
         self._D0 = None
-        self.bounds = {'A': (1, 100), 'alpha': (1e-2, 5e-3), 'T': (0.1, 1),
+        self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
                        'D0': (None, None)}
         self.spin = {'spincutModel': 'Disc_and_EB05',
                      'spincutPars': None,
@@ -61,15 +113,33 @@ class Normalizer:
                      'Gg': None,
                      'Sn': None}
         self.model: Optional[Callable[..., ndarray]] = constant_temperature
+        self.curried_model = lambda *arg: None
         self.multinest_path = Path('multinest')
 
         # Handle the method parameters
         self.use_smoothed_levels = True
         self.extractor = extractor
-        self.nld = nld
+        if extractor is not None:
+            nld = extractor.nld[0]
+        if nld is not None:
+            self.nld = nld
         self.discrete = discrete
 
+        self.nld_parameters: Dict[str, Tuple[float, float]] = {}
+        self.nld_transformed: List[Vector] = []
         LOG.debug("Created Normalizer")
+
+        # Load saved transformed vectors
+        if path is not None:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True)
+            try:
+                self.load(self.path)
+            except AssertionError:
+                pass
+        else:
+            self.path = Path('normalizations')
+            self.path.mkdir(exist_ok=True)
 
     def __call__(self, *args, **kwargs) -> None:
         """ Wrapper around normalize """
@@ -108,21 +178,35 @@ class Normalizer:
         self.D0 = D0  # To ensure the bounds are updated
         bounds = self.reset(bounds)
         spin = self.reset(spin)
+        extractor = self.reset(extractor, nonable=True)
 
-        # Use DE to get an inital guess before optimizing
-        args, guess = self.initial_guess(limit_low, limit_high)
-        # Optimize using multinest
-        popt, samples = self.optimize(args, guess)
+        if extractor is not None:
+            nlds = extractor.nld
+        else:
+            nld = self.nld
+            nld.E *= 1e3
+            nlds = [nld]
 
-        self.nld_parameters = popt
-        self.samples = samples
+        for nld in nlds:
+            self.nld = nld
+            # Use DE to get an inital guess before optimizing
+            args, guess = self.initial_guess(limit_low, limit_high)
+            # Optimize using multinest
+            popt, samples = self.optimize(args, guess)
 
-        return popt, samples
+            transformed = nld.transform(popt['A'][0], popt['alpha'][0],
+                                        inplace=False)
+            self.nld_transformed.append(transformed)
+
+            self.nld_parameters = popt
+            self.samples = samples
+
+        self.save()
 
     def initial_guess(self, limit_low: Tuple[float, float],
                       limit_high: Tuple[float, float]
-                      ) -> Tuple[Tuple[float, float, float, float],
-                                 Dict[str, float]]:
+    ) -> Tuple[Tuple[float, float, float, float],
+               Dict[str, float]]:
         """ Find an inital guess for the constant, α, T and D₀
 
         Uses differential evolution to perform the guessing.
@@ -150,6 +234,7 @@ class Normalizer:
 
         # We don't want to send unecessary parameters to the minimizer
         model = lambda *args, **kwargs: self.model(*args, **kwargs, spin=self.spin)
+        self.curried_model = model
         args = (nld_low, nld_high, discrete, model)
         res = differential_evolution(errfn, bounds=bounds, args=args)
 
@@ -249,33 +334,38 @@ class Normalizer:
     def plot(self, ax: Any = None) -> Tuple[Any, Any]:
         """ Plot the NLD, discrete levels and result of normalization
 
-		Args:
-    		ax: The matplotlib axis to plot onto
-    	Returns:
-        	The figure and axis created if no ax is supplied.
+        Args:
+            ax: The matplotlib axis to plot onto
+        Returns:
+            The figure and axis created if no ax is supplied.
         """
         if ax is None:
             fig, ax = plt.subplots()
         else:
             fig = None
 
-        self.nld.plot(ax=ax, label='NLD')
-        transformed = self.nld.transform(self.nld_parameters['A'][0],
-                                         self.nld_parameters['alpha'][0],
-                                         inplace=False)
-        transformed.plot(ax=ax, label='Transformed')
+        for transformed in self.nld_transformed:
+            transformed.plot(ax=ax, c='k', alpha=0.5)
         self.discrete.plot(ax=ax, label='Discrete levels')
         ax.set_yscale('log')
+
+        Sn = self.curried_model(T=self.nld_parameters['T'][0],
+                                D0=self.nld_parameters['D0'][0],
+                                E=self.spin['Sn'])
+        ax.scatter(self.spin['Sn'], Sn, label='$S_n$')
+
         if fig is not None:
             fig.legend(loc=9, ncol=3, frameon=False)
 
         return fig, ax
 
-    def reset(self, variable: Any) -> Any:
+    def reset(self, variable: Any, nonable: bool = False) -> Any:
         """ Ensures `variable` is not None
 
         Args:
             variable: The variable to check
+            nonable: Does not raise ValueError if
+                variable is None.
         Returns:
             The value of variable or self.variable
         Raises:
@@ -285,10 +375,47 @@ class Normalizer:
         name = _retrieve_name(variable)
         if variable is None:
             self_variable = getattr(self, name)
-            if self_variable is None:
+            if not nonable and self_variable is None:
                 raise ValueError(f"`{name}` must be set")
             return self_variable
         return variable
+
+    def load(self, path: Optional[Union[str, Path]] = None) -> None:
+        """ Load already extracted nld and gsf from file
+
+        Args:
+            path: The path to the directory containing the
+                files.
+        """
+        if path is not None:
+            path = Path(path)
+        else:
+            path = Path(self.path)  # TODO: Fix pathing
+
+        if not path.exists():
+            raise IOError(f"The path {path} does not exist.")
+        if self.nld_transformed:
+            warnings.warn("Loading nld and gsf into non-empty instance")
+
+        LOG.debug("Loading from %s", str(path))
+
+        for fname in path.glob("nld_[0-9]*.npy"):
+            self.nld_transformed.append(Vector(path=fname))
+
+        if not self.nld_transformed:
+            warnings.warn("Found no files")
+
+    def save(self, path: Optional[Union[str, Path]] = None) -> None:
+        if path is not None:
+            path = Path(path)
+        else:
+            path = Path(self.path)  # TODO: Fix pathing
+
+        LOG.debug("Saving to %s", str(path))
+
+        path.mkdir(exist_ok=True)
+        for i, nld in enumerate(self.nld_transformed):
+            nld.save(path / f"nld_{i}.npy")
 
     @property
     def discrete(self) -> Optional[Vector]:
@@ -329,6 +456,16 @@ class Normalizer:
             raise ValueError("D0 must contain (mean, std) [eV] of A-1 nucleus")
         self._D0 = value[0], value[1]
         self.bounds['D0'] = (0.99*value[0], 1.01*value[0])
+
+    @property
+    def nld(self) -> Optional[ndarray]:
+        return self._nld
+
+    @nld.setter
+    def nld(self, nld: ndarray) -> None:
+        LOG.debug("Setting NLD, dividing by 1e3")
+        self._nld = nld
+        self._nld.E /= 1e3
 
 
 def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:
@@ -401,9 +538,10 @@ def constant_temperature(E: ndarray, T: float, D0: float, spin: Dict[str, Any]) 
     return CT(E, T, shift)
 
 
-def CT(E, T, Eshift):
+def CT(E: ndarray, T: float, Eshift: float) -> ndarray:
     """ Constant Temperature NLD"""
-    return np.exp((E - Eshift) / T) / T
+    ct = np.exp((E - Eshift) / T) / T
+    return ct
 
 
 def Eshift_from_T(T, Sn):
@@ -451,10 +589,10 @@ def Sn_from_D0(D0, Sn, J_target,
 def _retrieve_name(var: Any) -> str:
     """ Finds the source-code name of `var`
 
-	NOTE: Only call from self.reset.
+        NOTE: Only call from self.reset.
 
-	Args:
-    	var: The variable to retrieve the name of.
+     Args:
+        var: The variable to retrieve the name of.
     Returns:
         The variable's name.
     """
@@ -462,6 +600,8 @@ def _retrieve_name(var: Any) -> str:
     # The 0th frame is the current function, the 1st frame is the
     # calling function and the second is the calling function's caller.
     line = inspect.stack()[2].code_context[0].strip()
+    match = re.search(r".*\((\w+).*\).*", line)
+    name = match.group(1)
     # The name to use is the name given in self.reset(...)
-    name = line.split('(')[1].split(')')[0].strip()
+    #name = line.split('(')[1].split(')')[0].strip()
     return name
