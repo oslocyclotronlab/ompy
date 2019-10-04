@@ -52,12 +52,16 @@ We cleaned the repository from old comits clogging the repo (big data files that
 The simplest way to get the new repo is to rerun the installation instructions below.
 
 ### Dependencies
- - Get and compile MultiNest (use the cmake version from https://github.com/JohannesBuchner/MultiNest). The goal is to create lib/libmultinest.so
+ - Get and compile MultiNest (use the cmake version from [github.com/JohannesBuchner/MultiNest](https://github.com/JohannesBuchner/MultiNest)). The goal is to create lib/libmultinest.so
     ``` bash
     git clone https://github.com/JohannesBuchner/MultiNest
     cd MultiNest/build
     cmake ..
     make
+    ```
+    Multinest had following hard dependencies: `lapack` and `blas`. To use MPI, additionally openmp has to be installed (probably does not work for MAC users, see below.). With apt-get you may fix the dependencies by:
+    ```bash
+    sudo apt-get install liblapack-dev libblas-dev libomp-dev
     ```
  - We require `python>=3.7`. Make sure you use the correct python version and the correct `pip`.
    You may need to replace `python` by `python3` and `pip` by `pip3` in the examples below. Run
