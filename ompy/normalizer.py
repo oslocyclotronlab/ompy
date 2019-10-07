@@ -13,7 +13,7 @@ from pathlib import Path
 from numpy import ndarray
 from scipy.optimize import differential_evolution
 from typing import Optional, Sequence, Tuple, Any, Union, Callable, Dict, List
-from scipy.stats import halfnorm
+from scipy.stats import truncnorm
 from .extractor import Extractor
 from .vector import Vector
 from .multinest_setup import run_nld_2regions
@@ -132,6 +132,7 @@ class Normalizer:
         # for plotting
         self.limit_low = None
         self.limit_high = None
+        self.std_fake = None  # See `normalize`
 
         # Load saved transformed vectors
         if path is not None:
@@ -185,6 +186,7 @@ class Normalizer:
         spin = self.reset(spin)
         extractor = self.reset(extractor, nonable=True)
         nlds = []  # Ensure to rerun if called again
+        self.nld_transformed = [] # Ensure to rerun if called again
 
         self.limit_low = limit_low
         self.limit_high = limit_high
@@ -203,10 +205,11 @@ class Normalizer:
             # Need to give some sort of standard deviation for sensible results
             # Otherwise deviations at higher level density will have an
             # uncreasonably high weight.
-            std_fake = False
-            if nld.std is None:
-                std_fake = True
-                nld.std = nld.values * 0.1 # 10% is an arb. choice
+            if self.std_fake is None:
+                self.std_fake = False
+            if self.std_fake or nld.std is None:
+                self.std_fake = True
+                nld.std = nld.values * 0.1  # 10% is an arb. choice
 
             self.nld = nld
             # Use DE to get an inital guess before optimizing
@@ -216,7 +219,7 @@ class Normalizer:
 
             transformed = nld.transform(popt['A'][0], popt['alpha'][0],
                                         inplace=False)
-            if std_fake:
+            if self.std_fake:
                 transformed.std = None
             self.nld_transformed.append(transformed)
 
@@ -289,13 +292,21 @@ class Normalizer:
             raise ValueError("Prior selection not implemented for T < 0")
         T_exponent = np.log10(guess['T'])
 
-        D0 = guess['D0']
         A = guess['A']
+        D0 = guess['D0']
+
+        # truncations from absolute values
+        lower, upper = 0., np.inf
+        mu_A, sigma_A = A, 4*A
+        a_A = (lower - mu_A) / sigma_A
+        mu_D0, sigma_D0 = D0[0], D0[1]
+        a_D0 = (lower - mu_D0) / sigma_D0
 
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # normal prior
-            cube[0] = halfnorm.ppf(cube[0], loc=A, scale=4*A)
+            cube[0] = truncnorm.ppf(cube[0], a_A, upper, loc=mu_A,
+                                    scale=sigma_A)
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -303,7 +314,8 @@ class Normalizer:
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # normal prior
-            cube[3] = halfnorm.ppf(cube[3], loc=D0[0], scale=D0[1])
+            cube[3] = truncnorm.ppf(cube[3], a_D0, upper, loc=mu_D0,
+                                    scale=sigma_D0)
             if np.isinf(cube[3]):
                 LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
@@ -313,7 +325,7 @@ class Normalizer:
             return loglikelihood
 
         self.multinest_path.mkdir(exist_ok=True)
-        path = self.multinest_path / "nld_norm"
+        path = self.multinest_path / "nld_norm_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
         LOG.info("Starting multinest")
