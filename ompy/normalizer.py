@@ -7,6 +7,7 @@ import pymultinest
 import matplotlib.pyplot as plt
 import re
 import warnings
+import copy
 from contextlib import redirect_stdout
 from pathlib import Path
 from numpy import ndarray
@@ -41,13 +42,12 @@ class Normalizer:
     interface. Much of the book-keeping associated with normalization
     has been automated, but there is still a lot of settings and
     parameters for the user to take care of. Some default values
-    has been seen, but the user must be _EXTREMELY_ careful when 
+    has been seen, but the user must be _EXTREMELY_ careful when
     evaluating the output.
 
     Attributes:
         discrete (Vector): The discrete NLD at lower energies. [MeV]
-        nld (Vector): The NLD to normalize. Gets converted to [MeV] from [keV]
-            when the property is set.
+        nld (Vector): The NLD to normalize. Gets converted to [MeV] from [keV].
         D0 (Tuple[float, float]): The (mean, std) average resonance
             spacing from s waves [eV]
         extractor (Extractor): An optional Extractor instance. The
@@ -76,7 +76,7 @@ class Normalizer:
     """
     def __init__(self, *, extractor: Optional[Extractor] = None,
                  nld: Optional[Vector] = None,
-                 discrete: Optional[Vector] = None, 
+                 discrete: Optional[Vector] = None,
                  path: Optional[Union[str, Path]] = None) -> None:
         """ Normalizes nld ang gSF.
 
@@ -103,7 +103,6 @@ class Normalizer:
         """
         # Create the private variables
         self._discrete = None
-        self._nld = None
         self._D0 = None
         self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
                        'D0': (None, None)}
@@ -118,16 +117,21 @@ class Normalizer:
 
         # Handle the method parameters
         self.use_smoothed_levels = True
-        self.extractor = extractor
+        self.extractor = copy.deepcopy(extractor)
+        self.nld = None
         if extractor is not None:
             nld = extractor.nld[0]
         if nld is not None:
-            self.nld = nld
+            self.nld = nld.copy()
         self.discrete = discrete
 
         self.nld_parameters: Dict[str, Tuple[float, float]] = {}
         self.nld_transformed: List[Vector] = []
         LOG.debug("Created Normalizer")
+
+        # for plotting
+        self.limit_low = None
+        self.limit_high = None
 
         # Load saved transformed vectors
         if path is not None:
@@ -172,22 +176,38 @@ class Normalizer:
 
         """
         # Update internal state
-        nld = self.reset(nld)
         discrete = self.reset(discrete)
+        discrete.to_MeV()
+        nld = self.reset(nld)
         D0 = self.reset(D0)
         self.D0 = D0  # To ensure the bounds are updated
         bounds = self.reset(bounds)
         spin = self.reset(spin)
         extractor = self.reset(extractor, nonable=True)
+        nlds = []  # Ensure to rerun if called again
+
+        self.limit_low = limit_low
+        self.limit_high = limit_high
 
         if extractor is not None:
             nlds = extractor.nld
         else:
             nld = self.nld
-            nld.E *= 1e3
             nlds = [nld]
 
         for nld in nlds:
+            nld = nld.copy()
+            LOG.debug("Setting NLD, convert to MeV")
+            nld.to_MeV()
+
+            # Need to give some sort of standard deviation for sensible results
+            # Otherwise deviations at higher level density will have an
+            # uncreasonably high weight.
+            std_fake = False
+            if nld.std is None:
+                std_fake = True
+                nld.std = nld.values * 0.1 # 10% is an arb. choice
+
             self.nld = nld
             # Use DE to get an inital guess before optimizing
             args, guess = self.initial_guess(limit_low, limit_high)
@@ -196,6 +216,8 @@ class Normalizer:
 
             transformed = nld.transform(popt['A'][0], popt['alpha'][0],
                                         inplace=False)
+            if std_fake:
+                transformed.std = None
             self.nld_transformed.append(transformed)
 
             self.nld_parameters = popt
@@ -205,8 +227,8 @@ class Normalizer:
 
     def initial_guess(self, limit_low: Tuple[float, float],
                       limit_high: Tuple[float, float]
-    ) -> Tuple[Tuple[float, float, float, float],
-               Dict[str, float]]:
+                      ) -> Tuple[Tuple[float, float, float, float],
+                                 Dict[str, float]]:
         """ Find an inital guess for the constant, α, T and D₀
 
         Uses differential evolution to perform the guessing.
@@ -239,7 +261,7 @@ class Normalizer:
         res = differential_evolution(errfn, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
-            header=['constant', 'α', 'T', 'D₀']))
+            header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
 
         p0 = dict(zip(["A", "alpha", "T", "D0"], (res.x).T))
         # overwrite result for D0, as we have a "correct" prior for it
@@ -327,7 +349,7 @@ class Normalizer:
             vals.append(fmts % (med, sigma))
 
         LOG.info("Multinest results:\n%s", tt.to_string([vals],
-            header=['constant', 'α', 'T', 'D₀']))
+            header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
 
         return popt, samples
 
@@ -345,14 +367,27 @@ class Normalizer:
             fig = None
 
         for transformed in self.nld_transformed:
-            transformed.plot(ax=ax, c='k', alpha=0.5)
+            transformed.plot(ax=ax, c='k', alpha=0.5, label="transformed")
         self.discrete.plot(ax=ax, label='Discrete levels')
         ax.set_yscale('log')
 
         Sn = self.curried_model(T=self.nld_parameters['T'][0],
                                 D0=self.nld_parameters['D0'][0],
                                 E=self.spin['Sn'])
+        # TODO: plot errorbar
         ax.scatter(self.spin['Sn'], Sn, label='$S_n$')
+
+        x = np.linspace(self.limit_high[0], self.spin['Sn'])
+        model = self.curried_model(T=self.nld_parameters['T'][0],
+                                   D0=self.nld_parameters['D0'][0],
+                                   E=x)
+        ax.plot(x, model, "--", label="model")
+
+        ax.axvline(self.limit_low[0], linestyle=":", color='grey', alpha=1.,
+                   label="fit limits")
+        ax.axvline(self.limit_low[1], linestyle=":", color='grey', alpha=1.)
+        ax.axvline(self.limit_high[0], linestyle=":", color='grey', alpha=1.)
+        ax.axvline(self.limit_high[1], linestyle=":", color='grey', alpha=1.)
 
         if fig is not None:
             fig.legend(loc=9, ncol=3, frameon=False)
@@ -429,12 +464,15 @@ class Normalizer:
         elif isinstance(value, (str, Path)):
             if self.nld is None:
                 raise ValueError(f"`nld` must be set before loading levels")
+            nld = self.nld.copy()
+            nld.to_MeV()
             if self.use_smoothed_levels:
-                self._discrete = load_levels_smooth(value, self.nld.E)
+                self._discrete = load_levels_smooth(value, nld.E)
                 LOG.debug("Set `discrete` by loading smooth")
             else:
-                self._discrete = load_levels_discrete(value, self.nld.E)
+                self._discrete = load_levels_discrete(value, nld.E)
                 LOG.debug("Set `discrete` by loading discrete")
+            self._discrete.units = "MeV"
 
         elif isinstance(value, Vector):
             if self.nld is not None and np.any(self.nld.E != value.E):
@@ -456,16 +494,6 @@ class Normalizer:
             raise ValueError("D0 must contain (mean, std) [eV] of A-1 nucleus")
         self._D0 = value[0], value[1]
         self.bounds['D0'] = (0.99*value[0], 1.01*value[0])
-
-    @property
-    def nld(self) -> Optional[ndarray]:
-        return self._nld
-
-    @nld.setter
-    def nld(self, nld: ndarray) -> None:
-        LOG.debug("Setting NLD, dividing by 1e3")
-        self._nld = nld
-        self._nld.E /= 1e3
 
 
 def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:

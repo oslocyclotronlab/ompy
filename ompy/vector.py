@@ -16,12 +16,13 @@ class Vector():
     def __init__(self, values: Optional[Iterable[float]] = None,
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
-                 std: Optional[Iterable[float]] = None):
+                 std: Optional[Iterable[float]] = None,
+                 units: Optional[str] = "keV"):
         """ Stores 1d array with energy axes (a vector)
 
         An empty initalization defaults to one bin with zero values.
         An initalization with only `values` creates an energy binning
-        of 1 MeV starting at 0.5 (midbin).
+        of 1 (default: keV) starting at 0.5 (midbin).
         An initialization with only `E`, or energy, defaults to
         zero values.
         An initialization using a path loads a vector from said path.
@@ -33,6 +34,8 @@ class Vector():
             E: The energy of each bin.
             path: The path to load a saved vector from
             std: The standard deviation of the counts
+            unit: Unit of the energies. Can be "keV" or "MeV".
+                  Defaults to "keV".
 
         Raises:
            ValueError if the given arrays are of differing lenghts.
@@ -53,6 +56,8 @@ class Vector():
         if std is not None:
             std = np.asarray(std, dtype=float)
         self.std: Optional[ndarray] = std
+
+        self.units = units
 
         if path is not None:
             self.load(path)
@@ -116,14 +121,16 @@ class Vector():
         Raises:
             ValueError if the filetype is not supported
         """
+        vector = self.copy()
+        vector.to_keV()
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
         if filetype == 'numpy':
-            save_numpy_1D(self.values, self.E, path)
+            save_numpy_1D(vector.values, vector.E, path)
         elif filetype == 'tar':
-            save_tar([self.values, self.E], path)
+            save_tar([vector.values, vector.E], path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -169,9 +176,10 @@ class Vector():
         if self.std is not None:
             std = relative_uncertainty * transformed
         if not inplace:
+            units = self.units
             if self.std is not None:
-                return Vector(transformed, E=self.E, std=std)
-            return Vector(transformed, E=self.E)
+                return Vector(transformed, E=self.E, std=std, units=units)
+            return Vector(transformed, E=self.E, units=units)
 
         self.values = transformed
         if self.std is not None:
@@ -237,7 +245,29 @@ class Vector():
             self.values = values
             self.std = std
         else:
-            return Vector(values=values, E=E, std=std)
+            units = self.units
+            return Vector(values=values, E=E, std=std, units=units)
+
+    def to_MeV(self) -> Vector:
+        """ Convert E from keV to MeV if necessary """
+        if self.units == "MeV":
+            pass
+        elif self.units == "keV":
+            self.E /= 1e3
+            self.units = "MeV"
+        else:
+            raise NotImplementedError("Uniits must be keV or MeV")
+
+    def to_keV(self) -> Vector:
+        """ Convert E from MeV to keV if necessary """
+        if self.units == "keV":
+            pass
+        elif self.units == "MeV":
+            self.E *= 1e3
+            self.units = "keV"
+        else:
+            raise NotImplementedError("Uniits must be keV or MeV")
+
 
     def copy(self) -> Vector:
         """ Return a copy of the matrix """
