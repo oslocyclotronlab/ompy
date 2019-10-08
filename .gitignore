@@ -126,3 +126,6 @@ tags
 
 notebooks/**/
 docs/source/api/**/
+
+# Apple attribute file
+.DS_Store
