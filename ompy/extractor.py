@@ -287,28 +287,32 @@ class Extractor:
         self.size = len(self.nld)
 
     def plot(self, ax: Optional[Any] = None, scale: str = 'log',
-             **kwargs) -> None:
+             plot_mean: bool = False,
+             color='k', **kwargs) -> None:
         """ Basic visualization of nld and gsf
 
         Args:
             ax: An axis to plot onto
             scale: Scale to use
+            plot_mean: Whether to plot individual samples or mean & std. dev
         TODO: Fix
         """
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)
-        # for nld, gsf in zip(self.nld, self.gsf):
-        #     ax[0].plot(nld.E, nld.values, color='k',
-        #                alpha=1/self.size, **kwargs)
-        #     ax[1].plot(gsf.E, gsf.values, color='k',
-        #                alpha=1/self.size, **kwargs)
         else:
             fig = None
 
-        ax[0].errorbar(self.nld[0].E, self.nld_mean(), yerr=self.nld_std(),
-                       fmt='o', ms=1, lw=1)
-        ax[1].errorbar(self.gsf[0].E, self.gsf_mean(), yerr=self.gsf_std(),
-                       fmt='o', ms=1, lw=1)
+        if plot_mean:
+            ax[0].errorbar(self.nld[0].E, self.nld_mean(), yerr=self.nld_std(),
+                           fmt='o', ms=2, lw=1, color=color, **kwargs)
+            ax[1].errorbar(self.gsf[0].E, self.gsf_mean(), yerr=self.gsf_std(),
+                           fmt='o', ms=2, lw=1, color=color, **kwargs)
+        else:
+            for nld, gsf in zip(self.nld, self.gsf):
+                ax[0].plot(nld.E, nld.values, color=color,
+                           alpha=1/self.size, **kwargs)
+                ax[1].plot(gsf.E, gsf.values, color=color,
+                           alpha=1/self.size, **kwargs)
 
         ax[0].set_title("Level density")
         ax[1].set_title("γSF")

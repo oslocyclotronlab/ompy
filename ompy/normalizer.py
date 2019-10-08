@@ -76,7 +76,7 @@ class Normalizer:
     """
     def __init__(self, *, extractor: Optional[Extractor] = None,
                  nld: Optional[Vector] = None,
-                 discrete: Optional[Vector] = None,
+                 discrete: Optional[Union[str, Vector]] = None,
                  path: Optional[Union[str, Path]] = None) -> None:
         """ Normalizes nld ang gSF.
 
@@ -98,15 +98,18 @@ class Normalizer:
             extractor: The extractor to use get nld from
             nld: The nuclear level density vector to normalize.
             discrete: The discrete level density at low energies to
-                normalize to.
+                      normalize to. Provide either histogram as a Vector,
+                      or the path to the discrete level file (in keV).
             path: If set, tries to load vectors from path.
         """
         # Create the private variables
         self._discrete = None
+        self._discrete_path = None
         self._D0 = None
+        self._use_smoothed_levels = None
         self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
                        'D0': (None, None)}
-        self.spin = {'spincutModel': 'Disc_and_EB05',
+        self.spin = {'spincutModel': None,
                      'spincutPars': None,
                      'J_target': None,
                      'Gg': None,
@@ -197,7 +200,8 @@ class Normalizer:
             nld = self.nld
             nlds = [nld]
 
-        for nld in nlds:
+        for i, nld in enumerate(nlds):
+            LOG.info(f"\n\n---------\nNormalizing nld #{i}")
             nld = nld.copy()
             LOG.debug("Setting NLD, convert to MeV")
             nld.to_MeV()
@@ -361,7 +365,7 @@ class Normalizer:
             vals.append(fmts % (med, sigma))
 
         LOG.info("Multinest results:\n%s", tt.to_string([vals],
-            header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
+                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
 
         return popt, samples
 
@@ -378,10 +382,14 @@ class Normalizer:
         else:
             fig = None
 
-        for transformed in self.nld_transformed:
-            transformed.plot(ax=ax, c='k', alpha=0.5, label="transformed")
+        for i, transformed in enumerate(self.nld_transformed):
+            label = None
+            if i == 0:
+                label = "normalized"
+            transformed.plot(ax=ax, c='k', alpha=1/len(self.nld_transformed),
+                             label=label)
+
         self.discrete.plot(ax=ax, label='Discrete levels')
-        ax.set_yscale('log')
 
         Sn = self.curried_model(T=self.nld_parameters['T'][0],
                                 D0=self.nld_parameters['D0'][0],
@@ -395,11 +403,12 @@ class Normalizer:
                                    E=x)
         ax.plot(x, model, "--", label="model")
 
-        ax.axvline(self.limit_low[0], linestyle=":", color='grey', alpha=1.,
-                   label="fit limits")
-        ax.axvline(self.limit_low[1], linestyle=":", color='grey', alpha=1.)
-        ax.axvline(self.limit_high[0], linestyle=":", color='grey', alpha=1.)
-        ax.axvline(self.limit_high[1], linestyle=":", color='grey', alpha=1.)
+        ax.axvspan(self.limit_low[0], self.limit_low[1], color='grey',
+                   alpha=0.1, label="fit limits")
+        ax.axvspan(self.limit_high[0], self.limit_high[1], color='grey',
+                   alpha=0.1)
+
+        ax.set_yscale('log')
 
         if fig is not None:
             fig.legend(loc=9, ncol=3, frameon=False)
@@ -485,6 +494,7 @@ class Normalizer:
                 self._discrete = load_levels_discrete(value, nld.E)
                 LOG.debug("Set `discrete` by loading discrete")
             self._discrete.units = "MeV"
+            self._discrete_path = value
 
         elif isinstance(value, Vector):
             if self.nld is not None and np.any(self.nld.E != value.E):
@@ -506,6 +516,16 @@ class Normalizer:
             raise ValueError("D0 must contain (mean, std) [eV] of A-1 nucleus")
         self._D0 = value[0], value[1]
         self.bounds['D0'] = (0.99*value[0], 1.01*value[0])
+
+    @property
+    def use_smoothed_levels(self) -> Optional[bool]:
+        return self._use_smoothed_levels
+
+    @use_smoothed_levels.setter
+    def use_smoothed_levels(self, value: bool) -> None:
+        self._use_smoothed_levels = value
+        if self._discrete_path is not None:
+            self.discrete = self._discrete_path
 
 
 def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:
