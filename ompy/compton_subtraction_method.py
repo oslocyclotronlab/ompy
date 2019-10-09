@@ -4,6 +4,9 @@ from .library import *
 from .rebin import *
 from .constants import *
 
+"""
+OLD class, not used any longer
+"""
 
 def rebin_and_shift(counts_in, E_array_in, E_array_out, energy_shift=0):
     """
@@ -74,19 +77,19 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
     # TODO: FIX ME! There is a bug here, it does not do Compton subtraction right.
 
     # The arrays from resp.dat are missing the first channel.
-    p = np.append(0, p) 
+    p = np.append(0, p)
     FWHM = np.append(0, FWHM)
 
     a1_Eg = (Eg_array[1]-Eg_array[0]) # bin width
     N_Ex, N_Eg = array.shape
 
-    # Shift is the same for all energies 
+    # Shift is the same for all energies
     if shift == "annihilation":
         # For the annihilation peak, all channels should be mapped on E = 511 keV. Of course, gamma channels below 511 keV,
         # and even well above that, cannot produce annihilation counts, but this is taken into account by the fact that p
         # is zero for these channels. Thus, we set i_shift=0 and make a special dimensions_shifted array to map all channels of
-        # original array to i(511). 
-        i_shift = 0 
+        # original array to i(511).
+        i_shift = 0
     else:
         i_shift = i_from_E(shift, Eg_array) - i_from_E(0, Eg_array) # The number of indices to shift by
 
@@ -108,7 +111,7 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
         # so that index i_shift of array is index 0 of array_shifted.
         # Also flatten array along Ex axis to facilitate multiplication.
         array_shifted_flattened = array[:,indices_original].ravel()
-        # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions 
+        # Make an array of N_Eg_sh x N_Eg_sh containing gaussian distributions
         # to multiply each Eg channel by. This array is the same for all Ex bins,
         # so it will be repeated N_Ex times and stacked for multiplication
         # To get correct normalization we multiply by bin width
@@ -130,8 +133,8 @@ def shift_and_smooth3D(array, Eg_array, FWHM, p, shift, smoothing=True):
 
         # Finally, for each Ex bin, we now need to sum the contributions from the smoothing
         # of each Eg bin to get a total Eg spectrum containing the entire smoothed spectrum:
-        # Do this by reshaping into 3-dimensional array where each Eg bin (axis 0) contains a 
-        # N_Eg_sh x N_Eg_sh matrix, where each row is the smoothed contribution from one 
+        # Do this by reshaping into 3-dimensional array where each Eg bin (axis 0) contains a
+        # N_Eg_sh x N_Eg_sh matrix, where each row is the smoothed contribution from one
         # original Eg pixel. We sum the columns of each of these matrices:
         array_out = multiplied.reshape((N_Ex, N_Eg_sh, N_Eg_sh)).sum(axis=1)
         # print("array_out.shape =", array_out.shape)

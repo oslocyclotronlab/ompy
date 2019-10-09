@@ -54,7 +54,7 @@ def gauss_smoothing(double[:] array_in, double[:] E_array,
     Args:
         array_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of array_in, in
-                                 lower-bin-edge calibration
+                                 mid-bin calibration
         fwhm (array, double): The full-width-half-maximums. Need to be
                               same size as array_in
         truncate (double, optional): The window width of the Gaussian that is
@@ -73,13 +73,8 @@ def gauss_smoothing(double[:] array_in, double[:] E_array,
     cdef double[:] array_in_view = array_in
     cdef double a0, a1
 
-    # a0_lower_bin_edge = E_array[0]
     a0 = E_array[0]
     a1 = E_array[1] - E_array[0]
-
-    # # Convert from lower bin edge to middle-bin energy:
-    # E_array = E_array + a1/2
-    # a0 = E_array[0]
 
     array_out = np.zeros(len(array_in), dtype=DTYPE)
     # cdef double[:] array_out_view = array_out
@@ -105,7 +100,7 @@ def gauss_smoothing(double[:] array_in, double[:] E_array,
             i_cut_low, i_cut_high = find_truncation_indices(E_centroid_current,
                                                             sigma_current)
             pdf = np.zeros(len(array_in), dtype=DTYPE)
-            # using lower bin instead of center bin in both E_mid and mu
+            # if using lower bin instead of center bin in both E_mid and mu
             # below-> canceles out
             pdf[i_cut_low:i_cut_high] =\
                 gaussian(E_array[i_cut_low:i_cut_high],
@@ -129,7 +124,7 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
     Args:
         matrix_in (array, double): Array of inbound counts to be smoothed
         E_array (array, double): Array with energy calibration of matrix_in, in
-                                 lower-bin-edge calibration
+                                 mid-bin calibration
         fwhm (double or array of doubles): The full-width-half-maximums
         abs_or_rel (str): fhwm given absolute, or relative in %
                           relative: fwhm = fwhm_divE/100 * E_array

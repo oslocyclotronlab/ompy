@@ -387,8 +387,7 @@ def shift(counts_in, E_array_in, energy_shift):
 
     Args:
         counts_in (numpy array, float): Array of counts
-        E_array_in (numpy array, float): Energy calibration (lower bin edge)
-                                         of input counts
+        E_array_in (numpy array, float): Energies of input counts
         energy_shift (float): Amount to shift the counts by. Negative means
                               shift to lower energies. Default is 0.
     """

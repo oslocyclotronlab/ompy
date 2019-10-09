@@ -6,13 +6,19 @@ import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d#, interp2d
+import logging
+
 
 # from .firstgen import *
 # from .unfold import *
 from .rebin import *
 from .library import *
+from .decomposition import index
 from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 DTYPE = np.float64
 
@@ -51,18 +57,6 @@ def corr(Eg, theta):
     return (Eg*Eg/511*np.sin(theta))/(1+Eg/511*(1-np.cos(theta)))**2
 
 
-def Emid_to_bin(Emid, a0, a1):
-    """ Fin the bin of Emin, given te calibration (lower bin edge)
-
-    Assumes linear calibration
-    E_lower = a0 + a1 * i
-    Emid = E_lower + a1/2
-    """
-    E_lower = Emid - a1/2
-    i = (E_lower-a0)/a1
-    return int(i)
-
-
 def two_channel_split(E_centroid, E_array):
     """
     When E_centroid is between two bins in E_array, this function
@@ -70,21 +64,17 @@ def two_channel_split(E_centroid, E_array):
     the lower bin. The distance to the higher bin is 1-floor_distance
 
     Args:
-        E_centroid (double): The energy of the centroid
-        E_array (np.array, double): The energy grid to distribute on
-                                    Lower edge calibration.
+        E_centroid (double): The energy of the centroid (mid-bin)
+        E_array (np.array, double): The energy grid to distribute
     """
 
     a0 = E_array[0]
     a1 = E_array[1]-E_array[0]
 
-    # convert to lower edge
-    E_centroid = E_centroid-a1/2
-
-    bin_exact_float = (E_centroid - a0)/a1
-    i_floor = int(np.floor((E_centroid - a0)/a1))
-    i_ceil = int(np.ceil((E_centroid - a0)/a1))
-    floor_distance = (bin_exact_float - i_floor)
+    bin_as_float = (E_centroid - a0)/a1
+    i_floor = int(np.floor(bin_as_float))
+    i_ceil = int(np.ceil(bin_as_float))
+    floor_distance = (bin_as_float - i_floor)
 
     return i_floor, i_ceil, floor_distance
 
@@ -158,8 +148,8 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     # "Eg_sim" means "gamma, simulated", and refers to the gamma energies where we have simulated Compton spectra.
 
     if Eout_array.min() < Eg_sim_array.min():
-        print("Note: The response below {:.0f} keV".format(Eg_sim_array.min()),
-              "is interpolation only, as there are no simulations available.")
+        LOG.info("Note: The response below {:.0f} keV".format(Eg_sim_array.min())\
+            + "is interpolation only, as there are no simulations available.")
 
     if Eout_array.max() > Eg_sim_array.max():
         # Actually I don't know why we shouldn't be able to
@@ -252,7 +242,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
     # indexed by j to match MAMA code:
     # Egmin = 30 # keV -- this is universal (TODO: Is it needed?)
     Egmin = Eout_array[0]
-    i_Egmin = Emid_to_bin(Egmin, a0_out, a1_out)
+    i_Egmin = index(Eout_array, Egmin)
 
     # Allocate response matrix array:
     R = np.zeros((N_out, N_out))
@@ -271,7 +261,7 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         # -> Better if the lowest energies of the simulated spectra are above
         # the gamma energy to be extrapolatedu
         Egmax = E_j + 1*fwhm_abs*f_fwhm_rel_perCent_norm(E_j)/2.35 #FWHM_rel.max()/2.35
-        i_Egmax = min(Emid_to_bin(Egmax, a0_out, a1_out), N_out)
+        i_Egmax = min(index(Eout_array, Egmax), N_out)
         # print("i_Egmax =", i_Egmax)
 
         # MAMA unfolds with 1/10 of real FWHM for convergence reasons.
@@ -316,9 +306,9 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
 
         # Get maximal energy by taking 6*sigma above full-energy peak
         E_low_max = Eg_low + 6*fwhm_abs_array[i_g_sim_low]/2.35
-        i_low_max = min(Emid_to_bin(E_low_max, a0_out, a1_out), N_out-1)
+        i_low_max = min(index(Eout_array, E_low_max), N_out-1)
         E_high_max = Eg_high + 6*fwhm_abs_array[i_g_sim_high]/2.35
-        i_high_max = min(Emid_to_bin(E_high_max, a0_out, a1_out), N_out-1)
+        i_high_max =min(index(Eout_array, E_high_max), N_out-1)
         # print("E_low_max =", E_low_max, "E_high_max =", E_high_max, flush=True)
 
         # Find back-scattering Ebsc and compton-edge Ece energy of the current Eout energy:
@@ -329,8 +319,10 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
         #     print("Ece =", Ece)
         #     print("Ebsc =", Ebsc)
         # Indices in Eout calibration corresponding to these energies:
-        i_ce_out = min(Emid_to_bin(Ece, a0_out, a1_out), i_Egmax)
-        i_bsc_out = max(Emid_to_bin(Ebsc, a0_out, a1_out), i_Egmin)
+
+        i_ce_out = min(index(Eout_array, Ece), i_Egmax)
+        i_bsc_out = min(index(Eout_array, Ebsc), i_Egmin)
+
         # print("i_ce_out =", i_ce_out, ", i_bsc_out =", i_bsc_out, ", i_Egmax =", i_Egmax)
 
 
@@ -365,10 +357,9 @@ def interpolate_response(folderpath, Eout_array, fwhm_abs, return_table=False):
                     # Determine interpolation indices in low and high arrays
                     # by Compton formula
                     Ecmp_ = E_compton(Eg_low, theta)
-                    i_low_interp = max(Emid_to_bin(Ecmp_, a0_out, a1_out),
-                                       i_bsc_out)
+                    i_low_interp = min(index(Eout_array, Ecmp_), i_bsc_out)
                     Ecmp_ = E_compton(Eg_high, theta)
-                    i_high_interp = min(Emid_to_bin(Ecmp_, a0_out, a1_out),                i_high_max)
+                    i_high_interp = min(index(Eout_array, Ecmp_), i_high_max)
                     FA = (cmp_high[i_high_interp]*corr(Eg_high, theta)
                           - cmp_low[i_low_interp]*corr(Eg_low, theta))
                     FB = cmp_low[i_low_interp]*corr(Eg_low, theta) + FA*(E_j - Eg_low)/(Eg_high - Eg_low)

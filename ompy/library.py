@@ -85,7 +85,7 @@ def E_array_from_calibration(a0: float, a1: float, *,
                              N: Optional[int] = None,
                              E_max: Optional[float] = None) -> np.ndarray:
     """
-    Return an array of lower-bin-edge energy values corresponding to the
+    Return an array of mid-bin energy values corresponding to the
     specified calibration.
 
     Args:
@@ -97,7 +97,7 @@ def E_array_from_calibration(a0: float, a1: float, *,
                  covers E_max. In other words,
                  E_array[-1] >= E_max - a1
     Returns:
-        E: Array of lower-bin-edge energy values
+        E: Array of mid-bin energy values
     """
     if E_max is not None and N is not None:
         raise ValueError("Cannot give both N and E_max -- must choose one")

@@ -775,13 +775,14 @@ class Matrix():
                              f". Got {type(state)}")
 
     def to_lower_bin(self):
+        """ Transform Eg and Ex from mid bin (=default) to lower bin. """
         dEx = (self.Ex[1] - self.Ex[0])/2
         dEg = (self.Eg[1] - self.Eg[0])/2
         self.Ex -= dEx
         self.Eg -= dEg
 
     def to_mid_bin(self):
-        """ Transform Eg and Ex from lower bin to mid bin """
+        """ Transform Eg and Ex from lower bin to mid bin (=default). """
         dEx = (self.Ex[1] - self.Ex[0])/2
         dEg = (self.Eg[1] - self.Eg[0])/2
         self.Ex += dEx

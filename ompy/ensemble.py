@@ -290,7 +290,7 @@ class Ensemble:
 
         Args:
            axis: Which axis to rebin, "Eg" or "Ex"
-           out_array: Lower-bin-edge energy calibration of output
+           out_array: mid-bin energy calibration of output
                       matrix along rebin axis
            member: which member to rebin, currently only FG available
 
@@ -313,21 +313,21 @@ class Ensemble:
         for i in tqdm(range(self.size)):
             values = ensemble[i]
             if do_Ex:
-                values = rebin_2D(values, edges_in=matrix.Ex,
-                                  edges_out=out_array, axis=0)
+                values = rebin_2D(values, mids_in=matrix.Ex,
+                                  mids_out=out_array, axis=0)
             if do_Eg:
-                values = rebin_2D(values, edges_in=matrix.Eg,
-                                  edges_out=out_array, axis=1)
+                values = rebin_2D(values, mids_in=matrix.Eg,
+                                  mids_out=out_array, axis=1)
             rebinned[i] = values
 
         # correct fg matrix (different attribute) and axis
         values = matrix.values
         if do_Ex:
-            values = rebin_2D(values, edges_in=matrix.Ex,
-                              edges_out=out_array, axis=0)
+            values = rebin_2D(values, mids_in=matrix.Ex,
+                              mids_out=out_array, axis=0)
         if do_Eg:
-            values = rebin_2D(values, edges_in=matrix.Eg,
-                              edges_out=out_array, axis=1)
+            values = rebin_2D(values, mids_in=matrix.Eg,
+                              mids_out=out_array, axis=1)
         matrix = Matrix(values, out_array, out_array)
 
         # recalculate std

@@ -9,13 +9,23 @@ from scipy.ndimage import gaussian_filter1d
 # from .matrix import Matrix
 
 
-def mama_read(filename):
-    # Reads a MAMA matrix file and returns the matrix/vector as a numpy array,
-    # as well as a list containing the four calibration coefficients
-    # (ordered as [bx, ax, by, ay] where Ei = ai*channel_i + bi)
-    # and 1-D arrays of lower-bin-edge calibrated x and y values for plotting
-    # and similar.
-    matrix = np.genfromtxt(filename, skip_header=10, skip_footer=1,
+def mama_read(filename: str) -> Union[Tuple[ndarray, ndarray],
+                                      Tuple[ndarray, ndarray, ndarray]]:
+    """ Read 1d and 2d mama spectra/matrices
+
+    Args:
+        filename (str): Filename of matrix/spectrum
+    Returns:
+        2 or 3 eleement tuple containing
+            - **counts** (*ndarray*): array of counts.
+            - **x_array** (*ndarray*): mid-bin energies of x axis.
+            - **y_array** (*ndarray, optional*): Returned only if input is 2d. Mid-bin energies of y-axis.
+    Raises:
+        ValueError: If format is wrong, ie. if the calibrations line is
+            not as expected.
+
+    """
+    counts = np.genfromtxt(filename, skip_header=10, skip_footer=1,
                            encoding="latin-1")
     cal = {}
     with open(filename, 'r', encoding='latin-1') as datafile:
@@ -42,27 +52,22 @@ def mama_read(filename):
                              "Check calibration line of the Mama file")
 
     if ndim == 1:
-        Nx = matrix.shape[0]
+        Nx = counts.shape[0]
         x_array = np.linspace(0, Nx - 1, Nx)
         # Make arrays in center-bin calibration:
         x_array = cal["a0x"] + cal["a1x"] * x_array + cal["a2x"] * x_array**2
-        # Then correct them to lower-bin-edge:
-        x_array = x_array - cal["a1x"] / 2
-        # Matrix, Eg array, Ex array
-        return matrix, x_array
+        # counts, E array
+        return counts, x_array
 
     elif ndim == 2:
-        Ny, Nx = matrix.shape
+        Ny, Nx = counts.shape
         y_array = np.linspace(0, Ny - 1, Ny)
         x_array = np.linspace(0, Nx - 1, Nx)
         # Make arrays in center-bin calibration:
         x_array = cal["a0x"] + cal["a1x"] * x_array + cal["a2x"] * x_array**2
         y_array = cal["a0y"] + cal["a1y"] * y_array + cal["a2y"] * y_array**2
-        # Then correct them to lower-bin-edge:
-        y_array = y_array - cal["a1y"] / 2
-        x_array = x_array - cal["a1x"] / 2
-        # Matrix, Eg array, Ex array
-        return matrix, x_array, y_array
+        # counts, Eg array, Ex array
+        return counts, x_array, y_array
 
 
 def mama_write(mat, filename, comment=""):
@@ -87,9 +92,6 @@ def mama_write1D(mat, filename, comment=""):
         "a1x": calibration['a1'],
         "a2x": 0,
     }
-    # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
-    # format is supposed to have:
-    cal["a0x"] += cal["a1x"] / 2
 
     # Write mandatory header:
     header_string = '!FILE=Disk \n'
@@ -140,10 +142,6 @@ def mama_write2D(mat, filename, comment=""):
         "a1y": calibration['a1x'],
         "a2y": 0
     }
-    # Convert from lower-bin-edge to centre-bin as this is what the MAMA file
-    # format is supposed to have:
-    cal["a0x"] += cal["a1x"] / 2
-    cal["a0y"] += cal["a1y"] / 2
 
     # Write mandatory header:
     header_string = '!FILE=Disk \n'
