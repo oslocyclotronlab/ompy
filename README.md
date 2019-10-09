@@ -1,6 +1,6 @@
 # Oslo Method Python - OMpy
 ![Travis (.org)](https://img.shields.io/travis/oslocyclotronlab/ompy?style=flat-square)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square)
 [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
@@ -26,7 +26,7 @@
 # OMpy
 
 This is `ompy`, the Oslo method in python. It contains all the functionality needed to go from a raw coincidence matrix, via unfolding and the first-generation method, to fitting a level density and gamma-ray strength function. It also supports uncertainty propagation by Monte Carlo.
-If you want to try the package before installation, you may simply [click here](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master) to launch it on Binder and navigate yourself to `notebooks/gettings_started.ipynb`
+If you want to try the package before installation, you may simply [click here](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb) to launch it on Binder.
 
 **This is a short introduction, see more at https://ompy.readthedocs.io/**
 

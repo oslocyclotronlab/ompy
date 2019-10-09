@@ -9,10 +9,9 @@ functionality needed to go from a raw coincidence matrix, via unfolding
 and the first-generation method, to fitting a level density and
 gamma-ray strength function. It also supports uncertainty propagation by
 Monte Carlo. If you want to try the package before installation, you may
-simply `click here`_ to launch it on Binder and navigate yourself to
-``notebooks/gettings_started.ipynb``
+simply `click here`_ to launch it on Binder.
 
-.. _click here: https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master
+.. _click here: https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb
 
 Citing
 ******
@@ -46,7 +45,7 @@ Indices and tables
 
 .. |Travis| image:: https://img.shields.io/travis/oslocyclotronlab/ompy?style=flat-square
 .. |Binder| image:: https://mybinder.org/badge_logo.svg
-   :target: https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master
+   :target: https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb
 .. |Code Climate maintainability| image:: https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square
 .. |DOI| image:: https://zenodo.org/badge/141709973.svg
    :target: https://zenodo.org/badge/latestdoi/141709973
