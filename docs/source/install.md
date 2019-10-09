@@ -5,10 +5,6 @@ git clone --recurse https://github.com/oslocyclotronlab/ompy/
 ```
 where the `--recurse` flag specifies, that all submodules shall be downloaded as well.
 
-**NB: Read this if you have cloned the repo before October 2019:**
-We cleaned the repository from old comits clogging the repo (big data files that should never have been there). Unfortunetely, this has the sideeffect that the history had to be rewritten: Previous commits now have a different SHA1. If you need anything from the previous repo, see [ompy_Archive_Sept2019](https://github.com/oslocyclotronlab/ompy_Archive_Sept2019). This will unfortunately also destroy references in issues.
-The simplest way to get the new repo is to rerun the installation instructions below.
-
 ### Dependencies
  - Get and compile MultiNest (use the cmake version from [github.com/JohannesBuchner/MultiNest](https://github.com/JohannesBuchner/MultiNest)). The goal is to create lib/libmultinest.so
     ``` bash
@@ -60,6 +56,9 @@ python setup.py build_ext --inplace
 ```
 
 ### Troubleshooting
+#### Docker container
+If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine
+
 #### Python version
 If you had some failed attempts, you might try to uninstall `ompy` before retrying the stepts above:
 ```bash
@@ -69,6 +68,11 @@ Note that we require python 3.7 or higher. If your standard `python` and `pip` l
 
 #### OpenMP / MAC
 If you don't have OpenMP / have problems installing it, you can install without OpenMP. Type `export ompy_OpenMP=False` in the terminal before the setup above. For attempts to solve this issue, see also [#30](https://github.com/oslocyclotronlab/ompy/issues/30).
+
+#### Cloned the repo before September 2019
+**NB: Read this (only) if you have cloned the repo before October 2019:**
+We cleaned the repository from old comits clogging the repo (big data files that should never have been there). Unfortunetely, this has the sideeffect that the history had to be rewritten: Previous commits now have a different SHA1 (git version keys). If you need anything from the previous repo, see [ompy_Archive_Sept2019](https://github.com/oslocyclotronlab/ompy_Archive_Sept2019). This will unfortunately also destroy references in issues.
+The simplest way to get the new repo is to rerun the installation instructions below.
 
 ### General usage
 All the functions and classes in the package are available in the main module. You get everything by importing the package
