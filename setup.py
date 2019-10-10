@@ -123,7 +123,8 @@ elif openmp in (False, "False", "false"):
     print("Building without OpenMP")
 else:
     raise ValueError("Env var ompy_OpenMP must be either True or False "
-                     "(or not set); use eg. 'export ompy_OpenMP=False'")
+                     "(or not set); use eg. 'export ompy_OpenMP=False'"
+                     f"Now it is: {openmp}")
 fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
