@@ -126,8 +126,6 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
         E_array (array, double): Array with energy calibration of matrix_in, in
                                  mid-bin calibration
         fwhm (double or array of doubles): The full-width-half-maximums
-        abs_or_rel (str): fhwm given absolute, or relative in %
-                          relative: fwhm = fwhm_divE/100 * E_array
         axis: The axis along which smoothing should happen.
               Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
     """

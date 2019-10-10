@@ -74,6 +74,7 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
     ``` bash
    conda install --file requirements.txt
    ```
+ - For openMP support (optional), install `libomp`. Easiest on linux/ubuntu: `sudo apt-get install libomp-dev` or MAC `brew install libomp`.
  - Many examples are written with [jupyter notebooks](https://jupyter.org/install), so you probably want to install this, too.
 
 ### OMpy package
@@ -108,8 +109,8 @@ pip uninstall ompy
 ```
 Note that we require python 3.7 or higher. If your standard `python` and `pip` link to python 2, you may have to use `python3` and `pip3`.
 
-#### OpenMP / MAC
-If you don't have OpenMP / have problems installing it, you can install without OpenMP. Type `export ompy_OpenMP=False` in the terminal before the setup above. For attempts to solve this issue, see also [#30](https://github.com/oslocyclotronlab/ompy/issues/30).
+#### OpenMP
+If you don't have OpenMP / have problems installing it (see above), you can install without OpenMP. Type `export ompy_OpenMP=False` in the terminal before the setup above.
 
 #### Cloned the repo before September 2019
 **NB: Read this (only) if you have cloned the repo before October 2019:**

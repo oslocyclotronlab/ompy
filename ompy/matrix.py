@@ -83,8 +83,8 @@ class Matrix():
 
     Attributes:
         matrix: 2D matrix storing the counting data
-        Eg: The gamma energy along the x-axis
-        Ex: The excitation energy along the y-axis
+        Eg: The gamma energy along the x-axis (mid-bin calibration)
+        Ex: The excitation energy along the y-axis (mid-bin calibration)
         std: Array of standard deviations
         state: An enum to keep track of what has been done to the matrix
 
@@ -690,10 +690,8 @@ class Matrix():
     def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
         """ Iterates over the last non-zero elements
 
-        Args:
-            mat: The matrix to iterate over
         Yields:
-            Indicies (i, j) over the last non-zero (=diagonal)
+            Iterator[Tuple[int, int]]: Indicies (i, j) over the last non-zero (=diagonal)
             elements.
         """
         return diagonal_elements(self.values)

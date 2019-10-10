@@ -31,7 +31,7 @@ class Vector():
 
         Args:
             values: The values at each bin.
-            E: The energy of each bin.
+            E: The energy of each bin. (mid-bin calibration)
             path: The path to load a saved vector from
             std: The standard deviation of the counts
             unit: Unit of the energies. Can be "keV" or "MeV".
