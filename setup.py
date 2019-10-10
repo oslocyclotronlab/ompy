@@ -4,7 +4,6 @@ from pkg_resources import get_build_platform
 import numpy
 import subprocess
 import os
-import platform
 import builtins
 
 try:
@@ -110,10 +109,7 @@ write_version_py()
 
 # some machines have difficulties with OpenMP
 openmp = os.getenv("ompy_OpenMP")
-if openmp is None and platform.system() == 'Darwin':
-    openmp = False
-    print("MacOS detected: Building without OpenMP")
-elif openmp in (True, "True", "true"):
+if openmp in (None, True, "True", "true"):
     openmp = True
 elif openmp in (False, "False", "false"):
     openmp = False
