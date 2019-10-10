@@ -1,0 +1,53 @@
+language: python
+
+python: 3.7
+
+matrix:
+
+  include:
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - gfortran
+            - cmake
+            - liblapack-dev
+            - libblas-dev
+            - libomp-dev
+            - libopenmpi-dev
+            - git
+
+#    - os: osx
+#      addons:
+#        homebrew:
+#          packages:
+#            - cmake
+#            - gcc
+#            - python
+#            - libomp
+
+#    - os: osx
+#      addons:
+#        homebrew:
+#          packages:
+#            - cmake
+#            - gcc
+#            - python
+
+
+install:
+  - sudo pip install cython scipy numpy matplotlib future
+  - |
+    DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
+    mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
+    git clone https://github.com/JohannesBuchner/MultiNest.git
+    git clone https://github.com/vetlewi/PyMultiNest.git
+    cd MultiNest/build && cmake .. && make && sudo make install && cd ${DEPS_DIR}
+    cd PyMultiNest && sudo pip install -e . && cd ${TRAVIS_BUILD_DIR}
+  - sudo pip install -e .
+
+#install:
+#    - pip install -e .
+
+script:
+    - pytest ./tests/
