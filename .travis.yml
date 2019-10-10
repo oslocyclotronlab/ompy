@@ -35,16 +35,18 @@ matrix:
 #            - python
 
 
+# git clone https://github.com/vetlewi/PyMultiNest.git
+# cd PyMultiNest && pip3 install -e . && cd ${TRAVIS_BUILD_DIR} 
+
 install:
-  - pip install cython scipy numpy matplotlib future
+  - pip3 install cython scipy numpy matplotlib future
   - |
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
     git clone https://github.com/JohannesBuchner/MultiNest.git
-    git clone https://github.com/vetlewi/PyMultiNest.git
-    cd MultiNest/build && cmake .. && make && sudo make install && cd ${DEPS_DIR}
-    cd PyMultiNest && pip install -e . && cd ${TRAVIS_BUILD_DIR}
-  - pip install -e .
+    cd MultiNest/build && cmake .. && make && sudo make install && cd ${TRAVIS_BUILD_DIR}
+    export LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
+  - pip3 install -e .
 
 #install:
 #    - pip install -e .
