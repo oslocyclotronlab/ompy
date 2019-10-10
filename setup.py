@@ -5,6 +5,8 @@ import numpy
 import subprocess
 import os
 import builtins
+import platform
+from ctypes.util import find_library
 
 try:
     from Cython.Build import cythonize
@@ -106,10 +108,15 @@ git_revision = '%(git_revision)s'
         a.close()
 write_version_py()
 
-
-# some machines have difficulties with OpenMP
+# If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
 openmp = os.getenv("ompy_OpenMP")
-if openmp in (None, True, "True", "true"):
+if openmp is None and platform.system() == 'Darwin': # Check if macOS
+    if find_library("omp") != None:
+        openmp = True
+        print("libOMP found, building with OpenMP")
+    else:
+        print("libOMP not found, building without OpenMP")
+elif openmp in (True, "True", "true"):
     openmp = True
 elif openmp in (False, "False", "false"):
     openmp = False
@@ -123,7 +130,10 @@ if os.path.exists(fname):
 
 extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
 extra_link_args = []
-if openmp:
+if openmp and platform.system() == 'Darwin':
+    extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
+    extra_link_args.insert(-1, "-lomp")
+elif openmp:
     extra_compile_args.insert(-1, "-fopenmp")
     extra_link_args.insert(-1, "-fopenmp")
 
