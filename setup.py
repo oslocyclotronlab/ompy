@@ -110,13 +110,13 @@ write_version_py()
 
 # If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
 openmp = os.getenv("ompy_OpenMP")
-if openmp is None and platform.system() == 'Darwin': # Check if macOS
+if openmp is None and platform.system() == 'Darwin':  # Check if macOS
     if find_library("omp") != None:
         openmp = True
         print("libOMP found, building with OpenMP")
     else:
         print("libOMP not found, building without OpenMP")
-elif openmp in (True, "True", "true"):
+elif openmp in (None, True, "True", "true"):
     openmp = True
 elif openmp in (False, "False", "false"):
     openmp = False
