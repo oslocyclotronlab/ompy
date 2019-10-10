@@ -43,7 +43,7 @@ matrix:
 # cd PyMultiNest && pip3 install -e . && cd ${TRAVIS_BUILD_DIR} 
 
 install:
-  - pip3 install cython scipy numpy matplotlib future
+  - pip3 install cython scipy numpy matplotlib future pytest
   - |
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
