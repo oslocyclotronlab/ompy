@@ -5,7 +5,8 @@ python: 3.7
 matrix:
 
   include:
-    - os: linux
+    - name: "Python on linux"
+      os: linux
       addons:
         apt:
           packages:
@@ -17,14 +18,17 @@ matrix:
             - libopenmpi-dev
             - git
 
-#    - os: osx
-#      addons:
-#        homebrew:
-#          packages:
-#            - cmake
-#            - gcc
-#            - python
-#            - libomp
+    - name: "Python on macOS (with libomp)"
+      os: osx
+      osx_image: xcode11
+      language: shell
+      addons:
+        homebrew:
+          packages:
+            - cmake
+            - gcc
+            - python
+            - libomp
 
 #    - os: osx
 #      addons:
@@ -39,7 +43,7 @@ matrix:
 # cd PyMultiNest && pip3 install -e . && cd ${TRAVIS_BUILD_DIR} 
 
 install:
-  - pip3 install cython scipy numpy matplotlib future pymultinest
+  - pip3 install cython scipy numpy matplotlib future
   - |
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
