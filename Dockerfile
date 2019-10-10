@@ -24,7 +24,7 @@ RUN [ "/bin/bash", "-c", "cd MultiNest/build/ && cmake .. && make && cd ../../" 
 ENV LD_LIBRARY_PATH=/home/jovyan/MultiNest/lib/:$LD_LIBRARY_PATH
 
 USER $NB_USER
-RUN git clone  --recurse https://github.com/oslocyclotronlab/ompy/
+COPY . ompy
 # REMBEBER TO checkout the BRANCH you want
 RUN cd ompy &&\
     pip install -e .
