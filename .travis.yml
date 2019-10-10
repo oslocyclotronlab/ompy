@@ -30,13 +30,16 @@ matrix:
             - python
             - libomp
 
-#    - os: osx
-#      addons:
-#        homebrew:
-#          packages:
-#            - cmake
-#            - gcc
-#            - python
+    - name: "Python on macOS (without libomp)"
+      os: osx
+      osx_image: xcode11
+      language: shell
+      addons:
+        homebrew:
+          packages:
+            - cmake
+            - gcc
+            - python
 
 
 # git clone https://github.com/vetlewi/PyMultiNest.git
