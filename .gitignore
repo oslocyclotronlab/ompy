@@ -25,6 +25,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+ompy/version.py
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -126,3 +127,6 @@ tags
 
 notebooks/**/
 docs/source/api/**/
+
+# Apple attribute file
+.DS_Store
