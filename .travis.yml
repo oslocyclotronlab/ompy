@@ -44,7 +44,9 @@ install:
     DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
     mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
     git clone https://github.com/JohannesBuchner/MultiNest.git
+    git clone https://github.com/vetlewi/PyMultiNest.git
     cd MultiNest/build && cmake .. && make && sudo make install && cd ${TRAVIS_BUILD_DIR}
+    cd PyMultiNest && pip3 install -e . && cd ${TRAVIS_BUILD_DIR} 
     export LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH}
   - pip3 install -e .
 
