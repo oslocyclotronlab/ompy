@@ -24,7 +24,10 @@ RUN [ "/bin/bash", "-c", "cd MultiNest/build/ && cmake .. && make && cd ../../" 
 ENV LD_LIBRARY_PATH=/home/jovyan/MultiNest/lib/:$LD_LIBRARY_PATH
 
 USER $NB_USER
-COPY . ompy
+# Due to some cache issue with Mybinder we ought to use COPY instead
+# of git clone.
+COPY --chown=1000:100 . ompy
 # REMBEBER TO checkout the BRANCH you want
 RUN cd ompy &&\
+    git submodule update --init --recursive &&\
     pip install -e .
