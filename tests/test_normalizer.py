@@ -5,7 +5,9 @@ import numpy as np
 
 def test_attributes():
     nld = om.Vector(np.linspace(0, 6, 100))
-    discretes = om.load_levels_discrete('data/discrete_levels.txt', nld.E)
+    discretes = \
+        om.load_levels_discrete('example_data/discrete_levels_Dy164.txt',
+                                nld.E)
     normalizer = om.Normalizer()
 
     with pytest.raises(ValueError):
@@ -40,5 +42,4 @@ def test_attributes():
 
     normalizer.discrete = None
     normalizer.normalize((0, 1), (0, 1), nld=nld,
-            discrete='data/discrete_levels.txt')
-
+                         discrete='data/discrete_levels.txt')
