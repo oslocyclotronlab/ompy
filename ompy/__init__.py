@@ -39,6 +39,7 @@ from .norm_nld import *
 from .norm_gsf import *
 from .multinest_setup import *
 from .response import *
+from .response_class import *
 from .compton_subtraction_method import *
 from .gauss_smoothing import *
 from .firstgeneration import FirstGeneration
