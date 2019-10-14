@@ -14,6 +14,7 @@ from numpy import ndarray
 from scipy.optimize import differential_evolution
 from typing import Optional, Sequence, Tuple, Any, Union, Callable, Dict, List
 from scipy.stats import truncnorm
+from tqdm import tqdm
 from .extractor import Extractor
 from .vector import Vector
 from .multinest_setup import run_nld_2regions
@@ -200,7 +201,7 @@ class Normalizer:
             nld = self.nld
             nlds = [nld]
 
-        for i, nld in enumerate(nlds):
+        for i, nld in enumerate(tqdm(nlds)):
             LOG.info(f"\n\n---------\nNormalizing nld #{i}")
             nld = nld.copy()
             LOG.debug("Setting NLD, convert to MeV")
@@ -395,7 +396,7 @@ class Normalizer:
                                 D0=self.nld_parameters['D0'][0],
                                 E=self.spin['Sn'])
         # TODO: plot errorbar
-        ax.scatter(self.spin['Sn'], Sn, label='$S_n$')
+        ax.scatter(self.spin['Sn'], Sn, label=r'$\rho(S_n)$')
 
         x = np.linspace(self.limit_high[0], self.spin['Sn'])
         model = self.curried_model(T=self.nld_parameters['T'][0],
@@ -409,6 +410,9 @@ class Normalizer:
                    alpha=0.1)
 
         ax.set_yscale('log')
+        ax.set_ylabel(r"$\rho(E_x) \quad [\mathrm{MeV}^{-1}]$")
+        ax.set_xlabel(r"E_x \quad [\mathrm{MeV}]$")
+
 
         if fig is not None:
             fig.legend(loc=9, ncol=3, frameon=False)
