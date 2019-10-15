@@ -97,6 +97,7 @@ class Vector():
                 `symlog` or `logit`.
             xlabel (optional, str): Label on x-axis. Default is `"Energy"`.
             ylabel (optional, str): Label on y-axis. Default is `None`.
+            kwargs: Additional kwargs to plot command.
         Returns:
             The figure and axis used.
         """
@@ -195,10 +196,12 @@ class Vector():
                 as itself.
         """
         # Hack since something is screwy with the import
-        if hasattr(other, 'E'):
-            if np.all(other.E != self.E):
-                raise ValueError("Must have equal energy binning")
+        # |-> is this comment still up to date?
+        try:
+            self.has_equal_binning(other)
             other = other.values
+        except TypeError:  # already an array
+            pass
         squared_error = (self.values - other)**2
         if self.std is not None:
             if std is not None:
@@ -268,11 +271,35 @@ class Vector():
         else:
             raise NotImplementedError("Uniits must be keV or MeV")
 
+    def has_equal_binning(self, other, **kwargs) -> bool:
+        """ Check whether `other` has equal_binning as `self` within precision.
+        Args:
+            other (Vector): Vector to compare to.
+            kwargs: Additional kwargs to `np.allclose`.
+        Returns:
+            bool (bool): Returns `True` if both arrays are equal  .
+        Raises:
+            TypeError: If other is not a Vector.
+            ValueError: If any of the bins in any of the arrays are not equal.
+
+        """
+        if not isinstance(other, Vector):
+            raise TypeError("Other must be a Vector")
+        if self.shape != other.shape:
+            raise ValueError("Must have equal number of energy bins.")
+        if not np.allclose(self.E, other.E, **kwargs):
+            raise ValueError("Must have equal energy binning.")
+        else:
+            return True
 
     def copy(self) -> Vector:
-        """ Return a copy of the matrix """
+        """ Return a copy of the Vector """
         return copy.deepcopy(self)
 
     def index(self, E) -> int:
         """ Returns the closest index corresponding to the E value """
         return index(self.E, E)
+
+    @property
+    def shape(self) -> Tuple[int]:
+        return self.values.shape

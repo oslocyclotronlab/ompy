@@ -75,6 +75,7 @@ class Unfolder:
         R (Matrix): The response matrix
         weight_fluctuation (float):
         minimum_iterations (int):
+        window_size (float or int?): window_size for fill negatives on output
         use_compton_subtraction (bool): Set usage of Compton subtraction method
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
             a table with information ('E', 'eff_tot', ...) must be provided.
@@ -99,6 +100,7 @@ class Unfolder:
         self.num_iter = num_iter
         self.weight_fluctuation = 0.2
         self.minimum_iterations = 3
+        self.window_size = 10
         self.zeroes: Optional[np.ndarray] = None
         self._param = 5
         self._R: Optional[Matrix] = response
@@ -106,7 +108,6 @@ class Unfolder:
         self.use_compton_subtraction: bool = True
         self.response_tab: Optional[pandas.DataFrame] = None
         self.FWHM_tweak_multiplier = None
-
 
     def __call__(self, matrix: Matrix) -> Matrix:
         """ Wrapper for self.apply() """
@@ -116,8 +117,10 @@ class Unfolder:
         """Verify internal consistency and set default values
 
         Raises:
-            AssertionError: If the raw matrix and response matrix
-                have different calibration coefficients a10 and a11.
+            ValueError: If the raw matrix and response matrix have different
+                calibrations.
+
+        Deleted Raises:
             AttributeError: If no diagonal cut has been made.
         """
         # Ensure that the given matrix is in fact raw
@@ -125,18 +128,28 @@ class Unfolder:
             warnings.warn("Trying to unfold matrix that is not raw")
 
         assert self.R is not None, "Response R must be set"
+        assert self.R.shape[0] == self.R.shape[1],\
+            "Response R must be a square matrix"
 
-        LOG.debug("Comparing calibration of raw against response:"
-                  f"\n{self.raw.calibration()}"
-                  f"\n{self.R.calibration()}")
-        calibration_diff = self.raw.calibration_array() -\
-            self.R.calibration_array()
-        eps = 1e-3
-        if not (np.abs(calibration_diff[2:]) < eps).all():
-            raise AssertionError(("Calibration mismatch: "
-                                  f"{calibration_diff}"
-                                  "\nEnsure that the raw matrix and"
-                                  " calibration matrix are cut equally."))
+        LOG.debug("Comparing calibration of raw against response")
+        if len(self.raw.Eg) != len(self.R.Eg):
+            raise ValueError("Must have equal number of energy bins.")
+        if not np.allclose(self.raw.Eg, self.R.Eg):
+            raise ValueError("Must have equal energy binning.")
+
+        LOG.debug("Check for negative counts.")
+        if np.any(self.raw.values < 0) or np.any(self.R.values < 0):
+            raise ValueError("Raw and response cannot have negative counts."
+                             "Consider using fill_negatives and "
+                             "remove_negatives on the input matixes.")
+        # calibration_diff = self.raw.calibration_array() -\
+        #     self.R.calibration_array()
+        # eps = 1e-3
+        # if not (np.abs(calibration_diff[2:]) < eps).all():
+        #     raise AssertionError(("Calibration mismatch: "
+        #                           f"{calibration_diff}"
+        #                           "\nEnsure that the raw matrix and"
+        #                           " calibration matrix are cut equally."))
 
         # TODO: Warn if the Matrix is not diagonal
         # raise AttributeError("Call cut_diagonal() before unfolding")
@@ -198,8 +211,7 @@ class Unfolder:
         # These two lines feel out of place
         # TODO: What they do and where they should be run is very unclear.
         #     Fix later.
-        unfolded.fill_negative(window_size=10)
-        unfolded.remove_negative()
+        unfolded.fill_and_remove_negative(window_size=self.window_size)
         return unfolded
 
     def step(self, unfolded, folded, step):

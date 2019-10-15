@@ -233,6 +233,10 @@ class Ensemble:
         path = self.path / f"raw_{step}.npy"
         raw = self.load_matrix(path)
         if raw is None:
+            # if np.any(self.raw.values < 0):
+            #     raise ValueError("input matrix has to have positive"
+            #                      "entries only. Consider using fill and or"
+            #                      "remove negatives")
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
                 values = self.generate_gaussian()

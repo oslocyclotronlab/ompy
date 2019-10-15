@@ -184,7 +184,11 @@ class Extractor:
             Implement automatic rebinning if bin_width is given(?)
 
         """
+        if np.any(matrix.values < 0):
+            raise ValueError("input matrix has to have positive entries only.")
         if std is not None:
+            if np.any(std.values < 0):
+                raise ValueError("std has to have positive entries only.")
             assert matrix.shape == std.shape
             std.values = std.values.copy(order='C')
             matrix.values, std.values = normalize(matrix, std)

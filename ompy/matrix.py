@@ -270,6 +270,7 @@ class Matrix():
             vmax Maximum value for coloring in scaling
             xlabel (optional, str): Label on x-axis. Default see source.
             ylabel (optional, str): Label on y-axis. Default see source.
+            kwargs: Additional kwargs to plot command.
         Returns:
             The ax used for plotting
         Raises:
@@ -351,6 +352,7 @@ class Matrix():
             normalize: Whether or not to normalize the counts.
             xlabel (optional, str): Label on x-axis. See source.
             ylabel (optional, str): Label on y-axis. Default is `None`.
+            kwargs: Additional kwargs to plot command.
         Raises:
             ValueError: If axis is not in [0, 1]
         Returns:
@@ -714,9 +716,9 @@ class Matrix():
     def remove_negative(self):
         self.values = np.where(self.values > 0, self.values, 0)
 
-    def fill_and_remove_negative(self):
+    def fill_and_remove_negative(self, window_size):
         """Temporary function to remove boilerplate"""
-        self.fill_negative(window_size=10)
+        self.fill_negative(window_size=window_size)
         self.remove_negative()
 
     def index_Eg(self, E: float) -> int:
@@ -798,20 +800,16 @@ class Matrix():
         return self.values.__setitem__(key, item)
 
     def __sub__(self, other) -> Matrix:
-        if not isinstance(other, Matrix):
-            raise TypeError("Other must be a Matrix")
-        if np.all(self.Ex != other.Ex) or np.all(self.Eg != other.Eg):
-            raise NotImplementedError()
-            # other = other.rebin('Ex', self.Ex, inplace=False)
-            # other = other.rebin('Eg', self.Eg, inplace=False)
+        self.has_equal_binning(other)
         result = copy.deepcopy(self)
         result.values -= other.values
         return result
 
     def __add__(self, other) -> Matrix:
-        if not isinstance(other, Matrix):
-            raise TypeError("Other must be a Matrix")
-        raise NotImplementedError
+        self.has_equal_binning(other)
+        result = copy.deepcopy(self)
+        result.values -= other.values
+        return result
 
     def __rmul__(self, factor) -> Matrix:
         other = copy.deepcopy(self)
@@ -820,6 +818,28 @@ class Matrix():
 
     def __mul__(self, factor) -> Matrix:
         return self.__rmul__(factor)
+
+    def has_equal_binning(self, other, **kwargs) -> bool:
+        """ Check whether `other` has equal binning as `self` within precision.
+        Args:
+            other (Matrix): Matrix to compare to.
+            kwargs: Additional kwargs to `np.allclose`.
+        Returns:
+            bool (bool): Returns `True` if both arrays are equal  .
+        Raises:
+            TypeError: If other is not a Matrix
+            ValueError: If any of the bins in any of the arrays are not equal.
+
+        """
+        if not isinstance(other, Matrix):
+            raise TypeError("Other must be a Matrix")
+        if np.any(self.shape != other.shape):
+            raise ValueError("Must have equal number of energy bins.")
+        if not np.allclose(self.Ex, other.Ex, **kwargs) \
+           or not np.allclose(self.Eg, other.Eg, **kwargs):
+            raise ValueError("Must have equal energy binning.")
+        else:
+            return True
 
 
 def to_plot_axis(axis: Any) -> int:

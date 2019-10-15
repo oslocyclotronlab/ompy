@@ -121,6 +121,8 @@ class FirstGeneration:
         self.action.act_on(matrix)
         # We don't want negative energies
         matrix.cut('Ex', Emin=0.0)
+        if np.any(matrix.values < 0):
+            raise ValueError("input matrix has to have positive entries only.")
 
         valley_correction = self.cut_valley_correction(matrix)
 
@@ -324,8 +326,9 @@ class FirstGeneration:
             raise TypeError("`valley_correction` must be a vector.")
         valley_correction.copy()
         valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max())
-        assert (valley_correction.E == matrix.Ex).all(), \
-            "valley correction matrix must have the same Ex array as matrix."
+        valley_correction.has_equal_binning(matrix)
+        if np.any(valley_correction.values < 0):
+            raise ValueError("valley correction has to have positive entries only.")
 
         return valley_correction.values
 
