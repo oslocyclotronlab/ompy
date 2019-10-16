@@ -5,7 +5,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
-from .filehandling import (load_numpy_1D, save_numpy_1D, filetype_from_suffix,
+from .filehandling import (load_numpy_1D, save_numpy_1D,
+                           mama_read, mama_write,
+                           filetype_from_suffix,
                            load_tar, save_tar)
 from .matrix import MeshLocator
 from .decomposition import index
@@ -132,6 +134,8 @@ class Vector():
             save_numpy_1D(vector.values, vector.E, path)
         elif filetype == 'tar':
             save_tar([vector.values, vector.E], path)
+        elif filetype == 'mama':
+            mama_write(self, path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -148,8 +152,13 @@ class Vector():
             self.values, self.E = load_numpy_1D(path)
         elif filetype == 'tar':
             self.values, self.E = load_tar(path)
+        elif filetype == 'mama':
+            self.values, self.E = mama_read(path)
         else:
-            raise ValueError(f"Unknown filetype {filetype}")
+            try:
+                self.values, self.E = mama_read(path)
+            except ValueError:  # from within ValueError
+                raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
         return None

@@ -202,12 +202,12 @@ class Matrix():
         elif filetype == 'tar':
             self.values, self.Eg, self.Eg = load_tar(path)
         elif filetype == 'mama':
-            matrix, Eg, Ex = mama_read(path)
-            self.values = matrix
-            self.Eg = Eg
-            self.Ex = Ex
+            self.matrix, self.Eg, self.Ex = mama_read(path)
         else:
-            raise ValueError(f"Unknown filetype {filetype}")
+            try:
+                self.matrix, self.Eg, self.Ex = mama_read(path)
+            except ValueError:  # from within mama_read
+                raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
         return None
@@ -322,6 +322,23 @@ class Matrix():
         else:
             ax.set_ylabel(ylabel)
 
+        # show z-value in status bar
+        # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
+        def format_coord(x, y):
+            xarr = Eg
+            yarr = Ex
+            if ((x > xarr.min()) & (x <= xarr.max())
+               & (y > yarr.min()) & (y <= yarr.max())):
+                col = np.searchsorted(xarr, x)-1
+                row = np.searchsorted(yarr, y)-1
+                z = masked[row, col]
+                return f'x={x:1.0f}, y={y:1.0f}, z={z:1.2E}'
+                # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
+            else:
+                return f'x={x:1.0f}, y={y:1.0f}'
+        ax.format_coord = format_coord
+
+
         if fig is not None:
             if vmin is not None and vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='both')
@@ -340,7 +357,8 @@ class Matrix():
                         Emax: float = None, *, ax: Any = None,
                         normalize: bool = False,
                         xlabel: Optional[str] = "Energy",
-                        ylabel: Optional[str] = None, **kwargs) -> Any:
+                        ylabel: Optional[str] = None,
+                        scale: Optional[str]= None, **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
         Args:
@@ -352,6 +370,7 @@ class Matrix():
             normalize: Whether or not to normalize the counts.
             xlabel (optional, str): Label on x-axis. See source.
             ylabel (optional, str): Label on y-axis. Default is `None`.
+            scale (optional, str): y-scale, i.e `log` or `linear`.
             kwargs: Additional kwargs to plot command.
         Raises:
             ValueError: If axis is not in [0, 1]
@@ -378,6 +397,9 @@ class Matrix():
         if xlabel is not None:  # overwrite the above
             ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+
+        if scale is not None:
+            ax.set_yscale(scale)
 
         return ax
 
