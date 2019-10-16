@@ -197,7 +197,6 @@ class Matrix():
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
-        print(filetype)
         if filetype == 'numpy':
             self.values, self.Eg, self.Ex = load_numpy_2D(path)
         elif filetype == 'tar':
