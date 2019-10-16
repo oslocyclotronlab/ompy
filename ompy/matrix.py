@@ -197,12 +197,13 @@ class Matrix():
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
+        print(filetype)
         if filetype == 'numpy':
             self.values, self.Eg, self.Ex = load_numpy_2D(path)
         elif filetype == 'tar':
             self.values, self.Eg, self.Eg = load_tar(path)
         elif filetype == 'mama':
-            self.matrix, self.Eg, self.Ex = mama_read(path)
+            self.values, self.Eg, self.Ex = mama_read(path)
         else:
             try:
                 self.matrix, self.Eg, self.Ex = mama_read(path)
