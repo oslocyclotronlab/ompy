@@ -38,8 +38,7 @@ from .ensemble import Ensemble
 from .norm_nld import *
 from .norm_gsf import *
 from .multinest_setup import *
-from .response import *
-from .response_class import *
+from .response import Response
 from .compton_subtraction_method import *
 from .gauss_smoothing import *
 from .firstgeneration import FirstGeneration
