@@ -35,3 +35,34 @@ def test_cut():
     valcut = np.arange(34, 43)
     assert_equal(vector.E, Ecut)
     assert_equal(vector.values, valcut)
+
+@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')
+def test_numericals():
+    E = np.array([0, 1, 2])
+    values1 = np.array([0, 1, -2.])
+    vector1 = om.Vector(values=values1, E=E)
+
+    values2 = values1+1
+    vector2 = om.Vector(values=values2, E=E)
+
+    factor = 5.
+
+    assert_equal((vector1/vector2).values, values1/values2)
+    assert_equal((vector2/vector1).values, values2/values1)
+    assert_equal((vector1/factor).values, values1/factor)
+    assert_equal((factor/vector1).values, factor/values1)
+
+    assert_equal((vector1*vector2).values, values1*values2)
+    assert_equal((vector2*vector1).values, values2*values1)
+    assert_equal((vector1*factor).values, values1*factor)
+    assert_equal((factor*vector1).values, factor*values1)
+
+    assert_equal((vector1+vector2).values, values1+values2)
+    assert_equal((vector2+vector1).values, values2+values1)
+    assert_equal((vector1+factor).values, values1+factor)
+    assert_equal((factor+vector1).values, factor+values1)
+
+    assert_equal((vector1-vector2).values, values1-values2)
+    assert_equal((vector2-vector1).values, values2-values1)
+    assert_equal((vector1-factor).values, values1-factor)
+    assert_equal((factor-vector1).values, factor-values1)

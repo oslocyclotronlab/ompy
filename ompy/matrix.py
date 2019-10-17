@@ -205,7 +205,7 @@ class Matrix():
             self.values, self.Eg, self.Ex = mama_read(path)
         else:
             try:
-                self.matrix, self.Eg, self.Ex = mama_read(path)
+                self.values, self.Eg, self.Ex = mama_read(path)
             except ValueError:  # from within mama_read
                 raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
@@ -822,24 +822,64 @@ class Matrix():
         return self.values.__setitem__(key, item)
 
     def __sub__(self, other) -> Matrix:
-        self.has_equal_binning(other)
         result = copy.deepcopy(self)
-        result.values -= other.values
+        if isinstance(other, (int, float)):
+            result.values -= other
+        else:
+            self.has_equal_binning(other)
+            result.values -= other.values
+        return result
+
+    def __rsub__(self, other) -> Matrix:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values = other - result.values
+        else:
+            self.has_equal_binning(other)
+            result.values = other.values - result.values
         return result
 
     def __add__(self, other) -> Matrix:
-        self.has_equal_binning(other)
         result = copy.deepcopy(self)
-        result.values -= other.values
+        if isinstance(other, (int, float)):
+            result.values += other
+        else:
+            self.has_equal_binning(other)
+            result.values += other.values
         return result
 
-    def __rmul__(self, factor) -> Matrix:
-        other = copy.deepcopy(self)
-        other.values *= factor
-        return other
+    def __radd__(self, other) -> Matrix:
+        return self.__add__(other)
 
-    def __mul__(self, factor) -> Matrix:
-        return self.__rmul__(factor)
+    def __mul__(self, other) -> Matrix:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values *= other
+        else:
+            self.has_equal_binning(other)
+            result.values *= other.values
+        return result
+
+    def __rmul__(self, other) -> Matrix:
+        return self.__mul__(other)
+
+    def __truediv__(self, other) -> Matrix:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values /= other
+        else:
+            self.has_equal_binning(other)
+            result.values /= other.values
+        return result
+
+    def __rtruediv__(self, other) -> Matrix:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values = other / result.values
+        else:
+            self.has_equal_binning(other)
+            result.values = other.values / result.values
+        return result
 
     def has_equal_binning(self, other, **kwargs) -> bool:
         """ Check whether `other` has equal binning as `self` within precision.

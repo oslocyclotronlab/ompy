@@ -1,6 +1,7 @@
 import pytest
 import ompy as om
 import numpy as np
+from numpy.testing import assert_equal
 
 
 @pytest.fixture()
@@ -58,3 +59,34 @@ def test_index(E, index):
     mat.Ex = np.arange(-10.5, 10.5)
     assert mat.index_Ex(E) == index
 
+
+@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')
+def test_numericals():
+    E = np.array([0, 1, 2])
+    values1 = np.array([[0, 1, 2.], [-2, 1, 2.],  [2, 3, -10.]])
+    matrix1 = om.Matrix(values=values1, Ex=E, Eg=E)
+
+    values2 = values1+1
+    matrix2 = om.Matrix(values=values2, Ex=E, Eg=E)
+
+    factor = 5.
+
+    assert_equal((matrix1/matrix2).values, values1/values2)
+    assert_equal((matrix2/matrix1).values, values2/values1)
+    assert_equal((matrix1/factor).values, values1/factor)
+    assert_equal((factor/matrix1).values, factor/values1)
+
+    assert_equal((matrix1*matrix2).values, values1*values2)
+    assert_equal((matrix2*matrix1).values, values2*values1)
+    assert_equal((matrix1*factor).values, values1*factor)
+    assert_equal((factor*matrix1).values, factor*values1)
+
+    assert_equal((matrix1+matrix2).values, values1+values2)
+    assert_equal((matrix2+matrix1).values, values2+values1)
+    assert_equal((matrix1+factor).values, values1+factor)
+    assert_equal((factor+matrix1).values, factor+values1)
+
+    assert_equal((matrix1-matrix2).values, values1-values2)
+    assert_equal((matrix2-matrix1).values, values2-values1)
+    assert_equal((matrix1-factor).values, values1-factor)
+    assert_equal((factor-matrix1).values, factor-values1)

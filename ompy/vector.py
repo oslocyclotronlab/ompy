@@ -312,3 +312,65 @@ class Vector():
     @property
     def shape(self) -> Tuple[int]:
         return self.values.shape
+
+    def __sub__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values -= other
+        else:
+            self.has_equal_binning(other)
+            result.values -= other.values
+        return result
+
+    def __rsub__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values = other - result.values
+        else:
+            self.has_equal_binning(other)
+            result.values = other.values - result.values
+        return result
+
+    def __add__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values += other
+        else:
+            self.has_equal_binning(other)
+            result.values += other.values
+        return result
+
+    def __radd__(self, other) -> Vector:
+        return self.__add__(other)
+
+    def __mul__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values *= other
+        else:
+            self.has_equal_binning(other)
+            result.values *= other.values
+        return result
+
+    def __rmul__(self, other) -> Vector:
+        return self.__mul__(other)
+
+    def __truediv__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values /= other
+        else:
+            self.has_equal_binning(other)
+            result.values /= other.values
+        return result
+
+    def __rtruediv__(self, other) -> Vector:
+        result = copy.deepcopy(self)
+        if isinstance(other, (int, float)):
+            result.values = other / result.values
+        else:
+            self.has_equal_binning(other)
+            result.values = other.values / result.values
+        return result
+
+
