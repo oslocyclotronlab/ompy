@@ -375,6 +375,9 @@ class Response():
             "the relative fwhm (= fwhm/E), but normalized to 1 at 1.33 MeV."\
             f"Now it is: {self.f_fwhm_rel_perCent_norm(1330)} at 1.33 MeV."
 
+        LOG.info(f"Note: Spectra outside of {self.resp['Eg'].min()} and"
+                 f"{self.resp['Eg'].max()} are extrapolation only.")
+
     def get_closest_compton(self, E: float) -> Tuple[int, int]:
         """Find and rebin closest energies from available response functions
 

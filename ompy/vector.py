@@ -12,9 +12,9 @@ from .filehandling import (load_numpy_1D, save_numpy_1D,
 from .matrix import MeshLocator
 from .decomposition import index
 from .library import div0
+from .abstractarray import AbstractArray
 
-
-class Vector():
+class Vector(AbstractArray):
     def __init__(self, values: Optional[Iterable[float]] = None,
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
@@ -301,76 +301,8 @@ class Vector():
         else:
             return True
 
-    def copy(self) -> Vector:
-        """ Return a copy of the Vector """
-        return copy.deepcopy(self)
-
     def index(self, E) -> int:
         """ Returns the closest index corresponding to the E value """
         return index(self.E, E)
-
-    @property
-    def shape(self) -> Tuple[int]:
-        return self.values.shape
-
-    def __sub__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values -= other
-        else:
-            self.has_equal_binning(other)
-            result.values -= other.values
-        return result
-
-    def __rsub__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values = other - result.values
-        else:
-            self.has_equal_binning(other)
-            result.values = other.values - result.values
-        return result
-
-    def __add__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values += other
-        else:
-            self.has_equal_binning(other)
-            result.values += other.values
-        return result
-
-    def __radd__(self, other) -> Vector:
-        return self.__add__(other)
-
-    def __mul__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values *= other
-        else:
-            self.has_equal_binning(other)
-            result.values *= other.values
-        return result
-
-    def __rmul__(self, other) -> Vector:
-        return self.__mul__(other)
-
-    def __truediv__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values /= other
-        else:
-            self.has_equal_binning(other)
-            result.values /= other.values
-        return result
-
-    def __rtruediv__(self, other) -> Vector:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values = other / result.values
-        else:
-            self.has_equal_binning(other)
-            result.values = other.values / result.values
-        return result
 
 

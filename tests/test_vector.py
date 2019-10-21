@@ -47,22 +47,11 @@ def test_numericals():
 
     factor = 5.
 
-    assert_equal((vector1/vector2).values, values1/values2)
-    assert_equal((vector2/vector1).values, values2/values1)
-    assert_equal((vector1/factor).values, values1/factor)
-    assert_equal((factor/vector1).values, factor/values1)
+    for op in ("/", "*", "+", "-"):
+        eval(f"assert_equal((vector1{op}vector2).values, values1{op}values2)")
+        eval(f"assert_equal((vector2{op}vector1).values, values2{op}values1)")
+        eval(f"assert_equal((vector1{op}factor).values, values1{op}factor)")
+        eval(f"assert_equal((factor{op}vector1).values, factor{op}values1)")
 
-    assert_equal((vector1*vector2).values, values1*values2)
-    assert_equal((vector2*vector1).values, values2*values1)
-    assert_equal((vector1*factor).values, values1*factor)
-    assert_equal((factor*vector1).values, factor*values1)
-
-    assert_equal((vector1+vector2).values, values1+values2)
-    assert_equal((vector2+vector1).values, values2+values1)
-    assert_equal((vector1+factor).values, values1+factor)
-    assert_equal((factor+vector1).values, factor+values1)
-
-    assert_equal((vector1-vector2).values, values1-values2)
-    assert_equal((vector2-vector1).values, values2-values1)
-    assert_equal((vector1-factor).values, values1-factor)
-    assert_equal((factor-vector1).values, factor-values1)
+    assert_equal((vector2@vector1).values, values2@values1)
+    assert_equal((vector1@vector2).values, values1@values2)

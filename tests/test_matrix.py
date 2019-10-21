@@ -71,22 +71,11 @@ def test_numericals():
 
     factor = 5.
 
-    assert_equal((matrix1/matrix2).values, values1/values2)
-    assert_equal((matrix2/matrix1).values, values2/values1)
-    assert_equal((matrix1/factor).values, values1/factor)
-    assert_equal((factor/matrix1).values, factor/values1)
+    for op in ("/", "*", "+", "-"):
+        eval(f"assert_equal((matrix1{op}matrix2).values, values1{op}values2)")
+        eval(f"assert_equal((matrix2{op}matrix1).values, values2{op}values1)")
+        eval(f"assert_equal((matrix1{op}factor).values, values1{op}factor)")
+        eval(f"assert_equal((factor{op}matrix1).values, factor{op}values1)")
 
-    assert_equal((matrix1*matrix2).values, values1*values2)
-    assert_equal((matrix2*matrix1).values, values2*values1)
-    assert_equal((matrix1*factor).values, values1*factor)
-    assert_equal((factor*matrix1).values, factor*values1)
-
-    assert_equal((matrix1+matrix2).values, values1+values2)
-    assert_equal((matrix2+matrix1).values, values2+values1)
-    assert_equal((matrix1+factor).values, values1+factor)
-    assert_equal((factor+matrix1).values, factor+values1)
-
-    assert_equal((matrix1-matrix2).values, values1-values2)
-    assert_equal((matrix2-matrix1).values, values2-values1)
-    assert_equal((matrix1-factor).values, values1-factor)
-    assert_equal((factor-matrix1).values, factor-values1)
+    assert_equal((matrix2@matrix1).values, values2@values1)
+    assert_equal((matrix1@matrix2).values, values1@values2)
