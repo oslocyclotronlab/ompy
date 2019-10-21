@@ -37,20 +37,21 @@ from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
-from .matrixstate import MatrixState
-from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .abstractarray import AbstractArray
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV
+from .decomposition import index
 from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
                            save_numpy_2D, load_numpy_2D, save_tar, load_tar,
                            filetype_from_suffix)
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV
+from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .matrixstate import MatrixState
 from .rebin import rebin_2D
-from .decomposition import index
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 
-class Matrix():
+class Matrix(AbstractArray):
     """ Stores 2d array with energy axes (a matrix).
 
     Stores matrices along with calibration and energy axis arrays. Performs
@@ -778,10 +779,6 @@ class Matrix():
         return self.values.sum()
 
     @property
-    def shape(self) -> Tuple[int, int]:
-        return self.values.shape
-
-    @property
     def state(self) -> MatrixState:
         return self._state
 
@@ -814,72 +811,6 @@ class Matrix():
         for row in range(self.shape[0]):
             for col in range(self.shape[1]):
                 yield row, col
-
-    def __getitem__(self, key):
-        return self.values.__getitem__(key)
-
-    def __setitem__(self, key, item):
-        return self.values.__setitem__(key, item)
-
-    def __sub__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values -= other
-        else:
-            self.has_equal_binning(other)
-            result.values -= other.values
-        return result
-
-    def __rsub__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values = other - result.values
-        else:
-            self.has_equal_binning(other)
-            result.values = other.values - result.values
-        return result
-
-    def __add__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values += other
-        else:
-            self.has_equal_binning(other)
-            result.values += other.values
-        return result
-
-    def __radd__(self, other) -> Matrix:
-        return self.__add__(other)
-
-    def __mul__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values *= other
-        else:
-            self.has_equal_binning(other)
-            result.values *= other.values
-        return result
-
-    def __rmul__(self, other) -> Matrix:
-        return self.__mul__(other)
-
-    def __truediv__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values /= other
-        else:
-            self.has_equal_binning(other)
-            result.values /= other.values
-        return result
-
-    def __rtruediv__(self, other) -> Matrix:
-        result = copy.deepcopy(self)
-        if isinstance(other, (int, float)):
-            result.values = other / result.values
-        else:
-            self.has_equal_binning(other)
-            result.values = other.values / result.values
-        return result
 
     def has_equal_binning(self, other, **kwargs) -> bool:
         """ Check whether `other` has equal binning as `self` within precision.
