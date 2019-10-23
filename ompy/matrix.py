@@ -255,7 +255,7 @@ class Matrix(AbstractArray):
              scale: Optional[str] = None,
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
-             midbin_ticks: bool = True,
+             midbin_ticks: bool = False,
              xlabel: Optional[str] = None,
              ylabel: Optional[str] = None,
              **kwargs) -> Any:
@@ -556,7 +556,7 @@ class Matrix(AbstractArray):
 
         If no limits are provided, an automatic cut will be made.
         Args:
-            E1: First point of intercept, ordered as Ex, Eg
+            E1: First point of intercept, ordered as (Eg, Ex)
             E2: Second point of intercept
             inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
@@ -601,6 +601,7 @@ class Matrix(AbstractArray):
         Iy = self.indices_Ex([Ey1, Ey2])
 
         # Interpolate between the two points
+        assert(Ix[1] != Ix[0])
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
         b = Iy[0] - a*Ix[0]
         line = lambda x: a*x + b  # NOQA E731
@@ -833,6 +834,22 @@ class Matrix(AbstractArray):
             raise ValueError("Must have equal energy binning.")
         else:
             return True
+
+    def __matmul__(self, other: Matrix) -> Matrix:
+        result = self.copy()
+        # cannot use has_equal_binning as we don't need the same
+        # shape for Ex and Eg.
+        # Remember: R[incident <-> Ex, detected <-> Eg]
+        if isinstance(other, Matrix):
+            if len(self.Eg) != len(self.Ex):
+                raise ValueError("Must have equal number of energy bins.")
+            if not np.allclose(self.Eg, other.Eg):
+                raise ValueError("Must have equal energy binning on Eg.")
+        else:
+            NotImplementedError("Type not implemented")
+
+        result.values = result.values@other.values
+        return result
 
 
 def to_plot_axis(axis: Any) -> int:

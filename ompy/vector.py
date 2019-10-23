@@ -305,4 +305,14 @@ class Vector(AbstractArray):
         """ Returns the closest index corresponding to the E value """
         return index(self.E, E)
 
+    def __matmul__(self, other) -> Vector:
+        result = self.copy()
+        if isinstance(other, Vector):
+            self.has_equal_binning(other)
+        else:
+            NotImplementedError("Type not implemented")
+
+        result.values = result.values@other.values
+        return result
+
 

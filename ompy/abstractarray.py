@@ -77,10 +77,10 @@ class AbstractArray:
         return result
 
     def __matmul__(self, other) -> AbstractArray:
-        result = self.copy()
-        self.has_equal_binning(other)
-        result.values = result.values@other.values
-        return result
+        """
+        Implemented in subclasses
+        """
+        raise NotImplementedError()
 
     @property
     def shape(self) -> Union[Tuple[int], Tuple[int, int]]:
