@@ -55,3 +55,16 @@ def test_numericals():
 
     assert_equal((vector2@vector1).values, values2@values1)
     assert_equal((vector1@vector2).values, values1@values2)
+
+# This does not work as of now...
+# def test_mutable():
+#     E = np.array([0, 1, 2])
+#     E_org = E.copy()
+
+#     values = np.array([0, 1, -2.])
+#     vector = om.Vector(values=values, E=E)
+
+#     # chaning the original array shouldn't change the vector array
+#     # (due to the setter)!
+#     E += 1
+#     assert_equal(vector.E, E_org)

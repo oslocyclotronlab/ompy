@@ -116,14 +116,13 @@ class Matrix(AbstractArray):
         for initialzing it with zero entries.
 
         """
-
         if shape is not None and values is not None:
             raise ValueError("'shape' and 'values' are exclusive")
 
         if shape is not None:
             self.values = np.zeros(shape, dtype=float)
         else:
-            self.values = np.asarray(values, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
 
         if (values is not None or shape is not None) and Ex is None:
             Ex = range(self.values.shape[0])
@@ -132,8 +131,8 @@ class Matrix(AbstractArray):
             Eg = range(self.values.shape[1])
             Eg = np.asarray(Eg) + 0.5
 
-        self.Eg: np.ndarray = np.asarray(Eg, dtype=float)
-        self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
+        self.Eg: np.ndarray = np.asarray(Eg, dtype=float).copy()
+        self.Ex: np.ndarray = np.asarray(Ex, dtype=float).copy()
         self.std = std
 
         if path is not None:
@@ -850,7 +849,6 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
-
 
 def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified

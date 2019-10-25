@@ -43,20 +43,20 @@ class Vector(AbstractArray):
            ValueError if the given arrays are of differing lenghts.
         """
         if values is None and E is not None:
-            self.E = np.asarray(E, dtype=float)
+            self.E = np.asarray(E, dtype=float).copy()
             self.values = np.zeros_like(E)
         elif values is not None and E is None:
-            self.values = np.asarray(values, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
             self.E = np.arange(0.5, len(self.values), 1)
         elif values is None and E is None:
             self.values = np.zeros(1)
             self.E = np.array([0.5])
         else:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.asarray(E, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
+            self.E = np.asarray(E, dtype=float).copy()
 
         if std is not None:
-            std = np.asarray(std, dtype=float)
+            std = np.asarray(std, dtype=float).copy()
         self.std: Optional[ndarray] = std
 
         self.units = units
@@ -314,5 +314,3 @@ class Vector(AbstractArray):
 
         result.values = result.values@other.values
         return result
-
-

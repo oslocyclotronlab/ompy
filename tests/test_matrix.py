@@ -79,3 +79,17 @@ def test_numericals():
 
     assert_equal((matrix2@matrix1).values, values2@values1)
     assert_equal((matrix1@matrix2).values, values1@values2)
+
+
+# This does not work as of now...
+# def test_mutable():
+#     E = np.array([0, 1, 2])
+#     E_org = E.copy()
+
+#     values = np.array([[0, 1, 2.], [-2, 1, 2.],  [2, 3, -10.]])
+#     matrix = om.Matrix(values=values, Ex=E, Eg=E)
+
+#     # chaning the Ex array shouldn't change the Eg array (due to the setter)!
+#     matrix.Ex[0] += 1
+#     assert_equal(matrix.Eg, E_org)
+

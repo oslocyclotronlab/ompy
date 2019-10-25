@@ -344,46 +344,51 @@ class FirstGeneration:
             raise ValueError("Expected multiplicity estimation to"
                              " be either 'statistical' or 'total'")
 
+
     @staticmethod
-    def allgen_from_primary(fg: Matrix, xs: Optional[np.ndarray] = None) -> Matrix:
+    def allgen_from_primary(fg: Matrix,
+                            xs: Optional[np.ndarray] = None) -> Matrix:
         """Create all generation matrix from first generations matrix
+
+        AG(Ex, Eg) = FG(Ex, Eg) + ∑ σ[Ex] weight(Ex->Ex') AG(Ex', Eg) / σ[Ex'],
+        where the sum runs over all excitation energies `Ex' < Ex`.
 
         Args:
             fg (Matrix): First generations matrix
             xs (np.ndarray, optional): Population cross-section for each Ex bin
-                                       (in #times populated, not mb)
+                in #times populated, not mb. Default is the same population
+                as the fg_matrix.
         Returns:
             ag (Matrix): All generations matrix
-
         """
         if xs is None:
-            xs = np.ones(fg.Ex.size)
+            xs = fg.values.sum(axis=1)
 
-        fg_matrix = fg
-        fg = fg.values
+        fg = fg.copy()
+        w = fg.copy()
+        w[:] = 0
+        ag = fg.copy()
+        ag[:] = 0
 
-        # # # weights are the FG matrix "flipped" around Eg_center
-        # # # TODO: Check what happens for the elements "above" the diagonal
-        # Wrong!
+        # Note: cannot do this here, as FG matrix "flipped" around Eg_center
         # w = np.tril(fg)
         # w = np.flip(w, axis=1)
 
-        w = np.zeros_like(fg)
         for i in range(w.shape[0]):  # Loop over Ex rows
             w[i, :i+1] = fg[i, i::-1]
-        w = normalize_rows(w)
+        w.values = normalize_rows(w.values)
 
-        ag = np.zeros_like(fg)
-        for i, Ex in enumerate(fg_matrix.Ex):
-            ag[i, :] = fg[i, :]/fg[i, :].sum() * xs[i]  # 1 fg per population
+
+        for i, Ex in enumerate(fg.Ex):
+            # 1 fg per population
+            ag[i, :] = div0(fg[i, :], fg[i, :].sum()) * xs[i]
             if i == 0:
                 continue
             else:
-                # print("")
-                for j in range(i):
-                    ag[i, :] += xs[i] * w[i, j] * ag[j, :] / xs[j]
+                for j, Efinal in enumerate(fg.Ex):  # add underlying AGs
+                    ag[i, :] += xs[i] * w[i, j] * div0(ag[j, :], xs[j])
 
-        return Matrix(ag, Eg=fg_matrix.Eg, Ex=fg_matrix.Ex)
+        return ag
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:
