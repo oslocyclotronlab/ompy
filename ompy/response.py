@@ -46,15 +46,19 @@ class Response():
             - adapt rutines for the possibility that not all cmp spectra have
               the same binning
         """
-
         path = Path(path) if isinstance(path, str) else path
+        path = path.expanduser()  # if "~" was used for the homedir
 
         if path.is_dir():
+            LOG.debug(f"Loading response from directory: {path}")
             self.resp, self.compton_matrix, self.Ecmp_array = self.LoadDir(
                 path)  # Better names would be adventagious
         elif path.is_file():
+            LOG.debug(f"Loading response from file: {path}")
             self.resp, self.compton_matrix, self.Ecmp_array = self.LoadZip(
                 path)
+        elif not path.exists():
+            raise ValueError(f"Path {path} does not exist")
 
         # if compton was not smoothed before
         self.smooth_compton = False
