@@ -306,7 +306,7 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
             else:
                 nld_tmp = nld[i]
             nld_tmp = nld_tmp.transform(alpha=alpha[i_multi],
-                                        const=A[i_multi])
+                                        const=A[i_multi], inplace=False)
             nld_trans.append(nld_tmp)
         except:
             pass
@@ -317,7 +317,7 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
             else:
                 gsf_tmp = gsf[i]
             gsf_tmp = gsf_tmp.transform(alpha=alpha[i_multi],
-                                        const=B[i_multi])
+                                        const=B[i_multi], inplace=False)
             gsf_trans.append(gsf_tmp)
         except:
             pass

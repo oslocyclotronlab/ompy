@@ -99,6 +99,7 @@ class Matrix(AbstractArray):
           the integrity of the matrix can be ensured.
     """
     def __init__(self,
+                 #values: Optional[Union[np.ndarray, Path]] = None,
                  values: Optional[np.ndarray] = None,
                  Eg: Optional[np.ndarray] = None,
                  Ex: Optional[np.ndarray] = None,
@@ -115,7 +116,17 @@ class Matrix(AbstractArray):
         a filename for loading a saved matrix or a shape
         for initialzing it with zero entries.
 
+        Args:
+            <NAME>: Set `values` given an array-like object
+                or load values from file if given a Path-like object.
+            values: Set the matrix' values.
+            Eg: The gamma ray energies using midbinning.
+            Ex: The excitation energies using midbinning.
+            std: The standard deviations at each bin of `values`
+            path: Load a
+
         """
+
         if shape is not None and values is not None:
             raise ValueError("'shape' and 'values' are exclusive")
 
@@ -276,7 +287,7 @@ class Matrix(AbstractArray):
         Raises:
             ValueError: If scale is unsupported
         """
-        fig, ax = plt.subplots() if ax is None else (None, ax)
+        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
         if len(self.Ex) <= 1 or len(self.Eg) <= 1:
             raise ValueError("Number of bins must be greater than 1")
 

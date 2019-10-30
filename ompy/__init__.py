@@ -47,5 +47,8 @@ from .setable import Setable
 from .filehandling import *
 from .action import Action
 from .decomposition import *
-from .normalizer import Normalizer, load_levels_discrete, load_levels_smooth, Eshift_from_T, Sn_from_D0, errfn
+from .normalizer import Normalizer, load_levels_discrete, load_levels_smooth, Eshift_from_T, Sn_from_D0
+from .normalizer_gsf import NormalizerGSF
+from .normalizer_simultan import NormalizerSimultan
+from .models import NormalizationParameters
 from .introspection import logging, hooks

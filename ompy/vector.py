@@ -103,10 +103,10 @@ class Vector(AbstractArray):
         Returns:
             The figure and axis used.
         """
-        fig, ax = plt.subplots() if ax is None else (None, ax)
+        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
         ax.step(self.E, self.values, where='mid', **kwargs)
-        #ax.xaxis.set_major_locator(MeshLocator(self.E))
+        # ax.xaxis.set_major_locator(MeshLocator(self.E))
         ax.set_yscale(scale)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -259,6 +259,25 @@ class Vector(AbstractArray):
         else:
             units = self.units
             return Vector(values=values, E=E, std=std, units=units)
+
+    def cut_nan(self, inplace: bool = True) -> Vector:
+        """ Cut the vector where elements are `np.nan`
+
+        Args:
+            inplace: Whether to perform the cut on this vector
+                or (False) return a copy.
+        Returns:
+            The cut vector if `inplace` is True.
+        """
+        inan = np.argwhere(np.isnan(self.values))
+
+        values = np.delete(self.values, inan)
+        E = np.delete(self.E, inan)
+        if inplace:
+            self.values = values
+            self.E = E
+        else:
+            return Vector(values=values, E=E, units=self.units)
 
     def to_MeV(self) -> Vector:
         """ Convert E from keV to MeV if necessary """

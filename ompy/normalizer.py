@@ -15,11 +15,12 @@ from scipy.optimize import differential_evolution
 from typing import Optional, Sequence, Tuple, Any, Union, Callable, Dict, List
 from scipy.stats import truncnorm
 from tqdm import tqdm
+from dataclasses import dataclass, field
 from .extractor import Extractor
 from .vector import Vector
-from .multinest_setup import run_nld_2regions
 from .spinfunctions import SpinFunctions
 from .filehandling import load_discrete
+from .models import ResultsNormalized
 
 
 LOG = logging.getLogger(__name__)
@@ -66,14 +67,15 @@ class Normalizer:
             book keeping. Is set by initial_guess(), _NOT_ the user.
         multinest_path (Path): Where to save the multinest output.
             defaults to 'multinest'.
-        nld_parameters (Dict[str, Tuple[float, float]]): The
-            result of the optimization. The keys are 'A', 'alpha',
-            'T' and 'D0' with values on the form (mean, std).
-        nld_transformed (List[Vector]): Contains the transformed nld using
-            optimized variables.
+        res (ResultsNormalized): Results of the normalization
         use_smoothed_levels (bool): Flag for whether to smooth histogram
             over discrete levels when loading from file. Defaults to True.
         path (Path): The path the transformed vectors to.
+
+    TODO:
+        - parameter to limit the number of multinest samples to store. Note
+        that the samples should be shuffled to retain some "random" samples
+        from the pdf (not the importance weighted)
     """
     def __init__(self, *, extractor: Optional[Extractor] = None,
                  nld: Optional[Vector] = None,
@@ -83,7 +85,7 @@ class Normalizer:
 
         The prefered syntax is Normalizer(extractor=...) or Normalizer(nld=...)
         If neither is given, the nld must be explicity be set later by:
-            normalizer.nld = nld
+            normalizer..renld = nld
             normalizer.extractor = extractor
         or:
             normalizer.normalize(..., nld=nld)
@@ -129,11 +131,10 @@ class Normalizer:
             self.nld = nld.copy()
         self.discrete = discrete
 
-        self.nld_parameters: Dict[str, Tuple[float, float]] = {}
-        self.nld_transformed: List[Vector] = []
+        self.res = ResultsNormalized(name="Results NLD")
+
         LOG.debug("Created Normalizer")
 
-        # for plotting
         self.limit_low = None
         self.limit_high = None
         self.std_fake = None  # See `normalize`
@@ -154,8 +155,8 @@ class Normalizer:
         """ Wrapper around normalize """
         self.normalize(*args, **kwargs)
 
-    def normalize(self, limit_low: Tuple[float, float],
-                  limit_high: Tuple[float, float], *,
+    def normalize(self, limit_low: Optional[Tuple[float, float]] = None,
+                  limit_high: Optional[Tuple[float, float]] = None, *,
                   nld: Optional[Vector] = None,
                   extractor: Optional[Extractor] = None,
                   discrete: Optional[Vector] = None,
@@ -181,6 +182,10 @@ class Normalizer:
 
         """
         # Update internal state
+        self.limit_low = self.reset(limit_low)
+        self.limit_high = self.reset(limit_high)
+        limit_low = self.limit_low
+        limit_high = self.limit_high
         discrete = self.reset(discrete)
         discrete.to_MeV()
         nld = self.reset(nld)
@@ -188,12 +193,16 @@ class Normalizer:
         self.D0 = D0  # To ensure the bounds are updated
         bounds = self.reset(bounds)
         spin = self.reset(spin)
-        extractor = self.reset(extractor, nonable=True)
-        nlds = []  # Ensure to rerun if called again
-        self.nld_transformed = [] # Ensure to rerun if called again
 
-        self.limit_low = limit_low
-        self.limit_high = limit_high
+        # Ensure that spin is set
+        for key, val in spin.items():
+            if val is None:
+                raise ValueError(f"`{key}` has to be set.")
+        extractor = self.reset(extractor, nonable=True)
+
+        # Ensure to rerun if called again
+        nlds = []
+        self.res = ResultsNormalized(name="Results NLD")
 
         if extractor is not None:
             nlds = extractor.nld
@@ -226,15 +235,18 @@ class Normalizer:
                                         inplace=False)
             if self.std_fake:
                 transformed.std = None
-            self.nld_transformed.append(transformed)
 
-            self.nld_parameters = popt
-            self.samples = samples
+            self.res.nld.append(transformed)
+            self.res.pars.append(popt)
+            self.res.samples.append(samples)
+            ext_model = lambda E: self.curried_model(E, T=popt['T'][0],
+                                                     D0=popt['D0'][0])
+            self.res.nld_model.append(ext_model)
 
         self.save()
 
-    def initial_guess(self, limit_low: Tuple[float, float],
-                      limit_high: Tuple[float, float]
+    def initial_guess(self, limit_low: Optional[Tuple[float, float]] = None,
+                      limit_high: Optional[Tuple[float, float]] = None
                       ) -> Tuple[Tuple[float, float, float, float],
                                  Dict[str, float]]:
         """ Find an inital guess for the constant, α, T and D₀
@@ -252,6 +264,9 @@ class Normalizer:
            The arguments used for chi^2 minimization and the
            minimizer.
         """
+        limit_low = self.reset(limit_low)
+        limit_high = self.reset(limit_high)
+
         bounds = list(self.bounds.values())
         spinstring = json.dumps(self.spin, indent=4, sort_keys=True)
 
@@ -266,7 +281,7 @@ class Normalizer:
         model = lambda *args, **kwargs: self.model(*args, **kwargs, spin=self.spin)
         self.curried_model = model
         args = (nld_low, nld_high, discrete, model)
-        res = differential_evolution(errfn, bounds=bounds, args=args)
+        res = differential_evolution(self.errfn, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
             header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
@@ -277,7 +292,7 @@ class Normalizer:
 
         return args, p0
 
-    def optimize(self, args: Tuple[float, float, float, float],
+    def optimize(self, args,
                  guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
         """ Find parameters given model constraints and an initial guess
 
@@ -325,7 +340,7 @@ class Normalizer:
                 LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
-            chi2 = errfn(cube, *args)
+            chi2 = self.errfn(cube, *args)
             loglikelihood = -0.5 * chi2
             return loglikelihood
 
@@ -345,7 +360,7 @@ class Normalizer:
         names = list(guess.keys())
         json.dump(names, open(str(path) + 'params.json', 'w'))
         analyzer = pymultinest.Analyzer(len(guess),
-                outputfiles_basename=str(path))
+                                        outputfiles_basename=str(path))
 
         stats = analyzer.get_stats()
 
@@ -381,28 +396,34 @@ class Normalizer:
         if ax is None:
             fig, ax = plt.subplots()
         else:
-            fig = None
+            fig = ax.figure
 
-        for i, transformed in enumerate(self.nld_transformed):
+        for i, transformed in enumerate(self.res.nld):
             label = None
             if i == 0:
                 label = "normalized"
-            transformed.plot(ax=ax, c='k', alpha=1/len(self.nld_transformed),
+            transformed.plot(ax=ax, c='k', alpha=1/len(self.res.nld),
                              label=label)
 
         self.discrete.plot(ax=ax, label='Discrete levels')
 
-        Sn = self.curried_model(T=self.nld_parameters['T'][0],
-                                D0=self.nld_parameters['D0'][0],
-                                E=self.spin['Sn'])
-        # TODO: plot errorbar
-        ax.scatter(self.spin['Sn'], Sn, label=r'$\rho(S_n)$')
+        for i, pars in enumerate(self.res.pars):
+            Sn = self.curried_model(T=pars['T'][0],
+                                    D0=pars['D0'][0],
+                                    E=self.spin['Sn'])
 
-        x = np.linspace(self.limit_high[0], self.spin['Sn'])
-        model = self.curried_model(T=self.nld_parameters['T'][0],
-                                   D0=self.nld_parameters['D0'][0],
-                                   E=x)
-        ax.plot(x, model, "--", label="model")
+            x = np.linspace(self.limit_high[0], self.spin['Sn'])
+            model = self.curried_model(T=pars['T'][0],
+                                       D0=pars['D0'][0],
+                                       E=x)
+            # TODO: plot errorbar
+            labelSn = None
+            labelModel = None
+            if i == 0:
+                labelSn = '$S_n$'
+                labelModel = 'model'
+            ax.scatter(self.spin['Sn'], Sn, label=labelSn)
+            ax.plot(x, model, "--", label=labelModel)
 
         ax.axvspan(self.limit_low[0], self.limit_low[1], color='grey',
                    alpha=0.1, label="fit limits")
@@ -454,15 +475,15 @@ class Normalizer:
 
         if not path.exists():
             raise IOError(f"The path {path} does not exist.")
-        if self.nld_transformed:
+        if self.res.nld:
             warnings.warn("Loading nld and gsf into non-empty instance")
 
         LOG.debug("Loading from %s", str(path))
 
         for fname in path.glob("nld_[0-9]*.npy"):
-            self.nld_transformed.append(Vector(path=fname))
+            self.res.nld.append(Vector(path=fname))
 
-        if not self.nld_transformed:
+        if not self.res.nld:
             warnings.warn("Found no files")
 
     def save(self, path: Optional[Union[str, Path]] = None) -> None:
@@ -474,8 +495,36 @@ class Normalizer:
         LOG.debug("Saving to %s", str(path))
 
         path.mkdir(exist_ok=True)
-        for i, nld in enumerate(self.nld_transformed):
+        for i, nld in enumerate(self.res.nld):
             nld.save(path / f"nld_{i}.npy")
+
+    @staticmethod
+    def errfn(x: Tuple[float, float, float, float], nld_low: Vector,
+              nld_high: Vector, discrete: Vector,
+              model: Callable[..., ndarray]) -> float:
+        """ Compute the χ² of the normalization fitting
+
+        Args:
+            x: The arguments ordered as A, alpha, T and D0
+            nld_low: The lower region where discrete levels will be
+                fitted.
+            nld_high: The upper region to fit to model.
+            discrete: The discrete levels to be used in fitting the
+                lower region.
+            model: The model to use when fitting the upper region.
+                Must support the keyword arguments:
+                    model(T=..., D0=..., E=...) -> ndarray
+        Returns:
+            chi2 (float): The χ² value
+        """
+        A, alpha, T, D0 = x[:4]
+        transformed_low = nld_low.transform(A, alpha, inplace=False)
+        transformed_high = nld_high.transform(A, alpha, inplace=False)
+
+        err_low = transformed_low.error(discrete)
+        expected = model(T=T, D0=D0, E=transformed_high.E)
+        err_high = transformed_high.error(expected)
+        return err_low + err_high
 
     @property
     def discrete(self) -> Optional[Vector]:
@@ -563,35 +612,6 @@ def load_levels_smooth(path: Union[str, Path], energy: ndarray,
     _, smoothed = load_discrete(path, energy, resolution)
     return Vector(values=smoothed, E=energy)
 
-
-def errfn(x: Tuple[float, float, float, float], nld_low: Vector,
-          nld_high: Vector, discrete: Vector,
-          model: Callable[..., ndarray]) -> float:
-    """ Compute the χ² of the normalization fitting
-
-    Args:
-        x: The arguments ordered as A, alpha, T and D0
-        nld_low: The lower region where discrete levels will be
-            fitted.
-        nld_high: The upper region to fit to model.
-        discrete: The discrete levels to be used in fitting the
-            lower region.
-        model: The model to use when fitting the upper region.
-            Must support the keyword arguments:
-                model(T=..., D0=..., E=...) -> ndarray
-    Returns:
-        The χ² value
-    """
-    A, alpha, T, D0 = x[:4]
-    transformed_low = nld_low.transform(A, alpha, inplace=False)
-    transformed_high = nld_high.transform(A, alpha, inplace=False)
-
-    err_low = transformed_low.error(discrete)
-    expected = model(T=T, D0=D0, E=transformed_high.E)
-    err_high = transformed_high.error(expected)
-    return err_low + err_high
-
-
 #################################
 # Ugly code below, to be fixed! #
 #################################
@@ -650,6 +670,7 @@ def Sn_from_D0(D0, Sn, J_target,
     nld = 1 / (summe * D0 * 1e-6)
     return [Sn, nld]
 
+
 def _retrieve_name(var: Any) -> str:
     """ Finds the source-code name of `var`
 
@@ -665,7 +686,6 @@ def _retrieve_name(var: Any) -> str:
     # calling function and the second is the calling function's caller.
     line = inspect.stack()[2].code_context[0].strip()
     match = re.search(r".*\((\w+).*\).*", line)
+    assert match is not None, "Retrieving of name failed"
     name = match.group(1)
-    # The name to use is the name given in self.reset(...)
-    #name = line.split('(')[1].split(')')[0].strip()
     return name

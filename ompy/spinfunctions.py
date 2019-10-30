@@ -1,27 +1,22 @@
 import numpy as np
 from .library import call_model
 from scipy.interpolate import interp1d
+from typing import Optional, Sequence, Tuple, Any, Union, Dict
 
-"""
-Code by Fabio Zeiser to calculate spin distribution
-functions.
-"""
 
 class SpinFunctions:
-    """ Calculates spin distributions, spin cuts (...)
+    """ Calculates spin distributions, spin cuts (...) """
 
-    Args:
-        Ex : double or dnarray
-            Excitation energy
-        J : double or dnarray
-            Spin
-        model : string
-            Model to for the spincut
-        pars : dict
-            Additional parameters necessary for the spin cut model
-    """
-
-    def __init__(self, Ex, J, model, pars):
+    def __init__(self, Ex: Union[float, Sequence], J: Union[float, Sequence],
+                 model: str, pars: Dict[str, Any]):
+        """
+        Attributes:
+            Ex (Union[float, Sequence]): Excitation energy
+            J (Union[float, Sequence]): Spin
+            model (str): Modelname for the the spincut
+            pars (Dict[str, Any]): Additional parameters necessary for the
+                spin cut model
+        """
         self.Ex = np.atleast_1d(Ex)
         self.J = np.atleast_1d(J)
         self.model = model
@@ -34,11 +29,22 @@ class SpinFunctions:
         pars = self.pars
 
         # different spin cut models
-        def EB05(mass, NLDa, Eshift, Ex=Ex):
+        def EB05(mass: int, NLDa: float, Eshift: float,
+                 Ex: Optional[Union[float, Sequence]] = Ex) -> Union[float, Sequence] : # noqa
             """
             Von Egidy & B PRC72,044311(2005), Eq. (4)
             The rigid moment of inertia formula (RMI)
             FG+CT
+
+            Args:
+                mass (int): The mass number of the residual nucleus
+                NLDa (float): Level density parameter
+                Eshift (float): Energy shift
+                Ex (Optional[Union[float, Sequence]], optional):
+                    Excitation energy
+
+            Returns:
+                Union[float, Sequence]: Squared spincut
             """
             Ex = np.atleast_1d(Ex)
             Eeff = Ex - Eshift
@@ -48,19 +54,34 @@ class SpinFunctions:
                       / (2 * NLDa))
             return sigma2
 
-        def EB09_CT(mass):
+        def EB09_CT(mass: int) -> Union[float, Sequence]:
             """
             The constant temperature (CT) formula
             - Von Egidy & B PRC80,054310, below Eq. (8)
             - original ref: Von Egidy et al., NPA 481 (1988) 189, Eq. (3)
+
+            Args:
+                mass (int): Excitation energy
+
+            Returns:
+                Union[float, Sequence]: Squared spincut
             """
             sigma2 = np.power(0.98 * (mass**(0.29)), 2)
             return sigma2
 
-        def EB09_emp(mass, Pa_prime, Ex=Ex):
+        def EB09_emp(mass: int, Pa_prime: float,  Ex: Optional[Union[float, Sequence]] = Ex) -> Union[float, Sequence] : # noqa
             """
             Von Egidy & B PRC80,054310, Eq.(16)
             FG+CT
+
+            Args:
+                mass (int): Excitation energy
+                Pa_prime (float): Deuteron pairing energy
+                Ex (Optional[Union[float, Sequence]], optional):
+                    Excitation energy
+
+            Returns:
+                Union[float, Sequence]: Squared spincut
             """
             Ex = np.atleast_1d(Ex)
             Eeff = Ex - 0.5 * Pa_prime
@@ -68,30 +89,39 @@ class SpinFunctions:
             sigma2 = 0.391 * np.power(mass, 0.675) * np.power(Eeff, 0.312)
             return sigma2
 
-        def Disc_and_EB05(mass, NLDa, Eshift, Sn, sigma2_disc, Ex=Ex):
+        def Disc_and_EB05(mass: int, NLDa: float, Eshift: float, Sn: float,
+                          sigma2_disc: Tuple[float, float],
+                          Ex: Optional[Union[float, Sequence]] = Ex) -> Union[float, Sequence] : # noqa
             """
             Linear interpolation of the spin-cut between
             a spin cut "from the discrete levels" and EB05
-            See eg:
-            Guttormsen et al., 2017, PRC 96, 024313
+            RReference: Guttormsen et al., 2017, PRC 96, 024313
 
             Note:
-            We set sigma2(E<E_discrete) = sigma2(E_discrete).
-            This is not specified in the article, and may have been done
-            differently before.
+                We set sigma2(E<E_discrete) = sigma2(E_discrete).
+                This is not specified in the article, and may have been done
+                differently before.
 
-            Parameters:
-            -----------v
-            sigma2_disc: [float, float]
-                [Energy, sigma2] from the discretes
+            Args:
+                mass (int): The mass number of the residual nucleus
+                NLDa (float): Level density parameter
+                Eshift (float): Energy shift
+                Sn (float): Neutron separation energy
+                sigma2_disc (Tuple[float, float]): [float, float]
+                    [Energy, sigma2] from the discretes
+                Ex (Optional[Union[float, Sequence]], optional):
+                    Excitation energy
+
+            Returns:
+                Union[float, Sequence]: Squared spincut
             """
             Ex = np.atleast_1d(Ex)
             sigma2_Sn = EB05(mass, NLDa, Eshift, Ex=Sn)
             x = [sigma2_disc[0], Sn]
             y = [sigma2_disc[1], sigma2_Sn]
-            sigma2 = interp1d(x,y,
+            sigma2 = interp1d(x, y,
                               bounds_error=False,
-                              fill_value=(sigma2_disc[1],"extrapolate"))
+                              fill_value=(sigma2_disc[1], "extrapolate"))
             return sigma2(Ex)
 
         if model == "EB05":
@@ -110,23 +140,19 @@ class SpinFunctions:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
 
-    def distibution(self):
-        """ Get spin distribution
+    def distibution(self) -> Tuple[float, np.ndarray]:
+        """Get spin distribution
 
-        Note: assuming equal parity
+        Note: Assuming equal parity
 
         Returns:
-        --------
-        spinDist: double or ndarray
-          Spin distribution. Shape depends on input Ex and J and is squeezed
-          if only one of them is an array. If both are arrays: spinDist[Ex,J]
+            spinDist (Tuple[float, np.ndarray]): Spin distribution. Shape
+                depends on input Ex and J and is squeezed if only one of them
+                is an array. If both are arrays: `spinDist[Ex,J]`
         """
-        Ex = self.Ex
-        J = self.J
-
         sigma2 = self.get_sigma2()
         sigma2 = sigma2[np.newaxis]  # ability to transpose "1D" array
 
-        spinDist = ((2. * J + 1.) / (2. * sigma2.T)
-                    * np.exp(-np.power(J + 0.5, 2.) / (2. * sigma2.T)))
+        spinDist = ((2. * self.J + 1.) / (2. * sigma2.T)
+                    * np.exp(-np.power(self.J + 0.5, 2.) / (2. * sigma2.T)))
         return np.squeeze(spinDist)  # return 1D if Ex or J is single entry
