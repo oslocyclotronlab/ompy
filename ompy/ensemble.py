@@ -552,8 +552,14 @@ class Ensemble:
             raise NotImplementedError(f"State {state} is not a known state")
         return matrix
 
-    def plot(self):
-        fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)
+    def plot(self, ax=None):
+        if ax is not None:
+            if len(ax) < 3:
+                raise ValueError("Three axes must be provided")
+            fig = ax.figure
+        else:
+            fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)
+
         self.std_raw.plot(ax=ax[0], title='Raw')
         self.std_unfolded.plot(ax=ax[1], title='Unfolded')
         self.std_firstgen.plot(ax=ax[2], title='First Generation')
