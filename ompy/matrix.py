@@ -619,34 +619,45 @@ class Matrix(AbstractArray):
             Ex_min: The bottom edge of the trapezoid
             Ex_max: The top edge of the trapezoid
             Eg_min: The left edge of the trapezoid
-            #Eg_max: The right edge of the trapezoid used for defining the
-            #    diagonal. If not set, the diagonal will be found by
-            #    using the last nonzeros of each row.
+            Eg_max: The right edge of the trapezoid used for defining the
+               diagonal. If not set, the diagonal will be found by
+               using the last nonzeros of each row.
         Returns:
             Cut matrix if 'inplace' is True
+
+        TODO:
+            -possibility to have inclusive or exclusive cut
         """
-        # Transform to index basis
-        if Eg_max is not None:
-            raise NotImplementedError()
+        matrix = self.copy()
 
-        for i, j in reversed(list(self.diagonal_elements())):
-            if self.Ex[i] <= Ex_max:
-                Eg_max = self.Eg[j]
-                break
+        matrix.cut("Ex", Emin=Ex_min, Emax=Ex_max)
+        if Eg_max is None:
+            lastEx = matrix[-1, :]
+            try:
+                iEg_max = np.nonzero(lastEx)[0][-1]
+            except IndexError():
+                raise ValueError("Last Ex column has no non-zero elements")
+            Eg_max = matrix.Eg[iEg_max]
 
-        iEx = (Ex_min < self.Ex) & (self.Ex < Ex_max)
-        iEg = (Eg_min < self.Eg) & (self.Eg < Eg_max)
-        indicies = np.ix_(iEx, iEg)
-        #mask = np.zeros_like(self.values, dtype=bool)
-        #mask[indicies] = True
+        matrix.cut("Eg", Emin=Eg_min, Emax=Eg_max)
+
+        Eg, Ex = np.meshgrid(matrix.Eg, matrix.Ex)
+        mask = np.zeros_like(matrix.values, dtype=bool)
+
+        dEg = Eg_max - Ex_max
+        if dEg > 0:
+            binwidth = Eg[1]-Eg[0]
+            dEg = np.ceil(dEg/binwidth) * binwidth
+        mask[Eg >= Ex + dEg] = True
+        matrix[mask] = 0
+
         if inplace:
-            self.values = self.values[indicies]
-            self.Ex = self.Ex[iEx]
-            self.Eg = self.Eg[iEg]
+            self.values = matrix.values
+            self.Ex = matrix.Ex
+            self.Eg = matrix.Eg
+            self.state = matrix.state
         else:
-            return Matrix(values=self.values[indicies], Ex=self.Ex[iEx],
-                          Eg=self.Eg[iEg])
-
+            return matrix
 
     def rebin(self, axis: Union[int, str],
               edges: Optional[Sequence[float]] = None,
@@ -714,8 +725,11 @@ class Matrix(AbstractArray):
 
     def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
         """ Iterates over the last non-zero elements
-
-        Yields:
+        Note:
+            Assumes that the matrix is diagonal, i.e. that there are no
+            entries with `Eg > Ex + dE`.
+        Args:
+            mat: The matrix to iterate over
             Iterator[Tuple[int, int]]: Indicies (i, j) over the last non-zero (=diagonal)
             elements.
         """
