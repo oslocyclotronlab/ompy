@@ -37,6 +37,10 @@ class Action:
             ret_vals.append(ret)
         return ret_vals
 
+    def curry(self, **kwargs):
+        for call in self.calls:
+            call[2].update(kwargs)
+
 
 def wrap(self, name: str) -> Callable:
     """ Saves the function call and arguments for later use

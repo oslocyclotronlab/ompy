@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 from .ensemble import Ensemble
 from .matrix import Matrix
 from .vector import Vector
-from .decomposition import chisquare_diagonal, nld_T_product
+from .decomposition import chisquare_diagonal, nld_T_product, index
 from .action import Action
 
 
@@ -146,8 +146,15 @@ class Extractor:
         assert self.trapezoid is not None
         matrix = self.ensemble.get_firstgen(num).copy()
         std = self.ensemble.std_firstgen.copy()
-        self.trapezoid.act_on(matrix)
-        self.trapezoid.act_on(std)
+        # ensure same vuts for all ensemble members if Eg_max is not given
+        # (thus auto-determined) in the trapezoid.
+        if num == 0:
+            self.trapezoid.act_on(matrix)
+            self.trapezoid.act_on(std)
+            self.trapezoid.curry(Eg_max=matrix.Eg[-1])
+        else:
+            self.trapezoid.act_on(matrix)
+            self.trapezoid.act_on(std)
         nld, gsf = self.decompose(matrix, std)
         return nld, gsf
 
@@ -163,6 +170,9 @@ class Extractor:
             energy resolution. Tries to minimize the product
                 firstgen = nld·gsf
             using square error or chi square as error function.
+
+            If first nld / last gsf elements cannot be constrained, as there
+            are no entries for them in the matrix, they will be set to np.nan
         Args:
             matrix: The matrix to decompose. Should already
                 be cut into appropiate size
@@ -189,7 +199,8 @@ class Extractor:
         if std is not None:
             if np.any(std.values < 0):
                 raise ValueError("std has to have positive entries only.")
-            assert matrix.shape == std.shape
+            assert matrix.shape == std.shape, \
+                f"matrix.shape: {matrix.shape} != std.shape : {std.shape}"
             std.values = std.values.copy(order='C')
             matrix.values, std.values = normalize(matrix, std)
             matrix.Ex = matrix.Ex.copy(order='C')
@@ -217,7 +228,7 @@ class Extractor:
 
         # create nld energy array
         resolution = matrix.diagonal_resolution()
-        Emin = -resolution.max()
+        Emin = matrix.Ex.max()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
         E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width))
 
@@ -248,6 +259,12 @@ class Extractor:
         T = res.x[:matrix.Eg.size]
         nld = res.x[matrix.Eg.size:]
 
+        # Set elements that couldn't be constrained (no entries) to np.na
+        n_nan_gsf, n_nan_nld = self.unconstrained_elements(matrix, E_nld)
+        if n_nan_gsf > 0:
+            T[-n_nan_gsf:] = np.nan
+        nld[:n_nan_nld] = np.nan
+
         # Convert transmission coefficient to the more useful
         # gamma strength function
         gsf = T/(2*np.pi*matrix.Eg**3)
@@ -259,6 +276,29 @@ class Extractor:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg), mat
         else:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg)
+
+    @staticmethod
+    def unconstrained_elements(matrix: Matrix,
+                               E_nld: np.ndarray) -> Tuple[int, int]:
+        """
+        Indices of elements close to the diagonal in gsf and nld that
+        cannot be constrained, as the bins don't have counts
+
+        TODO:
+            - Should take into account resolution too. Currently, we may still
+            have too many bins that are lateron not constrained in the chi2
+            minimization.
+
+        """
+        dEx = matrix.Ex[1] - matrix.Ex[0]
+        dEg = matrix.Eg[1] - matrix.Eg[0]
+        assert dEx == dEg
+
+        lastEx = matrix[-1, :]
+        n_nan_gsf = (matrix.shape[1]-1) - np.nonzero(lastEx)[0][-1]
+        Efirst_nld = matrix.Ex[-1] - matrix.Eg[-(1+n_nan_gsf)]
+        n_nan_nld = np.abs(E_nld-Efirst_nld).argmin()
+        return n_nan_gsf, n_nan_nld
 
     def load(self, path: Optional[Union[str, Path]] = None) -> None:
         """ Load already extracted nld and gsf from file
@@ -327,16 +367,16 @@ class Extractor:
         return fig, ax
 
     def nld_mean(self) -> np.ndarray:
-        return np.mean([nld.values for nld in self.nld], axis=0)
+        return np.nanmean([nld.values for nld in self.nld], axis=0)
 
     def gsf_mean(self) -> np.ndarray:
-        return np.mean([gsf.values for gsf in self.gsf], axis=0)
+        return np.nanmean([gsf.values for gsf in self.gsf], axis=0)
 
     def nld_std(self) -> np.ndarray:
-        return np.std([nld.values for nld in self.nld], axis=0)
+        return np.nanstd([nld.values for nld in self.nld], axis=0)
 
     def gsf_std(self) -> np.ndarray:
-        return np.std([gsf.values for gsf in self.gsf], axis=0)
+        return np.nanstd([gsf.values for gsf in self.gsf], axis=0)
 
     def ensemble_nld(self) -> Vector:
         energy = self.nld[0].E
