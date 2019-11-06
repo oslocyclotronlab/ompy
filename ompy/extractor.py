@@ -230,7 +230,7 @@ class Extractor:
         resolution = matrix.diagonal_resolution()
         Emin = matrix.Ex.max()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
-        E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width))
+        E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width)+1)
 
         if x0 is None:
             nld0 = np.ones(E_nld.size)
