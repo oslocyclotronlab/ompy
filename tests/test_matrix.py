@@ -1,8 +1,8 @@
 import pytest
 import ompy as om
 import numpy as np
-from numpy.testing import assert_equal
-
+from numpy.testing import assert_equal, assert_almost_equal
+import os
 
 @pytest.fixture()
 def Si28():
@@ -82,10 +82,15 @@ def test_numericals():
 
 def test_FitPeak():
     peak_fit = {'const': 1182930.5206675457, 'mean': 4435.811321829209, 'std': 99.67972415903449, 'slope': 1.999450091327474, 'intercept': -7826.141269345372}
-    mat = om.Matrix(path="../example_data/test_PeakFit.m")
-    result = om.FitPeak((3790, 4250), (4650, 5200), (6382, 8850)) 
+    path = os.path.dirname(os.path.realpath(__file__))
+    mat = om.Matrix(path=path+"/../example_data/test_PeakFit.m")
+    result = mat.FitPeak((3790, 4250), (4650, 5200), (6382, 8850)) 
 
-    assert_equal(peak_fit, result)
+    assert_almost_equal(peak_fit['const'], result['const'], decimal=1)
+    assert_almost_equal(peak_fit['mean'], result['mean'], decimal=1)
+    assert_almost_equal(peak_fit['std'], result['std'], decimal=1)
+    assert_almost_equal(peak_fit['slope'], result['slope'], decimal=1)
+    assert_almost_equal(peak_fit['intercept'], result['intercept'], decimal=1)
 
 # This does not work as of now...
 # def test_mutable():
