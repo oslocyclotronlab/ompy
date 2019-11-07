@@ -34,6 +34,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib import ticker
 from pathlib import Path
+from scipy.optimize import curve_fit
 from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
@@ -576,6 +577,125 @@ class Matrix(AbstractArray):
             matrix = copy.deepcopy(self)
             matrix.values[mask] = 0.0
             return matrix
+
+    def FitPeak(self, pre_region: Tuple[float, float],
+                post_region: Tuple[float, float],
+                ex: Tuple[float,float]) -> dict[str, float]:
+        """Fit a gamma peak with a gaussian on top of a linear
+        spectra.
+        Args:
+            pre_region: Energy region with linear spectra on the left
+            side of the peak
+            post_region: Energy region with linear spectra on the right
+            side of the peak
+            ex: Either a tuple with the max/min excitation energy included
+            in the fit or the index of the excitation bin to be fitted.
+        """
+        def Gaus(x, const, mean, std):
+            return const*np.exp(-0.5*((x-mean)/std)**2)/(std*np.sqrt(2*np.pi))
+        def Pol(x, slope, intercept):
+            return x*slope + intercept
+        def Model(x, const, mean, std, slope, intercept):
+            return Gaus(x, const, mean, std) + Pol(x, slope, intercept)
+
+        pre_slice = slice(self.index_Eg(pre_region[0]), self.index_Eg(pre_region[1])+1)
+        peak_slice = slice(self.index_Eg(pre_region[1])+1, self.index_Eg(post_region[0]))
+        post_slice = slice(self.index_Eg(post_region[0]), self.index_Eg(post_region[1])+1)
+        fit_slice = slice(self.index_Eg(pre_region[0]), self.index_Eg(post_region[1])+1)
+
+        ex_slice = slice(self.index_Ex(ex[0]), self.index_Ex(ex[1])+1)
+        pre_spec = self.values[ex_slice, pre_slice].sum(axis=0)
+        peak_spec = self.values[ex_slice, peak_slice].sum(axis=0)
+        post_spec = self.values[ex_slice, post_slice].sum(axis=0)
+        fit_spec = self.values[ex_slice, fit_slice].sum(axis=0)
+
+        # Estimate the mean, std and constant
+        peak_mean = np.sum(self.Eg[peak_slice]*peak_spec)/np.sum(peak_spec)
+        peak_var = np.sum(peak_spec*self.Eg[peak_slice]**2)/np.sum(peak_spec)
+        peak_std = np.sqrt(peak_var - peak_mean**2)
+
+        # We estimate the constant from the height found at the mean
+        peak_const = np.max(peak_spec)/Gaus(peak_mean, 1., peak_mean, peak_std)
+
+        # Estimate the linear background
+        pol_estimate = np.polyfit(np.append(self.Eg[pre_slice], self.Eg[post_slice]),
+                                  np.append(pre_spec, post_spec), 1)
+
+        # Calculate the curve fitting
+        initial_guess = [peak_const, peak_mean, peak_std, pol_estimate[1], pol_estimate[0]]
+        popt, cov = curve_fit(Model, self.Eg[peak_slice], peak_spec, p0=initial_guess)
+        return {'const': popt[0], 'mean': popt[1], 'std': popt[2],
+            'slope': popt[3], 'intercept': popt[4]}
+
+    def remove_peak(self,
+                    Eg_min_region: Tuple,
+                    Eg_max_region: Tuple,
+                    Ex_min: float,
+                    Ex_max: float,
+                    inplace: bool = True) -> Optional[Matrix]:
+        """Remove a peak from the matrix. Assume a linear function
+        between Eg_min_region and Eg_max_region. Fluctuations are
+        added to the region where the interpolation is used.
+        
+        Args:
+            Eg_min_region: Tuple with energy range with linear data before the peak to be included in fit
+            Eg_max_region: Tuple with energy range with linear data after the peak to be included in fit
+            Ex_min: Minimum excitation energy to remove peak from
+            Ex_max: Maximum excitation energy to remove peak from
+            inplace: Whether to make the peak removal in place or not.
+        """
+        if not inplace:
+            mat = self.copy()
+            mat.remove_peak(Eg_min_region, Eg_max_region, Ex_min, Ex_max, inplace=True)
+            return mat
+
+        def Gaus(Eg, A, mean, sig):
+                return A*np.exp(-0.5*((Eg - mean)/sig)**2)/(np.sqrt(2)*sig)
+        def Pol(Eg, a, b):
+            return a + b*Eg
+
+        def Fit_curve(Eg, A, mean, sig, a, b):
+            return Gaus(Eg, A, mean, sig)+Pol(Eg, a, b)
+
+        # Initial guess is found with the FitPeak procedure
+        initial_guess = self.FitPeak(Eg_min_region, Eg_max_region, (Ex_min, Ex_max))
+        init_guess = [initial_guess['const'], initial_guess['mean'], initial_guess['std'],
+                      initial_guess['slope'], initial_guess['intercept']]
+
+        # First we find the Ex range to perform on.
+        index_start_Ex = self.index_Ex(Ex_min)
+        index_stop_Ex = self.index_Ex(Ex_max)
+        ex_slice = slice(index_start_Ex, index_stop_Ex+1)
+
+        pre_peak_slice = slice(self.index_Eg(Eg_min_region[0]), self.index_Eg(Eg_min_region[1])+1)
+        post_peak_slice = slice(self.index_Eg(Eg_max_region[0]), self.index_Eg(Eg_max_region[1])+1)
+        replace_slice = slice(self.index_Eg(Eg_min_region[1]), self.index_Eg(Eg_max_region[1])+1)
+
+        gaus_slice = slice(self.index_Eg(Eg_min_region[0]), self.index_Eg(Eg_max_region[1])+1)
+
+        fit_Eg = self.Eg[pre_peak_slice]
+        fit_Eg = np.append(fit_Eg, self.Eg[post_peak_slice])
+
+        replace_Eg = self.Eg[replace_slice]
+        gaus_Eg = self.Eg[gaus_slice]
+
+        # We use the entire range to fit the gaussian mean and std
+        spec = self.values[ex_slice, gaus_slice].sum(axis=0)
+        popt_g, cov = curve_fit(Fit_curve, gaus_Eg, spec, p0=init_guess)
+
+        for index_Ex in range(index_start_Ex, index_stop_Ex+1):
+            vals = self.values[index_Ex,pre_peak_slice]
+            vals = np.append(vals, self.values[index_Ex, post_peak_slice])
+            pol = np.poly1d(np.polyfit(fit_Eg, vals, 1))
+            def FitFunc(Eg, A, a, b):
+                return Gaus(Eg, A, popt_g[1], popt_g[2])+Pol(Eg, a, b)
+
+            popt, cov = curve_fit(FitFunc, replace_Eg, self.values[index_Ex, replace_slice])
+
+            # Replace the old values with the "new"
+            self.values[index_Ex,replace_slice] -= Gaus(replace_Eg, popt[0], popt_g[1], popt_g[2])
+        self.fill_and_remove_negative(window_size=2)
+
 
     def line_mask(self, E1: Iterable[float],
                   E2: Iterable[float]) -> np.ndarray:
