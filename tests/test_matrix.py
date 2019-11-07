@@ -80,6 +80,12 @@ def test_numericals():
     assert_equal((matrix2@matrix1).values, values2@values1)
     assert_equal((matrix1@matrix2).values, values1@values2)
 
+def test_FitPeak():
+    peak_fit = {'const': 1182930.5206675457, 'mean': 4435.811321829209, 'std': 99.67972415903449, 'slope': 1.999450091327474, 'intercept': -7826.141269345372}
+    mat = om.Matrix(path="../example_data/test_PeakFit.m")
+    result = om.FitPeak((3790, 4250), (4650, 5200), (6382, 8850)) 
+
+    assert_equal(peak_fit, result)
 
 # This does not work as of now...
 # def test_mutable():
