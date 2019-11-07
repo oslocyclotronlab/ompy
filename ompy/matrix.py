@@ -37,20 +37,21 @@ from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     List, Sequence, Optional, Iterator)
-from .matrixstate import MatrixState
-from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .abstractarray import AbstractArray
+from .constants import DE_PARTICLE, DE_GAMMA_1MEV
+from .decomposition import index
 from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
                            save_numpy_2D, load_numpy_2D, save_tar, load_tar,
                            filetype_from_suffix)
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV
+from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .matrixstate import MatrixState
 from .rebin import rebin_2D
-from .decomposition import index
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 
-class Matrix():
+class Matrix(AbstractArray):
     """ Stores 2d array with energy axes (a matrix).
 
     Stores matrices along with calibration and energy axis arrays. Performs
@@ -115,14 +116,13 @@ class Matrix():
         for initialzing it with zero entries.
 
         """
-
         if shape is not None and values is not None:
             raise ValueError("'shape' and 'values' are exclusive")
 
         if shape is not None:
             self.values = np.zeros(shape, dtype=float)
         else:
-            self.values = np.asarray(values, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
 
         if (values is not None or shape is not None) and Ex is None:
             Ex = range(self.values.shape[0])
@@ -131,8 +131,8 @@ class Matrix():
             Eg = range(self.values.shape[1])
             Eg = np.asarray(Eg) + 0.5
 
-        self.Eg: np.ndarray = np.asarray(Eg, dtype=float)
-        self.Ex: np.ndarray = np.asarray(Ex, dtype=float)
+        self.Eg: np.ndarray = np.asarray(Eg, dtype=float).copy()
+        self.Ex: np.ndarray = np.asarray(Ex, dtype=float).copy()
         self.std = std
 
         if path is not None:
@@ -202,12 +202,12 @@ class Matrix():
         elif filetype == 'tar':
             self.values, self.Eg, self.Eg = load_tar(path)
         elif filetype == 'mama':
-            matrix, Eg, Ex = mama_read(path)
-            self.values = matrix
-            self.Eg = Eg
-            self.Ex = Ex
+            self.values, self.Eg, self.Ex = mama_read(path)
         else:
-            raise ValueError(f"Unknown filetype {filetype}")
+            try:
+                self.values, self.Eg, self.Ex = mama_read(path)
+            except ValueError:  # from within mama_read
+                raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
         return None
@@ -254,7 +254,7 @@ class Matrix():
              scale: Optional[str] = None,
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
-             midbin_ticks: bool = True,
+             midbin_ticks: bool = False,
              xlabel: Optional[str] = None,
              ylabel: Optional[str] = None,
              **kwargs) -> Any:
@@ -322,6 +322,23 @@ class Matrix():
         else:
             ax.set_ylabel(ylabel)
 
+        # show z-value in status bar
+        # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
+        def format_coord(x, y):
+            xarr = Eg
+            yarr = Ex
+            if ((x > xarr.min()) & (x <= xarr.max())
+               & (y > yarr.min()) & (y <= yarr.max())):
+                col = np.searchsorted(xarr, x)-1
+                row = np.searchsorted(yarr, y)-1
+                z = masked[row, col]
+                return f'x={x:1.0f}, y={y:1.0f}, z={z:1.2E}'
+                # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
+            else:
+                return f'x={x:1.0f}, y={y:1.0f}'
+        ax.format_coord = format_coord
+
+
         if fig is not None:
             if vmin is not None and vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='both')
@@ -340,7 +357,8 @@ class Matrix():
                         Emax: float = None, *, ax: Any = None,
                         normalize: bool = False,
                         xlabel: Optional[str] = "Energy",
-                        ylabel: Optional[str] = None, **kwargs) -> Any:
+                        ylabel: Optional[str] = None,
+                        scale: Optional[str]= None, **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
         Args:
@@ -352,6 +370,7 @@ class Matrix():
             normalize: Whether or not to normalize the counts.
             xlabel (optional, str): Label on x-axis. See source.
             ylabel (optional, str): Label on y-axis. Default is `None`.
+            scale (optional, str): y-scale, i.e `log` or `linear`.
             kwargs: Additional kwargs to plot command.
         Raises:
             ValueError: If axis is not in [0, 1]
@@ -378,6 +397,9 @@ class Matrix():
         if xlabel is not None:  # overwrite the above
             ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+
+        if scale is not None:
+            ax.set_yscale(scale)
 
         return ax
 
@@ -533,7 +555,7 @@ class Matrix():
 
         If no limits are provided, an automatic cut will be made.
         Args:
-            E1: First point of intercept, ordered as Ex, Eg
+            E1: First point of intercept, ordered as (Eg, Ex)
             E2: Second point of intercept
             inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
@@ -578,6 +600,7 @@ class Matrix():
         Iy = self.indices_Ex([Ey1, Ey2])
 
         # Interpolate between the two points
+        assert(Ix[1] != Ix[0])
         a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
         b = Iy[0] - a*Ix[0]
         line = lambda x: a*x + b  # NOQA E731
@@ -756,10 +779,6 @@ class Matrix():
         return self.values.sum()
 
     @property
-    def shape(self) -> Tuple[int, int]:
-        return self.values.shape
-
-    @property
     def state(self) -> MatrixState:
         return self._state
 
@@ -793,32 +812,6 @@ class Matrix():
             for col in range(self.shape[1]):
                 yield row, col
 
-    def __getitem__(self, key):
-        return self.values.__getitem__(key)
-
-    def __setitem__(self, key, item):
-        return self.values.__setitem__(key, item)
-
-    def __sub__(self, other) -> Matrix:
-        self.has_equal_binning(other)
-        result = copy.deepcopy(self)
-        result.values -= other.values
-        return result
-
-    def __add__(self, other) -> Matrix:
-        self.has_equal_binning(other)
-        result = copy.deepcopy(self)
-        result.values -= other.values
-        return result
-
-    def __rmul__(self, factor) -> Matrix:
-        other = copy.deepcopy(self)
-        other.values *= factor
-        return other
-
-    def __mul__(self, factor) -> Matrix:
-        return self.__rmul__(factor)
-
     def has_equal_binning(self, other, **kwargs) -> bool:
         """ Check whether `other` has equal binning as `self` within precision.
         Args:
@@ -841,6 +834,21 @@ class Matrix():
         else:
             return True
 
+    def __matmul__(self, other: Matrix) -> Matrix:
+        result = self.copy()
+        # cannot use has_equal_binning as we don't need the same
+        # shape for Ex and Eg.
+        # Remember: R[incident <-> Ex, detected <-> Eg]
+        if isinstance(other, Matrix):
+            if len(self.Eg) != len(self.Ex):
+                raise ValueError("Must have equal number of energy bins.")
+            if not np.allclose(self.Eg, other.Eg):
+                raise ValueError("Must have equal energy binning on Eg.")
+        else:
+            NotImplementedError("Type not implemented")
+
+        result.values = result.values@other.values
+        return result
 
 def to_plot_axis(axis: Any) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified

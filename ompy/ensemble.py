@@ -45,7 +45,11 @@ class Ensemble:
     """Generates perturbated matrices to estimate uncertainty
 
     Attributes:
-        raw (Matrix): The raw matrix used as model for the ensemble.
+        raw (Matrix): The raw matrix used as model for the ensemble. If a
+            background is provided, this will initially be the the
+            "prompt+bg" matrix.
+        bg: Background matrix to subtract.
+        bg_ratio: Prompt is obtainied by `raw - bg_ratio * bg`. Defaults to 1.
         path (str): The path used for saving the generated matrices.
         unfolder (Unfolder): An instance of Unfolder which is used in
             the unfolding of the generated matrices. Only has to support
@@ -63,6 +67,10 @@ class Ensemble:
         firstgen_ensemble (np.ndarray): The entire firstgen ensemble.
         action_raw (Action[Matrix]): An arbitrary action to apply to each
             generated raw matrix. Defaults to NOP.
+        action_prompt_w_bg (Action[Matrix]): An arbitrary action to apply to
+            each generated prompt_w_bg matrix. Defaults to NOP.
+        action_bg (Action[Matrix]): An arbitrary action to apply to
+            each generated bg matrix. Defaults to NOP.
         action_unfolded (Action[Matrix]): An arbitrary action to apply to each
             generated unfolded matrix. Defaults to NOP.
         action_firstgen (Action[Matrix]): An arbitrary action to apply to each
@@ -74,22 +82,34 @@ class Ensemble:
         Try to abstract it away.
     """
     def __init__(self, raw: Optional[Matrix] = None,
+                 bg: Optional[Matrix] = None,
+                 bg_ratio: Optional[float] = 1,
                  path: Union[str, Path] = None):
         """ Sets up attributes and loads a saved ensemble if provided.
 
         Args:
-            raw: The model matrix to peturbate. Can be provided later
-                in generate().
+            raw: The model matrix to peturbate. If a background is provided,
+                this is the "prompt+bg" matrix.
+            bg: Background matrix to subtract.
+            bg_ratio: Prompt is obtainied by `raw - bg_ratio * bg`. Defaults to
+                1. This is the case for equal time gate length of `prompt+bg`
+                and `bg`.
             path: The path where to save the ensemble. If set,
                 the ensemble will try to load from the path, but will
                 fail *silently* if it is unable to. It is recommended to call
                 load([path]) explicitly.
         """
         self.raw: Optional[Matrix] = raw
+        self.bg: Optional[Matrix] = bg
+        self.bg_ratio: Optional[float] = bg_ratio
+        self.prompt_w_bg: Optional[Matrix] = raw
+
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0
         self.regenerate = False
+        self.action_prompt_w_bg = Action('matrix')
+        self.action_bg = Action('matrix')
         self.action_raw = Action('matrix')
         self.action_unfolded = Action('matrix')
         self.action_firstgen = Action('matrix')
@@ -178,7 +198,13 @@ class Ensemble:
 
         for step in tqdm(range(number)):
             LOG.info(f"Generating {step}")
-            raw = self.generate_raw(step, method)
+            if self.bg is not None:
+                prompt_w_bg = self.generate_perturbed(step, method,
+                                                      state="prompt+bg")
+                bg = self.generate_perturbed(step, method, state="bg")
+                raw = self.subtract_bg(step, prompt_w_bg, bg)
+            else:
+                raw = self.generate_perturbed(step, method, state="raw")
             unfolded = self.unfold(step, raw)
             firstgen = self.first_generation(step, unfolded)
 
@@ -218,7 +244,8 @@ class Ensemble:
         self.unfolded_ensemble = unfolded_ensemble
         self.firstgen_ensemble = firstgen_ensemble
 
-    def generate_raw(self, step: int, method: str) -> Matrix:
+
+    def generate_perturbed(self, step: int, method: str, state: str) -> Matrix:
         """Generate a perturbated matrix
 
         Looks for an already generated file before generating the matrix.
@@ -226,25 +253,52 @@ class Ensemble:
             step: The identifier of the matrix to generate
             method: The name of the method to use. Can be either
                 "gaussian" or "poisson"
+            state: Either "raw", "prompt+bg" or "bg".
         Returns:
             The generated matrix
         """
-        LOG.debug(f"Generating raw ensemble {step}")
-        path = self.path / f"raw_{step}.npy"
-        raw = self.load_matrix(path)
-        if raw is None:
-            # if np.any(self.raw.values < 0):
+        allowed = ["raw", "prompt+bg", "bg"]
+        if state not in allowed:
+            raise NotImplementedError(f"Matrix must be a state in {allowed}")
+        LOG.debug(f"Generating {state} ensemble {step}")
+        path = self.path / f"{state}_{step}.npy"
+        mat = self.load_matrix(path)
+        if mat is None:
+            # if np.any(self.mat.values < 0):
             #     raise ValueError("input matrix has to have positive"
             #                      "entries only. Consider using fill and or"
             #                      "remove negatives")
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
-                values = self.generate_gaussian()
+                values = self.generate_gaussian(state)
             elif method == 'poisson':
-                values = self.generate_poisson()
+                values = self.generate_poisson(state)
             else:
                 raise ValueError(f"Method {method} is not supported")
-            raw = Matrix(values, Eg=self.raw.Eg, Ex=self.raw.Ex)
+            base_mat = self.matrix_from_state(state)
+            mat = Matrix(values, Eg=base_mat.Eg, Ex=base_mat.Ex, state=state)
+            mat.save(path)
+        self.action_from_state(state).act_on(mat)
+        return mat
+
+    def subtract_bg(self, step: int, matrix: Matrix, bg: Matrix) -> Matrix:
+        """ Subtract bg from "raw" (prompt+bg) matrix
+
+        Looks for an already generated file before generating the matrix.
+        Args:
+            step: The identifier of the matrix to act on.
+            matrix: The matrix to subtract from (usually, prompt+bg)
+            bg: The bg matrix.
+        Returns:
+            raw: The prompts only matrix ("raw" matrix).
+        """
+        LOG.debug(f"Subtracting bg from prompt+bg {step}")
+        path = self.path / f"raw_{step}.npy"
+        raw = self.load_matrix(path)
+        if raw is None:
+            LOG.debug("Raw matrix")
+            raw = matrix - self.bg_ratio * bg
+            raw.remove_negative()
             raw.save(path)
         self.action_raw.act_on(raw)
         return raw
@@ -344,25 +398,32 @@ class Ensemble:
         self.firstgen_ensemble = rebinned
         self.std_firstgen = firstgen_std
 
-    def generate_gaussian(self) -> np.ndarray:
-        """Generates an array with Gaussian perturbations of self.raw
+    def generate_gaussian(self, state: str) -> np.ndarray:
+        """Generates an array with Gaussian perturbations of a matrix.
+        Note that entries are truncated at 0 (only positive).
 
+        Args:
+            state: State of the matrx/which matrix should be taken as a base
         Returns:
             The resulting array
         """
-        std = np.sqrt(np.where(self.raw.value > 0, self.raw.values, 0))
-        perturbed = np.random.normal(size=self.raw.shape, loc=self.raw.values,
+        mat = self.matrix_from_state(state)
+        std = np.sqrt(np.where(mat.values > 0, mat.values, 0))
+        perturbed = np.random.normal(size=mat.shape, loc=mat.values,
                                      scale=std)
         perturbed[perturbed < 0] = 0
         return perturbed
 
-    def generate_poisson(self) -> np.ndarray:
-        """Generates an array with Poisson perturbations of self.raw
+    def generate_poisson(self, state: str) -> np.ndarray:
+        """Generates an array with Poisson perturbations of a matrix
 
+        Args:
+            state: State of the matrx/which matrix should be taken as a base
         Returns:
             The resulting array
         """
-        std = np.where(self.raw.values > 0, self.raw.values, 0)
+        mat = self.matrix_from_state(state)
+        std = np.where(mat.values > 0, mat.values, 0)
         perturbed = np.random.poisson(std)
         return perturbed
 
@@ -446,6 +507,48 @@ class Ensemble:
         return Matrix(self.firstgen_ensemble[index],
                       self.firstgen.Eg,
                       self.firstgen.Ex, state='firstgen')
+
+    def action_from_state(self, state: str) -> Action:
+        """ Return the action corresponding to a given state
+        Args:
+            state: The state
+        Returns:
+            action: The corresponding action
+        """
+        if state == "raw":
+            action = self.action_raw
+        elif state == "prompt+bg":
+            action = self.action_prompt_w_bg
+        elif state == "bg":
+            action = self.action_bg
+        elif state == "unfolded":
+            action = self.action_unfolded
+        elif state == "firstgen":
+            action = self.action_firstgen
+        else:
+            raise NotImplementedError(f"State {state} is not a known state")
+        return action
+
+    def matrix_from_state(self, state: str) -> Action:
+        """ Return the matrix corresponding to a given state
+        Args:
+            state: The state
+        Returns:
+            Matrix: The corresponding matrix
+        """
+        if state == "raw":
+            matrix = self.raw
+        elif state == "prompt+bg":
+            matrix = self.prompt_w_bg
+        elif state == "bg":
+            matrix = self.bg
+        # elif state == "unfolded":
+        #     matrix = self.unfolded
+        # elif state == "firstgen":
+        #     matrix = self.firstgen
+        else:
+            raise NotImplementedError(f"State {state} is not a known state")
+        return matrix
 
     def plot(self):
         fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)

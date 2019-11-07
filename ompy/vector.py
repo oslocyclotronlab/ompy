@@ -5,14 +5,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
-from .filehandling import (load_numpy_1D, save_numpy_1D, filetype_from_suffix,
+from .filehandling import (load_numpy_1D, save_numpy_1D,
+                           mama_read, mama_write,
+                           filetype_from_suffix,
                            load_tar, save_tar)
 from .matrix import MeshLocator
 from .decomposition import index
 from .library import div0
+from .abstractarray import AbstractArray
 
-
-class Vector():
+class Vector(AbstractArray):
     def __init__(self, values: Optional[Iterable[float]] = None,
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
@@ -41,20 +43,20 @@ class Vector():
            ValueError if the given arrays are of differing lenghts.
         """
         if values is None and E is not None:
-            self.E = np.asarray(E, dtype=float)
+            self.E = np.asarray(E, dtype=float).copy()
             self.values = np.zeros_like(E)
         elif values is not None and E is None:
-            self.values = np.asarray(values, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
             self.E = np.arange(0.5, len(self.values), 1)
         elif values is None and E is None:
             self.values = np.zeros(1)
             self.E = np.array([0.5])
         else:
-            self.values = np.asarray(values, dtype=float)
-            self.E = np.asarray(E, dtype=float)
+            self.values = np.asarray(values, dtype=float).copy()
+            self.E = np.asarray(E, dtype=float).copy()
 
         if std is not None:
-            std = np.asarray(std, dtype=float)
+            std = np.asarray(std, dtype=float).copy()
         self.std: Optional[ndarray] = std
 
         self.units = units
@@ -132,6 +134,8 @@ class Vector():
             save_numpy_1D(vector.values, vector.E, path)
         elif filetype == 'tar':
             save_tar([vector.values, vector.E], path)
+        elif filetype == 'mama':
+            mama_write(self, path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -148,8 +152,13 @@ class Vector():
             self.values, self.E = load_numpy_1D(path)
         elif filetype == 'tar':
             self.values, self.E = load_tar(path)
+        elif filetype == 'mama':
+            self.values, self.E = mama_read(path)
         else:
-            raise ValueError(f"Unknown filetype {filetype}")
+            try:
+                self.values, self.E = mama_read(path)
+            except ValueError:  # from within ValueError
+                raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
         return None
@@ -292,14 +301,16 @@ class Vector():
         else:
             return True
 
-    def copy(self) -> Vector:
-        """ Return a copy of the Vector """
-        return copy.deepcopy(self)
-
     def index(self, E) -> int:
         """ Returns the closest index corresponding to the E value """
         return index(self.E, E)
 
-    @property
-    def shape(self) -> Tuple[int]:
-        return self.values.shape
+    def __matmul__(self, other) -> Vector:
+        result = self.copy()
+        if isinstance(other, Vector):
+            self.has_equal_binning(other)
+        else:
+            NotImplementedError("Type not implemented")
+
+        result.values = result.values@other.values
+        return result

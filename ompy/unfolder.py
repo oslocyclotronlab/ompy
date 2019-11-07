@@ -70,11 +70,10 @@ class Unfolder:
         raw (Matrix): The Matrix to unfold
         num_iter (int): The number of iterations to perform. The best iteration
             is then selected based on the `score` method
-        zeroes (boolean ndarray): Masks everything below the diagonal to false
         r (Matrix): The trapezoidal cut raw Matrix
         R (Matrix): The response matrix
-        weight_fluctuation (float):
-        minimum_iterations (int):
+        weight_fluctuation (float): A attempt to penalize fluctuations.
+        minimum_iterations (int): Minimum number of iterations
         window_size (float or int?): window_size for fill negatives on output
         use_compton_subtraction (bool): Set usage of Compton subtraction method
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
@@ -86,9 +85,9 @@ class Unfolder:
                                      "de": 1.3, "511": 0.9}
             ```
 
-    TODO: There is the possibility for wrong results if the response
-       and the matrix are not rebinned the same. Another question that
-       arises is *when* are two binnings equal? What is equal enough?
+    TODO:
+        - Unfolding for a single spectrum (currently needs to be mocked as a
+            Matrix).
     """
     def __init__(self, num_iter: int = 33, response: Optional[Matrix] = None):
         """Unfolds the gamma-detector response of a spectrum
@@ -101,13 +100,15 @@ class Unfolder:
         self.weight_fluctuation = 0.2
         self.minimum_iterations = 3
         self.window_size = 10
-        self.zeroes: Optional[np.ndarray] = None
-        self._param = 5
+
         self._R: Optional[Matrix] = response
 
         self.use_compton_subtraction: bool = True
         self.response_tab: Optional[pandas.DataFrame] = None
         self.FWHM_tweak_multiplier = None
+
+        self.remove_negatives = True  # remove negs. in final unfolded spectrum
+
 
     def __call__(self, matrix: Matrix) -> Matrix:
         """ Wrapper for self.apply() """
@@ -155,8 +156,6 @@ class Unfolder:
         # raise AttributeError("Call cut_diagonal() before unfolding")
 
         self.r = self.raw.values
-        # TODO Use the arbitrary diagonal mask instead
-        self.zeroes = self.raw.diagonal_mask()
 
     def apply(self, raw: Matrix,
               response: Optional[Matrix] = None) -> Matrix:
@@ -179,7 +178,7 @@ class Unfolder:
         for i in range(self.num_iter):
             unfolded, folded = self.step(unfolded, folded, i)
             unfolded_cube[i, :, :] = unfolded
-            chisquare[i, :] = self.chi_square(folded)
+            chisquare[i, :] = self.chi_square_red(folded)
             fluctuations[i, :] = self.fluctuations(unfolded)
 
             if LOG.level >= logging.DEBUG:
@@ -190,6 +189,7 @@ class Unfolder:
         # and select the best one.
         fluctuations /= self.fluctuations(self.r)
         iscores = self.score(chisquare, fluctuations)
+        self.iscores = iscores # keep if interesting for later
         unfolded = np.zeros_like(self.r)
         for iEx in range(self.r.shape[0]):
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
@@ -208,10 +208,8 @@ class Unfolder:
         unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
 
-        # These two lines feel out of place
-        # TODO: What they do and where they should be run is very unclear.
-        #     Fix later.
-        unfolded.fill_and_remove_negative(window_size=self.window_size)
+        if self.remove_negatives:
+            unfolded.fill_and_remove_negative(window_size=self.window_size)
         return unfolded
 
     def step(self, unfolded, folded, step):
@@ -223,26 +221,24 @@ class Unfolder:
             set everything below the diagonal of f to 0
 
         """
-        if step > 0:
+        if step > 0:  # since the initial guess is the raw spectrum
             unfolded = unfolded + (self.r - folded)
-        folded = unfolded@self.R.values
 
-        # Suppress everything below the diagonal
-        # *Why* is this necessary? Where does the off-diagonals come from?
-        folded[self.zeroes] = 0.0
+        folded = unfolded@self.R.values
 
         return unfolded, folded
 
-    def chi_square(self, folded: np.ndarray) -> np.ndarray:
-        """ Compute Χ² of the folded spectrum
+    def chi_square_red(self, folded: np.ndarray) -> np.ndarray:
+        """ Compute reduced Χ² of the folded spectrum
 
         Uses the familiar Χ² = Σᵢ (fᵢ-rᵢ)²/rᵢ
         """
-        return div0(np.power(folded - self.r, 2),
+        chi2 = div0(np.power(folded - self.r, 2),
                     np.where(self.r > 0, self.r, 0)).sum(axis=1)
+        return chi2/self.r.shape[1]
 
     def fluctuations(self, counts: np.ndarray,
-                     sigma: float = 0.12) -> np.ndarray:
+                     sigma: float = 20) -> np.ndarray:
         """
         Calculates fluctuations in each Ex bin gamma spectrum by summing
         the absolute diff between the spectrum and a smoothed version of it.
@@ -252,7 +248,7 @@ class Unfolder:
 
         a1 = self.raw.Eg[1] - self.raw.Eg[0]
         counts_matrix_smoothed = gaussian_filter1d(
-            counts, sigma=sigma * a1, axis=1)
+            counts, sigma=sigma / a1, axis=1)
         fluctuations = np.sum(
             np.abs(counts_matrix_smoothed - counts), axis=1)
 
@@ -278,6 +274,20 @@ class Unfolder:
             self.minimum_iterations * np.ones(len(best_iteration), dtype=int),
             best_iteration)
         return best_iteration
+
+    def fold(self, matrix: Matrix) -> Matrix:
+        """ Folds a matrix with the loaded response
+
+        Args:
+            matrix (Matrix): Input matrix
+
+        Returns:
+            folded (Matrix): Folded matrix
+        """
+        assert self.R is not None, "Need to load response first"
+        folded = matrix.copy()
+        folded.values = matrix.values@self.R.values
+        return folded
 
     @property
     def R(self) -> Matrix:
@@ -317,6 +327,10 @@ class Unfolder:
         We apply smoothing to the different peak structures as described in
         the article. However, you may also "tweak" the FWHMs per peak
         for something Magne thinks is a better result.
+
+        TODO:
+            - When we unfolding with a reduced FWHM, should the compton method
+              still work with the actual fhwm?
         """
         LOG.debug("Applying Compton subtraction method")
 

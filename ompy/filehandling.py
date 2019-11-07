@@ -278,7 +278,7 @@ def filetype_from_suffix(path: Path) -> str:
     elif suffix == '.m':
         return 'mama'
     else:
-        raise ValueError(f"Unsupported filetype {suffix}")
+        return "unknown"
 
 
 def load_discrete(path: Union[str, Path], energy: ndarray,

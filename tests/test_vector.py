@@ -35,3 +35,36 @@ def test_cut():
     valcut = np.arange(34, 43)
     assert_equal(vector.E, Ecut)
     assert_equal(vector.values, valcut)
+
+@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')
+def test_numericals():
+    E = np.array([0, 1, 2])
+    values1 = np.array([0, 1, -2.])
+    vector1 = om.Vector(values=values1, E=E)
+
+    values2 = values1+1
+    vector2 = om.Vector(values=values2, E=E)
+
+    factor = 5.
+
+    for op in ("/", "*", "+", "-"):
+        eval(f"assert_equal((vector1{op}vector2).values, values1{op}values2)")
+        eval(f"assert_equal((vector2{op}vector1).values, values2{op}values1)")
+        eval(f"assert_equal((vector1{op}factor).values, values1{op}factor)")
+        eval(f"assert_equal((factor{op}vector1).values, factor{op}values1)")
+
+    assert_equal((vector2@vector1).values, values2@values1)
+    assert_equal((vector1@vector2).values, values1@values2)
+
+# This does not work as of now...
+# def test_mutable():
+#     E = np.array([0, 1, 2])
+#     E_org = E.copy()
+
+#     values = np.array([0, 1, -2.])
+#     vector = om.Vector(values=values, E=E)
+
+#     # chaning the original array shouldn't change the vector array
+#     # (due to the setter)!
+#     E += 1
+#     assert_equal(vector.E, E_org)

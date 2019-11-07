@@ -126,7 +126,7 @@ ompy/*.html
 tags
 
 notebooks/**/
-docs/source/api/**/
+docs/source/api
 
 # Apple attribute file
 .DS_Store

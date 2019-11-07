@@ -345,6 +345,52 @@ class FirstGeneration:
                              " be either 'statistical' or 'total'")
 
 
+    @staticmethod
+    def allgen_from_primary(fg: Matrix,
+                            xs: Optional[np.ndarray] = None) -> Matrix:
+        """Create all generation matrix from first generations matrix
+
+        AG(Ex, Eg) = FG(Ex, Eg) + ∑ σ[Ex] weight(Ex->Ex') AG(Ex', Eg) / σ[Ex'],
+        where the sum runs over all excitation energies `Ex' < Ex`.
+
+        Args:
+            fg (Matrix): First generations matrix
+            xs (np.ndarray, optional): Population cross-section for each Ex bin
+                in #times populated, not mb. Default is the same population
+                as the fg_matrix.
+        Returns:
+            ag (Matrix): All generations matrix
+        """
+        if xs is None:
+            xs = fg.values.sum(axis=1)
+
+        fg = fg.copy()
+        w = fg.copy()
+        w[:] = 0
+        ag = fg.copy()
+        ag[:] = 0
+
+        # Note: cannot do this here, as FG matrix "flipped" around Eg_center
+        # w = np.tril(fg)
+        # w = np.flip(w, axis=1)
+
+        for i in range(w.shape[0]):  # Loop over Ex rows
+            w[i, :i+1] = fg[i, i::-1]
+        w.values = normalize_rows(w.values)
+
+
+        for i, Ex in enumerate(fg.Ex):
+            # 1 fg per population
+            ag[i, :] = div0(fg[i, :], fg[i, :].sum()) * xs[i]
+            if i == 0:
+                continue
+            else:
+                for j, Efinal in enumerate(fg.Ex):  # add underlying AGs
+                    ag[i, :] += xs[i] * w[i, j] * div0(ag[j, :], xs[j])
+
+        return ag
+
+
 def normalize_rows(array: np.ndarray) -> np.ndarray:
     """ Normalize each row to unity """
     return div0(array, array.sum(axis=1).reshape(array.shape[1], 1))
