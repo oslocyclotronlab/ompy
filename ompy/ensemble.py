@@ -104,6 +104,8 @@ class Ensemble:
         self.bg_ratio: Optional[float] = bg_ratio
         self.prompt_w_bg: Optional[Matrix] = raw
 
+        self.raw.state = "raw"
+
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0

@@ -105,7 +105,7 @@ class Matrix(AbstractArray):
                  std: Optional[np.ndarray] = None,
                  path: Optional[Union[str, Path]] = None,
                  shape: Optional[Tuple[int, int]] = None,
-                 state: Union[str, MatrixState] = 'raw'):
+                 state: Union[str, MatrixState] = None):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
@@ -314,11 +314,11 @@ class Matrix(AbstractArray):
 
         ax.set_title(title if title is not None else self.state)
         if xlabel is None:
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
         else:
             ax.set_xlabel(xlabel)
         if ylabel is None:
-            ax.set_ylabel(r"Excitation energy $E_{x}$ [eV]")
+            ax.set_ylabel(r"Excitation energy $E_{x}$")
         else:
             ax.set_ylabel(ylabel)
 
@@ -798,7 +798,9 @@ class Matrix(AbstractArray):
 
     @state.setter
     def state(self, state: Union[str, MatrixState]) -> None:
-        if isinstance(state, str):
+        if state is None:
+            self._state = None
+        elif isinstance(state, str):
             self._state = MatrixState.str_to_state(state)
         # Buggy. Impossible to compare type of Enum??
         elif type(state) == type(MatrixState.RAW):
