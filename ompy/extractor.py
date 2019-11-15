@@ -197,6 +197,7 @@ class Extractor:
         if np.any(matrix.values < 0):
             raise ValueError("input matrix has to have positive entries only.")
         if std is not None:
+            std = std.copy()
             if np.any(std.values < 0):
                 raise ValueError("std has to have positive entries only.")
             assert matrix.shape == std.shape, \
@@ -260,17 +261,19 @@ class Extractor:
         nld = res.x[matrix.Eg.size:]
 
         # Set elements that couldn't be constrained (no entries) to np.na
-        n_nan_gsf, n_nan_nld = self.unconstrained_elements(matrix, E_nld)
+        n_nan_gsf, n_nan_nld = self.unconstrained_elements(matrix, E_nld,
+                                                           resolution)
         if n_nan_gsf > 0:
             T[-n_nan_gsf:] = np.nan
         nld[:n_nan_nld] = np.nan
-
         # Convert transmission coefficient to the more useful
         # gamma strength function
         gsf = T/(2*np.pi*matrix.Eg**3)
 
         if product:
-            values = nld_T_product(nld, T, resolution,
+            nld_0 = np.where(np.isnan(nld), np.zeros_like(nld), nld)
+            T_0 = np.where(np.isnan(T), np.zeros_like(T), T)
+            values = nld_T_product(nld_0, T_0, resolution,
                                    E_nld, matrix.Eg, matrix.Ex)
             mat = Matrix(values=values, Ex=matrix.Ex, Eg=matrix.Eg)
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg), mat
@@ -279,22 +282,22 @@ class Extractor:
 
     @staticmethod
     def unconstrained_elements(matrix: Matrix,
-                               E_nld: np.ndarray) -> Tuple[int, int]:
+                               E_nld: np.ndarray,
+                               resolution: np.ndarray) -> Tuple[int, int]:
         """
         Indices of elements close to the diagonal in gsf and nld that
         cannot be constrained, as the bins don't have counts
-
-        TODO:
-            - Should take into account resolution too. Currently, we may still
-            have too many bins that are lateron not constrained in the chi2
-            minimization.
-
         """
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
         assert dEx == dEg
 
-        lastEx = matrix[-1, :]
+        lastEx = matrix[-1, :].copy()
+
+        # account for resolution
+        iEgmax = matrix.index_Eg(matrix.Ex[-1] + resolution[-1])
+        lastEx[iEgmax:] = 0
+
         n_nan_gsf = (matrix.shape[1]-1) - np.nonzero(lastEx)[0][-1]
         Efirst_nld = matrix.Ex[-1] - matrix.Eg[-(1+n_nan_gsf)]
         n_nan_nld = np.abs(E_nld-Efirst_nld).argmin()
