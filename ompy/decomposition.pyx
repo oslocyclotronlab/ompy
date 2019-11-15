@@ -1,5 +1,5 @@
 cimport cython
-cimport numpy as cnp
+cimport numpy as np
 import numpy as np
 
 IF OPENMP:
@@ -8,7 +8,7 @@ ELSE:
     pass
 
 
-ctypedef cnp.float64_t DTYPE_t
+ctypedef np.float64_t DTYPE_t
 DTYPE=np.float64
 
 @cython.boundscheck(False)
@@ -43,14 +43,13 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
         Py_ssize_t i_Ex
         int i_Eg, i_E_nld
         double Eg_max, E_f
-        double dEg = (Eg[1] - Eg[0])/2
     firstgen = np.zeros((num_Ex, num_Eg), dtype=DTYPE)
     cdef double[:, ::1] firstgen_view = firstgen
 
     # Remember to change both loops simultaneously
     IF OPENMP:
         for i_Ex in prange(num_Ex, nogil=True, schedule='static'):
-            Eg_max = Ex[i_Ex] + resolution[i_Ex] + dEg
+            Eg_max = Ex[i_Ex] + resolution[i_Ex]
             i_Eg = 0
             while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
                 E_f = Ex[i_Ex] - Eg[i_Eg]
@@ -59,7 +58,7 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
                 i_Eg = i_Eg + 1
     ELSE:
         for i_Ex in range(num_Ex):
-            Eg_max = Ex[i_Ex] + resolution[i_Ex] + dEg
+            Eg_max = Ex[i_Ex] + resolution[i_Ex]
             i_Eg = 0
             while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
                 E_f = Ex[i_Ex] - Eg[i_Eg]
@@ -68,7 +67,7 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
                 i_Eg = i_Eg + 1
 
     # We want probabilities
-    normalize(firstgen_view)
+    normalize(firstgen)
     return firstgen
 
 @cython.boundscheck(False)
@@ -152,13 +151,12 @@ def chisquare_diagonal_with_zero(double[:, ::1] fact, double[:, ::1] fit,
     cdef:
         double chi = 0.0
         double Eg_max
-        double dEg = (Eg[1]-Eg[0])/2
         Py_ssize_t num_Eg = len(Eg)
         Py_ssize_t num_Ex = len(Ex)
         int i, j
 
     for i in range(num_Ex):# prange(num_Ex, nogil=True, schedule='static'):
-        Eg_max = Ex[i] + resolution[i] + dEg
+        Eg_max = Ex[i] + resolution[i]
         for j in range(num_Eg):
             if Eg[j] > Eg_max:
                 break
@@ -194,13 +192,12 @@ def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
     cdef:
         double chi = 0.0
         double Eg_max
-        double dEg = (Eg[1]-Eg[0])/2
         Py_ssize_t num_Eg = len(Eg)
         Py_ssize_t num_Ex = len(Ex)
         int i, j
 
     for i in range(num_Ex):# prange(num_Ex, nogil=True, schedule='static'):
-        Eg_max = Ex[i] + resolution[i] + dEg
+        Eg_max = Ex[i] + resolution[i]
         for j in range(num_Eg):
             if Eg[j] > Eg_max:
                 break
@@ -241,21 +238,10 @@ def chisquare(double[:, ::1] fact, double[:, ::1] fit,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def normalize(double[:, ::1] matrix):
+def normalize(np.ndarray[DTYPE_t, ndim=2] matrix):
     """ Row-normalizes the matrix
 
     Args:
         matrix: The matrix to normalize
     """
-    cdef:
-        Py_ssize_t num_rows = matrix.shape[0]
-        Py_ssize_t num_cols = matrix.shape[1]
-        double total
-        double[:, ::1] view = matrix
-        int row, col
-    for row in range(num_rows):
-        total = 0.0
-        for col in range(num_cols):
-            total += view[row, col]
-        for col in range(num_cols):
-            view[row, col] = view[row, col]/total
+    matrix /= matrix.sum(axis=1)[:, np.newaxis]
