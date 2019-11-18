@@ -20,7 +20,7 @@ except ImportError:
 
 # Version rutine taken from numpy
 MAJOR = 0
-MINOR = 4
+MINOR = 8
 MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
