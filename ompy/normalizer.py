@@ -18,6 +18,7 @@ from tqdm import tqdm
 from dataclasses import dataclass, field
 from .extractor import Extractor
 from .vector import Vector
+from .library import self_if_none
 from .spinfunctions import SpinFunctions
 from .filehandling import load_discrete
 from .models import ResultsNormalized
@@ -77,7 +78,7 @@ class Normalizer:
         that the samples should be shuffled to retain some "random" samples
         from the pdf (not the importance weighted)
     """
-    def __init__(self, *, extractor: Optional[Extractor] = None,
+    def __init__(self, *,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Union[str, Vector]] = None,
                  path: Optional[Union[str, Path]] = None) -> None:
@@ -123,17 +124,10 @@ class Normalizer:
 
         # Handle the method parameters
         self.use_smoothed_levels = True
-        self.extractor = copy.deepcopy(extractor)
-        self.nld = None
-        if extractor is not None:
-            nld = extractor.nld[0]
-        if nld is not None:
-            self.nld = nld.copy()
+        self.nld = None if nld is None else nld.copy()
         self.discrete = discrete
 
         self.res = ResultsNormalized(name="Results NLD")
-
-        LOG.debug("Created Normalizer")
 
         self.limit_low = None
         self.limit_high = None
@@ -155,14 +149,14 @@ class Normalizer:
         """ Wrapper around normalize """
         self.normalize(*args, **kwargs)
 
-    def normalize(self, limit_low: Optional[Tuple[float, float]] = None,
-                  limit_high: Optional[Tuple[float, float]] = None, *,
+    def normalize(self, *, limit_low: Optional[Tuple[float, float]] = None,
+                  limit_high: Optional[Tuple[float, float]] = None,
                   nld: Optional[Vector] = None,
-                  extractor: Optional[Extractor] = None,
                   discrete: Optional[Vector] = None,
                   D0: Optional[Tuple[float, float]] = None,
                   bounds: Optional[TupleDict] = None,
-                  spin: Optional[Dict[str, Any]] = None) -> None:
+                  spin: Optional[Dict[str, Any]] = None,
+                  num: Optional[int] = 0) -> None:
         """ Normalize NLD to a low and high energy region
 
         Args:
@@ -171,7 +165,6 @@ class Normalizer:
             limit_high: The limits (start, stop) where to normalize to
                 a theoretical model and neutron separation energy at high
                 energies.
-            extractor: The extractor to use get nld from
             nld: The nuclear level density vector to normalize.
             discrete: The discrete level density at low energies to
                 normalize to.
@@ -179,71 +172,65 @@ class Normalizer:
             bounds: The bounds of the parameters
             spin: Parameters for use in the high energy model and
                 spin cut model.
+            num (Optional[int], optional): Loop number
 
         """
         # Update internal state
-        self.limit_low = self.reset(limit_low)
-        self.limit_high = self.reset(limit_high)
+        self.limit_low = self.self_if_none(limit_low)
+        self.limit_high = self.self_if_none(limit_high)
         limit_low = self.limit_low
         limit_high = self.limit_high
-        discrete = self.reset(discrete)
+
+        discrete = self.self_if_none(discrete)
         discrete.to_MeV()
-        nld = self.reset(nld)
-        D0 = self.reset(D0)
+        nld = self.self_if_none(nld)
+        D0 = self.self_if_none(D0)
         self.D0 = D0  # To ensure the bounds are updated
-        bounds = self.reset(bounds)
-        spin = self.reset(spin)
+        bounds = self.self_if_none(bounds)
+        spin = self.self_if_none(spin)
 
         # Ensure that spin is set
         for key, val in spin.items():
             if val is None:
                 raise ValueError(f"`{key}` has to be set.")
-        extractor = self.reset(extractor, nonable=True)
 
-        # Ensure to rerun if called again
-        nlds = []
         self.res = ResultsNormalized(name="Results NLD")
 
-        if extractor is not None:
-            nlds = extractor.nld
-        else:
-            nld = self.nld
-            nlds = [nld]
+        nld = self.self_if_none(nld)
+        LOG.info(f"\n\n---------\nNormalizing nld #{num}")
+        nld = nld.copy()
+        LOG.debug("Setting NLD, convert to MeV")
+        nld.to_MeV()
 
-        for i, nld in enumerate(tqdm(nlds)):
-            LOG.info(f"\n\n---------\nNormalizing nld #{i}")
-            nld = nld.copy()
-            LOG.debug("Setting NLD, convert to MeV")
-            nld.to_MeV()
+        # Need to give some sort of standard deviation for sensible results
+        # Otherwise deviations at higher level density will have an
+        # uncreasonably high weight.
+        if self.std_fake is None:
+            self.std_fake = False
+        if self.std_fake or nld.std is None:
+            self.std_fake = True
+            nld.std = nld.values * 0.1  # 10% is an arb. choice
+        self.nld = nld
 
-            # Need to give some sort of standard deviation for sensible results
-            # Otherwise deviations at higher level density will have an
-            # uncreasonably high weight.
-            if self.std_fake is None:
-                self.std_fake = False
-            if self.std_fake or nld.std is None:
-                self.std_fake = True
-                nld.std = nld.values * 0.1  # 10% is an arb. choice
+        # Use DE to get an inital guess before optimizing
+        args, guess = self.initial_guess(limit_low, limit_high)
+        # Optimize using multinest
+        popt, samples = self.optimize(args, guess)
 
-            self.nld = nld
-            # Use DE to get an inital guess before optimizing
-            args, guess = self.initial_guess(limit_low, limit_high)
-            # Optimize using multinest
-            popt, samples = self.optimize(args, guess)
+        transformed = nld.transform(popt['A'][0], popt['alpha'][0],
+                                    inplace=False)
+        if self.std_fake:
+            nld.std = None
+            transformed.std = None
 
-            transformed = nld.transform(popt['A'][0], popt['alpha'][0],
-                                        inplace=False)
-            if self.std_fake:
-                transformed.std = None
+        self.res.nld = transformed
+        self.res.pars = popt
+        self.res.samples = samples
+        ext_model = lambda E: self.curried_model(E, T=popt['T'][0],
+                                                 D0=popt['D0'][0])
+        self.res.nld_model = ext_model
 
-            self.res.nld.append(transformed)
-            self.res.pars.append(popt)
-            self.res.samples.append(samples)
-            ext_model = lambda E: self.curried_model(E, T=popt['T'][0],
-                                                     D0=popt['D0'][0])
-            self.res.nld_model.append(ext_model)
-
-        self.save()
+        self.save(num=num)
 
     def initial_guess(self, limit_low: Optional[Tuple[float, float]] = None,
                       limit_high: Optional[Tuple[float, float]] = None
@@ -264,8 +251,8 @@ class Normalizer:
            The arguments used for chi^2 minimization and the
            minimizer.
         """
-        limit_low = self.reset(limit_low)
-        limit_high = self.reset(limit_high)
+        limit_low = self.self_if_none(limit_low)
+        limit_high = self.self_if_none(limit_high)
 
         bounds = list(self.bounds.values())
         spinstring = json.dumps(self.spin, indent=4, sort_keys=True)
@@ -385,11 +372,21 @@ class Normalizer:
 
         return popt, samples
 
-    def plot(self, ax: Any = None) -> Tuple[Any, Any]:
+    def plot(self, ax: Any = None, *,
+             add_label: Optional[bool] = True,
+             results: ResultsNormalized = None,
+             add_figlegend: Optional[bool] = True,
+             plot_fitregion: Optional[bool] = True,
+             reset_color_cycle: Optional[bool] = True,
+             **kwargs) -> Tuple[Any, Any]:
         """ Plot the NLD, discrete levels and result of normalization
 
         Args:
             ax: The matplotlib axis to plot onto
+            add_figlegend (bool): Whether to add a legend. Workaround
+                for `plot_interactive`.
+            results Optional[ResultsNormalized]: If provided, gsf and model
+                are taken from here instead.
         Returns:
             The figure and axis created if no ax is supplied.
         """
@@ -398,44 +395,51 @@ class Normalizer:
         else:
             fig = ax.figure
 
-        for i, transformed in enumerate(self.res.nld):
-            label = None
-            if i == 0:
-                label = "normalized"
-            transformed.plot(ax=ax, c='k', alpha=1/len(self.res.nld),
-                             label=label)
+        if reset_color_cycle:
+            ax.set_prop_cycle(None)
 
-        self.discrete.plot(ax=ax, label='Discrete levels')
+        res = self.res if results is None else results
+        pars = res.pars
+        nld = res.nld
 
-        for i, pars in enumerate(self.res.pars):
-            Sn = self.curried_model(T=pars['T'][0],
-                                    D0=pars['D0'][0],
-                                    E=self.spin['Sn'])
+        labelNld = None
+        labelSn = None
+        labelModel = None
+        if add_label:
+            labelNld = "normalized"
+            labelSn = '$S_n$'
+            labelModel = 'model'
+        nld.plot(ax=ax, label=labelNld, **kwargs)
 
-            x = np.linspace(self.limit_high[0], self.spin['Sn'])
-            model = self.curried_model(T=pars['T'][0],
-                                       D0=pars['D0'][0],
-                                       E=x)
-            # TODO: plot errorbar
-            labelSn = None
-            labelModel = None
-            if i == 0:
-                labelSn = '$S_n$'
-                labelModel = 'model'
+        if add_label:
+            self.discrete.plot(ax=ax, c='k', label='Discrete levels')
+
+        Sn = self.curried_model(T=pars['T'][0],
+                                D0=pars['D0'][0],
+                                E=self.spin['Sn'])
+
+        x = np.linspace(self.limit_high[0], self.spin['Sn'])
+        model = self.curried_model(T=pars['T'][0],
+                                   D0=pars['D0'][0],
+                                   E=x)
+        # TODO: plot errorbar
+
+        if add_label:
             ax.scatter(self.spin['Sn'], Sn, label=labelSn)
-            ax.plot(x, model, "--", label=labelModel)
+        ax.plot(x, model, "--", label=labelModel,
+                c='g', **kwargs)
 
-        ax.axvspan(self.limit_low[0], self.limit_low[1], color='grey',
-                   alpha=0.1, label="fit limits")
-        ax.axvspan(self.limit_high[0], self.limit_high[1], color='grey',
-                   alpha=0.1)
+        if plot_fitregion:
+            ax.axvspan(self.limit_low[0], self.limit_low[1], color='grey',
+                       alpha=0.1, label="fit limits")
+            ax.axvspan(self.limit_high[0], self.limit_high[1], color='grey',
+                       alpha=0.1)
 
         ax.set_yscale('log')
         ax.set_ylabel(r"$\rho(E_x) \quad [\mathrm{MeV}^{-1}]$")
         ax.set_xlabel(r"E_x \quad [\mathrm{MeV}]$")
 
-
-        if fig is not None:
+        if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
 
         return fig, ax
@@ -467,6 +471,8 @@ class Normalizer:
         Args:
             path: The path to the directory containing the
                 files.
+        TODO:
+            - Save/LOAD whole Results class
         """
         if path is not None:
             path = Path(path)
@@ -486,7 +492,12 @@ class Normalizer:
         if not self.res.nld:
             warnings.warn("Found no files")
 
-    def save(self, path: Optional[Union[str, Path]] = None) -> None:
+    def save(self, path: Optional[Union[str, Path]] = None,
+             num: int = None) -> None:
+        """
+        TODO:
+            - Save/LOAD whole Results class
+        """
         if path is not None:
             path = Path(path)
         else:
@@ -495,8 +506,7 @@ class Normalizer:
         LOG.debug("Saving to %s", str(path))
 
         path.mkdir(exist_ok=True)
-        for i, nld in enumerate(self.res.nld):
-            nld.save(path / f"nld_{i}.npy")
+        self.res.nld.save(path / f"nld_{num}.npy")
 
     @staticmethod
     def errfn(x: Tuple[float, float, float, float], nld_low: Vector,
@@ -579,6 +589,10 @@ class Normalizer:
         self._use_smoothed_levels = value
         if self._discrete_path is not None:
             self.discrete = self._discrete_path
+
+    def self_if_none(self, *args, **kwargs):
+        """ wrapper for lib.self_if_none """
+        return self_if_none(self, *args, **kwargs)
 
 
 def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:

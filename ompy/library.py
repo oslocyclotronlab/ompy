@@ -29,14 +29,15 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 from numpy import ndarray
-from .constants import DE_PARTICLE, DE_GAMMA_8MEV, DE_GAMMA_1MEV
 from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 import matplotlib
 from itertools import product
-from typing import Optional, Iterable, Union, List, Tuple, Iterator
+from typing import Optional, Iterable, Union, List, Tuple, Iterator, Any
+import inspect
+import re
 
-import ompy as om
+from .constants import DE_PARTICLE, DE_GAMMA_8MEV, DE_GAMMA_1MEV
 
 
 
@@ -224,7 +225,6 @@ def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
 
     return matrix_out
 
-
 def log_interp1d(xx, yy, **kwargs):
     """ Interpolate a 1-D function.logarithmically """
     logy = np.log(yy)
@@ -242,92 +242,6 @@ def call_model(fun,pars,pars_req):
         return fun(**pcall)
     else:
         raise TypeError("Error: Need following arguments for this method: {0}".format(pars_req))
-
-
-def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
-                     N_max: int = 100,
-                     random_state=np.random.RandomState(65489)):
-    """
-    Use a list(dict) of samples of `A`, `B`, and `alpha` parameters from
-    multinest to transform a (list of) nld and/or gsf sample(s). Can be used
-    to normalize the nld and/or gsf
-
-    Args:
-        samples (dict): Multinest samples.
-        nld (om.Vector or list/array[om.Vector], optional):
-            nld ("unnormalized")
-        gsf (om.Vector or list/array[om.Vector], optional):
-            gsf ("unnormalized")
-        N_max (int, optional): Maximum number of samples returned if `nld`
-                               and `gsf` is a list/array
-        random_state (optional): random state, set by default such that
-                                 a repeted use of the function gives the same
-                                 results.
-
-    Returns:
-        `nld_trans` and/or `gsf_trans`: Transformed `nld` and or `gsf`,
-                                        depending on what input is given.
-
-    """
-
-    # Need to sweep though multinest samples in random order
-    # as they are ordered with decreasing likelihood by default
-    for key, value in samples.items():
-        N_multinest = len(value)
-        break
-    randlist = np.arange(N_multinest)
-    random_state.shuffle(randlist)  # works in-place
-
-    if nld is not None:
-        A = samples["A"]
-        alpha = samples["alpha"]
-        if type(nld) is om.Vector:
-            N = min(N_multinest, N_max)
-        else:
-            N = len(nld)
-        nld_trans = []
-
-    if gsf is not None:
-        B = samples["B"]
-        alpha = samples["alpha"]
-        if type(gsf) is om.Vector:
-            N = min(N_multinest, N_max)
-        else:
-            N = len(gsf)
-        gsf_trans = []
-
-    # transform the list
-    for i in range(N):
-        i_multi = randlist[i]
-        # nld loop
-        try:
-            if type(nld) is om.Vector:
-                nld_tmp = nld
-            else:
-                nld_tmp = nld[i]
-            nld_tmp = nld_tmp.transform(alpha=alpha[i_multi],
-                                        const=A[i_multi], inplace=False)
-            nld_trans.append(nld_tmp)
-        except:
-            pass
-        # gsf loop
-        try:
-            if type(gsf) is om.Vector:
-                gsf_tmp = gsf
-            else:
-                gsf_tmp = gsf[i]
-            gsf_tmp = gsf_tmp.transform(alpha=alpha[i_multi],
-                                        const=B[i_multi], inplace=False)
-            gsf_trans.append(gsf_tmp)
-        except:
-            pass
-
-    if nld is not None and gsf is not None:
-        return nld_trans, gsf_trans
-    elif gsf is not None:
-        return gsf_trans
-    elif nld is not None:
-        return nld_trans
 
 
 def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
@@ -416,3 +330,49 @@ def diagonal_elements(matrix: np.ndarray) -> Iterator[Tuple[int, int]]:
             if col != 0.0:
                 yield i, Ny-j
                 break
+
+
+def self_if_none(instance: Any, variable: Any, nonable: bool = False) -> Any:
+    """ Sets `variable` from instance if variable is None.
+
+    Note: Has to be imported as in the normalizer class due to class stack
+          name retrieval
+
+    Args:
+        instance: instance
+        variable: The variable to check
+        nonable: Does not raise ValueError if
+            variable is None.
+    Returns:
+        The value of variable or instance.variable
+    Raises:
+        ValueError if both variable and
+        self.variable are None.
+    """
+    name = _retrieve_name(variable)
+    if variable is None:
+        self_variable = getattr(instance, name)
+        if not nonable and self_variable is None:
+            raise ValueError(f"`{name}` must be set")
+        return self_variable
+    return variable
+
+
+def _retrieve_name(var: Any) -> str:
+    """ Finds the source-code name of `var`
+
+        NOTE: Only call from self.reset.
+
+     Args:
+        var: The variable to retrieve the name of.
+    Returns:
+        The variable's name.
+    """
+    # Retrieve the line of the source code of the third frame.
+    # The 0th frame is the current function, the 1st frame is the
+    # calling function and the second is the calling function's caller.
+    line = inspect.stack()[3].code_context[0].strip()
+    match = re.search(r".*\((\w+).*\).*", line)
+    assert match is not None, "Retrieving of name failed"
+    name = match.group(1)
+    return name

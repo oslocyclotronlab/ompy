@@ -344,9 +344,9 @@ class NormalizationParameters(Model):
 @dataclass
 class ResultsNormalized(Model):
     nld: Union[Vector, List[Vector]] = field(default_factory=list,
-             metadata='normalized nld')  # noqa
+             metadata='nld (normalized or initial, depending on method)')  # noqa
     gsf: Union[Vector, List[Vector]] = field(default_factory=list,
-             metadata='normalized gsf')  # noqa
+             metadata='gsf (normalized or initial, depending on method)')  # noqa
     pars: List[Dict[str, Any]] = field(default_factory=list,
             metadata='Parameters for the normalization/models used there')  # noqa
     samples: List[Dict[str, Any]] = field(default_factory=list,

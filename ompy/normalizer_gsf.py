@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Optional, Union, Tuple, Any, Callable
 import matplotlib.pyplot as plt
 
-from .extractor import Extractor
-from .library import log_interp1d
+from .library import log_interp1d, self_if_none
 from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
 from .normalizer import Normalizer
@@ -17,27 +16,18 @@ from .vector import Vector
 LOG = logging.getLogger(__name__)
 
 
-class NormalizerGSF(Normalizer):
-    def __init__(self, *, extractor: Optional[Extractor] = None,
-                 nld_normalizer: Optional[Normalizer] = None,
+class NormalizerGSF():
+    def __init__(self, *, nld_normalizer: Optional[Normalizer] = None,
                  nld: Optional[Vector] = None,
                  nld_model: Optional[Callable[..., Any]] = None,
                  alpha: Optional[float] = None,
                  gsf: Optional[Vector] = None,
                  norm_pars: Optional[NormalizationParameters] = None,
-                 # discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = None) -> None:
+                 #path: Optional[Union[str, Path]] = None
+                 ) -> None:
         """
-
-        TODO:
-            - Abstract away Normalizer
-            - check that norm_pars is set correctly
-            - by default, create "good" model_low and model_high
-
+        Normalize γSF to a given` <Γγ> (Gg)
         """
-        # super().__init__(extractor, nld, discrete, path)
-        self.extractor = extractor
-
         # use self._gsf internally, but separate from self._gsf
         # in order to not trasform self.gsf_in 2x, if normalize() is called 2x
         self.gsf_in = None if gsf is None else gsf.copy()
@@ -63,116 +53,87 @@ class NormalizerGSF(Normalizer):
 
         self.res: Optional[ResultsNormalized] = None
 
-    def normalize(self, *, extractor: Optional[Extractor] = None,
+    def normalize(self, *, gsf: Optional[Vector] = None,
                   nld_normalizer: Optional[Normalizer] = None,
-                  gsf: Optional[Vector] = None,
                   alpha: Optional[float] = None,
                   nld: Optional[Vector] = None,
                   nld_model: Optional[Callable[..., Any]] = None,
-                  norm_pars: Optional[NormalizationParameters] = None
-                  # Gg: Optional[float] = None,  # or [Tuple[float, float]]
-                  # D0: Optional[float] = None # or [Tuple[float, float]]
-                  ):
-        """ Normalize gsf to a given <Γγ> (Gg)
-
-        TODO:
-            - transform gsf before sending to extrapolation
-            - should we have `NormalizationParameters` as input instead of
-              all signle inputs?
-              Why do we need this: in a common optimization rutine, we want
-              to normalize the gsf given Gg, D0 (...). Need to make sure there
-              that we don't change the *actual* Gg, but only the parameter
-              point.
-            - self.extrapolate(gsf) should get the gsf of the extractor, if
-            an extractor is specified
-            - specify D0 and Gg here ? Otherwise delete the unused keywords
+                  norm_pars: Optional[NormalizationParameters] = None,
+                  num: Optional[int] = 0) -> None:
+        """ Normalize gsf to a given <Γγ> (Gg). Saves results to `self.res`.
         """
         # Update internal state
         if gsf is None:
             gsf = self.gsf_in
-        extractor = self.reset(extractor, nonable=True)
-        nld_normalizer = self.reset(nld_normalizer, nonable=True)
-        alpha = self.reset(alpha, nonable=True)
-        nld = self.reset(nld, nonable=True)
-        nld_model = self.reset(nld_model, nonable=True)
-        norm_pars = self.reset(norm_pars)
+        assert gsf is not None, "Need to provide gsf as input"
+
+        nld_normalizer = self.self_if_none(nld_normalizer, nonable=True)
+
+        if nld is None:
+            LOG.debug("Setting nld from from nld_normalizer")
+            self.nld = nld_normalizer.res.nld
+        else:
+            self.nld = self.self_if_none(nld)
+
+        alpha = self.self_if_none(alpha, nonable=True)
+        if alpha is None:
+            LOG.debug("Setting alpha from from nld_normalizer")
+            alpha = nld_normalizer.res.pars["alpha"][0]
+        assert alpha is not None, \
+            "Provide alpha or nld_normalizer with alpha"
+
+        self.nld_model = self.self_if_none(nld_model, nonable=True)
+        if nld_model is None:
+            LOG.debug("Setting nld_model from from nld_normalizer")
+            self.nld_model = nld_normalizer.res.nld_model
+        assert alpha is not None, \
+            "Provide nld_model or nld_normalizer with nld_model"
+
+        norm_pars = self.self_if_none(norm_pars)
         self.norm_pars.verify()  # check that they have been set
 
-        if gsf is not None and extractor is not None:
-            raise ValueError("Cannot use both kewords simultaneously")
-
-        # if several gsfs shall be normalized, get them from extractor
-        if extractor is not None:
-            assert nld_normalizer is not None,\
-                "If extractor is used, need to provide nld_normalizer, too"
-            gsfs = extractor.gsf
-            nlds = nld_normalizer.res.nld
-            assert len(gsfs) == len(nlds), \
-                "Extractor and nld_normalizer need to have same size"
-            nld_models = nld_normalizer.res.nld_model
-            alphas = [pars["alpha"][0] for pars in nld_normalizer.res.pars]
+        # ensure to rerun
+        if nld_normalizer is not None:
             self.res = copy.deepcopy(nld_normalizer.res)
         else:
-            gsfs = [gsf]
-            if nld is None:
-                raise ValueError("Need to set either nld or extractor")
-            nlds = [nld]
-            if nld_model is not None:
-                nld_models = [nld_model]
-            else:
-                assert nld_normalizer is not None, \
-                    "Provide nld_model or nld_normalizer"
-                LOG.debug("Setting nld_model from nld_normalizer")
-                nld_models = [nld_normalizer.res.nld_model[0]]
-            if alpha is not None:
-                alphas = [alpha]
-            else:
-                assert nld_normalizer is not None, \
-                    "Provide alpha or nld_normalizer"
-                LOG.debug("Setting alpha from nld_normalizer")
-                alphas = [nld_normalizer.res.pars[0]["alpha"][0]]
             self.res = ResultsNormalized(name="Results NLD and GSF, stepwise")
 
-        # normalization
-        lists = zip(nlds, gsfs, nld_models, alphas)
-        for i, (nld, gsf, nld_model, alpha) in enumerate(lists):
-            LOG.info(f"Normalizing #{i}")
-            self._gsf = gsf.copy()  # make a copy as it will be transformed
-            gsf.to_MeV()
-            gsf = gsf.transform(alpha=alpha, inplace=False)
-            self._gsf = gsf
+        LOG.info(f"Normalizing #{num}")
+        self._gsf = gsf.copy()  # make a copy as it will be transformed
+        gsf.to_MeV()
+        gsf = gsf.transform(alpha=alpha, inplace=False)
+        self._gsf = gsf
 
-            self.nld = nld
-            self.nld_model = nld_model
+        self.model_low.autorange(gsf)
+        self.model_high.autorange(gsf)
+        self._gsf_low, self._gsf_high = self.extrapolate(gsf)
 
-            self.model_low.autorange(gsf)
-            self.model_high.autorange(gsf)
-            self._gsf_low, self._gsf_high = self.extrapolate(gsf)
+        # experimental Gg and calc. both in meV
+        B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
 
-            # experimental Gg and calc. both in meV
-            B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
+        # apply transformation and export results
+        self._gsf.transform(B_norm)
+        self.model_low.norm_to_shift_after(B_norm)
+        self.model_high.norm_to_shift_after(B_norm)
 
-            # apply transformation and export results
-            self._gsf.transform(B_norm)
-            self.model_low.norm_to_shift_after(B_norm)
-            self.model_high.norm_to_shift_after(B_norm)
-
-            # save results
-            self.res.gsf.append(self._gsf)
-            self.res.gsf_model_low.append(copy.deepcopy(self.model_low))
-            self.res.gsf_model_high.append(copy.deepcopy(self.model_high))
-            if len(self.res.pars) > 0:
-                self.res.pars[i]["B"] = B_norm
-            else:
-                self.res.pars.append({"B": B_norm})
+        # save results
+        self.res.gsf = self._gsf
+        self.res.gsf_model_low = copy.deepcopy(self.model_low)
+        self.res.gsf_model_high = copy.deepcopy(self.model_high)
+        if len(self.res.pars) > 0:
+            self.res.pars["B"] = B_norm
+        else:
+            self.res.pars = {"B": B_norm}
 
     def extrapolate(self,
-                    gsf: Optional[Vector] = None) -> Tuple[Vector, Vector]:
+                    gsf: Optional[Vector] = None,
+                    E: Optional[np.ndarray] = [None, None]) -> Tuple[Vector, Vector]:
         """ Extrapolate gsf using given models
 
         Args:
             gsf (Optional[Vector]): If extrapolation is fit, it will be fit to
                 this vector. Default is `self._gsf`.
+            E (optional): extrapolation energies [Elow, Ehigh]
         Returns:
             The extrapolated gSF-vectors on the form
             [low region, high region]
@@ -188,10 +149,10 @@ class NormalizerGSF(Normalizer):
             self.model_high.fit(gsf)
 
         LOG.debug("Extrapolating low: %s", self.model_low)
-        extrapolated_low = self.model_low.extrapolate(scaled=False)
+        extrapolated_low = self.model_low.extrapolate(scaled=False, E=E[0])
 
         LOG.debug("Extrapolating high: %s", self.model_high)
-        extrapolated_high = self.model_high.extrapolate(scaled=False)
+        extrapolated_high = self.model_high.extrapolate(scaled=False, E=E[1])
         return extrapolated_low, extrapolated_high
 
     def Gg_before_norm(self):
@@ -336,14 +297,21 @@ class NormalizerGSF(Normalizer):
     #     err_high = transformed_high.error(expected)
     #     return err_low + err_high
 
-    def plot(self, ax: Any = None,
-             add_legend: bool = True) -> Tuple[Any, Any]:
+    def plot(self, ax: Optional[Any] = None, *,
+             add_label: Optional[bool] = True,
+             add_figlegend: Optional[bool] = True,
+             plot_fitregion: Optional[bool] = True,
+             results: Optional[ResultsNormalized] = None,
+             reset_color_cycle: Optional[bool] = True,
+             **kwargs) -> Tuple[Any, Any]:
         """ Plot the gsf and extrapolation normalization
 
         Args:
             ax: The matplotlib axis to plot onto
-            add_legend (bool): Whether to add a legend. Workaround
+            add_figlegend (bool): Whether to add a legend. Workaround
                 for `plot_interactive`.
+            results Optional[ResultsNormalized]: If provided, gsf and model
+                are taken from here instead.
         Returns:
             The figure and axis created if no ax is supplied.
 
@@ -355,35 +323,38 @@ class NormalizerGSF(Normalizer):
         else:
             fig = ax.figure
 
-        mylist = zip(self.res.gsf, self.res.gsf_model_low,
-                     self.res.gsf_model_high)
-        for i, (gsf, model_low, model_high) in enumerate(mylist):
-            label_gsf = "normalized" if i == 0 else None
-            label_model = "model" if i == 0 else None
-            label_limits = "fit_limits" if i == 0 else None
-            gsf.plot(ax=ax, c='k', alpha=1/len(self.res.gsf),
-                     label=label_gsf)
+        if reset_color_cycle:
+            ax.set_prop_cycle(None)
+        res = self.res if results is None else results
+        gsf = res.gsf
+        model_low = res.gsf_model_low
+        model_high = res.gsf_model_high
 
-            # extend the plotting range to the fit range
-            xplot = np.linspace(model_low.Emin, model_low.Efit[1])
-            gsf_low = model_low.extrapolate(xplot)
-            xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
-            gsf_high = model_high.extrapolate(xplot)
+        label_gsf = "normalized" if add_label else None
+        label_model = "model" if add_label else None
+        label_limits = "fit limits" if add_label else None
+        gsf.plot(ax=ax, label=label_gsf, **kwargs)
 
-            gsf_low.plot(ax=ax, c='g', linestyle="--", label=label_model,
-                         alpha=1/len(self.res.gsf))
-            gsf_high.plot(ax=ax, c='g', linestyle="--",
-                          alpha=1/len(self.res.gsf))
+        # extend the plotting range to the fit range
+        xplot = np.linspace(model_low.Emin, model_low.Efit[1])
+        gsf_low = model_low.extrapolate(xplot)
+        xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
+        gsf_high = model_high.extrapolate(xplot)
 
-            if i == 0:
-                ax.axvspan(model_low.Efit[0], model_low.Efit[1],
-                           color='grey', alpha=0.1, label=label_limits)
-                ax.axvspan(model_high.Efit[0], model_high.Efit[1],
-                           color='grey', alpha=0.1)
+        gsf_low.plot(ax=ax, c='g', linestyle="--", label=label_model,
+                     **kwargs)
+        gsf_high.plot(ax=ax, c='g', linestyle="--",
+                      **kwargs)
+
+        if plot_fitregion:
+            ax.axvspan(model_low.Efit[0], model_low.Efit[1],
+                       color='grey', alpha=0.1, label=label_limits)
+            ax.axvspan(model_high.Efit[0], model_high.Efit[1],
+                       color='grey', alpha=0.1)
 
         ax.set_yscale('log')
 
-        if fig is not None and add_legend:
+        if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
 
         return fig, ax
@@ -407,7 +378,7 @@ class NormalizerGSF(Normalizer):
                 self.model_low.Efit = [Efit_low0, Efit_low1]
                 self.model_high.Efit = [Efit_high0, Efit_high1]
                 self.normalize()
-                self.plot(ax=ax, add_legend=False)
+                self.plot(ax=ax, add_figlegend=False)
                 ax.set_ylim(ylim)
                 ax.set_xlim(xlim)
 
@@ -425,7 +396,7 @@ class NormalizerGSF(Normalizer):
                 self.model_high.scale = scale_high
                 self.model_high.shift = shift_high
                 self.normalize()
-                _, _, legend = self.plot(ax=ax, add_legend=False)
+                _, _, legend = self.plot(ax=ax, add_figlegend=False)
                 ax.set_ylim(ylim)
                 ax.set_xlim(xlim)
 
@@ -442,6 +413,10 @@ class NormalizerGSF(Normalizer):
         chi2 = (self.Gg_before_norm() - Gg)/(sigma_Gg)
         chi2 = chi2**2
         return chi2
+
+    def self_if_none(self, *args, **kwargs):
+        """ wrapper for lib.self_if_none """
+        return self_if_none(self, *args, **kwargs)
 
 
 def fnld(E: ndarray, nld: Vector,
