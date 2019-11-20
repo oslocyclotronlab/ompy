@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from .library import log_interp1d, self_if_none
 from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
-from .normalizer import Normalizer
+from .normalizer_nld import NormalizerNLD
 from .spinfunctions import SpinFunctions
 from .vector import Vector
 
@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 
 
 class NormalizerGSF():
-    def __init__(self, *, nld_normalizer: Optional[Normalizer] = None,
+    def __init__(self, *, nld_normalizer: Optional[NormalizerNLD] = None,
                  nld: Optional[Vector] = None,
                  nld_model: Optional[Callable[..., Any]] = None,
                  alpha: Optional[float] = None,
@@ -54,7 +54,7 @@ class NormalizerGSF():
         self.res: Optional[ResultsNormalized] = None
 
     def normalize(self, *, gsf: Optional[Vector] = None,
-                  nld_normalizer: Optional[Normalizer] = None,
+                  nld_normalizer: Optional[NormalizerNLD] = None,
                   alpha: Optional[float] = None,
                   nld: Optional[Vector] = None,
                   nld_model: Optional[Callable[..., Any]] = None,

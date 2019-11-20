@@ -20,7 +20,7 @@ from .extractor import Extractor
 from .library import log_interp1d, self_if_none
 from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
-from .normalizer import Normalizer
+from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
@@ -35,7 +35,7 @@ class NormalizerSimultan():
     Attributes:
         extractor (Extractor): Extractor instance
         normalizer_gsf (NormalizerGSF): NormalizerGSF instance
-        normalizer_nld (Normalizer): Normalizer instance
+        normalizer_nld (Normalizer): NormalizerNLD instance
         res (ResultsNormalized, optional): Results
         std_fake_gsf (bool): Whether the std. deviation is faked
             (see `normalize`)
@@ -43,7 +43,8 @@ class NormalizerSimultan():
             (see `normalize`)
         multinest_path (Path, optional): Default path where multinest
             saves files
-        multinest_kwargs (dict): Additional keywords to multinest
+        multinest_kwargs (dict): Additional keywords to multinest. Defaults to
+            `{"seed": 65498, "resume": False}`
 
     TODO: Work with more general models, too, not just CT for nld
     """
@@ -51,7 +52,7 @@ class NormalizerSimultan():
     def __init__(self, *,
                  gsf: Optional[Vector] = None,
                  nld: Optional[Vector] = None,
-                 normalizer_nld: Optional[Normalizer] = None,
+                 normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None):
         """
         TODO:
@@ -64,7 +65,7 @@ class NormalizerSimultan():
         else:
             self.normalizer_nld = copy.deepcopy(normalizer_nld)
 
-        if normalizer_nld is None:
+        if normalizer_gsf is None:
             self.normalizer_gsf = None
         else:
             self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
@@ -78,12 +79,12 @@ class NormalizerSimultan():
         self.res: Optional[ResultsNormalized] = None
 
         self.multinest_path: Optional[Path] = Path('multinest')
-        self.multinest_kwargs: dict = {}
+        self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
     def normalize(self, *, num: Optional[int] = 0,
                   gsf: Optional[Vector] = None,
                   nld: Optional[Vector] = None,
-                  normalizer_nld: Optional[Normalizer] = None,
+                  normalizer_nld: Optional[NormalizerNLD] = None,
                   normalizer_gsf: Optional[NormalizerGSF] = None):
         """Perform normalization and saves results to `self.res`
 
@@ -92,7 +93,7 @@ class NormalizerSimultan():
             gsf (Optional[Vector], optional): gsf before normalization
             nld (Optional[Vector], optional): nld before normalization
             normalizer_gsf (NormalizerGSF): NormalizerGSF instance
-            normalizer_nld (Normalizer): Normalizer instance
+            normalizer_nld (Normalizer): NormalizerNLD instance
         """
         # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
@@ -260,22 +261,15 @@ class NormalizerSimultan():
         path = self.multinest_path / f"sim_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        # defaults
-        kwargs = self.multinest_kwargs
-        if "verbose" not in kwargs:
-            kwargs["verbose"] = True
-        if "False" not in kwargs:
-            kwargs["resume"] = False
-
         LOG.info("Starting multinest: ")
-        LOG.debug("with following keywords %s:", kwargs)
+        LOG.debug("with following keywords %s:", self.multinest_kwargs)
         #  Hack where stdout from Multinest is redirected as info messages
         LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
 
         with redirect_stdout(LOG):
             pymultinest.run(loglike, prior, len(guess),
                             outputfiles_basename=str(path),
-                            **kwargs)
+                            **self.multinest_kwargs)
 
         # Save parameters for analyzer
         names = list(guess.keys())

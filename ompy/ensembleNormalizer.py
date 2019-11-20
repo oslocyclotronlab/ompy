@@ -14,7 +14,7 @@ from .matrix import Matrix
 from .models import ResultsNormalized
 from .vector import Vector
 from .extractor import Extractor
-from .normalizer import Normalizer
+from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .normalizer_simultan import NormalizerSimultan
 
@@ -30,7 +30,7 @@ class EnsembleNormalizer:
     """
 
     def __init__(self, *, extractor: Extractor,
-                 normalizer_nld: Optional[Normalizer] = None,
+                 normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None,
                  normalizer_simultan: Optional[NormalizerSimultan] = None):
 
