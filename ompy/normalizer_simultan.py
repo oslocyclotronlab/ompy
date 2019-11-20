@@ -1,8 +1,3 @@
-"""Summary
-
-Attributes:
-    LOG (TYPE): Description
-"""
 import logging
 import numpy as np
 import copy
@@ -34,19 +29,23 @@ class NormalizerSimultan():
 
     Attributes:
         extractor (Extractor): Extractor instance
-        normalizer_gsf (NormalizerGSF): NormalizerGSF instance
-        normalizer_nld (Normalizer): NormalizerNLD instance
-        res (ResultsNormalized, optional): Results
-        std_fake_gsf (bool): Whether the std. deviation is faked
-            (see `normalize`)
-        std_fake_nld (bool): Whether the std. deviation is faked
-            (see `normalize`)
+        gsf (Optional[Vector], optional): gsf to normalize
         multinest_path (Path, optional): Default path where multinest
             saves files
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
             `{"seed": 65498, "resume": False}`
+        nld (Optional[Vector], optional): nld to normalize
+        normalizer_nld (NormalizerNLD): `NormalizerNLD` instance to get the normalization paramters
+        normalizer_gsf (NormalizerGSF): `NormalizerGSF` instance to get the normalization paramters
+        res (ResultsNormalized): Results
+        std_fake_gsf (bool): Whether the std. deviation is faked
+            (see `normalize`)
+        std_fake_nld (bool): Whether the std. deviation is faked
+            (see `normalize`)
 
-    TODO: Work with more general models, too, not just CT for nld
+
+    TODO:
+        Work with more general models, too, not just CT for nld
     """
 
     def __init__(self, *,
@@ -58,6 +57,12 @@ class NormalizerSimultan():
         TODO:
             - currently have to set arguments here, an cannot set them in
               "normalize"
+
+        Args:
+            gsf (optional): see above
+            nld (optional): see above
+            normalizer_nld (optional): see above
+            normalizer_gsf (optional): see above
 
         """
         if normalizer_nld is None:
@@ -81,19 +86,19 @@ class NormalizerSimultan():
         self.multinest_path: Optional[Path] = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
-    def normalize(self, *, num: Optional[int] = 0,
+    def normalize(self, *, num: int = 0,
                   gsf: Optional[Vector] = None,
                   nld: Optional[Vector] = None,
                   normalizer_nld: Optional[NormalizerNLD] = None,
-                  normalizer_gsf: Optional[NormalizerGSF] = None):
+                  normalizer_gsf: Optional[NormalizerGSF] = None) -> None:
         """Perform normalization and saves results to `self.res`
 
         Args:
-            num (Optional[int], optional): Loop number
+            num (int, optional): Loop number
             gsf (Optional[Vector], optional): gsf before normalization
             nld (Optional[Vector], optional): nld before normalization
-            normalizer_gsf (NormalizerGSF): NormalizerGSF instance
-            normalizer_nld (Normalizer): NormalizerNLD instance
+            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD instance
+            normalizer_gsf (Optional[NormalizerGSF], optional): NormalizerGSF instance
         """
         # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
@@ -154,7 +159,7 @@ class NormalizerSimultan():
             model.shift_after = model.shift
 
 
-    def initial_guess(self):
+    def initial_guess(self) -> None:
         """ Find an inital guess for normalization parameters
 
         Uses guess of normalizer_nld and corresponding normalization of gsf
@@ -198,6 +203,7 @@ class NormalizerSimultan():
             guess (Dict[str, float]): The initial guess of the parameters
 
         Returns:
+            Tuple:
             - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
                 parameters
             - samples (Dict[str, List[float]]): Multinest samplesø.
@@ -205,7 +211,7 @@ class NormalizerSimultan():
                 from the posterior.
 
         Raises:
-            ValueError: Description
+            ValueError: Invalid parameters for automatix prior
         """
         if guess['alpha'] < 0:
             raise ValueError("Prior selection not implemented for α < 0")
@@ -331,19 +337,29 @@ class NormalizerSimultan():
         normalizer_gsf.nld_model = nld_model
         normalizer_gsf.nld = nld
         normalizer_gsf.norm_pars.D0 = [D0, np.nan]  # dummy uncertainty
-        normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha, inplace=False)
+        normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha,
+                                                              inplace=False)
         normalizer_gsf._gsf_low, normalizer_gsf._gsf_high = \
             normalizer_gsf.extrapolate()
         err_gsf = normalizer_gsf.errfn()
         return err_nld + err_gsf
 
-    def plot(self, ax: Any = None, add_label: bool = True,
+    def plot(self, ax: Optional[Any] = None, add_label: bool = True,
              add_figlegend: bool = True,
              **kwargs) -> Tuple[Any, Any]:
-        """ Plots randomly drawn samples
-        TODO: Cleanup!
-        # TODO:
-            - Could not find out how to not plot dublicate legend entries
+        """Plots nld and gsf
+
+        Args:
+            ax (optional): The matplotlib axis to plot onto. Creates axis
+                is not provided
+            add_label (bool, optional):Defaults to `True`.
+            add_figlegend (bool, optional): Defaults to `True`.
+            results Optional[ResultsNormalized]: If provided, gsf and model
+                are taken from here instead.
+            **kwargs: kwargs for plot
+
+        Returns:
+            fig, ax
         """
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)

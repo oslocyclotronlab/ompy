@@ -1,77 +1,92 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+import logging
+from contextlib import redirect_stdout
 from uncertainties import unumpy
-from tqdm import tqdm
+import os
+
 from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 from scipy.optimize import minimize
 from .ensemble import Ensemble
 from .matrix import Matrix
 from .vector import Vector
-from .decomposition import chisquare_diagonal, nld_T_product, index
+from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
+
+if 'JPY_PARENT_PID' in os.environ:
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
+
+LOG = logging.getLogger(__name__)
 
 
 class Extractor:
-    """ Extracts nld and γSF from an Ensemble or a Matrix
+    """Extracts nld and γSF from an Ensemble or a Matrix
 
     Basically a wrapper around a minimization routine with bookeeping.
-    By giving an Ensemble instance and an Action cutting a Matrix into
+    By giving an `Ensemble` instance and an `Action` cutting a `Matrix` into
     the desired shape, nuclear level density (nld) and gamma strength function
     (gsf/γSF) are extracted. The results are exposed in the attributes
     self.nld and self.gsf, as well as saved to disk. The saved results are
-    used if filenames match, or can be loaded manually with load().
+    used if filenames match, or can be loaded manually with `load()`.
 
-    The method decompose(matrix, [std]) extracts the nld and gsf from a single
-    Matrix. If no std is given, the error function will be the square
-    error.
+    The method `decompose(matrix, [std])` extracts the nld and gsf from a
+    single Matrix.
 
     Attributes:
         ensemble (Ensemble): The Ensemble instance to extract nld and gsf from.
-        size (int): The number of (nld, gsf) pairs to extract. Must be equal to
-           or smaller than ensemble.size.
         regenerate (bool): Whether to force extraction from matrices even if
             previous results are found on disk. Defaults to True
-        path (path): The path to save and/or load nld and gsf to/from.
         method (str): The scipy.minimization method to use. Defaults to Powell.
         options (dict): The scipy.minimization options to use.
         nld (list[Vector]): The nuclear level densities extracted.
         gsf (list[Vector]): The gamma strength functions extracted.
         trapezoid (Action[Matrix]): The Action cutting the matrices of the
-            Ensemble
-           into the desired shape where from the nld and gsf will
-           be extracted from.
+            Ensemble into the desired shape where from the nld and gsf will be
+            extracted from.
+        path (path): The path to save and/or load nld and gsf to/from.
+        extend_diagonal_by_resolution (bool, optional): If `True` (default),
+            the fit will be extended beyond Ex=Eg by the (FWHM) of the
+            resolution. Remember to set the resolution according to your
+            experiment
+        resolution_Ex (float or np.ndarray, optional): Resolution (FWHM) along
+            Ex axis (particle detector resolution). Defaults to 150 keV
+
 
     TODO:
         - If path is given, it tries to load. If path is later set,
           it is not created. This is a very common pattern. Consider
           superclassing the disk book-keeping.
-        - Make bin_width setable
     """
     def __init__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None,
                  path: Optional[Union[str, Path]] = None):
+        """
+        ensemble (Ensemble, optional): see above
+        trapezoid (Action[Matrix], optional): see above
+        path (Path or str, optional): see above
+        """
         self.ensemble = ensemble
-        self.size = 10 if ensemble is None else ensemble.size
         self.regenerate = False
         self.method = 'Powell'
         self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
-        self.bin_width = None  # TODO: Make Setable
 
         if path is not None:
             self.path = Path(path)
             self.path.mkdir(exist_ok=True)
-            try:
-                self.load(self.path)
-            except AssertionError:
-                pass
+            self.load(self.path)
         else:
             self.path = Path('extraction_ensemble')
             self.path.mkdir(exist_ok=True)
+
+        self.extend_fit_by_resolution: bool = True
+        self.resolution_Ex = 150  # keV
 
     def __call__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None):
@@ -80,23 +95,23 @@ class Extractor:
     def extract_from(self, ensemble: Optional[Ensemble] = None,
                      trapezoid: Optional[Action] = None,
                      regenerate: Optional[bool] = None):
-        """ Decompose each first generation matrix in an Ensemble
+        """Decompose each first generation matrix in an Ensemble
 
-        Saves the extracted nld and gsf to file, or loads them if
-        already generated. Exposes the vectors in the attributes
-        self.nld and self.gsf.
+        If `regenerate` is `True` it saves the extracted nld and gsf to file,
+        or loads them if already generated. Exposes the vectors in the
+        attributes self.nld and self.gsf.
 
         Args:
-            ensemble: The ensemble to extract nld and gsf from.
-                Can be provided in __init__ instead.
-            trapezoid: An Action describing the cut to apply
-                to the matrices to obtain the desired region for
-                extracting nld and gsf.
-            regenerate: Whether to regenerate all nld and gsf even if
-                they are found on disk.
+            ensemble (Ensemble, optional): The ensemble to extract nld and gsf
+                from. Can be provided in when initializing instead.
+            trapezoid (Action, optional): An Action describing the cut to apply
+                to the matrices to obtain the desired region for extracting nld
+                and gsf.
+            regenerate (bool, optional): Whether to regenerate all nld and gsf
+                even if they are found on disk.
+
         Raises:
-            ValueError if no Ensemble instance is provided here
-                or earlier.
+            ValueError: If no Ensemble instance is provided here or earlier.
         """
         if ensemble is not None:
             self.ensemble = ensemble
@@ -110,11 +125,9 @@ class Extractor:
             regenerate = self.regenerate
         self.path = Path(self.path)  # TODO: Fix
 
-        assert self.ensemble.size >= self.size, "Ensemble is too small"
-
         nlds = []
         gsfs = []
-        for i in tqdm(range(self.size)):
+        for i in tqdm(range(self.ensemble.size)):
             nld_path = self.path / f'nld_{i}.npy'
             gsf_path = self.path / f'gsf_{i}.npy'
             if nld_path.exists() and gsf_path.exists() and not regenerate:
@@ -132,12 +145,18 @@ class Extractor:
 
     def step(self, num: int) -> Tuple[Vector, Vector]:
         """ Wrapper around _extract in order to be consistent with other classes
+
+        Args:
+            num: Number of the fg matrix to extract
         """
         nld, gsf = self._extract(num)
         return nld, gsf
 
     def _extract(self, num: int) -> Tuple[Vector, Vector]:
         """ Extract nld and gsf from matrix number i from Ensemble
+
+        Args:
+            num: Number of the fg matrix to extract
 
         Returns:
             The nld and gsf as Vectors
@@ -161,18 +180,20 @@ class Extractor:
     def decompose(self, matrix: Matrix,
                   std: Optional[Matrix] = None,
                   x0: Optional[np.ndarray] = None,
-                  bin_width: Optional[int] = None,
                   product: bool = False) -> Tuple[Vector, Vector]:
         """ Decomposes a matrix into nld and γSF
 
         Algorithm:
             Creates the energy range for nld based on the diagonal
-            energy resolution. Tries to minimize the product
+            energy resolution. Tries to minimize the product::
+
                 firstgen = nld·gsf
-            using square error or chi square as error function.
+
+            using (weighted) chi square as error function.
 
             If first nld / last gsf elements cannot be constrained, as there
-            are no entries for them in the matrix, they will be set to np.nan
+            are no entries for them in the matrix, they will be set to `np.nan`
+
         Args:
             matrix: The matrix to decompose. Should already
                 be cut into appropiate size
@@ -180,18 +201,13 @@ class Extractor:
                 be the same size as the matrix. If no std is provided,
                 square error will be used instead of chi square.
             x0: The initial guess for nld and gsf.
-            bin_width: NOT YET IMPLEMENTED!
-                The bin width of the energy array of nld.
-                Defaults to self.bin_width if None.
             product: Whether to return the first generation matrix
                resulting from the product of nld and gsf.
+
         Returns:
             The nuclear level density and the gamma strength function
             as Vectors.
-            Optionally returns nld*γSF if product is True
-
-        Todo:
-            Implement automatic rebinning if bin_width is given(?)
+            Optionally returns `nld*γSF` if `product` is `True`
 
         """
         if np.any(matrix.values < 0):
@@ -209,14 +225,6 @@ class Extractor:
         else:
             matrix.values, _ = normalize(matrix)
 
-        if bin_width is not None:
-            bin_width = bin_width
-        else:
-            bin_width = self.bin_width
-        if bin_width is not None:
-            raise NotImplementedError("Bin-width cannot be set yet."
-                                      "Rebin upfront.")
-
         # Eg and Ex *must* have the same step size for the
         # decomposition to make sense.
         dEx = matrix.Ex[1] - matrix.Ex[0]
@@ -228,12 +236,16 @@ class Extractor:
         bin_width = dEx
 
         # create nld energy array
-        resolution = matrix.diagonal_resolution()
         Emin = matrix.Ex.max()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
         E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width)+1)
 
-        if x0 is None:
+        if self.extend_fit_by_resolution:
+            resolution = self.diagonal_resolution(matrix)
+        else:
+            resolution = self.zeros_like(matrix.Ex)
+
+        if x0 is None:  # default initial guess
             nld0 = np.ones(E_nld.size)
             T0, _ = matrix.projection('Eg')
             x0 = np.append(T0, nld0)
@@ -256,12 +268,15 @@ class Extractor:
                                          resolution, matrix.Eg, matrix.Ex)
                 return chi
 
-        res = minimize(errfun, x0=x0, method=self.method, options=self.options)
+        LOG.info("Minimizing")
+        LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
+        with redirect_stdout(LOG):
+            res = minimize(errfun, x0=x0, method=self.method, options=self.options)
         T = res.x[:matrix.Eg.size]
         nld = res.x[matrix.Eg.size:]
 
         # Set elements that couldn't be constrained (no entries) to np.na
-        n_nan_gsf, n_nan_nld = self.unconstrained_elements(matrix, E_nld,
+        n_nan_nld, n_nan_gsf = self.unconstrained_elements(matrix, E_nld,
                                                            resolution)
         if n_nan_gsf > 0:
             T[-n_nan_gsf:] = np.nan
@@ -287,6 +302,14 @@ class Extractor:
         """
         Indices of elements close to the diagonal in gsf and nld that
         cannot be constrained, as the bins don't have counts
+
+        Args:
+            matrix (Matrix): Input matrix
+            E_nld (np.ndarray): Energy array of the nld
+            resolution (np.ndarray): Resolution at `Ex=Ex`
+
+        Returns:
+            Number of unconstrained elements of nld and gsf
         """
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
@@ -301,7 +324,42 @@ class Extractor:
         n_nan_gsf = (matrix.shape[1]-1) - np.nonzero(lastEx)[0][-1]
         Efirst_nld = matrix.Ex[-1] - matrix.Eg[-(1+n_nan_gsf)]
         n_nan_nld = np.abs(E_nld-Efirst_nld).argmin()
-        return n_nan_gsf, n_nan_nld
+        return n_nan_nld, n_nan_gsf
+
+    def diagonal_resolution(self, matrix: Matrix) -> np.ndarray:
+        """Detector resolution at the Ex=Eg diagonal
+
+        Uses gaussian error propagations which assumes independence of
+        resolutions along Ex and Eg axis.
+
+        Args:
+            matrix (Matrix): Matrix for which the sesoluton shall be calculated
+
+        Returns:
+            resolution at Ex = Eg.
+        """
+        dEx = matrix.Ex[1] - matrix.Ex[0]
+        dEg = matrix.Eg[1] - matrix.Eg[0]
+        assert dEx == dEg
+
+        dE_resolution = np.sqrt(self.resolution_Ex**2
+                                + self.resolution_Eg(matrix)**2)
+        return dE_resolution
+
+    @staticmethod
+    def resolution_Eg(matrix: Matrix) -> np.ndarray:
+        """Resolution along Eg axis for each Ex. Defaults in this class are for OSCAR.
+
+        Args:
+            matrix (Matrix): Matrix for which the sesoluton shall be calculated
+
+        Returns:
+            resolution
+        """
+        def fFWHM(E, p):
+            return np.sqrt(p[0] + p[1] * E + p[2] * E**2)
+        fwhm_pars = np.array([73.2087, 0.50824, 9.62481e-05])
+        return fFWHM(matrix.Ex, fwhm_pars)
 
     def load(self, path: Optional[Union[str, Path]] = None) -> None:
         """ Load already extracted nld and gsf from file
@@ -314,6 +372,7 @@ class Extractor:
             path = Path(path)
         else:
             path = Path(self.path)  # TODO: Fix pathing
+        LOG.debug("Loading from %s", path)
 
         if not path.exists():
             raise IOError(f"The path {path} does not exist.")
@@ -342,7 +401,6 @@ class Extractor:
             ax: An axis to plot onto
             scale: Scale to use
             plot_mean: Whether to plot individual samples or mean & std. dev
-        TODO: Fix
         """
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)
@@ -394,7 +452,21 @@ class Extractor:
         return Vector(values=values, E=energy, std=std)
 
 
-def normalize(mat: Matrix, std: Optional[Matrix]):
+def normalize(mat: Matrix,
+              std: Optional[Matrix]) -> Tuple[np.ndarray, np.ndarray]:
+    """Matrix normalization per row taking into account the std. dev
+
+    Error propagation assuming gaussian error propagation.
+
+    Args:
+        mat (Matrix): input matrix
+        std (Matrix, optional): Standard deviation at each bin
+
+    Returns:
+        Values of normalized matrix and normalized standard deviation
+
+
+    """
     matrix = unumpy.uarray(mat.values, std.values if std is not None else None)
 
     # normalize each Ex row to 1 (-> get decay probability)

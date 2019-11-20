@@ -1,16 +1,13 @@
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-from typing import Callable, Union, List, Optional, Any, Tuple
-from pathlib import Path
+import os
+from typing import List, Optional, Any, Tuple
 from operator import xor
 import pandas as pd
-from random import sample
 import copy
 from itertools import repeat
 
-from .matrix import Matrix
 from .models import ResultsNormalized
 from .vector import Vector
 from .extractor import Extractor
@@ -18,22 +15,50 @@ from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .normalizer_simultan import NormalizerSimultan
 
+if 'JPY_PARENT_PID' in os.environ:
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
+
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 
 class EnsembleNormalizer:
-    """ Normalizes NLD nad γSF extracted from the ensemble
+    """Normalizes NLD nad γSF extracted from the ensemble
+
+    Usage:
+      The calling syntax can be either to normalize simultaneously::
+
+        EnsembleNormalizer(extractor=...,
+                           normalizer_simultan=...)
+
+      , or to normalize sequentially::
+
+          EnsembleNormalizer(extractor=...,
+                               normalizer_nld=...,
+                               normalizer_gsf=...)
 
     Attributes:
         extractor (Extractor): Extractor instance
+        normalizer_nld (NormalizerNLD): NormalizerNLD instance
+        normalizer_gsf (NormalizerGSF): NormalizerGSF instance
+        normalizer_simultan (NormalizerSimultan): NormalizerSimultan instance
+        res (List[ResultsNormalized]): List of the results
     """
 
     def __init__(self, *, extractor: Extractor,
                  normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None,
                  normalizer_simultan: Optional[NormalizerSimultan] = None):
-
+        """
+        Args:
+            extractor (Extractor): Extractor instance
+            normalizer_nld (NormalizerNLD, optional): NormalizerNLD instance
+            normalizer_gsf (NormalizerGSF, optional): NormalizerGSF instance
+            normalizer_simultan (NormalizerSimultan, optional):
+                NormalizerSimultan instance
+        """
         self.extractor = extractor
 
         self.normalizer_nld = normalizer_nld
@@ -101,7 +126,7 @@ class EnsembleNormalizer:
             res (ResultsNormalized): results (/parameters) of normalization
         """
         self.normalizer_nld.normalize(nld=nld, num=num)
-        self.normalizer_gsf.normalize(nld_normalizer=self.normalizer_nld,
+        self.normalizer_gsf.normalize(normalizer_nld=self.normalizer_nld,
                                       gsf=gsf)
 
         # same B for all normalizations of the same nld
@@ -115,8 +140,11 @@ class EnsembleNormalizer:
              n_plot: Optional[bool] = 5,
              **kwargs) -> Tuple[Any, Any]:
         """ Plots randomly drawn samples
+
         TODO:
-            - Could not find out how to not plot dublicate legend entries
+            - Refactor code
+            - Could not find out how to not plot dublicate legend entries,
+              thus using a workaround
             - Checks if extrapolating where nld or gsf is np.nan
         """
 

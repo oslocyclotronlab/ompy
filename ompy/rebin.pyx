@@ -135,17 +135,15 @@ def rebin_2D(double[:, :] counts, double[:] mids_in,
     the axis that is not being rebinned.
 
     Args:
-        counts: Matrix of counts to rebin
+        counts: (N,M) Array of counts  to rebin
         mids_in: Array of mid-bins energies of input
             matrix along rebin axis
         mids_out: Array of mid-bins energies of output
             matrix along rebin axis
         axis: Axis to rebin
+
     Returns:
         counts_out: Matrix of rebinned counts
-
-
-
     """
 
     # Define variables for Cython:
@@ -162,7 +160,7 @@ def rebin_2D(double[:, :] counts, double[:] mids_in,
 
     # Calculate shape of rebinned matrix and allocate it:
     shape = np.array([counts.shape[0], counts.shape[1]],
-                         dtype=int)
+                     dtype=int)
     shape[axis] = len(mids_out)
     counts_out = np.zeros(shape, dtype=DTYPE)
 

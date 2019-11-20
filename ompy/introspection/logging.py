@@ -32,7 +32,15 @@ def get_logger(name: str, level=logging.INFO):
 
 
 def available_loggers() -> List[str]:
-    """ Get all available OMpy loggers """
+    """ Get all available OMpy loggers
+
+    NOTE: The global logging space can be contaminated
+    by user input. To be sure which loggers are actually
+    available, run this function immediately after importing OMpy.
+
+    Returns:
+        List of available loggers
+    """
     # Is the code from cython source
     existing = logging.root.manager.loggerDict.keys()
     ompy_loggers = [k.split('.')[1] for k in existing

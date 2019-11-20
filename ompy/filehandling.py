@@ -6,20 +6,21 @@ import numpy as np
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 
-# from .matrix import Matrix
-
 
 def mama_read(filename: str) -> Union[Tuple[ndarray, ndarray],
                                       Tuple[ndarray, ndarray, ndarray]]:
-    """ Read 1d and 2d mama spectra/matrices
+    """Read 1d and 2d mama spectra/matrices
 
     Args:
         filename (str): Filename of matrix/spectrum
+
     Returns:
         2 or 3 eleement tuple containing
             - **counts** (*ndarray*): array of counts.
             - **x_array** (*ndarray*): mid-bin energies of x axis.
-            - **y_array** (*ndarray, optional*): Returned only if input is 2d. Mid-bin energies of y-axis.
+            - **y_array** (*ndarray, optional*): Returned only if input is 2d.
+                Mid-bin energies of y-axis.
+
     Raises:
         ValueError: If format is wrong, ie. if the calibrations line is
             not as expected.
@@ -283,16 +284,18 @@ def filetype_from_suffix(path: Path) -> str:
 
 def load_discrete(path: Union[str, Path], energy: ndarray,
                   resolution: float = 0.1) -> Tuple[ndarray, ndarray]:
-    """ Load discrete levels and apply smoothing
+    """Load discrete levels and apply smoothing
 
     Assumes linear equdistant binning
 
     Args:
-        path: The file to load
-        energy: The binning to use
-        resolution: The resolution to apply to the gaussian smoothing
+        path (Union[str, Path]): The file to load
+        energy (ndarray): The binning to use
+        resolution (float, optional): The resolution to apply to the gaussian
+            smoothing. Defaults to 0.1.
+
     Returns:
-        The binned energies and the smoothed binning
+        Tuple[ndarray, ndarray]
     """
     energies = np.loadtxt(path)
     energies /= 1e3  # convert to MeV

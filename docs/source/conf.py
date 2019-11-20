@@ -47,6 +47,7 @@ release = __full_version__
 # ones.
 extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.napoleon',
+              'sphinx_autodoc_typehints',  # needs to be loaded after napoelon
               'sphinx.ext.autosummary',
               'sphinx.ext.intersphinx',
               'sphinx.ext.viewcode',
@@ -108,9 +109,11 @@ pygments_style = 'friendly'
 # look like 'heading' rather than 'path/to/file:heading'
 autosectionlabel_prefix_document = True
 
-# autodoc_default_flags = ["members"]
+autodoc_default_flags = ["members"]
 autosummary_generate = True
 autosummary_imported_members = False
+
+automodsumm_inherited_members = True
 
 # remove typehints in signature
 # autodoc_typehints = "none"
@@ -125,6 +128,7 @@ todo_include_todos = True
 numpydoc_show_class_members = False
 
 napoleon_use_ivar = True
+
 
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),

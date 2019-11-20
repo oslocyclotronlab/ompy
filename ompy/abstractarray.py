@@ -6,6 +6,10 @@ from typing import Union, Tuple
 
 class AbstractArray:
     def __init__(self):
+        """ Abstract class for Matrix and Vector.
+
+        Do not initialize itself.
+        """
         raise NotImplementedError()
 
     def has_equal_binning(other: AbstractArray) -> bool:
@@ -13,7 +17,7 @@ class AbstractArray:
         raise NotImplementedError()
 
     def copy(self) -> AbstractArray:
-        """ Return a deepcopy of the class"""
+        """ Return a deepcopy of the class """
         return copy.deepcopy(self)
 
     def __sub__(self, other) -> AbstractArray:
@@ -91,6 +95,3 @@ class AbstractArray:
 
     def __setitem__(self, key, item):
         return self.values.__setitem__(key, item)
-
-if __name__ == "__main__":
-    print("hey")

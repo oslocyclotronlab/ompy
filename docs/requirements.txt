@@ -1,5 +1,6 @@
 sphinx>=2.1.2.
 sphinx-automodapi
+sphinx-autodoc-typehints
 nbsphinx
 nbsphinx-link
 mock

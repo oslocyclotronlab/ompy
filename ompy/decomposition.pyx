@@ -35,7 +35,9 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
 
     Returns:
         The first generation matrix
-    TODO: Is the indexing optimal?
+
+    TODO:
+        - Is the indexing optimal?
     """
     cdef:
         Py_ssize_t num_Ex = len(Ex)
@@ -126,46 +128,6 @@ def index(double[:] array, double element):
             prev_distance = distance
     return i
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.embedsignature(True)
-def chisquare_diagonal_with_zero(double[:, ::1] fact, double[:, ::1] fit,
-              double[:, ::1] std, double[::1] resolution,
-              double[::1] Eg, double[::1] Ex):
-    """ Computes χ² of two matrices
-
-    Exploits the diagonal resolution to do less computation
-
-    Args:
-        fact: The true matrix
-        fit: The candidate matrix
-        std: The standard deviation of the fit/fact
-        resolution: Array describing the resolution at
-            each element of the gamma energy Eg
-        Eg: The gamma energy
-        Ex: The excitation energy
-    Returns:
-        The value of χ²
-    """
-
-    cdef:
-        double chi = 0.0
-        double Eg_max
-        Py_ssize_t num_Eg = len(Eg)
-        Py_ssize_t num_Ex = len(Ex)
-        int i, j
-
-    for i in range(num_Ex):# prange(num_Ex, nogil=True, schedule='static'):
-        Eg_max = Ex[i] + resolution[i]
-        for j in range(num_Eg):
-            if Eg[j] > Eg_max:
-                break
-            if std[i, j] == 0:
-                chi = chi + (fact[i, j] - fit[i, j])**2
-            else:
-                chi = chi + (fact[i, j] - fit[i, j])**2/std[i, j]**2
-    return chi
-
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -206,14 +168,13 @@ def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
             chi = chi + (fact[i, j] - fit[i, j])**2/std[i, j]**2
     return chi
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
 def chisquare(double[:, ::1] fact, double[:, ::1] fit,
               double[:, ::1] std):
     """ Computes χ² of two matrices
-
-    Exploits the diagonal resolution to do less computation
 
     Args:
         fact: The true matrix

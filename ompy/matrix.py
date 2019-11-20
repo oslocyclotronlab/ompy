@@ -34,16 +34,15 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib import ticker
 from pathlib import Path
-from matplotlib.colors import LogNorm, Normalize, LinearSegmentedColormap
+from matplotlib.colors import LogNorm, Normalize
 from typing import (Dict, Iterable, Any, Union, Tuple,
-                    List, Sequence, Optional, Iterator)
+                    Sequence, Optional, Iterator)
 from .abstractarray import AbstractArray
-from .constants import DE_PARTICLE, DE_GAMMA_1MEV
 from .decomposition import index
-from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
+from .filehandling import (mama_read, mama_write,
                            save_numpy_2D, load_numpy_2D, save_tar, load_tar,
                            filetype_from_suffix)
-from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
+from .library import div0, fill_negative, diagonal_elements
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
 from .vector import Vector
@@ -53,7 +52,7 @@ logging.captureWarnings(True)
 
 
 class Matrix(AbstractArray):
-    """ Stores 2d array with energy axes (a matrix).
+    """Stores 2d array with energy axes (a matrix).
 
     Stores matrices along with calibration and energy axis arrays. Performs
     several integrity checks to verify that the arrays makes sense in relation
@@ -84,10 +83,11 @@ class Matrix(AbstractArray):
                      axis 1 of matrix
 
     Attributes:
-        matrix: 2D matrix storing the counting data
+        values: 2D matrix storing the counting data
         Eg: The gamma energy along the x-axis (mid-bin calibration)
         Ex: The excitation energy along the y-axis (mid-bin calibration)
         std: Array of standard deviations
+        path: Load a Matrix from a given path
         state: An enum to keep track of what has been done to the matrix
 
 
@@ -100,7 +100,6 @@ class Matrix(AbstractArray):
           the integrity of the matrix can be ensured.
     """
     def __init__(self,
-                 #values: Optional[Union[np.ndarray, Path]] = None,
                  values: Optional[np.ndarray] = None,
                  Eg: Optional[np.ndarray] = None,
                  Ex: Optional[np.ndarray] = None,
@@ -118,13 +117,14 @@ class Matrix(AbstractArray):
         for initialzing it with zero entries.
 
         Args:
-            <NAME>: Set `values` given an array-like object
-                or load values from file if given a Path-like object.
             values: Set the matrix' values.
             Eg: The gamma ray energies using midbinning.
             Ex: The excitation energies using midbinning.
             std: The standard deviations at each bin of `values`
-            path: Load a
+            path: Load a Matrix from a given path
+            shape: Tuple (len(Ex), len(Ex)) to create a matrix with 0 counts.
+            state: An enum to keep track of what has been done to the matrix.
+                Can also be a str. like in ["raw", "unfolded", ...]
 
         """
 
@@ -175,7 +175,7 @@ class Matrix(AbstractArray):
                 try:
                     diffdiff = diff - diff[1]
                     np.testing.assert_array_almost_equal(diffdiff,
-                            np.zeros_like(diff))
+                                                         np.zeros_like(diff))
                 except AssertionError:
                     raise ValueError("Ex array is not equispaced")
         if self.Ex is not None and self.Ex.ndim > 1:
@@ -202,7 +202,15 @@ class Matrix(AbstractArray):
 
     def load(self, path: Union[str, Path],
              filetype: Optional[str] = None) -> None:
-        """ Load vector from specified format
+        """ Load matrix from specified format
+
+        Args:
+            path (str or Path): path to file to load
+            filetype (str, optional): Filetype to load. Has an
+                auto-recognition.
+
+        Raises:
+            ValueError: If filetype is unknown
         """
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
@@ -222,10 +230,16 @@ class Matrix(AbstractArray):
                 raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
-        return None
-
     def save(self, path: Union[str, Path], filetype: Optional[str] = None):
-        """Save matrix to mama file
+        """Save matrix to file
+
+        Args:
+            path (str or Path): path to file to save
+            filetype (str, optional): Filetype to save. Has an
+                auto-recognition.
+
+        Raises:
+            ValueError: If filetype is unknown
         """
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
@@ -244,7 +258,8 @@ class Matrix(AbstractArray):
     def calibration(self) -> Dict[str, np.ndarray]:
         """ Calculates the calibration coefficients of the energy axes
 
-        Returns: The calibration coefficients in a dictionary.
+        Returns:
+            The calibration coefficients in a dictionary.
         """
         calibration = {
             "a0x": self.Ex[0],
@@ -254,21 +269,13 @@ class Matrix(AbstractArray):
         }
         return calibration
 
-    def calibration_array(self) -> np.ndarray:
-        """ Calculates the calibration coefficients of the energy axes
-
-        Returns: The calibration coefficients in an array.
-        """
-        return np.array(list(self.calibration().values()))
-
-    def plot(self, ax: Any = None,
+    def plot(self, *, ax: Any = None,
              title: Optional[str] = None,
              scale: Optional[str] = None,
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
              midbin_ticks: bool = False,
-             xlabel: Optional[str] = None,
-             ylabel: Optional[str] = None,
+             add_cbar: bool = True,
              **kwargs) -> Any:
         """ Plots the matrix with the energy along the axis
 
@@ -280,11 +287,12 @@ class Matrix(AbstractArray):
                 if number of counts > 1000
             vmin: Minimum value for coloring in scaling
             vmax Maximum value for coloring in scaling
-            xlabel (optional, str): Label on x-axis. Default see source.
-            ylabel (optional, str): Label on y-axis. Default see source.
+            add_cbar: Whether to add a colorbar. Defaults to True.
             kwargs: Additional kwargs to plot command.
+
         Returns:
             The ax used for plotting
+
         Raises:
             ValueError: If scale is unsupported
         """
@@ -295,6 +303,8 @@ class Matrix(AbstractArray):
         if scale is None:
             scale = 'log' if self.counts > 1000 else 'linear'
         if scale == 'log':
+            if vmin is not None and vmin <= 0:
+                raise ValueError("`vmin` must be positive for log-scale")
             norm = LogNorm(vmin=vmin, vmax=vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
@@ -325,14 +335,8 @@ class Matrix(AbstractArray):
         #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
-        if xlabel is None:
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
-        else:
-            ax.set_xlabel(xlabel)
-        if ylabel is None:
-            ax.set_ylabel(r"Excitation energy $E_{x}$")
-        else:
-            ax.set_ylabel(ylabel)
+        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
+        ax.set_ylabel(r"Excitation energy $E_{x}$")
 
         # show z-value in status bar
         # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
@@ -350,7 +354,6 @@ class Matrix(AbstractArray):
                 return f'x={x:1.0f}, y={y:1.0f}'
         ax.format_coord = format_coord
 
-
         if fig is not None:
             if vmin is not None and vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='both')
@@ -362,15 +365,14 @@ class Matrix(AbstractArray):
                 cbar = fig.colorbar(lines, ax=ax)
 
             # cbar.ax.set_ylabel("# counts")
-            plt.show()
+            # plt.show()
         return lines, ax, fig
 
-    def plot_projection(self, axis: int, Emin: float = None,
+    def plot_projection(self, axis: Union[int, str],
+                        Emin: float = None,
                         Emax: float = None, *, ax: Any = None,
                         normalize: bool = False,
-                        xlabel: Optional[str] = "Energy",
-                        ylabel: Optional[str] = None,
-                        scale: Optional[str]= None, **kwargs) -> Any:
+                        scale: str = 'linear', **kwargs) -> Any:
         """ Plots the projection of the matrix along axis
 
         Args:
@@ -379,37 +381,32 @@ class Matrix(AbstractArray):
             Emin: The minimum energy to be summed over.
             Emax: The maximum energy to be summed over.
             ax: The axes object to plot onto.
-            normalize: Whether or not to normalize the counts.
-            xlabel (optional, str): Label on x-axis. See source.
-            ylabel (optional, str): Label on y-axis. Default is `None`.
-            scale (optional, str): y-scale, i.e `log` or `linear`.
+            normalize: If True, normalize the counts to 1. Defaults to False.
+            scale (optional, str): y-scale, i.e `log` or `linear`. Defaults to
+                "linear".
             kwargs: Additional kwargs to plot command.
+
         Raises:
             ValueError: If axis is not in [0, 1]
+
         Returns:
             The ax used for plotting
-        TODO: Fix normalization
         """
         if ax is None:
             fig, ax = plt.subplots()
 
         axis = to_plot_axis(axis)
         is_Ex = axis == 1
-        projection, energy = self.projection(axis, Emin, Emax, normalize=normalize)
-
-        # Shift energy by a half bin to make the steps correct
-        #shifted_energy = energy + (energy[1] - energy[0])/2
+        projection, energy = self.projection(axis, Emin, Emax,
+                                             normalize=normalize)
         Vector(values=projection, E=energy).plot(ax=ax, **kwargs)
+
         if is_Ex:
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         else:
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
-        if xlabel is not None:  # overwrite the above
-            ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
 
-        if scale is not None:
-            ax.set_yscale(scale)
+        ax.set_yscale(scale)
 
         return ax
 
@@ -422,13 +419,13 @@ class Matrix(AbstractArray):
             axis: The axis to project onto. Can be 0 or 1.
             Emin (optional): The minimum energy to be summed over.
             Emax (optional): The maximum energy to be summed over.
-            normalize: Whether or not to normalize the counts.
-                       Defaults to False
+            normalize: If True, normalize the counts to 1. Defaults to False.
+
         Raises:
             ValueError: If axis is not in [0, 1]
+
         Returns:
             The projection and the energies summed onto
-        TODO: Fix normalization
         """
         axis = to_plot_axis(axis)
         if axis not in (0, 1):
@@ -452,8 +449,10 @@ class Matrix(AbstractArray):
         return projection, energy
 
     def ascii_plot(self, shape=(5, 5)):
-        """ Plots a rebinned ascii version of the matrix
+        """Plots a rebinned ascii version of the matrix
 
+        Args:
+            shape (tuple, optional): Shape of the rebinned matrix
         """
         values = np.unique(np.sort(self.values.flatten()))
         values = values[values > 0]
@@ -493,7 +492,8 @@ class Matrix(AbstractArray):
                 lowest energy. Inclusive.
             Emax: Higest energy to be included. Defaults to
                 highest energy. Inclusive.
-            inplace: Whether to make the cut in place or not.
+            inplace: If True make the cut in place. Otherwise return a new
+                matrix. Defaults to True
             Emin_inclusive: whether the bin containing the lower bin
                 should be included (True) or excluded (False).
                 Defaults to True.
@@ -548,7 +548,18 @@ class Matrix(AbstractArray):
         else:
             return Matrix(values_cut, Eg=Eg, Ex=Ex)
 
-    def cut_like(self, other, inplace=True) -> Optional[Matrix]:
+    def cut_like(self, other: Matrix,
+                 inplace: bool = True) -> Optional[Matrix]:
+        """ Cut a matrix like another matrix (according to energy arrays)
+
+        Args:
+            other (Matrix): The other matrix
+            inplace (bool, optional): If True make the cut in place. Otherwise
+                return a new matrix. Defaults to True
+
+        Returns:
+            Optional[Matrix]: If inplace is False, returns the cut matrix
+        """
         if inplace:
             self.cut('Ex', other.Ex.min(), other.Ex.max())
             self.cut('Eg', other.Eg.min(), other.Eg.max())
@@ -563,18 +574,17 @@ class Matrix(AbstractArray):
                      inplace: bool = True) -> Optional[Matrix]:
         """Cut away counts to the right of a diagonal line defined by indices
 
-        If no limits are provided, an automatic cut will be made.
         Args:
             E1: First point of intercept, ordered as (Eg, Ex)
             E2: Second point of intercept
             inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
+
         Returns:
-            The matrix with counts above diagonal removed if not inplace.
+            The matrix with counts above diagonal removed (if inplace is
+            False).
         """
-        if E1 is None and E2 is None:
-            mask = self.diagonal_mask()
-        elif E1 is None or E2 is None:
+        if E1 is None or E2 is None:
             raise ValueError("If either E1 or E2 is specified, "
                              "both must be specified and have same type")
         else:
@@ -589,17 +599,21 @@ class Matrix(AbstractArray):
 
     def line_mask(self, E1: Iterable[float],
                   E2: Iterable[float]) -> np.ndarray:
-        """Create a mask for above (True) and below (False) the line
+        """Create a mask for above (True) and below (False) a line
 
         Args:
             E1: First point of intercept, ordered as Ex, Eg
             E2: Second point of intercept
+
         Returns:
             The boolean array with counts below the line set to False
-        TODO: Write as a property with memonized output for unchanged matrix
 
-        NOTE: My method and Jørgen's method give 2 pixels difference
-              Probably because of how the interpolated line is drawn
+        TODO:
+            - Write as a property with memonized output for unchanged matrix
+
+        NOTE:
+            This method and Jørgen's original method give 2 pixels difference
+            Probably because of how the interpolated line is drawn
         """
         # Transform from energy to index basis
         # NOTE: Ex and Ey refers to x- and y-direction
@@ -745,26 +759,17 @@ class Matrix(AbstractArray):
         """
         return diagonal_elements(self.values)
 
-    def diagonal_resolution(self) -> np.ndarray:
-        return diagonal_resolution(self.Ex)
-
-    def diagonal_mask(self) -> np.ndarray:
-        # TODO Implement an arbitrary diagonal mask
-        dEg = np.repeat(diagonal_resolution(self.Ex), len(self.Eg))
-        dEg = dEg.reshape(self.shape)
-        Eg, Ex = np.meshgrid(self.Eg, self.Ex)
-        mask = np.zeros_like(self.values, dtype=bool)
-        mask[Eg >= Ex + dEg] = True
-        return mask
-
-    def fill_negative(self, window_size):
+    def fill_negative(self, window_size: int):
+        """ Wrapper for :func:`ompy.fill_negative` """
         self.values = fill_negative(self.values, window_size)
 
     def remove_negative(self):
+        """ Entries with negative values are set to 0 """
         self.values = np.where(self.values > 0, self.values, 0)
 
-    def fill_and_remove_negative(self, window_size):
-        """Temporary function to remove boilerplate"""
+    def fill_and_remove_negative(self, window_size: int):
+        """ Combination of :meth:`ompy.Matrix.fill_negative` and
+        :meth:`ompy.Matrix.remove_negative` """
         self.fill_negative(window_size=window_size)
         self.remove_negative()
 
@@ -776,7 +781,7 @@ class Matrix(AbstractArray):
     def index_Ex(self, E: float) -> int:
         """ Returns the closest index corresponding to the Ex value """
         return index(self.Ex, E)
-        #return np.abs(self.Ex - E).argmin()
+        # return np.abs(self.Ex - E).argmin()
 
     def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
         """ Returns the closest indices corresponding to the Eg value"""
@@ -843,8 +848,10 @@ class Matrix(AbstractArray):
         Args:
             other (Matrix): Matrix to compare to.
             kwargs: Additional kwargs to `np.allclose`.
+
         Returns:
             bool (bool): Returns `True` if both arrays are equal  .
+
         Raises:
             TypeError: If other is not a Matrix
             ValueError: If any of the bins in any of the arrays are not equal.
@@ -864,7 +871,6 @@ class Matrix(AbstractArray):
         result = self.copy()
         # cannot use has_equal_binning as we don't need the same
         # shape for Ex and Eg.
-        # Remember: R[incident <-> Ex, detected <-> Eg]
         if isinstance(other, Matrix):
             if len(self.Eg) != len(self.Ex):
                 raise ValueError("Must have equal number of energy bins.")
@@ -876,7 +882,8 @@ class Matrix(AbstractArray):
         result.values = result.values@other.values
         return result
 
-def to_plot_axis(axis: Any) -> int:
+
+def to_plot_axis(axis: Union[int, str]) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
@@ -885,6 +892,7 @@ def to_plot_axis(axis: Any) -> int:
     Returns:
         An int describing the axis in the basis of the plot,
         _not_ the values' dimension.
+
     Raises:
         ValueError if the axis is not supported
     """
@@ -903,14 +911,16 @@ def to_plot_axis(axis: Any) -> int:
         raise ValueError(f"Unrecognized axis: {axis}")
 
 
-def to_values_axis(axis: Any) -> int:
+def to_values_axis(axis: Union[int, str]) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:
         axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
+
     Returns:
         An int describing the axis in the basis of values,
         _not_ the plot's dimension.
+
     Raises:
         ValueError if the axis is not supported
     """
@@ -923,6 +933,7 @@ def to_values_axis(axis: Any) -> int:
     if axis == 2:
         return axis
     return (axis + 1) % 2
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):

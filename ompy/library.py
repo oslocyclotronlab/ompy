@@ -25,21 +25,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-import warnings
 import numpy as np
-import matplotlib.pyplot as plt
-from numpy import ndarray
-from matplotlib.colors import LogNorm
 from scipy.interpolate import interp1d, RectBivariateSpline
 import matplotlib
 from itertools import product
-from typing import Optional, Iterable, Union, List, Tuple, Iterator, Any
+from typing import Optional, Tuple, Iterator, Any
 import inspect
 import re
-
-from .constants import DE_PARTICLE, DE_GAMMA_8MEV, DE_GAMMA_1MEV
-
-
 
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
@@ -112,7 +104,7 @@ def E_array_from_calibration(a0: float, a1: float, *,
         raise ValueError("Either N or E_max must be given")
 
 
-def fill_negative(matrix, window_size):
+def fill_negative(matrix, window_size: int):
     """
     Fill negative channels with positive counts from neighbouring channels
 
@@ -120,10 +112,7 @@ def fill_negative(matrix, window_size):
     use a sliding window along the Eg axis, given by the FWHM, to look for
     neighbouring bins with lots of counts and then take some counts from there.
     Can we do something similar in an easy way?
-
-    Todo: Debug me!
     """
-    warnings.warn("Hello from the fill_negative() function. Please debug me.")
     matrix_out = np.copy(matrix)
     # Loop over rows:
     for i_Ex in range(matrix.shape[0]):
@@ -225,11 +214,12 @@ def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
 
     return matrix_out
 
+
 def log_interp1d(xx, yy, **kwargs):
     """ Interpolate a 1-D function.logarithmically """
     logy = np.log(yy)
     lin_interp = interp1d(xx, logy, kind='linear', **kwargs)
-    log_interp = lambda zz: np.exp(lin_interp(zz))
+    log_interp = lambda zz: np.exp(lin_interp(zz))  # noqa
     return log_interp
 
 
@@ -241,22 +231,8 @@ def call_model(fun,pars,pars_req):
         pcall = {p: pars[p] for p in pars_req}
         return fun(**pcall)
     else:
-        raise TypeError("Error: Need following arguments for this method: {0}".format(pars_req))
-
-
-def diagonal_resolution(Ex: np.ndarray) -> np.ndarray:
-    """ Calculate Ex-dependent detector resolution (sum of sqroot)
-    Args:
-        Ex: Excitation energy bin array
-    """
-    # Assume constant particle resolution:
-    dE_particle = DE_PARTICLE
-    # Interpolate the gamma resolution linearly:
-    dE_gamma = ((DE_GAMMA_8MEV - DE_GAMMA_1MEV) / (8000 - 1000)
-                * (Ex - 1000)) + DE_GAMMA_1MEV
-
-    dE_resolution = np.sqrt(dE_particle**2 + dE_gamma**2)
-    return dE_resolution
+        raise TypeError("Error: Need following arguments for this method:"
+                        " {0}".format(pars_req))
 
 
 def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
