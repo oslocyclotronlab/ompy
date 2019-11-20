@@ -46,6 +46,7 @@ from .filehandling import (mama_read, mama_write, save_numpy_1D, load_numpy_1D,
 from .library import div0, fill_negative, diagonal_resolution, diagonal_elements
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
+from .vector import Vector
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -398,12 +399,10 @@ class Matrix(AbstractArray):
 
         # Shift energy by a half bin to make the steps correct
         #shifted_energy = energy + (energy[1] - energy[0])/2
-
+        Vector(values=projection, E=energy).plot(ax=ax, **kwargs)
         if is_Ex:
-            ax.step(energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
         else:
-            ax.step(energy, projection, where='mid', **kwargs)
             ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
         if xlabel is not None:  # overwrite the above
             ax.set_xlabel(xlabel)
@@ -924,7 +923,6 @@ def to_values_axis(axis: Any) -> int:
     if axis == 2:
         return axis
     return (axis + 1) % 2
-
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):

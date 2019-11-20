@@ -9,7 +9,6 @@ from .filehandling import (load_numpy_1D, save_numpy_1D,
                            mama_read, mama_write,
                            filetype_from_suffix,
                            load_tar, save_tar)
-from .matrix import MeshLocator
 from .decomposition import index
 from .library import div0
 from .abstractarray import AbstractArray
@@ -89,27 +88,36 @@ class Vector(AbstractArray):
 
     def plot(self, ax: Optional[Any] = None,
              scale: str = 'linear',
-             xlabel: Optional[str] = "Energy",
-             ylabel: Optional[str] = None, **kwargs) -> Tuple[Any, Any]:
+             kind: str = 'line',
+             **kwargs) -> Tuple[Any, Any]:
         """ Plots the vector as a step graph
 
         Args:
             ax: The axis to plot onto.
             scale: The scale to use. Can be `linear`, `log`
                 `symlog` or `logit`.
-            xlabel (optional, str): Label on x-axis. Default is `"Energy"`.
-            ylabel (optional, str): Label on y-axis. Default is `None`.
+            kind (str):
+                - 'line' : line plot (default) evokes `ax.plot`
+                - 'plot' : same as 'line'
+                - 'step' : step plot
+        - 'bar' : vertical bar plot
             kwargs: Additional kwargs to plot command.
         Returns:
             The figure and axis used.
         """
         fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
-        ax.step(self.E, self.values, where='mid', **kwargs)
+        if kind in ["plot", "line"]:
+            kwargs.setdefault("markersize", "2")
+            ax.plot(self.E, self.values, "o-", **kwargs)
+        elif kind == "step":
+            kwargs.setdefault("where", "mid")
+            ax.step(self.E, self.values, **kwargs)
+        else:
+            raise NotImplementedError()
         # ax.xaxis.set_major_locator(MeshLocator(self.E))
         ax.set_yscale(scale)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        ax.set_xlabel("Energy")
 
         if self.std is not None:
             # TODO: Fix color
