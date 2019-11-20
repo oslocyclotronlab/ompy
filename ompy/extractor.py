@@ -296,7 +296,7 @@ class Extractor:
 
         # account for resolution
         iEgmax = matrix.index_Eg(matrix.Ex[-1] + resolution[-1])
-        lastEx[iEgmax:] = 0
+        lastEx[iEgmax+1:] = 0
 
         n_nan_gsf = (matrix.shape[1]-1) - np.nonzero(lastEx)[0][-1]
         Efirst_nld = matrix.Ex[-1] - matrix.Eg[-(1+n_nan_gsf)]
