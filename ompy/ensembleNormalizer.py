@@ -103,6 +103,11 @@ class EnsembleNormalizer:
         self.normalizer_nld.normalize(nld=nld, num=num)
         self.normalizer_gsf.normalize(nld_normalizer=self.normalizer_nld,
                                       gsf=gsf)
+
+        # same B for all normalizations of the same nld
+        B = self.normalizer_gsf.res.pars["B"]
+        N = self.normalizer_gsf.res.samples["A"]
+        self.normalizer_gsf.res.samples["B"] = np.full_like(N, B)
         return self.normalizer_gsf.res
 
     def plot(self, ax: Any = None,
@@ -110,9 +115,9 @@ class EnsembleNormalizer:
              n_plot: Optional[bool] = 5,
              **kwargs) -> Tuple[Any, Any]:
         """ Plots randomly drawn samples
-        TODO: Cleanup!
-        # TODO:
+        TODO:
             - Could not find out how to not plot dublicate legend entries
+            - Checks if extrapolating where nld or gsf is np.nan
         """
 
         if ax is None:

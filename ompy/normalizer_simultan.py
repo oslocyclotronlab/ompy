@@ -138,10 +138,20 @@ class NormalizerSimultan():
         if self.std_fake_gsf is True:
             self.std_fake_gsf = None
             gsf.std = None
+
         self.res.nld = nld.transform(self.res.pars["A"][0],
                                      self.res.pars["alpha"][0], inplace=False)
         self.res.gsf = gsf.transform(self.res.pars["B"][0],
                                      self.res.pars["alpha"][0], inplace=False)
+
+        self.normalizer_gsf.model_low.autorange(self.res.gsf)
+        self.normalizer_gsf.model_high.autorange(self.res.gsf)
+        self.normalizer_gsf.extrapolate(self.res.gsf)
+        self.res.gsf_model_low = self.normalizer_gsf.model_low
+        self.res.gsf_model_high = self.normalizer_gsf.model_high
+        for model in [self.res.gsf_model_low, self.res.gsf_model_high]:
+            model.shift_after = model.shift
+
 
     def initial_guess(self):
         """ Find an inital guess for normalization parameters
