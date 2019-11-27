@@ -243,7 +243,7 @@ class Extractor:
         if self.extend_fit_by_resolution:
             resolution = self.diagonal_resolution(matrix)
         else:
-            resolution = self.zeros_like(matrix.Ex)
+            resolution = np.zeros_like(matrix.Ex)
 
         if x0 is None:  # default initial guess
             nld0 = np.ones(E_nld.size)
