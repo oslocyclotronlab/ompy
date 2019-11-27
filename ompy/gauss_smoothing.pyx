@@ -129,8 +129,8 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
 
-    if len(fwhm) == 1:
-        fwhm = np.full_like(matrix_in, fwhm)
+    if type(fwhm) == float or type(fwhm) == int:
+        fwhm = np.full_like(E_array, float(fwhm))
 
     axis = to_plot_axis(axis)
     is_Eg = axis == 0
