@@ -432,7 +432,7 @@ class Normalizer:
 
         ax.set_yscale('log')
         ax.set_ylabel(r"$\rho(E_x) \quad [\mathrm{MeV}^{-1}]$")
-        ax.set_xlabel(r"E_x \quad [\mathrm{MeV}]$")
+        ax.set_xlabel(r"$E_x \quad [\mathrm{MeV}]$")
 
 
         if fig is not None:
