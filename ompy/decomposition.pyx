@@ -45,13 +45,15 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
         Py_ssize_t i_Ex
         int i_Eg, i_E_nld
         double Eg_max, E_f
+        double halfbin = (Eg[1]-Eg[0])/2
     firstgen = np.zeros((num_Ex, num_Eg), dtype=DTYPE)
     cdef double[:, ::1] firstgen_view = firstgen
 
     # Remember to change both loops simultaneously
     IF OPENMP:
         for i_Ex in prange(num_Ex, nogil=True, schedule='static'):
-            Eg_max = Ex[i_Ex] + resolution[i_Ex]
+            # + halfbin to get closest bin (when calib uses midbins)
+            Eg_max = Ex[i_Ex] + resolution[i_Ex] + halfbin
             i_Eg = 0
             while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
                 E_f = Ex[i_Ex] - Eg[i_Eg]
@@ -60,7 +62,8 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
                 i_Eg = i_Eg + 1
     ELSE:
         for i_Ex in range(num_Ex):
-            Eg_max = Ex[i_Ex] + resolution[i_Ex]
+            # + halfbin to get closest bin (when calib uses midbins)
+            Eg_max = Ex[i_Ex] + resolution[i_Ex] + halfbin
             i_Eg = 0
             while i_Eg < num_Eg and Eg[i_Eg] <= Eg_max:
                 E_f = Ex[i_Ex] - Eg[i_Eg]

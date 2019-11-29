@@ -37,9 +37,9 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
 
 ### OMpy package
 
-There are two main options on how to install OMpy. We will start off with our recommendation, that is with the `-e` flag is a local project in “editable” mode. This way, you will not have to reinstall ompy if you pull a new version from git or create any local changes yourself.
+There are two main options on how to install OMpy. We will start off with our recommendation, that is with the `-e` flag is a local project in “editable” mode. This way, you will *in principal* not have to reinstall ompy if you pull a new version from git or create any local changes yourself.
 
-Note: If you change any of the `cython` modules, you will have to reinstall/recompile anyways.
+Note: If you change any of the `cython` modules (`*.pyx` files), you will have to reinstall/recompile anyways. As they may have changed upstream, the easiest is probably if you install again every time you pull.
 ```bash
 pip install -e .
 ```
