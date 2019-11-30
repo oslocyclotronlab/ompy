@@ -30,12 +30,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-from typing import Callable, Union, List, Optional
+import os
+
+from typing import Callable, Union, List, Optional, Any, Tuple
 from pathlib import Path
+from numpy import ndarray
 from .matrix import Matrix
 from .rebin import rebin_2D
 from .action import Action
+
+if 'JPY_PARENT_PID' in os.environ:
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -58,7 +65,8 @@ class Ensemble:
             FirstGeneration for applying the first generation method
             to unfolded matrices. Only has to be callable
             with (unfolded: Matrix)
-        regenerate (Bool): Whether to regenerate the matrices.
+        regenerate (bool): If true, regenerate the matrices instead of
+            loading from `path`.
         std_raw (Matrix): The computed standard deviation of the raw ensemble.
         std_unfolded (Matrix): The computed standard deviation of the unfolded
             ensemble.
@@ -77,14 +85,15 @@ class Ensemble:
             generated firstgen matrix. Defaults to NOP.
 
 
-    TODO: Separate each step - generation, unfolded, firstgening?
-    TODO: (Re)generation with book keeping is a recurring pattern.
-        Try to abstract it away.
+    TODO:
+        - Separate each step - generation, unfolded, firstgening?
+        - (Re)generation with book keeping is a recurring pattern.
+          Try to abstract it away.
     """
     def __init__(self, raw: Optional[Matrix] = None,
                  bg: Optional[Matrix] = None,
-                 bg_ratio: Optional[float] = 1,
-                 path: Union[str, Path] = None):
+                 bg_ratio: float = 1,
+                 path: Optional[Union[str, Path]] = None):
         """ Sets up attributes and loads a saved ensemble if provided.
 
         Args:
@@ -103,8 +112,6 @@ class Ensemble:
         self.bg: Optional[Matrix] = bg
         self.bg_ratio: Optional[float] = bg_ratio
         self.prompt_w_bg: Optional[Matrix] = raw
-
-        self.raw.state = "raw"
 
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
@@ -127,14 +134,13 @@ class Ensemble:
         if path is not None:
             self.path = Path(path)
             self.path.mkdir(exist_ok=True)
-            try:
-                self.load()
-            except AssertionError:
-                pass
+            self.load()
         else:
             # Should the ensemble always try to load?
             self.path = Path('ensemble')
             self.path.mkdir(exist_ok=True)
+
+        self.raw.state = "raw"
 
     def load(self, path: Optional[Union[str, Path]] = None):
         """ Loads a saved ensamble
@@ -190,7 +196,8 @@ class Ensemble:
         """
         assert self.raw is not None, "Set the raw matrix"
         assert self.unfolder is not None, "Set unfolder"
-        assert self.first_generation_method is not None, "Set first generation method"
+        assert self.first_generation_method is not None, \
+            "Set first generation method"
 
         self.size = number
         self.regenerate = regenerate
@@ -251,11 +258,13 @@ class Ensemble:
         """Generate a perturbated matrix
 
         Looks for an already generated file before generating the matrix.
+
         Args:
             step: The identifier of the matrix to generate
             method: The name of the method to use. Can be either
                 "gaussian" or "poisson"
             state: Either "raw", "prompt+bg" or "bg".
+
         Returns:
             The generated matrix
         """
@@ -349,12 +358,9 @@ class Ensemble:
         """ Rebins the first generations matrixes and recals std
 
         Args:
-           axis: Which axis to rebin, "Eg" or "Ex"
            out_array: mid-bin energy calibration of output
                       matrix along rebin axis
            member: which member to rebin, currently only FG available
-
-
         """
         if member != 'firstgen':
             raise NotImplementedError("Not implemented for raw and unfolding "
@@ -552,7 +558,27 @@ class Ensemble:
             raise NotImplementedError(f"State {state} is not a known state")
         return matrix
 
-    def plot(self, ax=None):
+    def plot(self, *, ax: Any = None,
+             vmin: Optional[float] = None,
+             vmax: Optional[float] = None,
+             add_cbar: bool = True,
+             scale_by: str = 'all',
+             **kwargs) -> Tuple[Any, ndarray]:
+        """ Plot the computed standard deviations
+
+        Args:
+            ax (optional): A matplotlib axis to plot onto.
+            vmin (optional, float): The lower cutoff for colors.
+            vmax (optional, float): The upper cutoff for colors.
+            add_cbar (optional, bool): Whether to add a colorbar.
+                Defaults to True.
+            scale_by (optional, str): Which std matrix to set color
+                limits by. Can be "raw", "unfolded", "firstgen" or "all".
+                Defaults to "all".
+
+        Returns:
+            The matplotlib figure and axis
+        """
         if ax is not None:
             if len(ax) < 3:
                 raise ValueError("Three axes must be provided")
@@ -560,10 +586,45 @@ class Ensemble:
         else:
             fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)
 
-        self.std_raw.plot(ax=ax[0], title='Raw')
-        self.std_unfolded.plot(ax=ax[1], title='Unfolded')
-        self.std_firstgen.plot(ax=ax[2], title='First Generation')
+        extrema = lambda x: (np.min(x), np.max(x)) # noqa
+        choices = {"raw": extrema(self.std_raw.values),
+                   "unfolded": extrema(self.std_unfolded.values),
+                   "firstgen": extrema(self.std_firstgen.values)}
+        choices["all"] = extrema([v for v in choices.values()])
+        if scale_by not in choices:
+            raise ValueError(f"`scale_by` can not be {scale_by}")
+
+        vminset = True
+        if vmin is None:
+            vminset = False
+            vmin = choices[scale_by][0]
+            vmin = 1 if vmin <= 0 else vmin
+        vmaxset = True
+        if vmax is None:
+            vmaxset = False
+            vmax = choices[scale_by][1]
+
+        # Actual plotting
+        self.std_raw.plot(ax=ax[0], title='Raw', add_cbar=False,
+                          vmin=vmin, vmax=vmax, **kwargs)
+        self.std_unfolded.plot(ax=ax[1], title='Unfolded', add_cbar=False,
+                               vmin=vmin, vmax=vmax, **kwargs)
+        im, _, _ = self.std_firstgen.plot(ax=ax[2], title='First Generation',
+                               vmin=vmin, vmax=vmax, add_cbar=False, **kwargs)
+
+        # Y labels only clutter
         ax[1].set_ylabel(None)
         ax[2].set_ylabel(None)
+
+        # Handle the colorbar
+        if add_cbar:
+            if vminset and vmaxset:
+                fig.colorbar(im, extend='both')
+            elif vminset:
+                fig.colorbar(im, extend='min')
+            elif vmaxset:
+                fig.colorbar(im, extend='max')
+            else:
+                fig.colorbar(im)
         fig.suptitle("Standard Deviation")
         return fig, ax

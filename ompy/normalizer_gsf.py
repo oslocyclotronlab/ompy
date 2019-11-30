@@ -2,48 +2,88 @@ import logging
 import numpy as np
 import copy
 from numpy import ndarray
-from pathlib import Path
-from typing import Optional, Union, Tuple, Any, Callable
+from typing import Optional, Tuple, Any, Callable
 import matplotlib.pyplot as plt
 
-from .extractor import Extractor
-from .library import log_interp1d
-from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
+from .library import log_interp1d, self_if_none
+from .models import ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
-from .normalizer import Normalizer
+from .normalizer_nld import NormalizerNLD
 from .spinfunctions import SpinFunctions
 from .vector import Vector
 
 LOG = logging.getLogger(__name__)
 
 
-class NormalizerGSF(Normalizer):
-    def __init__(self, *, extractor: Optional[Extractor] = None,
-                 nld_normalizer: Optional[Normalizer] = None,
+class NormalizerGSF():
+
+    """Normalize γSF to a given` <Γγ> (Gg)
+
+    Normalizes nld/gsf according to the transformation eq (3), Schiller2000::
+
+        gsf' = gsf * B * np.exp(alpha * Eg)
+
+    Attributes:
+        gsf_in (Vector): gsf to normalize
+        nld (Vector): nld
+        normalizer_nld (NormalizerNLD): NormalizerNLD to retriev parameters.
+        nld_model (Callable[..., Any]): Model for nld above data of the
+            from `y = nld_model(E)`
+        alpha (float): tranformation parameter α
+        model_low (ExtrapolationModelLow): Extrapolation model for the gsf at
+            low energies (below data)
+        model_high (ExtrapolationModelHigh): Extrapolation model for the gsf at
+            high energies (above data)
+        norm_pars (NormalizationParameters): Normalization parameters like
+            experimental <Γγ>
+        method_Gg (str): Method to use for the <Γγ> integral
+        res (ResultsNormalized): Results
+
+    """
+
+    def __init__(self, *, normalizer_nld: Optional[NormalizerNLD] = None,
                  nld: Optional[Vector] = None,
                  nld_model: Optional[Callable[..., Any]] = None,
                  alpha: Optional[float] = None,
                  gsf: Optional[Vector] = None,
                  norm_pars: Optional[NormalizationParameters] = None,
-                 # discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = None) -> None:
+                 ) -> None:
         """
+        Note:
+            The prefered syntax is `Normalizer(nld=...)`
+            If neither is given, the nld (and other parameters) can be
+            explicity
+            be set later by::
 
-        TODO:
-            - Abstract away Normalizer
-            - check that norm_pars is set correctly
-            - by default, create "good" model_low and model_high
+                `normalizer.normalize(..., nld=...)`
+
+            or::
+
+                `normalizer.nld = ...`
+
+            In the later case you *might* have to send in a copy if it's a
+            mutable to ensure it is not changed.
+
+        Args:
+            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+                to retrieve parameters. If `nld` and/or `nld_model` are not set, they are taken from `normalizer_nld.res` in `normalize`.
+            nld (Optional[Vector], optional): NLD. If not set it is taken from
+                `normalizer_nld.res` in `normalize`.
+            nld_model (Optional[Callable[..., Any]], optional): Model for nld
+                above data of the from `y = nld_model(E)`. If not set it is
+                taken from `normalizer_nld.res` in `normalize`.
+            alpha (Optional[float], optional): tranformation parameter α
+            gsf (Optional[Vector], optional): gsf to normalize.
+            norm_pars (Optional[NormalizationParameters], optional):
+                Normalization parameters like experimental <Γγ>
 
         """
-        # super().__init__(extractor, nld, discrete, path)
-        self.extractor = extractor
-
         # use self._gsf internally, but separate from self._gsf
         # in order to not trasform self.gsf_in 2x, if normalize() is called 2x
         self.gsf_in = None if gsf is None else gsf.copy()
 
         self.nld = None if nld is None else nld.copy()
-        self.nld_normalizer = nld_normalizer
+        self.normalizer_nld = normalizer_nld
         self.nld_model = nld_model
         self.alpha = alpha if alpha is None else alpha
 
@@ -63,116 +103,101 @@ class NormalizerGSF(Normalizer):
 
         self.res: Optional[ResultsNormalized] = None
 
-    def normalize(self, *, extractor: Optional[Extractor] = None,
-                  nld_normalizer: Optional[Normalizer] = None,
-                  gsf: Optional[Vector] = None,
+    def normalize(self, *, gsf: Optional[Vector] = None,
+                  normalizer_nld: Optional[NormalizerNLD] = None,
                   alpha: Optional[float] = None,
                   nld: Optional[Vector] = None,
                   nld_model: Optional[Callable[..., Any]] = None,
-                  norm_pars: Optional[NormalizationParameters] = None
-                  # Gg: Optional[float] = None,  # or [Tuple[float, float]]
-                  # D0: Optional[float] = None # or [Tuple[float, float]]
-                  ):
-        """ Normalize gsf to a given <Γγ> (Gg)
+                  norm_pars: Optional[NormalizationParameters] = None,
+                  num: int = 0) -> None:
+        """Normalize gsf to a given <Γγ> (Gg). Saves results to `self.res`.
 
-        TODO:
-            - transform gsf before sending to extrapolation
-            - should we have `NormalizationParameters` as input instead of
-              all signle inputs?
-              Why do we need this: in a common optimization rutine, we want
-              to normalize the gsf given Gg, D0 (...). Need to make sure there
-              that we don't change the *actual* Gg, but only the parameter
-              point.
-            - self.extrapolate(gsf) should get the gsf of the extractor, if
-            an extractor is specified
-            - specify D0 and Gg here ? Otherwise delete the unused keywords
+        Args:
+            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+                to retrieve parameters. If `nld` and/or `nld_model` are not set, they are taken from `normalizer_nld.res` in `normalize`.
+            nld (Optional[Vector], optional): NLD. If not set it is taken from
+                `normalizer_nld.res` in `normalize`.
+            nld_model (Optional[Callable[..., Any]], optional): Model for nld
+                above data of the from `y = nld_model(E)`. If not set it is
+                taken from `normalizer_nld.res` in `normalize`.
+            alpha (Optional[float], optional): tranformation parameter α
+            gsf (Optional[Vector], optional): gsf to normalize.
+            norm_pars (Optional[NormalizationParameters], optional):
+                Normalization parameters like experimental <Γγ>
+            num (Optional[int], optional): Loop number, defaults to 0.
         """
         # Update internal state
         if gsf is None:
             gsf = self.gsf_in
-        extractor = self.reset(extractor, nonable=True)
-        nld_normalizer = self.reset(nld_normalizer, nonable=True)
-        alpha = self.reset(alpha, nonable=True)
-        nld = self.reset(nld, nonable=True)
-        nld_model = self.reset(nld_model, nonable=True)
-        norm_pars = self.reset(norm_pars)
-        self.norm_pars.verify()  # check that they have been set
+        assert gsf is not None, "Need to provide gsf as input"
 
-        if gsf is not None and extractor is not None:
-            raise ValueError("Cannot use both kewords simultaneously")
+        normalizer_nld = self.self_if_none(normalizer_nld, nonable=True)
 
-        # if several gsfs shall be normalized, get them from extractor
-        if extractor is not None:
-            assert nld_normalizer is not None,\
-                "If extractor is used, need to provide nld_normalizer, too"
-            gsfs = extractor.gsf
-            nlds = nld_normalizer.res.nld
-            assert len(gsfs) == len(nlds), \
-                "Extractor and nld_normalizer need to have same size"
-            nld_models = nld_normalizer.res.nld_model
-            alphas = [pars["alpha"][0] for pars in nld_normalizer.res.pars]
-            self.res = copy.deepcopy(nld_normalizer.res)
+        if nld is None:
+            LOG.debug("Setting nld from from normalizer_nld")
+            self.nld = normalizer_nld.res.nld
         else:
-            gsfs = [gsf]
-            if nld is None:
-                raise ValueError("Need to set either nld or extractor")
-            nlds = [nld]
-            if nld_model is not None:
-                nld_models = [nld_model]
-            else:
-                assert nld_normalizer is not None, \
-                    "Provide nld_model or nld_normalizer"
-                LOG.debug("Setting nld_model from nld_normalizer")
-                nld_models = [nld_normalizer.res.nld_model[0]]
-            if alpha is not None:
-                alphas = [alpha]
-            else:
-                assert nld_normalizer is not None, \
-                    "Provide alpha or nld_normalizer"
-                LOG.debug("Setting alpha from nld_normalizer")
-                alphas = [nld_normalizer.res.pars[0]["alpha"][0]]
+            self.nld = self.self_if_none(nld)
+
+        alpha = self.self_if_none(alpha, nonable=True)
+        if alpha is None:
+            LOG.debug("Setting alpha from from normalizer_nld")
+            alpha = normalizer_nld.res.pars["alpha"][0]
+        assert alpha is not None, \
+            "Provide alpha or normalizer_nld with alpha"
+
+        self.nld_model = self.self_if_none(nld_model, nonable=True)
+        if nld_model is None:
+            LOG.debug("Setting nld_model from from normalizer_nld")
+            self.nld_model = normalizer_nld.res.nld_model
+        assert alpha is not None, \
+            "Provide nld_model or normalizer_nld with nld_model"
+
+        self.norm_pars = self.self_if_none(norm_pars)
+        self.norm_pars.is_changed()  # check that they have been set
+
+        # ensure to rerun
+        if normalizer_nld is not None:
+            self.res = copy.deepcopy(normalizer_nld.res)
+        else:
             self.res = ResultsNormalized(name="Results NLD and GSF, stepwise")
 
-        # normalization
-        lists = zip(nlds, gsfs, nld_models, alphas)
-        for i, (nld, gsf, nld_model, alpha) in enumerate(lists):
-            LOG.info(f"Normalizing #{i}")
-            self._gsf = gsf.copy()  # make a copy as it will be transformed
-            gsf.to_MeV()
-            gsf = gsf.transform(alpha=alpha, inplace=False)
-            self._gsf = gsf
+        LOG.info(f"Normalizing #{num}")
+        self._gsf = gsf.copy()  # make a copy as it will be transformed
+        gsf.to_MeV()
+        gsf = gsf.transform(alpha=alpha, inplace=False)
+        self._gsf = gsf
 
-            self.nld = nld
-            self.nld_model = nld_model
+        self.model_low.autorange(gsf)
+        self.model_high.autorange(gsf)
+        self._gsf_low, self._gsf_high = self.extrapolate(gsf)
 
-            self.model_low.autorange(gsf)
-            self.model_high.autorange(gsf)
-            self._gsf_low, self._gsf_high = self.extrapolate(gsf)
+        # experimental Gg and calc. both in meV
+        B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
 
-            # experimental Gg and calc. both in meV
-            B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
+        # apply transformation and export results
+        self._gsf.transform(B_norm)
+        self.model_low.norm_to_shift_after(B_norm)
+        self.model_high.norm_to_shift_after(B_norm)
 
-            # apply transformation and export results
-            self._gsf.transform(B_norm)
-            self.model_low.norm_to_shift_after(B_norm)
-            self.model_high.norm_to_shift_after(B_norm)
-
-            # save results
-            self.res.gsf.append(self._gsf)
-            self.res.gsf_model_low.append(copy.deepcopy(self.model_low))
-            self.res.gsf_model_high.append(copy.deepcopy(self.model_high))
-            if len(self.res.pars) > 0:
-                self.res.pars[i]["B"] = B_norm
-            else:
-                self.res.pars.append({"B": B_norm})
+        # save results
+        self.res.gsf = self._gsf
+        self.res.gsf_model_low = copy.deepcopy(self.model_low)
+        self.res.gsf_model_high = copy.deepcopy(self.model_high)
+        if len(self.res.pars) > 0:
+            self.res.pars["B"] = B_norm
+        else:
+            self.res.pars = {"B": B_norm}
 
     def extrapolate(self,
-                    gsf: Optional[Vector] = None) -> Tuple[Vector, Vector]:
+                    gsf: Optional[Vector] = None,
+                    E: Optional[np.ndarray] = [None, None]) -> Tuple[Vector, Vector]:
         """ Extrapolate gsf using given models
 
         Args:
             gsf (Optional[Vector]): If extrapolation is fit, it will be fit to
                 this vector. Default is `self._gsf`.
+            E (optional): extrapolation energies [Elow, Ehigh]
         Returns:
             The extrapolated gSF-vectors on the form
             [low region, high region]
@@ -188,13 +213,13 @@ class NormalizerGSF(Normalizer):
             self.model_high.fit(gsf)
 
         LOG.debug("Extrapolating low: %s", self.model_low)
-        extrapolated_low = self.model_low.extrapolate(scaled=False)
+        extrapolated_low = self.model_low.extrapolate(scaled=False, E=E[0])
 
         LOG.debug("Extrapolating high: %s", self.model_high)
-        extrapolated_high = self.model_high.extrapolate(scaled=False)
+        extrapolated_high = self.model_high.extrapolate(scaled=False, E=E[1])
         return extrapolated_low, extrapolated_high
 
-    def Gg_before_norm(self):
+    def Gg_before_norm(self) -> float:
         """ Compute <Γγ> before normalization
 
         Returns:
@@ -210,49 +235,50 @@ class NormalizerGSF(Normalizer):
             NotImplementedError(f"Chosen normalization {self.method_Gg}"
                                 "method is not known.")
 
-    def Gg_standard(self):
+    def Gg_standard(self) -> float:
         """ Compute normalization from <Γγ> (Gg) integral, the "standard" way
 
         Equals "old" (normalization.f) version in the Spin sum get the
         normaliation, see eg. eq (21) and (26) in Larsen2011; but converted
         T to gsf.
+
         Assumptions: s-wave (current implementation) and equal parity
 
+        .. parsed-literal:: # better format in shpinx
+            To derive the calculations, we start with
+            <Γγ(E,J,π)> = 1/(2π ρ(E,J,π)) ∑_XL ∑_Jf,πf ∫dEγ 2π Eγ³ gsf(Eγ)
+                                                            * ρ(E-Eγ, Jf, πf)
+
+            which leads to (eq 26)**
+
+            <Γγ> = 1 / (4π ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ 2π Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum
+                 = 1 / (2  ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ    Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum
+                (= 1 / (ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(π) )
+                (= D0 1 ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(π) )
+
+            where the integral runs from 0 to Sₙ, and the spinsum selects the
+            available spins in dippole decays j=[-1,0,1]:
+            spinsum = ∑ⱼ g(Sₙ-Eγ, Jₜ± ½+j).
+
+            and <Gg> is a shorthand for <Γγ(Sₙ, Jₜ± ½, πₜ)>
+            <Γγ(Sₙ, Jₜ± ½, πₜ)> =    <<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>>
+                                ≃ ½ * (<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>)
+            [but I'm challenged to derive "additivee" 1/ρ part; this is
+             probably an approximation, although a *equal sign* is used in the
+             article]
+
+            We can obtain ρ(Sₙ, Jₜ± ½, πₜ) from eq(19) via D0:
+            ρ(Sₙ, Jₜ± ½, πₜ) = ρ(Sₙ, Jₜ+ ½, πₜ) + ρ(Sₙ, Jₜ+ ½, πₜ) = 1/D₀
+                             = ½ (ρ(Sₙ, Jₜ+ ½) + ρ(Sₙ, Jₜ+ ½))  [equi-parity]
+
+            Equi-parity means further that g(J,π) = 1/2 * g(J), for the calc.
+            above: spinsum(π) =  1/2 * spinsum.
+
+            ** We set B to 1, so we get the <Γγ> before normalization. The
+            normalization B is then `B = <Γγ>_exp/ <Γγ>_cal`
+
         Returns:
-            Tuple[norm, ] (float, float): normalization
-
-        Note:
-        To derive the calculations, we start with
-        <Γγ(E,J,π)> = 1/(2π ρ(E,J,π)) ∑_XL ∑_Jf,πf ∫dEγ 2π Eγ³ gsf(Eγ)
-                                                        * ρ(E-Eγ, Jf, πf)
-
-        which leads to (eq 26)**
-
-        <Γγ> = 1 / (4π ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ 2π Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum
-             = 1 / (2  ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ    Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum
-            (= 1 / (ρ(Sₙ, Jₜ± ½, πₜ)) ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(π) )
-            (= D0 1 ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(π) )
-
-        where the integral runs from 0 to Sₙ, and the spinsum selects the
-        available spins in dippole decays j=[-1,0,1]:
-        spinsum = ∑ⱼ g(Sₙ-Eγ, Jₜ± ½+j).
-
-        and <Gg> is a shorthand for <Γγ(Sₙ, Jₜ± ½, πₜ)>
-        <Γγ(Sₙ, Jₜ± ½, πₜ)> =    <<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>>
-                            ≃ ½ * (<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>)
-        [but I'm challenged to derive "additivee" 1/ρ part; this is
-         probably an approximation, although a *equal sign* is used in the
-         article]
-
-        We can obtain ρ(Sₙ, Jₜ± ½, πₜ) from eq(19) via D0:
-        ρ(Sₙ, Jₜ± ½, πₜ) = ρ(Sₙ, Jₜ+ ½, πₜ) + ρ(Sₙ, Jₜ+ ½, πₜ) = 1/D₀
-                         = ½ (ρ(Sₙ, Jₜ+ ½) + ρ(Sₙ, Jₜ+ ½))  [equi-parity]
-
-        Equi-parity means further that g(J,π) = 1/2 * g(J), for the calc.
-        above: spinsum(π) =  1/2 * spinsum.
-
-        ** We set B to 1, so we get the <Γγ> before normalization. The
-        normalization B is then `B = <Γγ>_exp/ <Γγ>_cal`
+            Calculated Gg from gsf and nld
         """
 
         def wnld(E) -> ndarray:
@@ -278,12 +304,15 @@ class NormalizerGSF(Normalizer):
         return Gg
 
     def spin_dist(self, Ex, J):
-        """ Wrapper for `SpinFunctions` curried with model and pars """
+        """
+        Wrapper for :meth:`ompy.SpinFunctions` curried with model and pars
+        """
         return SpinFunctions(Ex=Ex, J=J,
                              model=self.norm_pars.spincutModel,
                              pars=self.norm_pars.spincutPars).distibution()
 
     def SpinSum(self, Ex, J):
+        """ Sum of spin distributions of the available states """
         spin_dist = self.spin_dist
         if J == 0:
             # if(J == 0.0) I_i = 1/2 => I_f = 1/2, 3/2
@@ -309,81 +338,68 @@ class NormalizerGSF(Normalizer):
         else:
             ValueError("Negative J not supported")
 
-    # def errfn(x: float, nld_low: Vector,
-    #       nld_high: Vector, discrete: Vector,
-    #       model: Callable[..., ndarray]) -> float:
-    #     """ Compute the χ² of the normalization fitting NLD and gsf simultan
-
-    #     Args:
-    #         x: The arguments ordered as A, alpha, T and D0
-    #         nld_low: The lower region where discrete levels will be
-    #             fitted.
-    #         nld_high: The upper region to fit to model.
-    #         discrete: The discrete levels to be used in fitting the
-    #             lower region.
-    #         model: The model to use when fitting the upper region.
-    #             Must support the keyword arguments:
-    #                 model(T=..., D0=..., E=...) -> ndarray
-    #     Returns:
-    #         The χ² value
-    #     """
-    #     A, alpha, T, D0 = x[:4]
-    #     transformed_low = nld_low.transform(A, alpha, inplace=False)
-    #     transformed_high = nld_high.transform(A, alpha, inplace=False)
-
-    #     err_low = transformed_low.error(discrete)
-    #     expected = model(T=T, D0=D0, E=transformed_high.E)
-    #     err_high = transformed_high.error(expected)
-    #     return err_low + err_high
-
-    def plot(self, ax: Any = None,
-             add_legend: bool = True) -> Tuple[Any, Any]:
-        """ Plot the gsf and extrapolation normalization
+    def plot(self, ax: Optional[Any] = None, *,
+             add_label: bool = True,
+             add_figlegend: bool = True,
+             plot_fitregion: bool = True,
+             results: Optional[ResultsNormalized] = None,
+             reset_color_cycle: bool = True,
+             **kwargs) -> Tuple[Any, Any]:
+        """Plot the gsf and extrapolation normalization
 
         Args:
-            ax: The matplotlib axis to plot onto
-            add_legend (bool): Whether to add a legend. Workaround
-                for `plot_interactive`.
-        Returns:
-            The figure and axis created if no ax is supplied.
+            ax (optional): The matplotlib axis to plot onto. Creates axis
+                is not provided
+            add_label (bool, optional): Defaults to `True`.
+            add_figlegend (bool, optional):Defaults to `True`.
+            plot_fitregion (Optional[bool], optional): Defaults to `True`.
+            results (ResultsNormalized, optional): If provided, gsf and model
+                are taken from here instead.
+            reset_color_cycle (Optional[bool], optional): Defaults to `True`
+            **kwargs: Additional keyword arguments
 
-        TODO:
-            plot model for each member
+        Returns:
+            fig, ax
         """
+
         if ax is None:
             fig, ax = plt.subplots()
         else:
             fig = ax.figure
 
-        mylist = zip(self.res.gsf, self.res.gsf_model_low,
-                     self.res.gsf_model_high)
-        for i, (gsf, model_low, model_high) in enumerate(mylist):
-            label_gsf = "normalized" if i == 0 else None
-            label_model = "model" if i == 0 else None
-            label_limits = "fit_limits" if i == 0 else None
-            gsf.plot(ax=ax, c='k', alpha=1/len(self.res.gsf),
-                     label=label_gsf)
+        if reset_color_cycle:
+            ax.set_prop_cycle(None)
+        res = self.res if results is None else results
+        gsf = res.gsf
+        model_low = res.gsf_model_low
+        model_high = res.gsf_model_high
 
-            # extend the plotting range to the fit range
-            xplot = np.linspace(model_low.Emin, model_low.Efit[1])
-            gsf_low = model_low.extrapolate(xplot)
-            xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
-            gsf_high = model_high.extrapolate(xplot)
+        label_gsf = "exp." if add_label else None
+        label_model = "model" if add_label else None
+        label_limits = "fit limits" if add_label else None
+        gsf.plot(ax=ax, label=label_gsf, **kwargs)
 
-            gsf_low.plot(ax=ax, c='g', linestyle="--", label=label_model,
-                         alpha=1/len(self.res.gsf))
-            gsf_high.plot(ax=ax, c='g', linestyle="--",
-                          alpha=1/len(self.res.gsf))
+        # extend the plotting range to the fit range
+        xplot = np.linspace(model_low.Emin, model_low.Efit[1])
+        gsf_low = model_low.extrapolate(xplot)
+        xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
+        gsf_high = model_high.extrapolate(xplot)
 
-            if i == 0:
-                ax.axvspan(model_low.Efit[0], model_low.Efit[1],
-                           color='grey', alpha=0.1, label=label_limits)
-                ax.axvspan(model_high.Efit[0], model_high.Efit[1],
-                           color='grey', alpha=0.1)
+        gsf_low.plot(ax=ax, c='g', linestyle="--",
+                     markersize=0, label=label_model,
+                     **kwargs)
+        gsf_high.plot(ax=ax, c='g', linestyle="--",
+                      markersize=0, **kwargs)
+
+        if plot_fitregion:
+            ax.axvspan(model_low.Efit[0], model_low.Efit[1],
+                       color='grey', alpha=0.1, label=label_limits)
+            ax.axvspan(model_high.Efit[0], model_high.Efit[1],
+                       color='grey', alpha=0.1)
 
         ax.set_yscale('log')
 
-        if fig is not None and add_legend:
+        if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
 
         return fig, ax
@@ -391,10 +407,12 @@ class NormalizerGSF(Normalizer):
     def plot_interactive(self):
         """ Interactive plot to study the impact of different fit regions
 
-        Note: This implementation is not the fastest, however helped to reduce
-              the code quite a lot compared to `slider_update`
+        Note:
+            - This implementation is not the fastest, however helped to reduce
+                the code quite a lot compared to `slider_update`
         """
         from ipywidgets import interact
+        from ipywidgets.widgets import SelectionRangeSlider
 
         self.normalize()  # maybe not needed here
         fig, ax = self.plot()
@@ -402,20 +420,34 @@ class NormalizerGSF(Normalizer):
         xlim = ax.get_xlim()
 
         if self.model_low.method == "fit":
-            def update(Efit_low0, Efit_low1, Efit_high0, Efit_high1):
+            energies = [x for x in self._gsf.E]
+            options = [(x, x) for x in energies]
+            defaults = [self._gsf.index(self.model_low.Efit[0]),
+                        self._gsf.index(self.model_low.Efit[1])]
+            slider_low = SelectionRangeSlider(options=options,
+                                              index=defaults,
+                                              description='Elow',
+                                              disabled=False)
+            energies = [x for x in self._gsf.E]
+            options = [(x, x) for x in energies]
+            defaults = [self._gsf.index(self.model_high.Efit[0]),
+                        self._gsf.index(self.model_high.Efit[1])]
+            slider_high = SelectionRangeSlider(options=options,
+                                               index=defaults,
+                                               description='Ehigh',
+                                               disabled=False)
+
+            def update(slider_low, slider_high):
                 ax.cla()
-                self.model_low.Efit = [Efit_low0, Efit_low1]
-                self.model_high.Efit = [Efit_high0, Efit_high1]
+                self.model_low.Efit = slider_low
+                self.model_high.Efit = slider_high
                 self.normalize()
-                self.plot(ax=ax, add_legend=False)
+                self.plot(ax=ax, add_figlegend=False)
                 ax.set_ylim(ylim)
                 ax.set_xlim(xlim)
 
             interact(update,
-                     Efit_low0=self.model_low.Efit[0],
-                     Efit_low1=self.model_low.Efit[1],
-                     Efit_high0=self.model_high.Efit[0],
-                     Efit_high1=self.model_high.Efit[1])
+                     slider_low=slider_low, slider_high=slider_high)
 
         elif self.model_low.method == "fix":
             def update(scale_low, shift_low, scale_high, shift_high):
@@ -425,7 +457,7 @@ class NormalizerGSF(Normalizer):
                 self.model_high.scale = scale_high
                 self.model_high.shift = shift_high
                 self.normalize()
-                _, _, legend = self.plot(ax=ax, add_legend=False)
+                _, _, legend = self.plot(ax=ax, add_figlegend=False)
                 ax.set_ylim(ylim)
                 ax.set_xlim(xlim)
 
@@ -443,9 +475,14 @@ class NormalizerGSF(Normalizer):
         chi2 = chi2**2
         return chi2
 
+    def self_if_none(self, *args, **kwargs):
+        """ wrapper for lib.self_if_none """
+        return self_if_none(self, *args, **kwargs)
+
 
 def fnld(E: ndarray, nld: Vector,
          nld_model: Callable) -> ndarray:
+    """ Function composed of nld and model, providing y = nld(E) """
     fexp = log_interp1d(nld.E, nld.values)
 
     conds = [E <= nld.E[-1], E > nld.E[-1]]
@@ -454,6 +491,7 @@ def fnld(E: ndarray, nld: Vector,
 
 def fgsf(E: ndarray, gsf: Vector,
          gsf_low: Vector, gsf_high: Vector) -> ndarray:
+    """ Function composed of gsf and model, providing y = gsf(E) """
     exp = log_interp1d(gsf.E, gsf.values)
     ext_low = log_interp1d(gsf_low.E, gsf_low.values)
     ext_high = log_interp1d(gsf_high.E, gsf_high.values)

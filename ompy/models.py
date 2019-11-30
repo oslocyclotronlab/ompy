@@ -1,4 +1,7 @@
 import numpy as np
+import re
+import pickle
+from pathlib import Path
 from dataclasses import dataclass, field, fields
 from typing import Optional, Union, Tuple, Any, Dict, Callable, List
 from scipy.optimize import curve_fit
@@ -12,37 +15,79 @@ def NonTuple2():
 
 @dataclass()
 class Model:
+    """Dataclass for Model
+
+    Attributes:
+        Name: Name of the class (for printing etc.)
+    """
+
     name: str
     __isfrozen: bool = False
 
-    def verify(self, include: Optional[List[str]] = None,
-               exclude: Optional[List[str]] = []) -> None:
-        """ Verify that defaults have been changed
+    def get_parameters(self) -> List[str]:
+        """ Returns a list of the names of the paramters """
+        parameters = [p for p in self.__dict__.keys()
+                      if "__" not in p]
+        return parameters
+
+    def is_changed(self, include: List[str] = [],
+                   exclude: List[str] = []) -> None:
+        """Verify that defaults arguments have been changed
 
         Args:
-            include (Optional[List[str]]): List of attribute names be
+            include (List[str], optional): List of attribute names be
                 included in the check. Default is all attributes.
-            exclude (Optional[List[str]]): List of attribute names to exclude
-                be excluded from check. Default is None ([]).
+            exclude (List[str], optional): List of attribute names to exclude
+                be excluded from check. Default is none
+
+        Raises:
+            ValueError: If parameters are still the default values
         """
-        if include is None:
-            include = self.__dict__.items()
+        include = include if include else self.get_parameters()
+        keys = [k for k in include if k not in exclude]
 
-        for name, val in include:
+        for key in keys:
             # exception for self._Emax: call self.Emax
-            if name[0] == "_" and name != "_Model__isfrozen":
-                name = name[1:]
-                val = getattr(self, name)
+            if key.startswith("_"):
+                key = key[1:]
 
-            if val in exclude:
-                continue
+            val = getattr(self, key)
             if val is None:
                 raise ValueError(f"Model `{self.name}` has default (None) "
-                                 f"variable `{name}`.")
+                                 f"variable `{key}`.")
             if isinstance(val, list):
-                if len(val) == 0 or None in val:
-                    raise ValueError(f"Model `{self.name}` has default (None) "
-                                     f"variable `{name}`.")
+                if not val or None in val:
+                    raise ValueError(f"Model `{self.name}` has default [] "
+                                     f"or `None` in variable `{name}`.")
+
+    def save(self, path: Union[str, Path]) -> None:
+        """Save the model parameters to `path`
+
+        Args:
+            path (Union[str, Path]): The path
+        """
+        path = Path(path)
+        with path.open('wb') as fopen:
+            pickle.dump(self, fopen, -1)
+
+    def load(self, path: Union[str, Path]) -> None:
+        """Loads own parameters from `path`
+
+        Args:
+            path (Union[str, Path]): Path to pickled file
+
+        Raises:
+            IOError: Path doesn't exist
+        """
+        path = Path(path)
+
+        if not path.exists():
+            raise IOError(f"The path {path} does not exist.")
+
+        with path.open('rb') as fin:
+            obj = pickle.load(fin)
+        for k in obj.get_parameters():
+            setattr(self, k, getattr(obj, k))
 
     def __setattr__(self, attr, value) -> None:
         if self.__isfrozen and not hasattr(self, attr):
@@ -72,6 +117,8 @@ class Model:
 def gettype(signature):
     signature = str(signature)
     signature = signature.replace('typing.', '')
+    # Remove nested types types
+    signature = re.sub(r"\w+\.", '', signature)
     if signature[0] == "<":
         return signature.split("'")[1]
     return signature
@@ -79,6 +126,28 @@ def gettype(signature):
 
 @dataclass
 class AbstractExtrapolationModel(Model):
+    """Abstract class for extrapolation models
+
+    Attributes:
+        scale (float): Exponential scaling Exp[scale*Eg + shift]
+            before normalization in MeV^-1
+        shift (float): Exponential shift Exp[scale*Eg + shift]
+            before normalization
+        shift_after (float): Exponential shift Exp[scale*Eg + shift]'
+            after normalization
+        Emin (float, optional): Minimal gamma energy to extrapolate from in MeV
+        Emax (float, optional): Maximal gamma energy to extrapolate from in MeV
+        steps (float, optional): Number of gamma energies to use in
+            extrapolation. Defaults to 1001.
+        method (float): Method to obtain `scale` and `shift`. Must be in
+            either ["fit", "fix"]
+        model (Callable[..., Any]): If `method` is `"fit"`, the model to fit
+            to the data has to be provided
+        Efit (Tuple[float, float]): Fit range (lower, higher).
+
+        TODO:
+            - allow for more flexible (more general) models.
+    """
     scale: float = field(default=1.0,
             metadata='Exponential scaling Exp[scale*Eg + shift]'
                      'before normalization in MeV^-1')  # noqa
@@ -105,6 +174,7 @@ class AbstractExtrapolationModel(Model):
                     metadata='Fit range')  # noqa
 
     def range(self) -> np.ndarray:
+        """Linearly spaced array from Emin to Emax """
         return np.linspace(self.Emin, self.Emax, self.steps)
 
     @property
@@ -139,11 +209,18 @@ class AbstractExtrapolationModel(Model):
             Emax: Optional[float] = None) -> None:
         """Fits parameters of `model` to the given gsf
 
+        Optional parameters are detemined from the instance attributes if
+        not provided.
+        Results are stored in the instance attributes.
+
         Args:
-            gsf (Vector): Description
-            model (Optional[float], optional): Description
-            Emin (Optional[float], optional): Description
-            Emax (Optional[float], optional): Description
+            gsf (Vector): gsf
+            model (float, optional): model to fit
+            Emin (float, optional): Lower limit on the fit range
+            Emax (float, optional): Higher limit on the fit range
+
+        TODO:
+            - allow for more flexible (more general) models.
         """
         if model is None:
             model = self.model
@@ -173,8 +250,9 @@ class AbstractExtrapolationModel(Model):
         """ Wrapper to extrapolate a model
 
         Args:
-            E (optional): extrapolation energies
+            E (optional): extrapolation energies. If not
             scaled (optional): If gsf is normalized, use same scaling
+
         Returns:
             The extrapolated values
         """
@@ -305,31 +383,54 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
 
 @dataclass
 class NormalizationParameters(Model):
+    """Storage for normalization parameters + some convenience functions
+    """
+
+    #: Average s-wave resonance spacing D0 [eV]
     D0: Optional[Tuple[float, float]] = field(default=None,
             metadata='Average s-wave resonance spacing D0 [eV]')  # noqa
+    #: Total average radiative width  [meV]
     Gg: Optional[Tuple[float, float]] = field(default=None,
             metadata='Total average radiative width  [meV]')  # noqa
+    #: Neutron separation energy [MeV]
     Sn: Optional[Tuple[float, float]] = field(default=None,
             metadata='Neutron separation energy [MeV]')  # noqa
+    #: "Target" (A-1 nucleus) ground state spin
     Jtarget: Optional[float] = field(default=None,
             metadata='"Target" (A-1 nucleus) ground state spin')  # noqa
+    #: Min energy to integrate <Γγ> from
     Emin: float = field(default=0.0,
-            metadata="Min energy to integrate from")  # noqa
+            metadata="Min energy to integrate <Γγ> from")  # noqa
+    #: Max energy to integrate <Γγ> to
     _Emax: float = field(default=None,
-            metadata="Max energy to integrate to")  # noqa
+            metadata="Max energy to integrate <Γγ> to")  # noqa
+    #: Number of steps in energy grid
     steps: int = field(default=101,
             metadata="Number of steps in energy grid")  # noqa
+    #: Spincut model
     spincutModel: str = field(default=None,
             metadata='Spincut model')  # noqa
+    #: Parameters necessary for the spin cut model
     spincutPars: Dict[str, Any] = field(default=None,
             metadata='parameters necessary for the spin cut model')  # noqa
 
-    def E_grid(self, retstep: bool = True) -> np.ndarray:
+    def E_grid(self,
+               retstep: bool = True) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+        """Wrapps np.linspace creates linearly spaced array from Emin to Emax
+
+        Args:
+            retstep (bool, optional): If `True` (default), returns stepsize
+
+        Returns:
+            Samples of the array. If `retstep` is `True`, returns also spacing
+            between the samples.
+        """
         return np.linspace(self.Emin, self.Sn[0], num=self.steps,
                            retstep=retstep)
 
     @property
     def Emax(self) -> float:
+        """ Max energy to integrate <Γγ> to """
         if self._Emax is None:
             return self.Sn[0]
         else:
@@ -343,17 +444,35 @@ class NormalizationParameters(Model):
 
 @dataclass
 class ResultsNormalized(Model):
+    """Class to store the results of the Oslo Method
+
+    Attributes:
+        nld: see below
+        gsf: see below
+        pars: see below
+        samples: see below
+        nld_model: see below
+        gsf_model_low: see below
+        gsf_model_high: see below
+    """
+    #: (Vector or List[Vector]): normalized or initial, depending on method
     nld: Union[Vector, List[Vector]] = field(default_factory=list,
-             metadata='normalized nld')  # noqa
+             metadata='nld (normalized or initial, depending on method)')  # noqa
+    #: (Vector or List[Vector]): normalized or initial, depending on method
     gsf: Union[Vector, List[Vector]] = field(default_factory=list,
-             metadata='normalized gsf')  # noqa
+             metadata='gsf (normalized or initial, depending on method)')  # noqa
+    #: (List[Dict[str, Any]]): Parameters for the normalization/models used there
     pars: List[Dict[str, Any]] = field(default_factory=list,
             metadata='Parameters for the normalization/models used there')  # noqa
+    #: (List[Dict[str, Any]]): Samples from the posterior of the parameters
     samples: List[Dict[str, Any]] = field(default_factory=list,
             metadata='Samples from the posterior of the parameters')  # noqa
+    #: (List[Callable[..., Any]]): nld model for each nld
     nld_model: List[Callable[..., Any]] = field(default_factory=list,
             metadata='nld model')  # noqa
+    #: List[AbstractExtrapolationModel]: gsf model at low Eγ for each gsf
     gsf_model_low: List[AbstractExtrapolationModel] = \
         field(default_factory=list, metadata='gsf model at low Eγ')  # noqa
+    #: List[AbstractExtrapolationModel]: gsf model at high Eγ for each gsf
     gsf_model_high: List[AbstractExtrapolationModel] = \
         field(default_factory=list, metadata='gsf model at high Eγ')  # noqa

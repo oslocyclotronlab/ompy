@@ -28,19 +28,38 @@ DTYPE = np.float64
 
 
 class Response():
-    """
-    The Resonse class that stores the data required to perform
-    the interpolation needed to create the response matrix
+    """ Interpolates response read from file for current setup
+
+    Implementaion of following method
+    Guttormsen et al., NIM A 374 (1996) 371–376.
+    DOI:10.1016/0168-9002(96)00197-0
+
+    Throughout the class, be aware that "compton" mat refer to all
+    non-discrete structures (instead of the real Compton effect only).
+
+    Attributes:
+        resp (pd.DataFrame): Information of the `response table`
+        compton_matrix (np.ndarray): array with compton counts.
+            Shape is (N_incident, N_cmp).
+        Ecmp_array (np.ndarray): energy array for the compton counts
+        smooth_compton (bool): If True, the compoton array is smoothed
+            before further processing. defaults to `False`
+        truncate (float): After how many sigma to truncate gaussian smoothing.
+            Defaults to 6.
+
     """
 
     def __init__(self,
-                 path: Union[str, Path] = None):
+                 path: Union[str, Path]):
         """
         The resonse object is initialized with the path to the source
         files required to perform the interpolation. The path varaiable
         can either be a folder (assuming "old" format) or a zip file
         containing the files otherwise found in the folder in the "old"
         format.
+
+        Args:
+            path (str or Path): Path to the required file(s)
 
         TODO:
             - adapt rutines for the possibility that not all cmp spectra have
@@ -61,10 +80,10 @@ class Response():
             raise ValueError(f"Path {path} does not exist")
 
         # if compton was not smoothed before
-        self.smooth_compton = False
+        self.smooth_compton: bool = False
 
         # after how many sigma to truncate gaussian smoothing
-        self.truncate = 6
+        self.truncate: float = 6
 
     def LoadZip(self,
                 path: Union[str, Path],
@@ -146,10 +165,6 @@ class Response():
                 - **compton_matrix** (*ndarray*): matrix with compton counts.
                     Shape is (N_incident, N_cmp)
                 - **last.E** (*ndarray*): energy array
-
-        Raises:
-            Exception: Description
-            NotImplementedError: Description
         """
 
         # Read resp.dat file, which gives information about the energy bins
@@ -218,6 +233,7 @@ class Response():
         return resp, compton_matrix, last.E
 
     def get_probabilities(self):
+        """ Interpolate full-energy peak probabilities (...) """
         # total number of counts for each of the loaded responses
         self.sum_spec = self.compton_matrix.sum(axis=1) \
             + self.resp['FE'] + self.resp['SE'] + self.resp['DE'] \
@@ -262,7 +278,7 @@ class Response():
     def interpolate(self,
                     Eout: np.ndarray = None,
                     fwhm_abs: float = None,
-                    return_table: bool = False):
+                    return_table: bool = False) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
         """ Interpolated the response matrix
 
         Perform the interpolation for the energy range specified in Eout with
@@ -274,17 +290,19 @@ class Response():
         Compton edge, then linear extrapolation again the rest of the way.
 
         Args:
-        folderpath: The path to the folder containing Compton spectra and resp.dat
-        Eout_array: The desired energies of the output response matrix.
-        fwhm_abs: The experimental absolute full-width-half-max at 1.33 MeV.
-                  Note: In the article it is recommended to use 1/10 of the
-                  real FWHM for unfolding.
-        return_table (optional): Returns "all" output, see below
+            folderpath: The path to the folder containing Compton spectra and
+            resp.dat
+            Eout_array: The desired energies of the output response matrix.
+            fwhm_abs: The experimental absolute full-width-half-max at 1.33
+                      MeV. Note: In the article it is recommended to use 1/10
+                      of the real FWHM for unfolding.
+            return_table (optional): Returns "all" output, see below
 
         Returns:
-         - response (Matrix): Response matrix with incident energy on the "Ex"
-                           axis and the spectral response on the "Eg" axis
-         - response_table (optinal, Dataframe): Table with efficiencies,
+            Matrix or Tuple[Matrix, pd.DataFrame]:
+              - response (Matrix): Response matrix with incident energy on the
+                "Ex" axis and the spectral response on the "Eg" axis
+              - response_table (DataFrame, optional): Table with efficiencies,
                 FE, SE (...) probabilities, and so on
         """
         self.Eout = Eout
@@ -374,12 +392,12 @@ class Response():
                              f"now {len(Eout)}")
 
         assert abs(self.f_fwhm_rel_perCent_norm(1330) - 1) < 0.05, \
-            "Response function format not as expected." \
-            "In the Mama-format, the 'f_fwhm_rel_perCent' column denotes"\
-            "the relative fwhm (= fwhm/E), but normalized to 1 at 1.33 MeV."\
+            "Response function format not as expected. " \
+            "In the Mama-format, the 'f_fwhm_rel_perCent' column denotes "\
+            "the relative fwhm (= fwhm/E), but normalized to 1 at 1.33 MeV. "\
             f"Now it is: {self.f_fwhm_rel_perCent_norm(1330)} at 1.33 MeV."
 
-        LOG.info(f"Note: Spectra outside of {self.resp['Eg'].min()} and"
+        LOG.info(f"Note: Spectra outside of {self.resp['Eg'].min()} and "
                  f"{self.resp['Eg'].max()} are extrapolation only.")
 
     def get_closest_compton(self, E: float) -> Tuple[int, int]:
@@ -552,7 +570,17 @@ class Response():
 
         return R, i_last
 
-    def discrete_peaks(self, i_response, fwhm_abs_array):
+    def discrete_peaks(self, i_response: int,
+                       fwhm_abs_array: np.ndarray) -> np.ndarray:
+        """Add discrete peaks for a given channel and smooth them
+
+        Args:
+            i_response (int): Channel in response matrix
+            fwhm_abs_array (np.ndarray): Array with fwhms for each channel
+
+        Returns:
+            Array with smoothed discrete peaks
+        """
         discrete_peaks = np.zeros(self.N_out)
         Eout = self.Eout
         E_fe = Eout[i_response]
@@ -603,7 +631,8 @@ class Response():
         Adapted from MAMA, file "folding.f", which references
         Canberra catalog ed.7, p.2.
 
-        Note: For `Eg <= 0.1` it returns `Eg`. (workaround)
+        Note:
+            For `Eg <= 0.1` it returns `Eg`. (workaround)
 
         Args:
             Eg: Energy of gamma-ray in keV

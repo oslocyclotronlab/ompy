@@ -30,7 +30,7 @@ import numpy as np
 import pandas
 import logging
 import warnings
-from typing import Iterable, Optional
+from typing import Optional, Tuple
 import termtables as tt
 from scipy.ndimage import gaussian_filter1d
 from copy import copy
@@ -38,7 +38,6 @@ from .gauss_smoothing import gauss_smoothing_matrix_1D
 from .library import div0, i_from_E
 from .matrix import Matrix
 from .matrixstate import MatrixState
-from .setable import Setable
 from .rebin import rebin_1D
 
 
@@ -53,37 +52,45 @@ class Unfolder:
 
     Define matrix Rij as the response in channel i when the detector
     is hit by γ-rays with energy corresponding to channel j. Each response
-    function is normalized by Σi Rij = 1. The folding is then
-                         f = Ru
+    function is normalized by Σi Rij = 1. The folding is then::
+
+        f = Ru
+
     where f is the folded spectrum and u the unfolded. If we obtain better and
     better trial spectra u, we can fold and compare them to the observed
     spectrum r.
 
-    As an initial guess, the trial function is u⁰ = r, and the subsequent being
-                      uⁱ = uⁱ⁻¹ + (r - fⁱ⁻¹)
+    As an initial guess, the trial function is u⁰ = r, and the subsequent
+    being::
+        uⁱ = uⁱ⁻¹ + (r - fⁱ⁻¹)
+
     until fⁱ≈r.
 
     Note that no actions are performed on the matrices; they must already
     be cut into the desired size.
 
     Attributes:
-        raw (Matrix): The Matrix to unfold
-        num_iter (int): The number of iterations to perform. The best iteration
-            is then selected based on the `score` method
-        r (Matrix): The trapezoidal cut raw Matrix
+        num_iter (int, optional): The number of iterations to perform. defaults
+             to 33. The best iteration is then selected based on the `score`
+             method
         R (Matrix): The response matrix
-        weight_fluctuation (float): A attempt to penalize fluctuations.
-        minimum_iterations (int): Minimum number of iterations
-        window_size (float or int?): window_size for fill negatives on output
-        use_compton_subtraction (bool): Set usage of Compton subtraction method
+        weight_fluctuation (float, optional): A attempt to penalize
+             fluctuations. Defaults to 0.2
+        minimum_iterations (int, optional): Minimum number of iterations.
+            Defaults to 3.
+        window_size (float or int?, optional): window_size for fill negatives
+            on output. Defaults to 10.
+        use_compton_subtraction (bool, optional): Set usage of Compton
+            subtraction method. Defaults to `True`.
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
             a table with information ('E', 'eff_tot', ...) must be provided.
         FWHM_tweak_multiplier (Dict, optional): See compton subtraction method
-            Necessary keys: ["fe", "se", "de", "511"]. Magne's suggestion:
-            ``` py
-            FWHM_tweak_multiplier = {"fe": 1., "se": 1.1,
-                                     "de": 1.3, "511": 0.9}
-            ```
+            Necessary keys: `["fe", "se", "de", "511"]`. Magne's suggestion::
+                FWHM_tweak_multiplier = {"fe": 1., "se": 1.1,
+                                         "de": 1.3, "511": 0.9}
+        iscores (np.ndarray, optional): Selected iteration number in the
+            unfolding. The unfolding and selection is performed independently
+            for each `Ex` row, thus this is an array with `len(raw.Ex)`.
 
     TODO:
         - Unfolding for a single spectrum (currently needs to be mocked as a
@@ -93,25 +100,29 @@ class Unfolder:
         """Unfolds the gamma-detector response of a spectrum
 
         Args:
-            num_iter: The number of iterations to perform.j
-            reponse: The response Matrix R to use in unfolding.
+            num_iter: see above
+            reponse: see above
         """
         self.num_iter = num_iter
-        self.weight_fluctuation = 0.2
-        self.minimum_iterations = 3
+        self.weight_fluctuation: float = 0.2
+        self.minimum_iterations: int = 3
         self.window_size = 10
 
         self._R: Optional[Matrix] = response
+        self.raw: Optional[Matrix] = None
+        self.r: Optional[np.ndarray] = None
 
         self.use_compton_subtraction: bool = True
         self.response_tab: Optional[pandas.DataFrame] = None
-        self.FWHM_tweak_multiplier = None
+        self.FWHM_tweak_multiplier: Optional[dict[str, float]] = None
 
-        self.remove_negatives = True  # remove negs. in final unfolded spectrum
+        # remove negs. in final unfolded spectrum
+        self.remove_negatives: bool = True
 
+        self.iscores: Optional[np.ndarray] = None
 
     def __call__(self, matrix: Matrix) -> Matrix:
-        """ Wrapper for self.apply() """
+        """ Wrapper for `self.apply()` """
         return self.apply(matrix)
 
     def update_values(self):
@@ -120,9 +131,6 @@ class Unfolder:
         Raises:
             ValueError: If the raw matrix and response matrix have different
                 calibrations.
-
-        Deleted Raises:
-            AttributeError: If no diagonal cut has been made.
         """
         # Ensure that the given matrix is in fact raw
         if self.raw.state != MatrixState.RAW:
@@ -143,25 +151,26 @@ class Unfolder:
             raise ValueError("Raw and response cannot have negative counts."
                              "Consider using fill_negatives and "
                              "remove_negatives on the input matixes.")
-        # calibration_diff = self.raw.calibration_array() -\
-        #     self.R.calibration_array()
-        # eps = 1e-3
-        # if not (np.abs(calibration_diff[2:]) < eps).all():
-        #     raise AssertionError(("Calibration mismatch: "
-        #                           f"{calibration_diff}"
-        #                           "\nEnsure that the raw matrix and"
-        #                           " calibration matrix are cut equally."))
-
-        # TODO: Warn if the Matrix is not diagonal
-        # raise AttributeError("Call cut_diagonal() before unfolding")
 
         self.r = self.raw.values
 
     def apply(self, raw: Matrix,
               response: Optional[Matrix] = None) -> Matrix:
-        """Run unfolding
+        """ Run unfolding.
 
-        TODO: Use better criteria for terminating
+        Selected iteration for each `Ex` row can be obtained via
+        `self.iscores`, see above.
+
+        Args:
+            raw (Matrix): Raw matrix to unfold
+            response (Matrix, optional): Response matrix. Defaults to
+                the matrix provided in initialization.
+
+        Returns:
+            Matrix: Unfolded matrix
+
+        TODO:
+            - Use better criteria for terminating
         """
         if response is not None:
             self.R = response
@@ -189,7 +198,7 @@ class Unfolder:
         # and select the best one.
         fluctuations /= self.fluctuations(self.r)
         iscores = self.score(chisquare, fluctuations)
-        self.iscores = iscores # keep if interesting for later
+        self.iscores = iscores  # keep if interesting for later
         unfolded = np.zeros_like(self.r)
         for iEx in range(self.r.shape[0]):
             unfolded[iEx, :] = unfolded_cube[iscores[iEx], iEx, :]
@@ -212,13 +221,23 @@ class Unfolder:
             unfolded.fill_and_remove_negative(window_size=self.window_size)
         return unfolded
 
-    def step(self, unfolded, folded, step):
+    def step(self, unfolded: np.ndarray, folded: np.ndarray,
+             step: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Perform a single step of Guttormsen unfolding
 
-        Performs the steps
-            u = u + (r - f)
-            f = uR
-            set everything below the diagonal of f to 0
+        .. parsed-literal::
+            Performs the steps
+                u = u + (r - f),      for step > 0
+                f = uR
+
+        Args:
+            unfolded (np.ndarray): unfolded spectrum of iteration `step-1`
+            folded (np.ndarray): folded spectrum of of iteration `step-1`
+            step (np.ndarray): Iteration number
+
+        Returns:
+            Arrays with counts for the unfolded and folded matrix
+            (unfolded, folded)
 
         """
         if step > 0:  # since the initial guess is the raw spectrum
@@ -243,7 +262,14 @@ class Unfolder:
         Calculates fluctuations in each Ex bin gamma spectrum by summing
         the absolute diff between the spectrum and a smoothed version of it.
 
-        Returns a column vector of fluctuations in each Ex bin
+        Args:
+            counts (np.ndarray): counts of spectrum to act on
+                (calibration from `self.raw`).
+            sigma (float, optional): width of the gaussian for the smoothing.
+                Defaults to 20
+
+        Returns:
+            np.ndarray: column vector of fluctuations in each Ex bin
         """
 
         a1 = self.raw.Eg[1] - self.raw.Eg[0]
@@ -259,6 +285,14 @@ class Unfolder:
         """
         Calculates the score of each unfolding iteration for each Ex
         bin based on a weighting of chisquare and fluctuations.
+
+        Args:
+            chisquare (np.ndarray): chisquare between raw and unfolded
+            fluctuations (np.ndarray): measure of fluctuations
+                (to be penalized)
+
+        Returns:
+            score (the lower the better)
         """
         # Check that it's consistent with chosen max number of iterations:
         if self.minimum_iterations > self.num_iter:
@@ -298,35 +332,34 @@ class Unfolder:
         # TODO Make setable
         self._R = response
 
-    def compton_subtraction(self, unfolded):
+    def compton_subtraction(self, unfolded: np.ndarray) -> np.ndarray:
         """ Compton Subtraction Method in Unfolding of Guttormsen et al (NIM 1996)
 
         Args:
             unfolded (ndarray): unfolded spectrum
 
         Returns:
-            unfolded (ndarray): unfolded spectrum, with compton subtraction
-                                applied
+            unfolded spectrum, with compton subtraction applied
 
         We follow the notation of Guttormsen et al (NIM 1996) in what follows.
-        u0 is the unfolded spectrum from above, r is the raw spectrum,
-        w = us + ud + ua
-        is the folding contributions from everything except Compton,i.e.
-        us = single escape,
-        ua = double escape,
-        ua = annihilation (511).
+        `u0` is the unfolded spectrum from above, `r` is the raw spectrum,
+        .. parsed-literal::
+            w = us + ud + ua
+            is the folding contributions from everything except Compton, i.e.
+            us = single escape,
+            ua = double escape,
+            ua = annihilation (511).
 
-        v = pf*u0 + w == uf + w is the estimated "raw minus Compton" spectrum c is the estimated Compton spectrum.
+        `v = pf*u0 + w == uf + w` is the estimated "raw minus Compton" spectrum `c` is the estimated Compton spectrum.
 
-        Note: The tweaking of the FWHM ("facFWHM" in Mama) has been delegated
+        Note:
+            - The tweaking of the FWHM ("facFWHM" in Mama) has been delegated
               to the creation of the response matrix. If one wants to unfold
               with, say, 1/10 of the "real" FWHM, this this should be provided
               as input here already.
-
-        Note:
-        We apply smoothing to the different peak structures as described in
-        the article. However, you may also "tweak" the FWHMs per peak
-        for something Magne thinks is a better result.
+            - We apply smoothing to the different peak structures as described
+              in the article. However, you may also "tweak" the FWHMs per peak
+              for something Magne thinks is a better result.
 
         TODO:
             - When we unfolding with a reduced FWHM, should the compton method

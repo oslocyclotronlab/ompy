@@ -148,7 +148,6 @@ ext_modules = [
                   ),
         Extension("ompy.rebin", ["ompy/rebin.pyx"], include_dirs=[numpy.get_include()]),
         Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
-        Extension("ompy.rhosig", ["ompy/rhosig.pyx"], include_dirs=[numpy.get_include()])
         ]
 
 install_requires = numpy.loadtxt("requirements.txt", dtype="str").tolist()

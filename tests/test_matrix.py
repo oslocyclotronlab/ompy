@@ -2,12 +2,30 @@ import pytest
 import ompy as om
 import numpy as np
 from numpy.testing import assert_equal
+from typing import Tuple
 
+
+def ones(shape: Tuple[int, int]) -> om.Matrix:
+    """ Creates a mock matrix with ones in the upper diagonal
+
+    A 5×5 looks like this:
+        ░░░░░░░░░░
+        ░░░░░░░░
+        ░░░░░░
+        ░░░░
+        ░░
+    Args:
+        shape: The shape of the matrix
+    Returns:
+        The matrix
+    """
+    mat = np.ones(shape)
+    mat = np.tril(mat)
+    return om.Matrix(values=mat)
 
 @pytest.fixture()
 def Si28():
     return om.example_raw('Si28')
-
 
 @pytest.mark.parametrize(
         "axis,Emin,Emax,shape",
@@ -17,7 +35,7 @@ def Si28():
          ('Eg', 1,    None, (10, 9)),
          ('Ex', 5.5,  5.5,  (1, 10))],)
 def test_cut_shape(axis, Emin, Emax, shape):
-    mat = om.ones((10, 10)).cut(axis, Emin, Emax, inplace=False)
+    mat = ones((10, 10)).cut(axis, Emin, Emax, inplace=False)
     assert mat.shape == shape
     assert len(mat.Eg) == shape[1]
     assert len(mat.Ex) == shape[0]
@@ -55,7 +73,7 @@ def test_cut_Si(Si28):
          (9.5, 20),
          (8.6, 19)])
 def test_index(E, index):
-    mat = om.ones((10, 10))
+    mat = ones((10, 10))
     mat.Ex = np.arange(-10.5, 10.5)
     assert mat.index_Ex(E) == index
 

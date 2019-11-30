@@ -1,8 +1,3 @@
-"""Summary
-
-Attributes:
-    LOG (TYPE): Description
-"""
 import logging
 import numpy as np
 import copy
@@ -15,14 +10,12 @@ from scipy.stats import truncnorm
 import pymultinest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
-import pandas as pd
-from random import sample
 
 from .extractor import Extractor
-from .library import log_interp1d, tranform_nld_gsf
+from .library import log_interp1d, self_if_none
 from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
-from .normalizer import Normalizer
+from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
@@ -36,36 +29,54 @@ class NormalizerSimultan():
 
     Attributes:
         extractor (Extractor): Extractor instance
-        normalizer_gsf (NormalizerGSF): NormalizerGSF instance
-        normalizer_nld (Normalizer): Normalizer instance
-        res (ResultsNormalized, optional): Results
+        gsf (Optional[Vector], optional): gsf to normalize
+        multinest_path (Path, optional): Default path where multinest
+            saves files
+        multinest_kwargs (dict): Additional keywords to multinest. Defaults to
+            `{"seed": 65498, "resume": False}`
+        nld (Optional[Vector], optional): nld to normalize
+        normalizer_nld (NormalizerNLD): `NormalizerNLD` instance to get the normalization paramters
+        normalizer_gsf (NormalizerGSF): `NormalizerGSF` instance to get the normalization paramters
+        res (ResultsNormalized): Results
         std_fake_gsf (bool): Whether the std. deviation is faked
             (see `normalize`)
         std_fake_nld (bool): Whether the std. deviation is faked
             (see `normalize`)
-        multinest_path (Path, optional): Default path where multinest
-            saves files
-        multinest_kwargs (dict): Additional keywords to multinest
 
-    TODO: Work with more general models, too, not just CT for nld
+
+    TODO:
+        Work with more general models, too, not just CT for nld
     """
 
-    def __init__(self, *, extractor: Optional[Extractor] = None,
-                 # gsf: Optional[Vector] = None,
-                 # nld: Optional[Vector] = None,
-                 normalizer_nld: Optional[Normalizer] = None,
+    def __init__(self, *,
+                 gsf: Optional[Vector] = None,
+                 nld: Optional[Vector] = None,
+                 normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None):
         """
         TODO:
             - currently have to set arguments here, an cannot set them in
               "normalize"
 
+        Args:
+            gsf (optional): see above
+            nld (optional): see above
+            normalizer_nld (optional): see above
+            normalizer_gsf (optional): see above
+
         """
+        if normalizer_nld is None:
+            self.normalizer_nld = None
+        else:
+            self.normalizer_nld = copy.deepcopy(normalizer_nld)
 
-        self.extractor = extractor
+        if normalizer_gsf is None:
+            self.normalizer_gsf = None
+        else:
+            self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
 
-        self.normalizer_nld = copy.deepcopy(normalizer_nld)
-        self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
+        self.gsf = None if gsf is None else gsf.copy()
+        self.nld = None if nld is None else nld.copy()
 
         self.std_fake_nld: Optional[bool] = None  # See `normalize`
         self.std_fake_gsf: Optional[bool] = None  # See `normalize`
@@ -73,60 +84,82 @@ class NormalizerSimultan():
         self.res: Optional[ResultsNormalized] = None
 
         self.multinest_path: Optional[Path] = Path('multinest')
-        self.multinest_kwargs: dict = {}
+        self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
-    def normalize(self):
-        """ Perform normalization and saves results to `self.res` """
-        if self.extractor is not None:
-            gsfs = self.extractor.gsf
-            nlds = self.extractor.nld
+    def normalize(self, *, num: int = 0,
+                  gsf: Optional[Vector] = None,
+                  nld: Optional[Vector] = None,
+                  normalizer_nld: Optional[NormalizerNLD] = None,
+                  normalizer_gsf: Optional[NormalizerGSF] = None) -> None:
+        """Perform normalization and saves results to `self.res`
 
-        # Ensure to rerun if called again
+        Args:
+            num (int, optional): Loop number
+            gsf (Optional[Vector], optional): gsf before normalization
+            nld (Optional[Vector], optional): nld before normalization
+            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD instance
+            normalizer_gsf (Optional[NormalizerGSF], optional): NormalizerGSF instance
+        """
+        # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
 
-        # normalization
-        lists = zip(nlds, gsfs)
-        for i, (nld, gsf) in enumerate(lists):
-            nld = nld.copy()
-            gsf = gsf.copy()
-            nld.to_MeV()
-            gsf.to_MeV()
+        normalizer_nld = copy.deepcopy(self.self_if_none(normalizer_nld))
+        normalizer_gsf = copy.deepcopy(self.self_if_none(normalizer_gsf))
 
-            # Need to give some sort of standard deviation for sensible results
-            # Otherwise deviations at higher level density will have an
-            # uncreasonably high weight.
-            if self.std_fake_nld is None:
-                self.std_fake_nld = False
-            if self.std_fake_nld or nld.std is None:
-                self.std_fake_nld = True
-                nld.std = nld.values * 0.1  # 10% is an arb. choice
-            if self.std_fake_gsf or gsf.std is None:
-                self.std_fake_gsf = True
-                gsf.std = gsf.values * 0.1  # 10% is an arb. choice
+        gsf = self.self_if_none(gsf)
+        nld = self.self_if_none(nld)
+        nld = nld.copy()
+        gsf = gsf.copy()
+        nld.to_MeV()
+        gsf.to_MeV()
 
-            # update
-            self.normalizer_nld.nld = nld  # update before initial guess
-            self.normalizer_gsf.gsf_in = gsf  # update before initial guess
+        # Need to give some sort of standard deviation for sensible results
+        # Otherwise deviations at higher level density will have an
+        # uncreasonably high weight.
+        if self.std_fake_nld is None:
+            self.std_fake_nld = False
+        if self.std_fake_nld or nld.std is None:
+            self.std_fake_nld = True
+            nld.std = nld.values * 0.1  # 10% is an arb. choice
+        if self.std_fake_gsf or gsf.std is None:
+            self.std_fake_gsf = True
+            gsf.std = gsf.values * 0.1  # 10% is an arb. choice
 
-            # Use DE to get an inital guess before optimizing
-            args_nld, guess = self.initial_guess()
-            # Optimize using multinest
-            popt, samples = self.optimize(i, args_nld, guess)
+        # update
+        self.normalizer_nld.nld = nld  # update before initial guess
+        self.normalizer_gsf.gsf_in = gsf  # update before initial guess
 
-            self.res.pars.append(popt)
-            self.res.samples.append(samples)
+        # Use DE to get an inital guess before optimizing
+        args_nld, guess = self.initial_guess()
+        # Optimize using multinest
+        popt, samples = self.optimize(num, args_nld, guess)
 
-            # reset
-            if self.std_fake_nld is True:
-                self.std_fake_nld = None
-                nld.std = None
-            if self.std_fake_gsf is True:
-                self.std_fake_gsf = None
-                gsf.std = None
-            self.res.nld.append(nld)
-            self.res.gsf.append(gsf)
+        self.res.pars = popt
+        self.res.samples = samples
 
-    def initial_guess(self):
+        # reset
+        if self.std_fake_nld is True:
+            self.std_fake_nld = None
+            nld.std = None
+        if self.std_fake_gsf is True:
+            self.std_fake_gsf = None
+            gsf.std = None
+
+        self.res.nld = nld.transform(self.res.pars["A"][0],
+                                     self.res.pars["alpha"][0], inplace=False)
+        self.res.gsf = gsf.transform(self.res.pars["B"][0],
+                                     self.res.pars["alpha"][0], inplace=False)
+
+        self.normalizer_gsf.model_low.autorange(self.res.gsf)
+        self.normalizer_gsf.model_high.autorange(self.res.gsf)
+        self.normalizer_gsf.extrapolate(self.res.gsf)
+        self.res.gsf_model_low = self.normalizer_gsf.model_low
+        self.res.gsf_model_high = self.normalizer_gsf.model_high
+        for model in [self.res.gsf_model_low, self.res.gsf_model_high]:
+            model.shift_after = model.shift
+
+
+    def initial_guess(self) -> None:
         """ Find an inital guess for normalization parameters
 
         Uses guess of normalizer_nld and corresponding normalization of gsf
@@ -146,7 +179,7 @@ class NormalizerSimultan():
         nld_model = lambda E: normalizer_nld.curried_model(E, T=T, D0=D0)  # noqa
 
         normalizer_gsf.normalize(nld=nld, nld_model=nld_model)
-        guess["B"] = normalizer_gsf.res.pars[0]["B"]
+        guess["B"] = normalizer_gsf.res.pars["B"]
 
         guess_print = copy.deepcopy(guess)
         guess_print["D0"] = guess_print["D0"][0]
@@ -157,7 +190,7 @@ class NormalizerSimultan():
 
         return args_nld, guess
 
-    def optimize(self, iteration: int,
+    def optimize(self, num: int,
                  args_nld: Iterable,
                  guess: Dict[str, float]) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[float]]]:  # noqa
         """Find parameters given model constraints and an initial guess
@@ -165,11 +198,12 @@ class NormalizerSimultan():
         Employs Multinest
 
         Args:
-            iteration (int): Iteration number
+            num (int): Loop number
             args_nld (Iterable): Additional arguments for the nld errfn
             guess (Dict[str, float]): The initial guess of the parameters
 
         Returns:
+            Tuple:
             - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
                 parameters
             - samples (Dict[str, List[float]]): Multinest samplesø.
@@ -177,7 +211,7 @@ class NormalizerSimultan():
                 from the posterior.
 
         Raises:
-            ValueError: Description
+            ValueError: Invalid parameters for automatix prior
         """
         if guess['alpha'] < 0:
             raise ValueError("Prior selection not implemented for α < 0")
@@ -230,25 +264,18 @@ class NormalizerSimultan():
         norm_pars_org = copy.deepcopy(self.normalizer_gsf.norm_pars)
 
         self.multinest_path.mkdir(exist_ok=True)
-        path = self.multinest_path / f"sim_norm_{iteration}_"
+        path = self.multinest_path / f"sim_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        # defaults
-        kwargs = self.multinest_kwargs
-        if "verbose" not in kwargs:
-            kwargs["verbose"] = True
-        if "False" not in kwargs:
-            kwargs["resume"] = False
-
         LOG.info("Starting multinest: ")
-        LOG.debug("with following keywords %s:", kwargs)
+        LOG.debug("with following keywords %s:", self.multinest_kwargs)
         #  Hack where stdout from Multinest is redirected as info messages
         LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
 
         with redirect_stdout(LOG):
             pymultinest.run(loglike, prior, len(guess),
                             outputfiles_basename=str(path),
-                            **kwargs)
+                            **self.multinest_kwargs)
 
         # Save parameters for analyzer
         names = list(guess.keys())
@@ -293,103 +320,66 @@ class NormalizerSimultan():
 
         Returns:
             chi2 (float): The χ² value
+
+        TODO:
+            Clean up assignment of D0 (see code)
         """
-        A, alpha, T, D0, B = x[:5]
+        A, alpha, T, D0, B = x[:5]  # slicing needed for multinest?
 
         normalizer_gsf = self.normalizer_gsf
         normalizer_nld = self.normalizer_nld
 
-        err_nld = normalizer_nld.errfn(x[:5], *args_nld)
+        err_nld = normalizer_nld.errfn(x[:4], *args_nld)
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.curried_model(E, T=T, D0=D0)  # noqa
 
         normalizer_gsf.nld_model = nld_model
         normalizer_gsf.nld = nld
-        normalizer_gsf.norm_pars.D0 = [D0, 5] # CHANGE LATER, but tuple doesn't support item assignment
-        normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha, inplace=False)
+        normalizer_gsf.norm_pars.D0 = [D0, np.nan]  # dummy uncertainty
+        normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha,
+                                                              inplace=False)
         normalizer_gsf._gsf_low, normalizer_gsf._gsf_high = \
             normalizer_gsf.extrapolate()
         err_gsf = normalizer_gsf.errfn()
         return err_nld + err_gsf
 
+    def plot(self, ax: Optional[Any] = None, add_label: bool = True,
+             add_figlegend: bool = True,
+             **kwargs) -> Tuple[Any, Any]:
+        """Plots nld and gsf
 
-    def plot(self):
-        """ Plots randomly drawn samples
-        TODO: Cleanup!
+        Args:
+            ax (optional): The matplotlib axis to plot onto. Creates axis
+                is not provided
+            add_label (bool, optional):Defaults to `True`.
+            add_figlegend (bool, optional): Defaults to `True`.
+            results Optional[ResultsNormalized]: If provided, gsf and model
+                are taken from here instead.
+            **kwargs: kwargs for plot
+
+        Returns:
+            fig, ax
         """
-        fig, ax = plt.subplots(1, 2, constrained_layout=True)
+        if ax is None:
+            fig, ax = plt.subplots(1, 2, constrained_layout=True)
+        else:
+            fig = ax.figure
 
-        nlds = []
-        gsfs = []
-        for i in range(len(self.res.nld)):
-            nld = self.res.nld[i]
-            gsf = self.res.gsf[i]
-            samples = self.res.samples[i]
-            nlds_, gsfs_ = tranform_nld_gsf(samples, nld, gsf)
-            nlds.append(nlds_)
-            gsfs.append(gsfs_)
-
-        flatten = lambda l: [item for sublist in l for item in sublist]
-        gsfs = flatten(gsfs)
-        nlds = flatten(nlds)
-
-        nld_vals = np.zeros((len(nlds), len(nld.E)))
-        gsf_vals = np.zeros((len(gsfs), len(gsf.E)))
-
-        for i, (nld, gsf) in enumerate(zip(nlds, gsfs)):
-            nld_vals[i, :] = nld.values
-            gsf_vals[i, :] = gsf.values
-
-        n_plot = 5
-        for i, (nld, gsf) in enumerate(sample(list(zip(nlds, gsfs)), n_plot)):
-            nld.std = None  # as they were just faked
-            gsf.std = None  # as they were just faked
-            if i == 0:
-                label = "random sample"
-            else:
-                label = None
-            nld.plot(ax=ax[0], scale="log", color='k', alpha=1/(n_plot),
-                     label=label)
-            gsf.plot(ax=ax[1], scale="log", color='k', alpha=1/(n_plot),
-                     label=label)
+        self.normalizer_nld.plot(ax=ax[0], add_label=True, results=self.res,
+                                 add_figlegend=False, **kwargs)
+        self.normalizer_gsf.plot(ax=ax[1], add_label=False, results=self.res,
+                                 add_figlegend=False, **kwargs)
 
         ax[0].set_title("Level density")
         ax[1].set_title("γSF")
 
-        ax[0].set_yscale("log")
-        ax[1].set_yscale("log")
+        if add_figlegend:
+            fig.legend(loc=9, ncol=4, frameon=True)
+            fig.subplots_adjust(left=0.1, right=0.9, top=0.8, bottom=0.1)
 
-        stat_nld = pd.DataFrame(nld_vals)
-        # Calculate all the desired values
-        stat_nld = pd.DataFrame({'mean': stat_nld.mean(), 'median': stat_nld.median(),
-            '25%': stat_nld.quantile(0.25, axis=0), '50%': stat_nld.quantile(0.5, axis=0),
-            '84%': stat_nld.quantile(0.84, axis=0)})
+        return fig, ax
 
-        stat_gsf = pd.DataFrame(gsf_vals)
-        # Calculate all the desired values
-        stat_gsf = pd.DataFrame({'mean': stat_gsf.mean(axis=0), 'median': stat_gsf.median(axis=0),
-            '16%': stat_gsf.quantile(0.16,axis=0), '50%': stat_gsf.quantile(0.5, axis=0), '84%': stat_gsf.quantile(0.84,axis=0)})
-
-        stat_nld["E"] = nld.E
-        stat_gsf["E"] = gsf.E
-
-        stat_nld.plot(x="E", ax=ax[0])
-        stat_gsf.plot(x="E", ax=ax[1])
-
-        ax[0].legend(loc="best")
-        ax[1].legend(loc="best")
-
-    #     fig2, ax2 = plt.subplots(1, 2, constrained_layout=True)
-    #     bins = np.logspace(-8, -6, num=50)
-
-    #     data = gsf_vals[:, 6]
-    #     median = np.percentile(data, 50)
-    #     low = np.percentile(data, 16)
-    #     high = np.percentile(data, 84)
-    #     print("low, median, high", low, median, high)
-    #     ax2[1].hist(gsf_vals[:, 6], bins=bins)
-    #     ax2[1].axvline(median, color="r")
-    #     ax2[1].axvline(low, color="g")
-    #     ax2[1].axvline(high, color="b")
-    #     ax2[1].set_xscale("log")
+    def self_if_none(self, *args, **kwargs):
+        """ wrapper for lib.self_if_none """
+        return self_if_none(self, *args, **kwargs)

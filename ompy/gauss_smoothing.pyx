@@ -1,10 +1,7 @@
 import os
 import numpy as np
 cimport numpy as np
-from scipy.interpolate import interp1d#, interp2d
 
-from .rebin import *
-from .library import *
 from .matrix import to_plot_axis
 
 DTYPE = np.float64
@@ -126,14 +123,14 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
         E_array (array, double): Array with energy calibration of matrix_in, in
                                  mid-bin calibration
         fwhm (double or array of doubles): The full-width-half-maximums
-        axis: The axis along which smoothing should happen.
+        axis (int or str, optional): The axis along which to smooth.
               Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
     """
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
 
-    if len(fwhm) == 1:
-        fwhm = np.full_like(matrix_in, fwhm)
+    if type(fwhm) == float or type(fwhm) == int:
+        fwhm = np.full_like(E_array, float(fwhm))
 
     axis = to_plot_axis(axis)
     is_Eg = axis == 0

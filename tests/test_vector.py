@@ -11,10 +11,9 @@ def test_init():
     assert_equal(E, vec.E)
     assert_equal(vals, vec.values)
 
-    # No energy defaults to midbin
-    vec = om.Vector(vals)
-    assert_equal(np.arange(0.5, 100.5, 1), vec.E)
-    assert_equal(vals, vec.values)
+    # Provide values only
+    with pytest.raises(AssertionError):
+        vec = om.Vector(vals)
 
     # No values defaults to zeros
     vec = om.Vector(E=E)
