@@ -85,7 +85,7 @@ class Extractor:
             self.path = Path('extraction_ensemble')
             self.path.mkdir(exist_ok=True)
 
-        self.extend_fit_by_resolution: bool = True
+        self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
 
     def __call__(self, ensemble: Optional[Ensemble] = None,
