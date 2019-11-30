@@ -418,7 +418,7 @@ class NormalizerNLD:
         labelSn = None
         labelModel = None
         if add_label:
-            labelNld = 'normalized'
+            labelNld = 'exp.'
             labelNldSn = r'$\rho(S_n)$'
             labelModel = 'model'
         nld.plot(ax=ax, label=labelNld, **kwargs)
@@ -438,7 +438,7 @@ class NormalizerNLD:
 
         if add_label:
             ax.scatter(self.norm_pars.Sn[0], nld_Sn, label=labelNldSn)
-        ax.plot(x, model, "--", label=labelModel,
+        ax.plot(x, model, "--", label=labelModel, markersize=0,
                 c='g', **kwargs)
 
         if plot_fitregion:

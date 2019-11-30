@@ -374,7 +374,7 @@ class NormalizerGSF():
         model_low = res.gsf_model_low
         model_high = res.gsf_model_high
 
-        label_gsf = "normalized" if add_label else None
+        label_gsf = "exp." if add_label else None
         label_model = "model" if add_label else None
         label_limits = "fit limits" if add_label else None
         gsf.plot(ax=ax, label=label_gsf, **kwargs)
@@ -385,10 +385,11 @@ class NormalizerGSF():
         xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
         gsf_high = model_high.extrapolate(xplot)
 
-        gsf_low.plot(ax=ax, c='g', linestyle="--", label=label_model,
+        gsf_low.plot(ax=ax, c='g', linestyle="--",
+                     markersize=0, label=label_model,
                      **kwargs)
         gsf_high.plot(ax=ax, c='g', linestyle="--",
-                      **kwargs)
+                      markersize=0, **kwargs)
 
         if plot_fitregion:
             ax.axvspan(model_low.Efit[0], model_low.Efit[1],

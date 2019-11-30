@@ -120,7 +120,7 @@ class Vector(AbstractArray):
         fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
         if kind in ["plot", "line"]:
-            kwargs.setdefault("markersize", "2")
+            kwargs.setdefault("markersize", "3")
             ax.plot(self.E, self.values, "o-", **kwargs)
         elif kind == "step":
             kwargs.setdefault("where", "mid")
