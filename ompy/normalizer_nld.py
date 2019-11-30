@@ -202,7 +202,7 @@ class NormalizerNLD:
         # Use DE to get an inital guess before optimizing
         args, guess = self.initial_guess(limit_low, limit_high)
         # Optimize using multinest
-        popt, samples = self.optimize(args, guess)
+        popt, samples = self.optimize(num, args, guess)
 
         transformed = nld.transform(popt['A'][0], popt['alpha'][0],
                                     inplace=False)
@@ -275,7 +275,7 @@ class NormalizerNLD:
 
         return args, p0
 
-    def optimize(self, args,
+    def optimize(self, num: int, args,
                  guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Find parameters given model constraints and an initial guess
 
@@ -338,7 +338,7 @@ class NormalizerNLD:
             return loglikelihood
 
         self.multinest_path.mkdir(exist_ok=True)
-        path = self.multinest_path / "nld_norm_"
+        path = self.multinest_path / f"nld_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
         LOG.info("Starting multinest")
