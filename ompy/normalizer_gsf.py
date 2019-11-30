@@ -153,7 +153,7 @@ class NormalizerGSF():
         assert alpha is not None, \
             "Provide nld_model or normalizer_nld with nld_model"
 
-        norm_pars = self.self_if_none(norm_pars)
+        self.norm_pars = self.self_if_none(norm_pars)
         self.norm_pars.is_changed()  # check that they have been set
 
         # ensure to rerun

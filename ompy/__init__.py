@@ -40,7 +40,7 @@ from .extractor import Extractor
 from .action import Action
 from .decomposition import nld_T_product, index
 from .normalizer_nld import (NormalizerNLD, load_levels_discrete,
-                             load_levels_smooth, Eshift_from_T, Sn_from_D0)
+                             load_levels_smooth, Eshift_from_T, nldSn_from_D0)
 from .normalizer_gsf import NormalizerGSF
 from .normalizer_simultan import NormalizerSimultan
 from .ensembleNormalizer import EnsembleNormalizer

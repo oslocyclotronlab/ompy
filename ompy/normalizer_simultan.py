@@ -324,12 +324,12 @@ class NormalizerSimultan():
         TODO:
             Clean up assignment of D0 (see code)
         """
-        A, alpha, T, D0, B = x[:5]
+        A, alpha, T, D0, B = x[:5]  # slicing needed for multinest?
 
         normalizer_gsf = self.normalizer_gsf
         normalizer_nld = self.normalizer_nld
 
-        err_nld = normalizer_nld.errfn(x[:5], *args_nld)
+        err_nld = normalizer_nld.errfn(x[:4], *args_nld)
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.curried_model(E, T=T, D0=D0)  # noqa

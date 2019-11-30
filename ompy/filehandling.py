@@ -291,14 +291,16 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
     Args:
         path (Union[str, Path]): The file to load
         energy (ndarray): The binning to use
-        resolution (float, optional): The resolution to apply to the gaussian
-            smoothing. Defaults to 0.1.
+        resolution (float, optional): The resolution (FWHM) to apply to the
+            gaussian smoothing. Defaults to 0.1.
 
     Returns:
         Tuple[ndarray, ndarray]
     """
     energies = np.loadtxt(path)
     energies /= 1e3  # convert to MeV
+    if len(energies) > 1:
+        assert energies.mean() < 5, "Probably energies are not in keV"
 
     binsize = energy[1] - energy[0]
     bin_edges = np.append(energy, energy[-1] + binsize)
@@ -307,7 +309,11 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
     hist, _ = np.histogram(energies, bins=bin_edges)
     hist = hist.astype(float) / binsize  # convert to levels/MeV
 
-    smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
+    if resolution > 0:
+        resolution /= 2.3548
+        smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
+    else:
+        smoothed = None
     return hist, smoothed
 
 

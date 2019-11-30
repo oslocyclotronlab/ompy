@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import logging
 import termtables as tt
 import json
@@ -15,7 +16,7 @@ from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
 from .filehandling import load_discrete
-from .models import ResultsNormalized
+from .models import ResultsNormalized, NormalizationParameters
 
 
 LOG = logging.getLogger(__name__)
@@ -47,16 +48,11 @@ class NormalizerNLD:
     Attributes:
         discrete (Vector): The discrete NLD at lower energies. [MeV]
         nld (Vector): The NLD to normalize. Gets converted to [MeV] from [keV].
-        D0 (Tuple[float, float]): The (mean, std) average resonance
-            spacing from s waves [eV]
-        extractor (Extractor): An optional Extractor instance. The
-            nld members will all be normalized.
+        norm_pars (NormalizationParameters): Normalization parameters like
+            experimental D₀, and spin(-cut) model
         bounds (Dict[str, Tuple[float, float]): The bounds on each of
             the parameters. Its keys are 'A', 'alpha', 'T', and 'D0'. The
             values are on the form (min, max).
-        spin (Dict[str, Any]): The parameters to be used in the spin
-            distribution model. Its keys are 'spincutModel', 'spincutPars',
-            'J_target', 'Gg' and 'Sn'.
         model (Callable[..., ndarray]): The model to use at high energies
             to estimate the NLD. Defaults to constant temperature model.
         curried_model (Callable[..., ndarray]): Same as model, but
@@ -67,15 +63,16 @@ class NormalizerNLD:
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
             `{"seed": 65498, "resume": False}`
         res (ResultsNormalized): Results of the normalization
-        use_smoothed_levels (bool): Flag for whether to smooth histogram
-            over discrete levels when loading from file. Defaults to True.
+        smooth_levels_fwhm (float): FWHM with which the discrete levels shall
+            be smoothed when loading from file. Defaults to 0.1 MeV.
         path (Path): The path the transformed vectors to.
 
     """
     def __init__(self, *,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = None) -> None:
+                 path: Optional[Union[str, Path]] = None,
+                 norm_pars: Optional[NormalizationParameters] = None) -> None:
         """ Normalizes nld ang gSF.
 
         Note:
@@ -94,13 +91,11 @@ class NormalizerNLD:
             mutable to ensure it is not changed.
 
         Args:
-            extractor: The extractor to use get nld from
-            nld: The nuclear level density vector to normalize.
-            discrete: The discrete level density at low energies to
-                      normalize to. Provide either histogram as a Vector,
-                      or the path to the discrete level file (in keV).
-            path: If set, tries to load vectors from path.
-
+            extractor: see above
+            nld: see above
+            discrete: see above
+            path: see above
+            norm_pars: see above
         TODO:
             - parameter to limit the number of multinest samples to store. Note
               that the samples should be shuffled to retain some "random"
@@ -111,21 +106,17 @@ class NormalizerNLD:
         self._discrete = None
         self._discrete_path = None
         self._D0 = None
-        self._use_smoothed_levels = None
+        self._smooth_levels_fwhm = None
+        self.norm_pars = norm_pars
         self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
-                       'D0': (None, None)}
-        self.spin = {'spincutModel': None,
-                     'spincutPars': None,
-                     'J_target': None,
-                     'Gg': None,
-                     'Sn': None}
+                       'D0': (None, None)}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = constant_temperature
         self.curried_model = lambda *arg: None
         self.multinest_path = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
         # Handle the method parameters
-        self.use_smoothed_levels = True
+        self.smooth_levels_fwhm = 0.1
         self.nld = None if nld is None else nld.copy()
         self.discrete = discrete
 
@@ -152,9 +143,8 @@ class NormalizerNLD:
                   limit_high: Optional[Tuple[float, float]] = None,
                   nld: Optional[Vector] = None,
                   discrete: Optional[Vector] = None,
-                  D0: Optional[Tuple[float, float]] = None,
                   bounds: Optional[TupleDict] = None,
-                  spin: Optional[Dict[str, Any]] = None,
+                  norm_pars: Optional[NormalizationParameters] = None,
                   num: int = 0) -> None:
         """ Normalize NLD to a low and high energy region
 
@@ -167,10 +157,9 @@ class NormalizerNLD:
             nld: The nuclear level density vector to normalize.
             discrete: The discrete level density at low energies to
                 normalize to.
-            D0: Average resonance spacing from s waves [eV]
             bounds: The bounds of the parameters
-            spin: Parameters for use in the high energy model and
-                spin cut model.
+            norm_pars (NormalizationParameters): Normalization parameters like
+            experimental D₀, and spin(-cut) model
             num (optional): Loop number, defauts to 0
 
         """
@@ -183,16 +172,16 @@ class NormalizerNLD:
         discrete = self.self_if_none(discrete)
         discrete.to_MeV()
         nld = self.self_if_none(nld)
-        D0 = self.self_if_none(D0)
-        self.D0 = D0  # To ensure the bounds are updated
-        bounds = self.self_if_none(bounds)
-        spin = self.self_if_none(spin)
 
-        # Ensure that spin is set
-        for key, val in spin.items():
-            if val is None:
-                raise ValueError(f"`{key}` has to be set.")
+        self.norm_pars = self.self_if_none(norm_pars)
+        self.norm_pars.is_changed(include=["D0", "Sn", "spincutModel",
+                                           "spincutPars"])  # check that set
 
+        self.bounds = self.self_if_none(bounds)
+        self.bounds['D0'] = (0.99*self.norm_pars.D0[0],
+                             1.01*self.norm_pars.D0[0])
+
+        # ensure that it's updated if running again
         self.res = ResultsNormalized(name="Results NLD")
 
         LOG.info(f"\n\n---------\nNormalizing nld #{num}")
@@ -253,27 +242,36 @@ class NormalizerNLD:
         limit_high = self.self_if_none(limit_high)
 
         bounds = list(self.bounds.values())
-        spinstring = json.dumps(self.spin, indent=4, sort_keys=True)
+        spinParsstring = json.dumps(self.norm_pars.spincutPars, indent=4,
+                                    sort_keys=True)
 
         LOG.debug("Using bounds %s", bounds)
-        LOG.debug("Using spin %s", spinstring)
+        LOG.debug("Using spincutModel %s", self.norm_pars.spincutModel)
+        LOG.debug("Using spincutPars %s", spinParsstring)
 
         nld_low = self.nld.cut(*limit_low, inplace=False)
         discrete = self.discrete.cut(*limit_low, inplace=False)
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
         # We don't want to send unecessary parameters to the minimizer
-        model = lambda *args, **kwargs: self.model(*args, **kwargs, spin=self.spin)
+        def model(*args, **kwargs) -> ndarray:
+            model = self.model(*args, **kwargs,
+                               Jtarget=self.norm_pars.Jtarget,
+                               Sn=self.norm_pars.Sn[0],
+                               spincutModel=self.norm_pars.spincutModel,
+                               spincutPars=self.norm_pars.spincutPars)
+            return model
+
         self.curried_model = model
         args = (nld_low, nld_high, discrete, model)
         res = differential_evolution(self.errfn, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
-            header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
+                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
 
         p0 = dict(zip(["A", "alpha", "T", "D0"], (res.x).T))
         # overwrite result for D0, as we have a "correct" prior for it
-        p0["D0"] = self.D0
+        p0["D0"] = self.norm_pars.D0
 
         return args, p0
 
@@ -420,26 +418,26 @@ class NormalizerNLD:
         labelSn = None
         labelModel = None
         if add_label:
-            labelNld = "normalized"
-            labelSn = '$S_n$'
+            labelNld = 'normalized'
+            labelNldSn = r'$\rho(S_n)$'
             labelModel = 'model'
         nld.plot(ax=ax, label=labelNld, **kwargs)
 
         if add_label:
             self.discrete.plot(ax=ax, c='k', label='Discrete levels')
 
-        Sn = self.curried_model(T=pars['T'][0],
-                                D0=pars['D0'][0],
-                                E=self.spin['Sn'])
+        nld_Sn = self.curried_model(T=pars['T'][0],
+                                    D0=pars['D0'][0],
+                                    E=self.norm_pars.Sn[0])
 
-        x = np.linspace(self.limit_high[0], self.spin['Sn'])
+        x = np.linspace(self.limit_high[0], self.norm_pars.Sn[0])
         model = self.curried_model(T=pars['T'][0],
                                    D0=pars['D0'][0],
                                    E=x)
         # TODO: plot errorbar
 
         if add_label:
-            ax.scatter(self.spin['Sn'], Sn, label=labelSn)
+            ax.scatter(self.norm_pars.Sn[0], nld_Sn, label=labelNldSn)
         ax.plot(x, model, "--", label=labelModel,
                 c='g', **kwargs)
 
@@ -452,6 +450,7 @@ class NormalizerNLD:
         ax.set_yscale('log')
         ax.set_ylabel(r"$\rho(E_x) \quad [\mathrm{MeV}^{-1}]$")
         ax.set_xlabel(r"$E_x \quad [\mathrm{MeV}]$")
+        ax.set_ylim(bottom=0.5/(nld.E[1]-nld.E[0]))
 
         if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
@@ -524,7 +523,7 @@ class NormalizerNLD:
         Returns:
             chi2 (float): The χ² value
         """
-        A, alpha, T, D0 = x[:4]
+        A, alpha, T, D0 = x[:4]  # slicing needed for multinest?
         transformed_low = nld_low.transform(A, alpha, inplace=False)
         transformed_high = nld_high.transform(A, alpha, inplace=False)
 
@@ -547,12 +546,10 @@ class NormalizerNLD:
                 raise ValueError(f"`nld` must be set before loading levels")
             nld = self.nld.copy()
             nld.to_MeV()
-            if self.use_smoothed_levels:
-                self._discrete = load_levels_smooth(value, nld.E)
-                LOG.debug("Set `discrete` by loading smooth")
-            else:
-                self._discrete = load_levels_discrete(value, nld.E)
-                LOG.debug("Set `discrete` by loading discrete")
+            LOG.debug("Set `discrete` levels from file with FWHM %s",
+                      self.smooth_levels_fwhm)
+            self._discrete = load_levels_smooth(value, nld.E,
+                                                self.smooth_levels_fwhm)
             self._discrete.units = "MeV"
             self._discrete_path = value
 
@@ -567,23 +564,12 @@ class NormalizerNLD:
                              " for discrete levels")
 
     @property
-    def D0(self) -> Optional[Tuple[float, float]]:
-        return self._D0
+    def smooth_levels_fwhm(self) -> Optional[float]:
+        return self._smooth_levels_fwhm
 
-    @D0.setter
-    def D0(self, value: Tuple[float, float]) -> None:
-        if len(value) != 2:
-            raise ValueError("D0 must contain (mean, std) [eV] of A-1 nucleus")
-        self._D0 = value[0], value[1]
-        self.bounds['D0'] = (0.99*value[0], 1.01*value[0])
-
-    @property
-    def use_smoothed_levels(self) -> Optional[bool]:
-        return self._use_smoothed_levels
-
-    @use_smoothed_levels.setter
-    def use_smoothed_levels(self, value: bool) -> None:
-        self._use_smoothed_levels = value
+    @smooth_levels_fwhm.setter
+    def smooth_levels_fwhm(self, value: float) -> None:
+        self._smooth_levels_fwhm = value
         if self._discrete_path is not None:
             self.discrete = self._discrete_path
 
@@ -615,21 +601,39 @@ def load_levels_smooth(path: Union[str, Path], energy: ndarray,
 
     Args:
         path: The file to load
-        energy: The binning to use
-        resolution: The resolution of the smoothing to use
+        energy: The binning to use in MeV
+        resolution: The resolution (FWHM) of the smoothing to use in MeV
     Returns:
         A vector describing the smoothed levels
     """
-    _, smoothed = load_discrete(path, energy, resolution)
-    return Vector(values=smoothed, E=energy)
+    histogram, smoothed = load_discrete(path, energy, resolution)
+    return Vector(values=smoothed if resolution > 0 else histogram, E=energy)
 
 #################################
 # Ugly code below, to be fixed! #
 #################################
 
-def constant_temperature(E: ndarray, T: float, D0: float, spin: Dict[str, Any]) -> ndarray:
-    Sn = Sn_from_D0(D0, **spin)
-    shift = Eshift_from_T(T, Sn)
+def constant_temperature(E: ndarray, *, D0: float,
+                         Sn: float, T: float, Jtarget: float,
+                         spincutModel: str, spincutPars: Dict[str, Any]) -> ndarray:
+    """ CT model "turned around"
+
+    Usually the parameters are the temperature T and a shift Eshift.
+    However, you can reparametrise to use T and D0 (from which you
+    calculate Eshift)
+
+    Args:
+        ... (bla): blub
+        D0 (float or Tuple[float, float], optional): If set, this D0 will be
+            used instead of the one from spincutPars
+
+    """
+    nldSn = nldSn_from_D0(D0=D0,
+                          Sn=Sn,
+                          Jtarget=Jtarget,
+                          spincutModel=spincutModel,
+                          spincutPars=spincutPars)
+    shift = Eshift_from_T(T, nldSn)
     return CT(E, T, shift)
 
 
@@ -639,14 +643,14 @@ def CT(E: ndarray, T: float, Eshift: float) -> ndarray:
     return ct
 
 
-def Eshift_from_T(T, Sn):
+def Eshift_from_T(T, nldSn):
     """ Eshift from T for CT formula """
-    return Sn[0] - T * np.log(Sn[1] * T)
+    return nldSn[0] - T * np.log(nldSn[1] * T)
 
 
-def Sn_from_D0(D0: float, Sn: float, J_target: float,
-               spincutModel: str, spincutPars: Dict[str, Any],
-               **kwargs):
+def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
+                  spincutModel: str, spincutPars: Dict[str, Any],
+                  **kwargs) -> Tuple[float, float]:
     """Calculate nld(Sn) from D0
 
     Parameters:
@@ -654,7 +658,7 @@ def Sn_from_D0(D0: float, Sn: float, J_target: float,
             Average resonance spacing from s waves [eV]
         Sn (float):
             Separation energy [MeV]
-        J_target (float):
+        Jtarget (float):
             Target spin
         spincutModel (str):
             Model to for the spincut
@@ -664,8 +668,7 @@ def Sn_from_D0(D0: float, Sn: float, J_target: float,
 
 
     Returns:
-        nld: [float, float]
-            Sn, nld at Sn [MeV, 1/MeV]
+        nld: Ex=Sn and nld at Sn [MeV, 1/MeV]
     """
 
     def g(J):
@@ -673,10 +676,10 @@ def Sn_from_D0(D0: float, Sn: float, J_target: float,
                              model=spincutModel,
                              pars=spincutPars).distibution()
 
-    if J_target == 0:
-        summe = g(J_target + 1 / 2)
+    if Jtarget == 0:
+        summe = g(Jtarget + 1 / 2)
     else:
-        summe = 1 / 2 * (g(J_target - 1 / 2) + g(J_target + 1 / 2))
+        summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
 
     nld = 1 / (summe * D0 * 1e-6)
     return [Sn, nld]
