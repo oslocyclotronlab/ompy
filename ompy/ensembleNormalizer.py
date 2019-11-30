@@ -2,7 +2,7 @@ import numpy as np
 import logging
 import matplotlib.pyplot as plt
 import os
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Union
 from operator import xor
 import pandas as pd
 import copy
@@ -138,14 +138,28 @@ class EnsembleNormalizer:
     def plot(self, ax: Any = None,
              add_figlegend: bool = True,
              n_plot: Optional[bool] = 5,
+             random_state: Optional[np.random.RandomState] = None,
              **kwargs) -> Tuple[Any, Any]:
-        """ Plots randomly drawn samples
+        """Plots randomly drawn samples
+
+        Args:
+            ax (Any, optional): The matplotlib axis to plot onto. Creates axis
+                            is not provided
+            add_figlegend (bool, optional): Defaults to `True`.
+            n_plot (bool, optional): Description
+            random_state (np.random.RandomState, optional): random state, set
+                by default such that a repeated use of the function gives the
+                same results.
+            **kwargs: Description
 
         TODO:
             - Refactor code
             - Could not find out how to not plot dublicate legend entries,
               thus using a workaround
             - Checks if extrapolating where nld or gsf is np.nan
+
+        Returns:
+            fig, ax
         """
 
         if ax is None:
@@ -161,13 +175,17 @@ class EnsembleNormalizer:
             normalizer_gsf = copy.deepcopy(self.normalizer_gsf)
             normalizer_nld = copy.deepcopy(self.normalizer_nld)
 
+        if random_state is None:  # cannot move this to definition
+            random_state = np.random.RandomState(98765)
+
         for i in range(len(self.res)):
             nld = self.extractor.nld[i].copy()
             gsf = self.extractor.gsf[i].copy()
             nld.to_MeV()
             gsf.to_MeV()
-            samples_ = self.res[i].samples
-            df = tranform_nld_gsf(samples_, nld, gsf)
+            samples_ = copy.deepcopy(self.res[i].samples)
+            df = tranform_nld_gsf(samples_, nld, gsf,
+                                  random_state=random_state)
             if i == 0:
                 samples = df
             else:
@@ -175,7 +193,8 @@ class EnsembleNormalizer:
 
         # plot some samples directly
         res = copy.deepcopy(self.res[i])
-        for i, (_, row) in enumerate(samples.sample(n=n_plot).iterrows()):
+        selection = samples.sample(n=n_plot, random_state=random_state)
+        for i, (_, row) in enumerate(selection.iterrows()):
             nld.values *= i
             res.nld = row["nld"]
             res.pars = row.to_dict()
@@ -286,7 +305,7 @@ class EnsembleNormalizer:
 
 def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
                      N_max: int = 100,
-                     random_state=np.random.RandomState(65489)):
+                     random_state=None):
     """
     Use a list(dict) of samples of `A`, `B`, and `alpha` parameters from
     multinest to transform a (list of) nld and/or gsf sample(s). Can be used
@@ -316,6 +335,8 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
         N_multinest = len(value)
         break
     randlist = np.arange(N_multinest)
+    if random_state is None:  # cannot move this to definition
+        random_state = np.random.RandomState(65489)
     random_state.shuffle(randlist)  # works in-place
 
     if nld is not None:
