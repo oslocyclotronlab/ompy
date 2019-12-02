@@ -415,9 +415,9 @@ class Extractor:
         else:
             for nld, gsf in zip(self.nld, self.gsf):
                 ax[0].plot(nld.E, nld.values, color=color,
-                           alpha=1/self.size, **kwargs)
+                           alpha=1/len(self.nld), **kwargs)
                 ax[1].plot(gsf.E, gsf.values, color=color,
-                           alpha=1/self.size, **kwargs)
+                           alpha=1/len(self.gsf), **kwargs)
 
         ax[0].set_title("Level density")
         ax[1].set_title("γSF")
