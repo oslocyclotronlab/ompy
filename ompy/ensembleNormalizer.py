@@ -135,18 +135,21 @@ class EnsembleNormalizer:
         self.normalizer_gsf.res.samples["B"] = np.full_like(N, B)
         return self.normalizer_gsf.res
 
-    def plot(self, ax: Any = None,
+    def plot(self, ax: Tuple[Any, Any] = None,
              add_figlegend: bool = True,
-             n_plot: Optional[bool] = 5,
+             n_plot: bool = 5,
+             plot_model_stats: bool = False,
              random_state: Optional[np.random.RandomState] = None,
              **kwargs) -> Tuple[Any, Any]:
         """Plots randomly drawn samples
 
         Args:
-            ax (Any, optional): The matplotlib axis to plot onto. Creates axis
-                            is not provided
+            ax (Tuple[Any, Any], optional): The matplotlib axis to plot onto.
+                Creates axis is not provided.
             add_figlegend (bool, optional): Defaults to `True`.
-            n_plot (bool, optional): Description
+            n_plot (bool, optional): Number of (nld, gsf) samples to plot
+            plot_model_stats (bool, optional): Plot stats also for models used
+                in normalization
             random_state (np.random.RandomState, optional): random state, set
                 by default such that a repeated use of the function gives the
                 same results.
@@ -178,6 +181,50 @@ class EnsembleNormalizer:
         if random_state is None:  # cannot move this to definition
             random_state = np.random.RandomState(98765)
 
+        samples = self.samples_from_res(random_state)
+        self.plot_selection(ax=ax, samples=samples,
+                            normalizer_nld=normalizer_nld,
+                            normalizer_gsf=normalizer_gsf)
+
+        # get median, 1 sigma, ...
+        percentiles = [0.16, 0.84]
+        lines = self.plot_vector_stats(ax, samples, percentiles)
+
+        if plot_model_stats:
+            Emin = samples["nld"].iloc[0].E[-1]
+            x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=20)
+            color = lines.get_facecolor()
+            self.plot_nld_ext_stats(ax[0], x=x, samples=samples,
+                                    normalizer_nld=normalizer_nld,
+                                    percentiles=percentiles, color=color)
+
+            E = samples["gsf"].iloc[0].E
+            xlow = np.linspace(0.001, E[0], num=20)
+            xhigh = np.linspace(E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
+            self.plot_gsf_ext_stats(ax[1], xlow=xlow, xhigh=xhigh,
+                                    samples=samples,
+                                    normalizer_gsf=normalizer_gsf,
+                                    percentiles=percentiles, color=color)
+
+        if add_figlegend:
+            fig.legend(loc=9, ncol=4, frameon=True)
+            fig.subplots_adjust(left=0.1, right=0.9, top=0.8, bottom=0.1)
+
+        return fig, ax
+
+    def samples_from_res(self,
+                         random_state: Optional[np.random.RandomState] = None) -> pd.DataFrame:
+        """Draw random samples from results with transformed nld & gsf
+
+        Args:
+            random_state (np.random.RandomState, optional): random state,
+                set by default such that a repeated use of the function
+                gives the same results.
+
+        Returns:
+            Samples
+        """
+
         for i in range(len(self.res)):
             nld = self.extractor.nld[i].copy()
             gsf = self.extractor.gsf[i].copy()
@@ -190,13 +237,39 @@ class EnsembleNormalizer:
                 samples = df
             else:
                 samples = samples.append(df)
+        return samples
 
-        # plot some samples directly
-        res = copy.deepcopy(self.res[i])
+    def plot_selection(self, *, ax: Tuple[Any, Any],
+                       samples: pd.DataFrame,
+                       normalizer_nld: Optional[NormalizerNLD],
+                       normalizer_gsf: Optional[NormalizerGSF],
+                       n_plot: Optional[bool] = 5,
+                       random_state: Optional[np.random.RandomState] = None) -> None:
+        """ Plot some nld and gsf samples
+
+        Args:
+            ax (Tuple[Any, Any]): The matplotlib axis to plot onto.
+                Creates axis is not provided.
+            samples (pd.DataFrame): Random samples from results with
+                transformed nld & gsf
+            normalizer_nld (NormalizerNLD): NormalizerNLD instance.
+                Note: Input a copy as the instance attributes will be changed.
+            normalizer_gsf (NormalizerGSF): NormalizerGSF instance.
+                Note: Input a copy as the instance attributes will be changed.
+            n_plot (bool, optional): Number of (nld, gsf) samples to plot
+            random_state (np.random.RandomState, optional): random state, set
+                by default such that a repeated use of the function gives the
+                same results.
+
+        """
+        if random_state is None:  # cannot move this to definition
+            random_state = np.random.RandomState(98765)
+
+        res = copy.deepcopy(self.res[0])  # dummy for later
         selection = samples.sample(n=n_plot, random_state=random_state)
         for i, (_, row) in enumerate(selection.iterrows()):
-            nld.values *= i
             res.nld = row["nld"]
+            res.gsf = row["gsf"]
             res.pars = row.to_dict()
 
             # workaround for the tuple (currently just a float)
@@ -204,9 +277,9 @@ class EnsembleNormalizer:
             for key in keys_workaround:
                 res.pars[key] = [res.pars[key], np.nan]
 
+            # create extrapolations of gsf
             normalizer_gsf._gsf = row["gsf"]
             normalizer_gsf.extrapolate(row["gsf"])
-            res.gsf = row["gsf"]
             res.gsf_model_low = normalizer_gsf.model_low
             res.gsf_model_high = normalizer_gsf.model_high
             for model in [res.gsf_model_low, res.gsf_model_high]:
@@ -223,89 +296,99 @@ class EnsembleNormalizer:
                                 add_figlegend=False,
                                 plot_fitregion=plot_fitregion)
 
-        # get median, 1 sigma, ...
-        array = samples[["nld", "gsf"]].to_numpy()
-        out = np.zeros((2, len(array), len(array[0, 0].E)))
+    @staticmethod
+    def stats_from_df(df, fmap, shape_out, percentiles):
+        array = df.to_numpy()
+        out = np.zeros(shape_out)
         indexed = enumerate(array)
+        # apply fmap to each row of the dataframe
+        np.fromiter(map(fmap, indexed, repeat(out)), dtype=float)
+        stats = pd.DataFrame(out[:, :])
+        stats = pd.DataFrame({'median': stats.median(),
+                              'low': stats.quantile(percentiles[0], axis=0),
+                              'high': stats.quantile(percentiles[1], axis=0)})
+        return stats
+
+    @staticmethod
+    def plot_vector_stats(ax: Tuple[Any, Any], samples, percentiles):
+        # define helper function
         def vec_to_values(x, out):  # noqa
             idx, vec = x
-            out[0, idx] = vec[0].values
-            out[1, idx] = vec[1].values
-        np.fromiter(map(vec_to_values, indexed, repeat(out)), dtype=float)
-        stat_nld = pd.DataFrame(out[0, :, :])
-        stat_gsf = pd.DataFrame(out[1, :, :])
+            out[idx] = vec.values
 
-        low, high = [0.16, 0.84]
-        stat_nld = pd.DataFrame({'median': stat_nld.median(),
-                                 'low': stat_nld.quantile(low, axis=0),
-                                 'high': stat_nld.quantile(high, axis=0)})
+        df = samples["nld"]
+        E = df.iloc[0].E
+        stats_nld = EnsembleNormalizer.stats_from_df(df, fmap=vec_to_values,
+                                            shape_out=(len(df), len(E)),
+                                            percentiles=percentiles)  # noqa
+        stats_nld["x"] = E
+        stats_nld.plot(x="x", y="median", ax=ax[0], legend=False)
 
-        stat_gsf = pd.DataFrame({'median': stat_gsf.median(axis=0),
-                                 'low': stat_gsf.quantile(low, axis=0),
-                                 'high': stat_gsf.quantile(high, axis=0)})
+        df = samples["gsf"]
+        stats_gsf = EnsembleNormalizer.stats_from_df(df, fmap=vec_to_values,
+                                            shape_out=(len(df), len(E)),
+                                            percentiles=percentiles)  # noqa
+        stats_gsf["x"] = df.iloc[0].E
+        stats_gsf.plot(x="x", y="median", ax=ax[1], legend=False)
 
-        stat_nld["E"] = nld.E
-        stat_gsf["E"] = gsf.E
-
-        stat_nld.plot(x="E", y="median", ax=ax[0], legend=False)
-        stat_gsf.plot(x="E", y="median", ax=ax[1], legend=False, label="")
-        ax[0].fill_between(stat_nld.E, stat_nld["low"], stat_nld["high"],
+        pc_diff = percentiles[1] - percentiles[0]
+        ax[0].fill_between(stats_nld.x, stats_nld["low"], stats_nld["high"],
                            alpha=0.3,
-                           label=f"{(high-low)*100:.0f}% credibility interval")
-        lines = ax[1].fill_between(stat_gsf.E, stat_gsf["low"],
-                                   stat_gsf["high"],
+                           label=f"{(pc_diff)*100:.0f}% credibility interval")
+        lines = ax[1].fill_between(stats_gsf.x, stats_gsf["low"],
+                                   stats_gsf["high"],
                                    alpha=0.3)
+        return lines
 
-        # for the extrapolations. Start with nld
-        x = np.linspace(nld.E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
-        array = samples[["T", "D0"]].to_numpy()
-        out = np.zeros((len(array), len(x)))
-        indexed = enumerate(array)
+    @staticmethod
+    def plot_nld_ext_stats(ax: Any, *, x: np.ndarray,
+                           samples, normalizer_nld, percentiles,
+                           color):
+        # define helper function
         def to_values(a, out):  # noqa
             idx, val = a
             out[idx] = normalizer_nld.curried_model(T=val[0],
                                                     D0=val[1],
                                                     E=x)
-        np.fromiter(map(to_values, indexed, repeat(out)), dtype=float)
-        stat = pd.DataFrame(out[:, :])
-        stat = pd.DataFrame({'median': stat.median(),
-                             'low': stat.quantile(low, axis=0),
-                             'high': stat.quantile(high, axis=0)})
-        ax[0].fill_between(x, stat["low"], stat["high"],
-                           alpha=0.3, color=lines.get_facecolor())
 
-        # gsf extrapolation
-        xlow = np.linspace(0.001, gsf.E[0], num=20)
-        xhigh = np.linspace(gsf.E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
-        array = samples["gsf"].to_numpy()
-        out = np.zeros((2, len(array), len(x)))
-        indexed = enumerate(array)
+        df = samples[["T", "D0"]]
+        stats = EnsembleNormalizer.stats_from_df(df, fmap=to_values,
+                                                 shape_out=(len(df), len(x)),
+                                                 percentiles=percentiles)
+        ax.fill_between(x, stats["low"], stats["high"],
+                        alpha=0.3, color=color)
+
+    @staticmethod
+    def plot_gsf_ext_stats(ax: Any, *, xlow: np.ndarray, xhigh: np.ndarray,
+                           samples, normalizer_gsf, percentiles,
+                           color):
+        # define helper function
         def to_values(a, out):  # noqa
             idx, val = a
             low, high = normalizer_gsf.extrapolate(val, E=[xlow, xhigh])
             out[0, idx] = low.values
             out[1, idx] = high.values
 
+        assert len(xlow) == len(xhigh)
+        array = samples["gsf"].to_numpy()
+        out = np.zeros((2, len(array), len(xlow)))
+        indexed = enumerate(array)
+
+        low, high = percentiles
         np.fromiter(map(to_values, indexed, repeat(out)), dtype=float)
         for i, arr in enumerate([out[0, :, :], out[1, :, :]]):
             stat = pd.DataFrame(arr)
             stat = pd.DataFrame({'median': stat.median(),
                                  'low': stat.quantile(low, axis=0),
                                  'high': stat.quantile(high, axis=0)})
-            ax[1].fill_between(xlow if i == 0 else xhigh,
-                               stat["low"], stat["high"],
-                               alpha=0.3, color=lines.get_facecolor())
-
-        if add_figlegend:
-            fig.legend(loc=9, ncol=4, frameon=True)
-            fig.subplots_adjust(left=0.1, right=0.9, top=0.8, bottom=0.1)
-
-        return fig, ax
+            ax.fill_between(xlow if i == 0 else xhigh,
+                            stat["low"], stat["high"],
+                            alpha=0.3, color=color)
 
 
 def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
                      N_max: int = 100,
-                     random_state=None):
+                     random_state=None) -> pd.DataFrame:
     """
     Use a list(dict) of samples of `A`, `B`, and `alpha` parameters from
     multinest to transform a (list of) nld and/or gsf sample(s). Can be used
@@ -324,8 +407,8 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
                                  results.
 
     Returns:
-        `nld_trans` (list) and/or `gsf_trans` (list)
-        and selected (dict[str, float]): Transformed `nld` and or `gsf`, depending on what input is given; and the selected samples.
+        Dataframe with randomly selected samples of nld, gsf and the
+        corresponding parameters. The nld and gsf are transformed
 
     """
 
