@@ -681,5 +681,5 @@ def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
     else:
         summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
 
-    nld = 1 / (summe * D0 * 1e-6)
+    nld = 2 / (summe * D0 * 1e-6)
     return [Sn, nld]
