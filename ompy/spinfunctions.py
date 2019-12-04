@@ -156,9 +156,10 @@ class SpinFunctions:
         Ex = self.Ex if Ex is None else Ex
         Ex = np.atleast_1d(Ex)
         sigma2_Sn = self.gEB05(mass, NLDa, Eshift, Ex=Sn)
+        sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex)
         x = [sigma2_disc[0], Sn]
-        y = [sigma2_disc[1], sigma2_Sn]
+        y = [sigma2_disc[1], sigma2_EB05(Sn)]
         sigma2 = interp1d(x, y,
                           bounds_error=False,
-                          fill_value=(sigma2_disc[1], "extrapolate"))
-        return sigma2(Ex)
+                          fill_value=(sigma2_disc[1], sigma2_Sn))
+        return np.where(Ex < Sn, sigma2(Ex), sigma2_EB05(Ex))
