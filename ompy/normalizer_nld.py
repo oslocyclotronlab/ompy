@@ -424,7 +424,7 @@ class NormalizerNLD:
         nld.plot(ax=ax, label=labelNld, **kwargs)
 
         if add_label:
-            self.discrete.plot(ax=ax, c='k', label='Discrete levels')
+            self.discrete.plot(ax=ax, c='k', label='Discrete levels', kind="step")
 
         nld_Sn = self.curried_model(T=pars['T'][0],
                                     D0=pars['D0'][0],
@@ -677,9 +677,9 @@ def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
                              pars=spincutPars).distibution()
 
     if Jtarget == 0:
-        summe = g(Jtarget + 1 / 2)
+        summe = 1 / 2 * g(Jtarget + 1 / 2)
     else:
         summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
 
-    nld = 2 / (summe * D0 * 1e-6)
+    nld = 1 / (summe * D0 * 1e-6)
     return [Sn, nld]
