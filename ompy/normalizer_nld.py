@@ -653,6 +653,11 @@ def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
                   **kwargs) -> Tuple[float, float]:
     """Calculate nld(Sn) from D0
 
+    1/D0 = nld(Sn) * ( g(Jtarget+1/2, pi_target) + g(Jtarget1/2, pi_target) )
+    Here we assume equal parity, g(J,pi) = g(J)/2 and
+    nld(Sn) = 1/D0 * 2/(g(Jtarget+1/2) + g(Jtarget-1/2))
+    For the case Jtarget = 0, the g(Jtarget-1/2) = 0
+
     Parameters:
         D0 (float):
             Average resonance spacing from s waves [eV]
@@ -677,7 +682,7 @@ def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
                              pars=spincutPars).distibution()
 
     if Jtarget == 0:
-        summe = g(Jtarget + 1 / 2)
+        summe = 1 / 2 * g(Jtarget + 1 / 2)
     else:
         summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
 
