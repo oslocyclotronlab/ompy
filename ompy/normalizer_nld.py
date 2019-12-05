@@ -424,7 +424,7 @@ class NormalizerNLD:
         nld.plot(ax=ax, label=labelNld, **kwargs)
 
         if add_label:
-            self.discrete.plot(ax=ax, c='k', label='Discrete levels', kind="step")
+            self.discrete.plot(ax=ax, c='k', label='Discrete levels')
 
         nld_Sn = self.curried_model(T=pars['T'][0],
                                     D0=pars['D0'][0],
