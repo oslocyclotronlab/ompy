@@ -402,9 +402,9 @@ class Matrix(AbstractArray):
         Vector(values=projection, E=energy).plot(ax=ax, **kwargs)
 
         if is_Ex:
-            ax.set_xlabel(r"Excitation energy $E_{x}$ [eV]")
+            ax.set_xlabel(r"Excitation energy $E_{x}$")
         else:
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$ [eV]")
+            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
 
         ax.set_yscale(scale)
 
