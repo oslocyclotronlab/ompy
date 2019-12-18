@@ -174,6 +174,8 @@ class NormalizerGSF():
 
         # experimental Gg and calc. both in meV
         B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
+        # propagate uncertainty of D0
+        B_norm_unc = B_norm * self.norm_pars.D0[1] / self.norm_pars.D0[0]
 
         # apply transformation and export results
         self._gsf.transform(B_norm)
@@ -185,9 +187,9 @@ class NormalizerGSF():
         self.res.gsf_model_low = copy.deepcopy(self.model_low)
         self.res.gsf_model_high = copy.deepcopy(self.model_high)
         if len(self.res.pars) > 0:
-            self.res.pars["B"] = B_norm
+            self.res.pars["B"] = [B_norm, B_norm_unc]
         else:
-            self.res.pars = {"B": B_norm}
+            self.res.pars = {"B": [B_norm, B_norm_unc]}
 
     def extrapolate(self,
                     gsf: Optional[Vector] = None,

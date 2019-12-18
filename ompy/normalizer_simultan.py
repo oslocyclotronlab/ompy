@@ -120,10 +120,10 @@ class NormalizerSimultan():
             self.std_fake_nld = False
         if self.std_fake_nld or nld.std is None:
             self.std_fake_nld = True
-            nld.std = nld.values * 0.1  # 10% is an arb. choice
+            nld.std = nld.values * 0.3  # x% is an arb. choice
         if self.std_fake_gsf or gsf.std is None:
             self.std_fake_gsf = True
-            gsf.std = gsf.values * 0.1  # 10% is an arb. choice
+            gsf.std = gsf.values * 0.3  # x% is an arb. choice
 
         # update
         self.normalizer_nld.nld = nld  # update before initial guess
@@ -158,7 +158,6 @@ class NormalizerSimultan():
         for model in [self.res.gsf_model_low, self.res.gsf_model_high]:
             model.shift_after = model.shift
 
-
     def initial_guess(self) -> None:
         """ Find an inital guess for normalization parameters
 
@@ -172,21 +171,20 @@ class NormalizerSimultan():
         normalizer_gsf = self.normalizer_gsf
 
         args_nld, guess = normalizer_nld.initial_guess()
-        [A, alpha, T, D0] = [guess["A"], guess["alpha"],
-                             guess["T"], guess["D0"][0]]
+        [A, alpha, T, Eshift] = [guess["A"], guess["alpha"],
+                                 guess["T"], guess["Eshift"]]
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
-        nld_model = lambda E: normalizer_nld.curried_model(E, T=T, D0=D0)  # noqa
+        nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
 
         normalizer_gsf.normalize(nld=nld, nld_model=nld_model)
-        guess["B"] = normalizer_gsf.res.pars["B"]
+        guess["B"] = normalizer_gsf.res.pars["B"][0]
 
         guess_print = copy.deepcopy(guess)
-        guess_print["D0"] = guess_print["D0"][0]
-        LOG.info("DE results/initial guess:\n%s\n%s",
+        LOG.info("DE results/initial guess:\n%s",
                  tt.to_string([list(guess_print.values())],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]*', 'B']),
-                 "*copied from input") # noqa
+                              header=['A', 'α [MeV⁻¹]', 'T [MeV]',
+                                      'Eshift [MeV]', 'B']))
 
         return args_nld, guess
 
@@ -222,16 +220,18 @@ class NormalizerSimultan():
         T_exponent = np.log10(guess['T'])
 
         A = guess['A']
-        D0 = guess['D0']
         B = guess["B"]
 
         # truncations from absolute values
         lower, upper = 0., np.inf
-        mu_A, sigma_A = A, 4*A
+        mu_A, sigma_A = A, 10*A
         a_A = (lower - mu_A) / sigma_A
-        mu_D0, sigma_D0 = D0[0], D0[1]
-        a_D0 = (lower - mu_D0) / sigma_D0
-        mu_B, sigma_B = B, 4*B
+
+        mu_Eshift, sigma_Eshift = 0, 5
+        lower, upper = -5., 5
+        a_Eshift = (lower - mu_Eshift) / sigma_Eshift
+
+        mu_B, sigma_B = B, 10*B
         a_B = (lower - mu_B) / sigma_B
 
         def prior(cube, ndim, nparams):
@@ -245,10 +245,10 @@ class NormalizerSimultan():
             # log-uniform prior
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
-            # normal prior
-            cube[3] = truncnorm.ppf(cube[3], a_D0, upper, loc=mu_D0,
-                                    scale=sigma_D0)
-            # normal prior
+            # truncated normal prior
+            cube[3] = truncnorm.ppf(cube[3], a_Eshift, upper, loc=mu_Eshift,
+                                    scale=sigma_Eshift)
+            # truncated normal prior
             cube[4] = truncnorm.ppf(cube[4], a_B, upper, loc=mu_B,
                                     scale=sigma_B)
 
@@ -302,7 +302,7 @@ class NormalizerSimultan():
             vals.append(fmts % (med, sigma))
 
         LOG.info("Multinest results:\n%s", tt.to_string([vals],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]', 'B']))
+                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]', 'B']))
 
         # reset state
         self.normalizer_gsf.norm_pars = norm_pars_org
@@ -315,16 +315,13 @@ class NormalizerSimultan():
 
         Args:
             x (Tuple[float, float, float, float, float]): The arguments
-                ordered as A, alpha, T and D0, B
+                ordered as A, alpha, T and Eshift, B
             args_nld (TYPE): Additional arguments for the nld errfn
 
         Returns:
             chi2 (float): The χ² value
-
-        TODO:
-            Clean up assignment of D0 (see code)
         """
-        A, alpha, T, D0, B = x[:5]  # slicing needed for multinest?
+        A, alpha, T, Eshift, B = x[:5]  # slicing needed for multinest?
 
         normalizer_gsf = self.normalizer_gsf
         normalizer_nld = self.normalizer_nld
@@ -332,10 +329,13 @@ class NormalizerSimultan():
         err_nld = normalizer_nld.errfn(x[:4], *args_nld)
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
-        nld_model = lambda E: normalizer_nld.curried_model(E, T=T, D0=D0)  # noqa
+        nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
 
         normalizer_gsf.nld_model = nld_model
         normalizer_gsf.nld = nld
+        # calculate the D0-equivalent of T and Eshift used
+        D0 = normalizer_nld.D0_from_nldSn(nld_model,
+                                          **normalizer_nld.norm_pars.asdict())
         normalizer_gsf.norm_pars.D0 = [D0, np.nan]  # dummy uncertainty
         normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha,
                                                               inplace=False)

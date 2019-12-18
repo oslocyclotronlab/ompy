@@ -2,7 +2,7 @@ import numpy as np
 import re
 import pickle
 from pathlib import Path
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, asdict
 from typing import Optional, Union, Tuple, Any, Dict, Callable, List
 from scipy.optimize import curve_fit
 
@@ -59,6 +59,10 @@ class Model:
                 if not val or None in val:
                     raise ValueError(f"Model `{self.name}` has default [] "
                                      f"or `None` in variable `{name}`.")
+
+    def asdict(self) -> Dict[str, Any]:
+        """ wrapper for dataclasses.asdict() """
+        return asdict(self)
 
     def save(self, path: Union[str, Path]) -> None:
         """Save the model parameters to `path`

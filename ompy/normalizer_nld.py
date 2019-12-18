@@ -55,9 +55,6 @@ class NormalizerNLD:
             values are on the form (min, max).
         model (Callable[..., ndarray]): The model to use at high energies
             to estimate the NLD. Defaults to constant temperature model.
-        curried_model (Callable[..., ndarray]): Same as model, but
-            curried with the spin distribution parameters to reduce
-            book keeping. Is set by initial_guess(), _NOT_ the user.
         multinest_path (Path): Where to save the multinest output.
             defaults to 'multinest'.
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
@@ -109,9 +106,9 @@ class NormalizerNLD:
         self._smooth_levels_fwhm = None
         self.norm_pars = norm_pars
         self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
-                       'D0': (None, None)}  # D0 bounds set later
-        self.model: Optional[Callable[..., ndarray]] = constant_temperature
-        self.curried_model = lambda *arg: None
+                       'Eshift': (-5, 5)}  # D0 bounds set later
+        self.model: Optional[Callable[..., ndarray]] = self.const_temperature
+        # self.curried_model = lambda *arg: None
         self.multinest_path = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
@@ -178,8 +175,6 @@ class NormalizerNLD:
                                            "spincutPars"])  # check that set
 
         self.bounds = self.self_if_none(bounds)
-        self.bounds['D0'] = (0.99*self.norm_pars.D0[0],
-                             1.01*self.norm_pars.D0[0])
 
         # ensure that it's updated if running again
         self.res = ResultsNormalized(name="Results NLD")
@@ -196,7 +191,7 @@ class NormalizerNLD:
             self.std_fake = False
         if self.std_fake or nld.std is None:
             self.std_fake = True
-            nld.std = nld.values * 0.1  # 10% is an arb. choice
+            nld.std = nld.values * 0.3  # x% is an arb. choice
         self.nld = nld
 
         # Use DE to get an inital guess before optimizing
@@ -213,8 +208,8 @@ class NormalizerNLD:
         self.res.nld = transformed
         self.res.pars = popt
         self.res.samples = samples
-        ext_model = lambda E: self.curried_model(E, T=popt['T'][0],
-                                                 D0=popt['D0'][0])
+        ext_model = lambda E: self.model(E, T=popt['T'][0],
+                                         Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
 
         self.save(num=num)
@@ -253,25 +248,18 @@ class NormalizerNLD:
         discrete = self.discrete.cut(*limit_low, inplace=False)
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
-        # We don't want to send unecessary parameters to the minimizer
-        def model(*args, **kwargs) -> ndarray:
-            model = self.model(*args, **kwargs,
-                               Jtarget=self.norm_pars.Jtarget,
-                               Sn=self.norm_pars.Sn[0],
-                               spincutModel=self.norm_pars.spincutModel,
-                               spincutPars=self.norm_pars.spincutPars)
-            return model
+        nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
+        rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
-        self.curried_model = model
-        args = (nld_low, nld_high, discrete, model)
+        args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
+                nldSn)
         res = differential_evolution(self.errfn, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
+                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
-        p0 = dict(zip(["A", "alpha", "T", "D0"], (res.x).T))
-        # overwrite result for D0, as we have a "correct" prior for it
-        p0["D0"] = self.norm_pars.D0
+        p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
 
         return args, p0
 
@@ -306,18 +294,19 @@ class NormalizerNLD:
         T_exponent = np.log10(guess['T'])
 
         A = guess['A']
-        D0 = guess['D0']
 
         # truncations from absolute values
         lower, upper = 0., np.inf
-        mu_A, sigma_A = A, 4*A
+        mu_A, sigma_A = A, 10*A
         a_A = (lower - mu_A) / sigma_A
-        mu_D0, sigma_D0 = D0[0], D0[1]
-        a_D0 = (lower - mu_D0) / sigma_D0
+
+        mu_Eshift, sigma_Eshift = 0, 5
+        lower, upper = -5., 5
+        a_Eshift = (lower - mu_Eshift) / sigma_Eshift
 
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
-            # normal prior
+            # truncated normal prior
             cube[0] = truncnorm.ppf(cube[0], a_A, upper, loc=mu_A,
                                     scale=sigma_A)
             # log-uniform prior
@@ -326,9 +315,9 @@ class NormalizerNLD:
             # log-uniform prior
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
-            # normal prior
-            cube[3] = truncnorm.ppf(cube[3], a_D0, upper, loc=mu_D0,
-                                    scale=sigma_D0)
+            # truncated normal prior
+            cube[3] = truncnorm.ppf(cube[3], a_Eshift, upper, loc=mu_Eshift,
+                                    scale=sigma_Eshift)
             if np.isinf(cube[3]):
                 LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
@@ -375,7 +364,7 @@ class NormalizerNLD:
             vals.append(fmts % (med, sigma))
 
         LOG.info("Multinest results:\n%s", tt.to_string([vals],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'D₀ [eV]']))
+                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         return popt, samples
 
@@ -415,30 +404,29 @@ class NormalizerNLD:
         nld = res.nld
 
         labelNld = None
-        labelSn = None
+        labelNldSn = None
         labelModel = None
+        labelDiscrete = None
         if add_label:
             labelNld = 'exp.'
             labelNldSn = r'$\rho(S_n)$'
             labelModel = 'model'
         nld.plot(ax=ax, label=labelNld, **kwargs)
 
-        if add_label:
-            self.discrete.plot(ax=ax, c='k', label='Discrete levels')
+        self.discrete.plot(ax=ax, c='k', label=labelDiscrete)
 
-        nld_Sn = self.curried_model(T=pars['T'][0],
-                                    D0=pars['D0'][0],
-                                    E=self.norm_pars.Sn[0])
+        nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
+        rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
         x = np.linspace(self.limit_high[0], self.norm_pars.Sn[0])
-        model = self.curried_model(T=pars['T'][0],
-                                   D0=pars['D0'][0],
-                                   E=x)
-        # TODO: plot errorbar
+        model = Vector(E=x, values=self.model(E=x,
+                                              T=pars['T'][0],
+                                              Eshift=pars['Eshift'][0]))
 
-        if add_label:
-            ax.scatter(self.norm_pars.Sn[0], nld_Sn, label=labelNldSn)
-        ax.plot(x, model, "--", label=labelModel, markersize=0,
+        ax.errorbar(self.norm_pars.Sn[0], nldSn[0], yerr=nldSn[1],
+                    label=labelNldSn, fmt="s", markerfacecolor='none')
+        ax.plot(model.E, model.values, "--", label=labelModel, markersize=0,
                 c='g', **kwargs)
 
         if plot_fitregion:
@@ -507,11 +495,12 @@ class NormalizerNLD:
     @staticmethod
     def errfn(x: Tuple[float, float, float, float], nld_low: Vector,
               nld_high: Vector, discrete: Vector,
-              model: Callable[..., ndarray]) -> float:
+              model: Callable[..., ndarray],
+              Sn, nldSn) -> float:
         """ Compute the χ² of the normalization fitting
 
         Args:
-            x: The arguments ordered as A, alpha, T and D0
+            x: The arguments ordered as A, alpha, T and Eshift
             nld_low: The lower region where discrete levels will be
                 fitted.
             nld_high: The upper region to fit to model.
@@ -519,18 +508,124 @@ class NormalizerNLD:
                 lower region.
             model: The model to use when fitting the upper region.
                 Must support the keyword arguments
-                ``model(T=..., D0=..., E=...) -> ndarray``
+                ``model(E=..., T=..., Eshift=...) -> ndarray``
         Returns:
             chi2 (float): The χ² value
         """
-        A, alpha, T, D0 = x[:4]  # slicing needed for multinest?
+        A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
         transformed_low = nld_low.transform(A, alpha, inplace=False)
         transformed_high = nld_high.transform(A, alpha, inplace=False)
 
         err_low = transformed_low.error(discrete)
-        expected = model(T=T, D0=D0, E=transformed_high.E)
+        expected = Vector(E=transformed_high.E,
+                          values=model(E=transformed_high.E,
+                                       T=T, Eshift=Eshift))
         err_high = transformed_high.error(expected)
-        return err_low + err_high
+
+        nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
+        err_nldSn = ((nldSn[0] - nldSn_model)/nldSn[1])**2
+
+        return err_low + err_high + err_nldSn
+
+    @staticmethod
+    def const_temperature(E: ndarray, T: float, Eshift: float) -> ndarray:
+        """ Constant Temperature NLD"""
+        ct = np.exp((E - Eshift) / T) / T
+        return ct
+
+    @staticmethod
+    def nldSn_from_D0(D0: Union[float, Tuple[float, float]],
+                      Sn: Union[float, Tuple[float, float]], Jtarget: float,
+                      spincutModel: str, spincutPars: Dict[str, Any],
+                      **kwargs) -> Tuple[float, float]:
+        """Calculate nld(Sn) from D0
+
+
+        1/D0 = nld(Sn) * ( g(Jtarget+1/2, pi_target)
+                         + g(Jtarget1/2, pi_target) )
+        Here we assume equal parity, g(J,pi) = g(J)/2 and
+        nld(Sn) = 1/D0 * 2/(g(Jtarget+1/2) + g(Jtarget-1/2))
+        For the case Jtarget = 0, the g(Jtarget-1/2) = 0
+
+        Parameters:
+            D0 (float or [float, float]):
+                Average resonance spacing from s waves [eV]. If a tuple,
+                it is assumed that it is of the form `[value, uncertainty]`.
+            Sn (float or [float, float]):
+                Separation energy [MeV]. If a tuple, it is assumed that it is of
+                the form `[value, uncertainty]`.
+            Jtarget (float):
+                Target spin
+            spincutModel (str):
+                Model to for the spincut
+            spincutPars Dict[str, Any]:
+                Additional parameters necessary for the spin cut model
+            **kwargs: Description
+
+
+        Returns:
+            nld: Ex=Sn and nld at Sn [MeV, 1/MeV]
+        """
+
+        D0 = np.atleast_1d(D0)[0]
+        Sn = np.atleast_1d(Sn)[0]
+
+        def g(J):
+            return SpinFunctions(Ex=Sn, J=J,
+                                 model=spincutModel,
+                                 pars=spincutPars).distibution()
+
+        if Jtarget == 0:
+            summe = 1 / 2 * g(Jtarget + 1 / 2)
+        else:
+            summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
+
+        nld = 1 / (summe * D0 * 1e-6)
+        return [Sn, nld]
+
+    @staticmethod
+    def D0_from_nldSn(nld_model: Callable[..., Any],
+                      Sn: Union[float, Tuple[float, float]], Jtarget: float,
+                      spincutModel: str, spincutPars: Dict[str, Any],
+                      **kwargs) -> Tuple[float, float]:
+        """Calculate D0 from nld(Sn), assuming equiparity.
+
+        This is the inverse of `nldSn_from_D0`
+
+        Parameters:
+            nld_model (Callable[..., Any]): Model for nld above data of the
+                from `y = nld_model(E)` in 1/MeV.
+            Sn (float or [float, float]):
+                Separation energy [MeV]. If a tuple, it is assumed that it is of
+                the form `[value, uncertainty]`.
+            Jtarget (float):
+                Target spin
+            spincutModel (str):
+                Model to for the spincut
+            spincutPars Dict[str, Any]:
+                Additional parameters necessary for the spin cut model
+            **kwargs: Description
+
+
+        Returns:
+            D0: D0 in eV
+        """
+
+        Sn = np.atleast_1d(Sn)[0]
+        nld = nld_model(Sn)
+
+        def g(J):
+            return SpinFunctions(Ex=Sn, J=J,
+                                 model=spincutModel,
+                                 pars=spincutPars).distibution()
+
+        if Jtarget == 0:
+            summe = 1 / 2 * g(Jtarget + 1 / 2)
+        else:
+            summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
+
+        D0 = 1 / (summe * nld * 1e-6)
+        return D0
 
     @property
     def discrete(self) -> Optional[Vector]:
@@ -608,83 +703,3 @@ def load_levels_smooth(path: Union[str, Path], energy: ndarray,
     """
     histogram, smoothed = load_discrete(path, energy, resolution)
     return Vector(values=smoothed if resolution > 0 else histogram, E=energy)
-
-#################################
-# Ugly code below, to be fixed! #
-#################################
-
-def constant_temperature(E: ndarray, *, D0: float,
-                         Sn: float, T: float, Jtarget: float,
-                         spincutModel: str, spincutPars: Dict[str, Any]) -> ndarray:
-    """ CT model "turned around"
-
-    Usually the parameters are the temperature T and a shift Eshift.
-    However, you can reparametrise to use T and D0 (from which you
-    calculate Eshift)
-
-    Args:
-        ... (bla): blub
-        D0 (float or Tuple[float, float], optional): If set, this D0 will be
-            used instead of the one from spincutPars
-
-    """
-    nldSn = nldSn_from_D0(D0=D0,
-                          Sn=Sn,
-                          Jtarget=Jtarget,
-                          spincutModel=spincutModel,
-                          spincutPars=spincutPars)
-    shift = Eshift_from_T(T, nldSn)
-    return CT(E, T, shift)
-
-
-def CT(E: ndarray, T: float, Eshift: float) -> ndarray:
-    """ Constant Temperature NLD"""
-    ct = np.exp((E - Eshift) / T) / T
-    return ct
-
-
-def Eshift_from_T(T, nldSn):
-    """ Eshift from T for CT formula """
-    return nldSn[0] - T * np.log(nldSn[1] * T)
-
-
-def nldSn_from_D0(D0: float, Sn: float, Jtarget: float,
-                  spincutModel: str, spincutPars: Dict[str, Any],
-                  **kwargs) -> Tuple[float, float]:
-    """Calculate nld(Sn) from D0
-
-    1/D0 = nld(Sn) * ( g(Jtarget+1/2, pi_target) + g(Jtarget1/2, pi_target) )
-    Here we assume equal parity, g(J,pi) = g(J)/2 and
-    nld(Sn) = 1/D0 * 2/(g(Jtarget+1/2) + g(Jtarget-1/2))
-    For the case Jtarget = 0, the g(Jtarget-1/2) = 0
-
-    Parameters:
-        D0 (float):
-            Average resonance spacing from s waves [eV]
-        Sn (float):
-            Separation energy [MeV]
-        Jtarget (float):
-            Target spin
-        spincutModel (str):
-            Model to for the spincut
-        spincutPars Dict[str, Any]:
-            Additional parameters necessary for the spin cut model
-        **kwargs: Description
-
-
-    Returns:
-        nld: Ex=Sn and nld at Sn [MeV, 1/MeV]
-    """
-
-    def g(J):
-        return SpinFunctions(Ex=Sn, J=J,
-                             model=spincutModel,
-                             pars=spincutPars).distibution()
-
-    if Jtarget == 0:
-        summe = 1 / 2 * g(Jtarget + 1 / 2)
-    else:
-        summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
-
-    nld = 1 / (summe * D0 * 1e-6)
-    return [Sn, nld]
