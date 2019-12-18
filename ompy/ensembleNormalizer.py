@@ -5,6 +5,7 @@ import os
 from typing import List, Optional, Any, Tuple, Union
 from operator import xor
 import pandas as pd
+from scipy.stats import norm as scipynorm
 import copy
 from itertools import repeat
 
@@ -129,10 +130,12 @@ class EnsembleNormalizer:
         self.normalizer_gsf.normalize(normalizer_nld=self.normalizer_nld,
                                       gsf=gsf)
 
-        # same B for all normalizations of the same nld
+        # sample B from the gaussian uncertainty for each nld
         B = self.normalizer_gsf.res.pars["B"]
-        N = self.normalizer_gsf.res.samples["A"]
-        self.normalizer_gsf.res.samples["B"] = np.full_like(N, B)
+        N = len(self.normalizer_gsf.res.samples["A"])
+        self.normalizer_gsf.res.samples["B"] = scipynorm.rvs(loc=B[0],
+                                                             scale=B[1],
+                                                             size=N)
         return self.normalizer_gsf.res
 
     def plot(self, ax: Tuple[Any, Any] = None,
@@ -184,7 +187,8 @@ class EnsembleNormalizer:
         samples = self.samples_from_res(random_state)
         self.plot_selection(ax=ax, samples=samples,
                             normalizer_nld=normalizer_nld,
-                            normalizer_gsf=normalizer_gsf)
+                            normalizer_gsf=normalizer_gsf,
+                            n_plot=n_plot)
 
         # get median, 1 sigma, ...
         percentiles = [0.16, 0.84]
@@ -273,7 +277,7 @@ class EnsembleNormalizer:
             res.pars = row.to_dict()
 
             # workaround for the tuple (currently just a float)
-            keys_workaround = ["T", "D0"]
+            keys_workaround = ["T", "Eshift"]
             for key in keys_workaround:
                 res.pars[key] = [res.pars[key], np.nan]
 
@@ -311,6 +315,11 @@ class EnsembleNormalizer:
 
     @staticmethod
     def plot_vector_stats(ax: Tuple[Any, Any], samples, percentiles):
+
+        # workaround as dataframe changes limits
+        lim_ax0 = [ax[0].get_xlim(), ax[0].get_ylim()]
+        lim_ax1 = [ax[1].get_xlim(), ax[1].get_ylim()]
+
         # define helper function
         def vec_to_values(x, out):  # noqa
             idx, vec = x
@@ -338,6 +347,11 @@ class EnsembleNormalizer:
         lines = ax[1].fill_between(stats_gsf.x, stats_gsf["low"],
                                    stats_gsf["high"],
                                    alpha=0.3)
+
+        ax[0].set_xlim(lim_ax0[0])
+        ax[0].set_ylim(lim_ax0[1])
+        ax[1].set_xlim(lim_ax1[0])
+        ax[1].set_ylim(lim_ax1[1])
         return lines
 
     @staticmethod
