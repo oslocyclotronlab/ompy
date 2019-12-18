@@ -354,7 +354,7 @@ class Matrix(AbstractArray):
                 return f'x={x:1.0f}, y={y:1.0f}'
         ax.format_coord = format_coord
 
-        if fig is not None:
+        if add_cbar:
             if vmin is not None and vmax is not None:
                 cbar = fig.colorbar(lines, ax=ax, extend='both')
             elif vmin is not None:
