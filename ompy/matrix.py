@@ -348,7 +348,7 @@ class Matrix(AbstractArray):
                 col = np.searchsorted(xarr, x)-1
                 row = np.searchsorted(yarr, y)-1
                 z = masked[row, col]
-                return f'x={x:1.0f}, y={y:1.0f}, z={z:1.2E}'
+                return f'x={x:1.2f}, y={y:1.2f}, z={z:1.2E}'
                 # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
             else:
                 return f'x={x:1.0f}, y={y:1.0f}'
