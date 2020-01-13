@@ -29,5 +29,5 @@ USER $NB_USER
 COPY --chown=1000:100 . ompy
 # REMBEBER TO checkout the BRANCH you want
 RUN cd ompy &&\
-    git submodule update --init --recursive &&\
+    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e .
