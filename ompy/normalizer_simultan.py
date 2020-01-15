@@ -223,21 +223,22 @@ class NormalizerSimultan():
         B = guess["B"]
 
         # truncations from absolute values
-        lower, upper = 0., np.inf
+        lower_A, upper_A = 0., np.inf
         mu_A, sigma_A = A, 10*A
-        a_A = (lower - mu_A) / sigma_A
+        a_A = (lower_A - mu_A) / sigma_A
 
+        lower_Eshift, upper_Eshift = -5., 5
         mu_Eshift, sigma_Eshift = 0, 5
-        lower, upper = -5., 5
-        a_Eshift = (lower - mu_Eshift) / sigma_Eshift
+        a_Eshift = (lower_Eshift - mu_Eshift) / sigma_Eshift
 
+        lower_B, upper_B = 0., np.inf
         mu_B, sigma_B = B, 10*B
-        a_B = (lower - mu_B) / sigma_B
+        a_B = (lower_B - mu_B) / sigma_B
 
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # normal prior
-            cube[0] = truncnorm.ppf(cube[0], a_A, upper, loc=mu_A,
+            cube[0] = truncnorm.ppf(cube[0], a_A, upper_A, loc=mu_A,
                                     scale=sigma_A)
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
@@ -246,10 +247,11 @@ class NormalizerSimultan():
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm.ppf(cube[3], a_Eshift, upper, loc=mu_Eshift,
+            cube[3] = truncnorm.ppf(cube[3], a_Eshift, upper_Eshift,
+                                    loc=mu_Eshift,
                                     scale=sigma_Eshift)
             # truncated normal prior
-            cube[4] = truncnorm.ppf(cube[4], a_B, upper, loc=mu_B,
+            cube[4] = truncnorm.ppf(cube[4], a_B, upper_B, loc=mu_B,
                                     scale=sigma_B)
 
             if np.isinf(cube[3]):
