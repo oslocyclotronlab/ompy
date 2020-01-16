@@ -26,6 +26,7 @@ VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 
 # Return the git revision as a string
+# See also ompy/version.py
 def git_version():
     def _minimal_ext_cmd(cmd):
         # construct minimal environment
@@ -88,10 +89,10 @@ def get_version_info():
     return FULLVERSION, GIT_REVISION
 
 
-def write_version_py(filename='ompy/version.py'):
+def write_version_py(filename='ompy/version_setup.py'):
     cnt = """
 # THIS FILE IS GENERATED FROM OMPY SETUP.PY
-#
+# State of last built is:
 short_version = '%(version)s'
 version = '%(version)s'
 full_version = '%(full_version)s'
