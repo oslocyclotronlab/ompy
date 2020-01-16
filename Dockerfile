@@ -14,6 +14,9 @@ USER root
 RUN conda install -y numpy &&\
     conda install -y cython
 
+# install ipywidgets for the notebook (not a strict requirement)
+RUN conda install -y ipywidgets
+
 RUN [ "/bin/bash", "-c", "apt-get update"]
 RUN [ "/bin/bash", "-c", "apt-get install -y libblas{3,-dev} liblapack{3,-dev} cmake build-essential gfortran"]
 # Didn't find this, but not necessary: batlas{3-base,-dev}
