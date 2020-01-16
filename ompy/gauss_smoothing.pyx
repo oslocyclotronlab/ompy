@@ -1,13 +1,20 @@
 import os
 import numpy as np
+cimport cython
 cimport numpy as np
 
 from .matrix import to_plot_axis
 
 DTYPE = np.float64
 
+ctypedef fused number:
+    cython.short
+    cython.int
+    cython.long
+    cython.float
+    cython.double
 
-def gaussian(double[:] Emids, double mu, double sigma):
+def gaussian(number[:] Emids, number mu, double sigma):
     """
     Returns a normalized Gaussian supported on Emids.
 
@@ -15,9 +22,9 @@ def gaussian(double[:] Emids, double mu, double sigma):
     same units. In OMpy the default unit is keV.
 
     Args:
-        Emids (array, double): Array of energies to evaluate
+        Emids (array, number): Array of energies to evaluate
                                (center bin calibration)
-        mu (double): Centroid
+        mu (number): Centroid
         sigma (double): Standard deviation
     Returns:
         gaussian_array (array, double): Array of gaussian
@@ -42,7 +49,7 @@ def gaussian(double[:] Emids, double mu, double sigma):
     return gaussian_array
 
 
-def gauss_smoothing(double[:] array_in, double[:] E_array,
+def gauss_smoothing(double[:] array_in, number[:] E_array,
                     double[:] fwhm,
                     double truncate=3):
     """
@@ -50,7 +57,7 @@ def gauss_smoothing(double[:] array_in, double[:] E_array,
     of full-width-half-maximum FWHM. Preserves number of counts.
     Args:
         array_in (array, double): Array of inbound counts to be smoothed
-        E_array (array, double): Array with energy calibration of array_in, in
+        E_array (array, number): Array with energy calibration of array_in, in
                                  mid-bin calibration
         fwhm (array, double): The full-width-half-maximums. Need to be
                               same size as array_in
@@ -80,6 +87,7 @@ def gauss_smoothing(double[:] array_in, double[:] E_array,
                                 double sigma_current,
                                 double truncate=truncate):
         cdef int i_cut_low, i_cut_high
+        cdef double E_cut_low, E_cut_high
         E_cut_low = E_centroid_current - truncate * sigma_current
         i_cut_low = int((E_cut_low - a0) / a1)
         i_cut_low = max(0, i_cut_low)

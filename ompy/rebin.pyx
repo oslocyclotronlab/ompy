@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 cimport cython
+cimport numpy as np
 
 
 # We now need to fix a datatype for our arrays. I've used the variable
@@ -71,7 +72,7 @@ cdef double overlap(double edge_in_l, double edge_in_u,
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin_1D(double[:] counts, double[:] mids_in, double[:] mids_out):
+def rebin_1D(np.ndarray counts, np.ndarray mids_in, np.ndarray mids_out):
     """Rebin an array of counts from binning mids_in to binning mids_out
 
     Args:
@@ -125,8 +126,8 @@ def rebin_1D(double[:] counts, double[:] mids_in, double[:] mids_out):
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
 @cython.cdivision(True)
-def rebin_2D(double[:, :] counts, double[:] mids_in,
-             double[:] mids_out, int axis=0):
+def rebin_2D(np.ndarray counts, np.ndarray mids_in,
+             np.ndarray mids_out, int axis=0):
     """Rebin a matrix of counts from binning mids_in to binning mids_out
 
     This is a currently just a wrapper for rebin() to handle the logistics
