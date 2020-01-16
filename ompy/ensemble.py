@@ -31,6 +31,9 @@ import numpy as np
 import logging
 import matplotlib.pyplot as plt
 import os
+from pathos.multiprocessing import ProcessPool
+from pathos.helpers import cpu_count
+from itertools import repeat
 
 from typing import Callable, Union, List, Optional, Any, Tuple
 from pathlib import Path
@@ -50,6 +53,12 @@ logging.captureWarnings(True)
 
 class Ensemble:
     """Generates perturbated matrices to estimate uncertainty
+
+    Note:
+        When adding any functionality that runs withing the parallelized loop
+        make sure to use the random generator exposed via the arguments. If
+        one uses np.random instead, this will be the same an exact copy for
+        each process.
 
     Attributes:
         raw (Matrix): The raw matrix used as model for the ensemble. If a
@@ -83,6 +92,9 @@ class Ensemble:
             generated unfolded matrix. Defaults to NOP.
         action_firstgen (Action[Matrix]): An arbitrary action to apply to each
             generated firstgen matrix. Defaults to NOP.
+        nprocesses (int): Number of processes for multiprocessing.
+            Defaults to number of available cpus-1 (with mimimum 1).
+        seed (int): Random seed for reproducibility of results
 
 
     TODO:
@@ -130,6 +142,9 @@ class Ensemble:
         self.raw_ensemble: Optional[Matrix] = None
         self.unfolded_ensemble: Optional[Matrix] = None
         self.firstgen_ensemble: Optional[Matrix] = None
+
+        self.seed: int = 987654
+        self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
         if path is not None:
             self.path = Path(path)
@@ -201,34 +216,26 @@ class Ensemble:
 
         self.size = number
         self.regenerate = regenerate
-        raw_ensemble = np.zeros((number, *self.raw.shape))
-        unfolded_ensemble = np.zeros_like(raw_ensemble)
-        firstgen_ensemble = np.zeros_like(raw_ensemble)
 
-        for step in tqdm(range(number)):
-            LOG.info(f"Generating {step}")
-            if self.bg is not None:
-                prompt_w_bg = self.generate_perturbed(step, method,
-                                                      state="prompt+bg")
-                bg = self.generate_perturbed(step, method, state="bg")
-                raw = self.subtract_bg(step, prompt_w_bg, bg)
-            else:
-                raw = self.generate_perturbed(step, method, state="raw")
-            unfolded = self.unfold(step, raw)
-            firstgen = self.first_generation(step, unfolded)
+        LOG.info(f"Start normalization with {self.nprocesses} cpus")
+        pool = ProcessPool(nodes=self.nprocesses)
+        ss = np.random.SeedSequence(self.seed)
+        iterator = pool.imap(self.step, range(number), ss.spawn(number),
+                             repeat(method))
+        ensembles = np.array(list(tqdm(iterator, total=number)))
+        pool.close()
+        pool.join()
+        pool.clear()
 
-            raw_ensemble[step, :, :] = raw.values
-            unfolded_ensemble[step, :, :] = unfolded.values
-
-            # TODO The first generation method might reshape the matrix
-            if firstgen_ensemble.shape[1:] != firstgen.shape:
-                firstgen_ensemble = np.zeros((number, *firstgen.shape))
-            self.firstgen = firstgen
-            firstgen_ensemble[step, :, :] = firstgen.values
+        raw_ensemble = ensembles[:, 0, :, :]
+        unfolded_ensemble = ensembles[:, 1, :, :]
+        firstgen_ensemble = ensembles[:, 2, :, :]
 
         # TODO Move this to a save step
         self.raw.save(self.path / 'raw.npy')
-        self.firstgen.save(self.path / 'firstgen.npy')
+        # saving for firstgen is in step due to pickling
+        self.firstgen = Matrix(path=self.path / 'firstgen.npy')
+
         # Calculate standard deviation
         raw_ensemble_std = np.std(raw_ensemble, axis=0)
         raw_std = Matrix(raw_ensemble_std, self.raw.Eg, self.raw.Ex,
@@ -253,8 +260,39 @@ class Ensemble:
         self.unfolded_ensemble = unfolded_ensemble
         self.firstgen_ensemble = firstgen_ensemble
 
+    def step(self, step: int, rsequence: np.random.SeedSequence,
+             method: str):
+        """Single step in `self.generate`
 
-    def generate_perturbed(self, step: int, method: str, state: str) -> Matrix:
+        Args:
+            step (int): step (loop) number
+            rsequence (np.random.SeedSequence): SeedSequence for random seed
+            method (str): see `self.generate`
+
+        Returns:
+            raw, unfolded, firstgen
+        """
+        LOG.info(f"Generating {step}")
+        rstate = np.random.default_rng(rsequence)
+        if self.bg is not None:
+            prompt_w_bg = self.generate_perturbed(step, method,
+                                                  state="prompt+bg",
+                                                  rstate=rstate)
+            bg = self.generate_perturbed(step, method, state="bg",
+                                         rstate=rstate)
+            raw = self.subtract_bg(step, prompt_w_bg, bg)
+        else:
+            raw = self.generate_perturbed(step, method, state="raw",
+                                          rstate=rstate)
+        unfolded = self.unfold(step, raw)
+        firstgen = self.first_generation(step, unfolded)
+
+        if step == 0:  # workaround
+            firstgen.save(self.path / 'firstgen.npy')
+        return raw.values, unfolded.values, firstgen.values
+
+    def generate_perturbed(self, step: int, method: str, state: str,
+                           rstate: np.random.Generator) -> Matrix:
         """Generate a perturbated matrix
 
         Looks for an already generated file before generating the matrix.
@@ -264,6 +302,7 @@ class Ensemble:
             method: The name of the method to use. Can be either
                 "gaussian" or "poisson"
             state: Either "raw", "prompt+bg" or "bg".
+            rstate: numpy random generator (random state)
 
         Returns:
             The generated matrix
@@ -281,9 +320,9 @@ class Ensemble:
             #                      "remove negatives")
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
-                values = self.generate_gaussian(state)
+                values = self.generate_gaussian(state, rstate)
             elif method == 'poisson':
-                values = self.generate_poisson(state)
+                values = self.generate_poisson(state, rstate)
             else:
                 raise ValueError(f"Method {method} is not supported")
             base_mat = self.matrix_from_state(state)
@@ -406,33 +445,37 @@ class Ensemble:
         self.firstgen_ensemble = rebinned
         self.std_firstgen = firstgen_std
 
-    def generate_gaussian(self, state: str) -> np.ndarray:
+    def generate_gaussian(self, state: str,
+                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray: # noqa
         """Generates an array with Gaussian perturbations of a matrix.
         Note that entries are truncated at 0 (only positive).
 
         Args:
             state: State of the matrx/which matrix should be taken as a base
+            rstate (optional): numpy random generator (random state)
         Returns:
             The resulting array
         """
         mat = self.matrix_from_state(state)
         std = np.sqrt(np.where(mat.values > 0, mat.values, 0))
-        perturbed = np.random.normal(size=mat.shape, loc=mat.values,
-                                     scale=std)
+        perturbed = rstate.normal(size=mat.shape, loc=mat.values,
+                                  scale=std)
         perturbed[perturbed < 0] = 0
         return perturbed
 
-    def generate_poisson(self, state: str) -> np.ndarray:
+    def generate_poisson(self, state: str,
+                         rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:  # noqa
         """Generates an array with Poisson perturbations of a matrix
 
         Args:
             state: State of the matrx/which matrix should be taken as a base
+            rstate (optional): numpy random generator (random state)
         Returns:
             The resulting array
         """
         mat = self.matrix_from_state(state)
         std = np.where(mat.values > 0, mat.values, 0)
-        perturbed = np.random.poisson(std)
+        perturbed = rstate.poisson(std)
         return perturbed
 
     def load_matrix(self, path: Union[Path, str]) -> Union[Matrix, None]:

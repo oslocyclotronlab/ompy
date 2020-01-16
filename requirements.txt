@@ -1,9 +1,10 @@
  cython
- numpy
+ numpy>=1.17
  pandas
  matplotlib
  termtables
  pymultinest
  scipy
- uncertainties
+ uncertainties>=3.0.3
  tqdm
+ pathos

@@ -8,6 +8,8 @@ import pandas as pd
 from scipy.stats import norm as scipynorm
 import copy
 from itertools import repeat
+from pathos.multiprocessing import ProcessPool
+from pathos.helpers import cpu_count
 
 from .models import ResultsNormalized
 from .vector import Vector
@@ -40,12 +42,22 @@ class EnsembleNormalizer:
                                normalizer_nld=...,
                                normalizer_gsf=...)
 
+    Note:
+        If one should add a functionality that depends on random numbers
+        withing the parallelized loop make sure to use the random generator
+        exposed via the arguments (see Ensemble class for an example). If one
+        uses np.random instead, this will be the same an exact copy for each
+        process. Note that this is not an issue for multinest seach routine,
+        which is anyhow seeded by default as implemented in ompy.
+
     Attributes:
         extractor (Extractor): Extractor instance
         normalizer_nld (NormalizerNLD): NormalizerNLD instance
         normalizer_gsf (NormalizerGSF): NormalizerGSF instance
         normalizer_simultan (NormalizerSimultan): NormalizerSimultan instance
         res (List[ResultsNormalized]): List of the results
+        nprocesses (int): Number of processes for multiprocessing.
+            Defaults to number of available cpus-1 (with mimimum 1).
     """
 
     def __init__(self, *, extractor: Extractor,
@@ -67,6 +79,8 @@ class EnsembleNormalizer:
 
         self.normalizer_simultan = normalizer_simultan
 
+        self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
+
         self.res: Optional[List[ResultsNormalized]] = None
 
     def normalize(self) -> None:
@@ -80,24 +94,39 @@ class EnsembleNormalizer:
         gsfs = self.extractor.gsf
         nlds = self.extractor.nld
 
-        # reset
-        self.res = []
+        LOG.info(f"Start normalization with {self.nprocesses} cpus")
+        pool = ProcessPool(nodes=self.nprocesses)
+        N = len(nlds)
+        iterator = pool.imap(self.step, range(N), nlds, gsfs)
+        self.res = list(tqdm(iterator, total=N))
+        pool.close()
+        pool.join()
+        pool.clear()
 
-        # tqdm should be innermost (see github))
-        for i, (nld, gsf) in enumerate(zip(tqdm(nlds), gsfs)):
-            LOG.info(f"\n\n---------\nNormalizing #{i}")
-            nld.copy()
-            nld.cut_nan()
+    def step(self, i: int, nld: Vector, gsf: Vector):
+        """ Normalization step for each ensemble member
 
-            gsf.copy()
-            gsf.cut_nan()
+        Args:
+            i (int): Loop number
+            nld (Vector): NLD before normalization
+            gsf (Vector): gsf before normalization
 
-            if self.normalizer_simultan is not None:
-                res = self.normalizeSimultan(i, nld=nld, gsf=gsf)
-            else:
-                res = self.normalizeStagewise(i, nld=nld, gsf=gsf)
+        Returns:
+            res (ResultsNormalized): results (/parameters) of normalization
+        """
+        LOG.info(f"\n\n---------\nNormalizing #{i}")
+        nld.copy()
+        nld.cut_nan()
 
-            self.res.append(res)
+        gsf.copy()
+        gsf.cut_nan()
+
+        if self.normalizer_simultan is not None:
+            res = self.normalizeSimultan(i, nld=nld, gsf=gsf)
+        else:
+            res = self.normalizeStagewise(i, nld=nld, gsf=gsf)
+
+        return res
 
     def normalizeSimultan(self, num: int, *,
                           nld: Vector, gsf: Vector) -> ResultsNormalized:
@@ -128,7 +157,7 @@ class EnsembleNormalizer:
         """
         self.normalizer_nld.normalize(nld=nld, num=num)
         self.normalizer_gsf.normalize(normalizer_nld=self.normalizer_nld,
-                                      gsf=gsf)
+                                      gsf=gsf, num=num)
 
         # sample B from the gaussian uncertainty for each nld
         B = self.normalizer_gsf.res.pars["B"]
