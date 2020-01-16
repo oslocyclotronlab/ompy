@@ -73,13 +73,13 @@ def get_version_info():
     FULLVERSION = VERSION
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
-    elif os.path.exists('ompy/version.py'):
+    elif os.path.exists('ompy/version_setup.py'):
         # must be a source distribution, use existing version file
         try:
             from ompy.version import git_revision as GIT_REVISION
         except ImportError:
             raise ImportError("Unable to import git_revision. Try removing "
-                              "ompy/version.py and the build directory "
+                              "ompy/version_setup.py and the build directory "
                               "before building.")
     else:
         GIT_REVISION = "Unknown"
