@@ -1,3 +1,3 @@
-[submodule "oscar_response"]
-	path = oscar_response
-	url = https://github.com/oslocyclotronlab/oscar_response.git
+[submodule "OCL_response_functions"]
+	path = OCL_response_functions
+	url = https://github.com/oslocyclotronlab/OCL_response_functions
