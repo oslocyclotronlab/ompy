@@ -446,7 +446,7 @@ class Ensemble:
         self.std_firstgen = firstgen_std
 
     def generate_gaussian(self, state: str,
-                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:
+                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray: # noqa
         """Generates an array with Gaussian perturbations of a matrix.
         Note that entries are truncated at 0 (only positive).
 
@@ -464,7 +464,7 @@ class Ensemble:
         return perturbed
 
     def generate_poisson(self, state: str,
-                         rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:
+                         rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:  # noqa
         """Generates an array with Poisson perturbations of a matrix
 
         Args:
