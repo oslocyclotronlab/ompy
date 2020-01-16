@@ -2,6 +2,7 @@
 # see also setup.py
 import os
 import subprocess
+import pathlib
 from .version_setup import version as VERSION
 
 
@@ -38,6 +39,11 @@ def get_version_info():
     # Adding the git rev number needs to be done inside write_version_py(),
     # otherwise the import of ompy.version messes up the build under Python 3.
     FULLVERSION = VERSION
+
+    cwd = pathlib.Path.cwd()
+    filepwd = pathlib.Path(__file__).parent.absolute()
+    os.chdir(filepwd / "../")
+
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
     elif os.path.exists('ompy/version.py'):
@@ -52,6 +58,8 @@ def get_version_info():
         GIT_REVISION = "Unknown"
 
     FULLVERSION += '.dev0+' + GIT_REVISION[:7]
+
+    os.chdir(cwd)  # reset state
 
     return FULLVERSION, GIT_REVISION
 
