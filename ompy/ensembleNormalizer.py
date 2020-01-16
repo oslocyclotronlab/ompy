@@ -56,8 +56,8 @@ class EnsembleNormalizer:
         normalizer_gsf (NormalizerGSF): NormalizerGSF instance
         normalizer_simultan (NormalizerSimultan): NormalizerSimultan instance
         res (List[ResultsNormalized]): List of the results
-        nprocesses (int, optional): Number of processes for multiprocessing.
-            Defaults to number of available cpus.
+        nprocesses (int): Number of processes for multiprocessing.
+            Defaults to number of available cpus-1 (with mimimum 1).
     """
 
     def __init__(self, *, extractor: Extractor,
@@ -79,7 +79,7 @@ class EnsembleNormalizer:
 
         self.normalizer_simultan = normalizer_simultan
 
-        self.nprocesses: int = cpu_count()
+        self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
         self.res: Optional[List[ResultsNormalized]] = None
 

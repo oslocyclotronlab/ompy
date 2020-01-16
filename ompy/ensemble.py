@@ -93,7 +93,7 @@ class Ensemble:
         action_firstgen (Action[Matrix]): An arbitrary action to apply to each
             generated firstgen matrix. Defaults to NOP.
         nprocesses (int): Number of processes for multiprocessing.
-            Defaults to number of available cpus.
+            Defaults to number of available cpus-1 (with mimimum 1).
         seed (int): Random seed for reproducibility of results
 
 
@@ -144,7 +144,7 @@ class Ensemble:
         self.firstgen_ensemble: Optional[Matrix] = None
 
         self.seed: int = 987654
-        self.nprocesses: int = cpu_count()
+        self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
         if path is not None:
             self.path = Path(path)
