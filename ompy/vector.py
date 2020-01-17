@@ -144,7 +144,7 @@ class Vector(AbstractArray):
         Args:
             path (str or Path): Path to save
             filetype (str, optional): Filetype. Default uses
-                auto-recognition from suffix.
+                auto-recognition from suffix. Options: ["numpy", "tar", "mama"]
 
         Raises:
             ValueError: Filetype is not supported
