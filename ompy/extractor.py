@@ -165,12 +165,12 @@ class Extractor:
         assert self.trapezoid is not None
         matrix = self.ensemble.get_firstgen(num).copy()
         std = self.ensemble.std_firstgen.copy()
-        # ensure same vuts for all ensemble members if Eg_max is not given
+        # ensure same cuts for all ensemble members if Eg_max is not given
         # (thus auto-determined) in the trapezoid.
         if num == 0:
             self.trapezoid.act_on(matrix)
-            self.trapezoid.act_on(std)
             self.trapezoid.curry(Eg_max=matrix.Eg[-1])
+            self.trapezoid.act_on(std)
         else:
             self.trapezoid.act_on(matrix)
             self.trapezoid.act_on(std)
