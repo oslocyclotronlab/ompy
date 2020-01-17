@@ -236,7 +236,7 @@ class Extractor:
         bin_width = dEx
 
         # create nld energy array
-        Emin = matrix.Ex.max()-matrix.Eg.max()
+        Emin = matrix.Ex.min()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
         E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width)+1)
 
@@ -271,16 +271,16 @@ class Extractor:
         LOG.info("Minimizing")
         LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
         with redirect_stdout(LOG):
-            res = minimize(errfun, x0=x0, method=self.method, options=self.options)
+            res = minimize(errfun, x0=x0, method=self.method,
+                           options=self.options)
         T = res.x[:matrix.Eg.size]
         nld = res.x[matrix.Eg.size:]
 
         # Set elements that couldn't be constrained (no entries) to np.na
-        n_nan_nld, n_nan_gsf = self.unconstrained_elements(matrix, E_nld,
-                                                           resolution)
-        if n_nan_gsf > 0:
-            T[-n_nan_gsf:] = np.nan
-        nld[:n_nan_nld] = np.nan
+        nld_counts0, T_counts0 = self.constraining_counts(matrix, resolution)
+        T[T_counts0 == 0] = np.nan
+        nld[nld_counts0 == 0] = np.nan
+
         # Convert transmission coefficient to the more useful
         # gamma strength function
         gsf = T/(2*np.pi*matrix.Eg**3)
@@ -296,35 +296,38 @@ class Extractor:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg)
 
     @staticmethod
-    def unconstrained_elements(matrix: Matrix,
-                               E_nld: np.ndarray,
-                               resolution: np.ndarray) -> Tuple[int, int]:
-        """
-        Indices of elements close to the diagonal in gsf and nld that
-        cannot be constrained, as the bins don't have counts
+    def constraining_counts(matrix: Matrix,
+                            resolution: np.ndarray) -> Tuple[np.ndarray,
+                                                             np.ndarray]:
+        """ Number of counts constraining each nld bin and gsf bin
 
         Args:
             matrix (Matrix): Input matrix
-            E_nld (np.ndarray): Energy array of the nld
             resolution (np.ndarray): Resolution at `Ex=Ex`
 
         Returns:
-            Number of unconstrained elements of nld and gsf
+            Tuple[nld_counts, T_counts]: Number of counts constraining each
+                nld and gsf bin
         """
-        dEx = matrix.Ex[1] - matrix.Ex[0]
-        dEg = matrix.Eg[1] - matrix.Eg[0]
-        assert dEx == dEg
+        matrix = matrix.copy()
 
-        lastEx = matrix[-1, :].copy()
+        # Mask elements beyond Ex + resolution* to 0 (not used in chi2)
+        # * + halfbin to get closest bin (when calib uses midbins)
+        Egs = np.tile(matrix.Eg, (matrix.shape[0], 1))  # reapeat Egs
+        halfbin = (matrix.Eg[1]-matrix.Eg[0])/2
+        Emax = (matrix.Ex + resolution)[:, np.newaxis] + halfbin
+        matrix.values = np.ma.masked_array(matrix.values, Egs > Emax)
 
-        # account for resolution
-        iEgmax = matrix.index_Eg(matrix.Ex[-1] + resolution[-1])
-        lastEx[iEgmax+1:] = 0
+        # sum counts along diagonals
+        start = - (matrix.shape[0] - 1)
+        stop = matrix.shape[1]
+        nld_counts = np.array([matrix.values.trace(offset=d)
+                              for d in range(start, stop)])
+        nld_counts = nld_counts[::-1]
 
-        n_nan_gsf = (matrix.shape[1]-1) - np.nonzero(lastEx)[0][-1]
-        Efirst_nld = matrix.Ex[-1] - matrix.Eg[-(1+n_nan_gsf)]
-        n_nan_nld = np.abs(E_nld-Efirst_nld).argmin()
-        return n_nan_nld, n_nan_gsf
+        T_counts, _ = matrix.projection('Eg')
+
+        return nld_counts, T_counts.data
 
     def diagonal_resolution(self, matrix: Matrix) -> np.ndarray:
         """Detector resolution at the Ex=Eg diagonal
