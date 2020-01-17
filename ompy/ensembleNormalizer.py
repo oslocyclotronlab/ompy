@@ -363,6 +363,7 @@ class EnsembleNormalizer:
         stats_nld.plot(x="x", y="median", ax=ax[0], legend=False)
 
         df = samples["gsf"]
+        E = df.iloc[0].E
         stats_gsf = EnsembleNormalizer.stats_from_df(df, fmap=vec_to_values,
                                             shape_out=(len(df), len(E)),
                                             percentiles=percentiles)  # noqa
