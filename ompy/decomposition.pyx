@@ -75,6 +75,7 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
     normalize(firstgen)
     return firstgen
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
@@ -103,10 +104,19 @@ cdef int _index(double[:] array, double element) nogil:
             prev_distance = distance
     return i
 
+
+ctypedef fused number:
+    cython.short
+    cython.int
+    cython.long
+    cython.float
+    cython.double
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def index(double[:] array, double element):
+def index(number[:] array, number element):
     """ Finds the index of the closest element in the array
 
     Unsafe.

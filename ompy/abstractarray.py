@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from typing import Union, Tuple
+import numpy as np
 
 
 class AbstractArray:
@@ -19,6 +20,33 @@ class AbstractArray:
     def copy(self) -> AbstractArray:
         """ Return a deepcopy of the class """
         return copy.deepcopy(self)
+
+    def verify_equdistant(self, axis: Union[int, str]):
+        """ Runs checks to verify if energy arrays are equidistant
+
+        axis: The axis to project onto.
+                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
+        Raises:
+            ValueError: If any check fails
+        """
+        axis = to_plot_axis(axis)
+        isEx = (axis == 1)
+        try:  # better with isinstance, but good for now
+            energy = self.Ex if isEx else self.Eg
+            name = "Ex" if isEx else "Eg"
+        except AttributeError:
+            energy = self.E
+            name = "E"
+
+        # Check shapes:
+        if len(energy) > 2:
+            diff = (energy - np.roll(energy, 1))[1:]  # E_{i} - E_{i-1}
+            try:
+                diffdiff = diff - diff[1]
+                np.testing.assert_array_almost_equal(diffdiff,
+                                                     np.zeros_like(diff))
+            except AssertionError:
+                raise ValueError(f"{name} array is not equispaced")
 
     def __sub__(self, other) -> AbstractArray:
         result = self.copy()
@@ -95,3 +123,31 @@ class AbstractArray:
 
     def __setitem__(self, key, item):
         return self.values.__setitem__(key, item)
+
+
+def to_plot_axis(axis: Union[int, str]) -> int:
+    """Maps axis to 0, 1 or 2 according to which axis is specified
+
+    Args:
+        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
+              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
+    Returns:
+        An int describing the axis in the basis of the plot,
+        _not_ the values' dimension.
+
+    Raises:
+        ValueError if the axis is not supported
+    """
+    try:
+        axis = axis.lower()
+    except AttributeError:
+        pass
+
+    if axis in (0, 'eg', 'x'):
+        return 0
+    elif axis in (1, 'ex', 'y'):
+        return 1
+    elif axis in (2, 'both', 'egex', 'exeg', 'xy', 'yx'):
+        return 2
+    else:
+        raise ValueError(f"Unrecognized axis: {axis}")

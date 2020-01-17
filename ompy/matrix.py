@@ -37,7 +37,7 @@ from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     Sequence, Optional, Iterator)
-from .abstractarray import AbstractArray
+from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
 from .filehandling import (mama_read, mama_write,
                            save_numpy_2D, load_numpy_2D, save_tar, load_tar,
@@ -153,8 +153,12 @@ class Matrix(AbstractArray):
 
         self.state = state
 
-    def verify_integrity(self):
+    def verify_integrity(self, check_equidistant: bool = False):
         """ Runs checks to verify internal structure
+
+        Args:
+            check_equidistant (bool, optional): Check whether energy array
+                are equidistant spaced. Defaults to False.
 
         Raises:
             ValueError: If any check fails
@@ -169,15 +173,6 @@ class Matrix(AbstractArray):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Ex)}"))
-            if len(self.Ex) > 2:
-                # Verify equispaced array
-                diff = (self.Ex - np.roll(self.Ex, 1))[1:]
-                try:
-                    diffdiff = diff - diff[1]
-                    np.testing.assert_array_almost_equal(diffdiff,
-                                                         np.zeros_like(diff))
-                except AssertionError:
-                    raise ValueError("Ex array is not equispaced")
         if self.Ex is not None and self.Ex.ndim > 1:
             raise ValueError(f"Ex array must be ndim 1, not {self.Ex.ndim}")
 
@@ -186,15 +181,12 @@ class Matrix(AbstractArray):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Eg)}"))
-            if len(self.Eg) > 2:
-                # Verify equispaced array
-                diff = (self.Eg - np.roll(self.Eg, 1))[1:]
-                diffdiff = diff - diff[1]
-                if not np.allclose(diffdiff, np.zeros_like(diff)):
-                    print(self.Eg)
-                    raise ValueError("Eg array is not equispaced")
         if self.Eg is not None and self.Eg.ndim > 1:
             raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
+
+        if check_equidistant:
+            self.verify_equdistant("Ex")
+            self.verify_equdistant("Eg")
 
         if self.std is not None:
             if shape != self.std.shape:
@@ -881,59 +873,6 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
-
-
-def to_plot_axis(axis: Union[int, str]) -> int:
-    """Maps axis to 0, 1 or 2 according to which axis is specified
-
-    Args:
-        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
-              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
-    Returns:
-        An int describing the axis in the basis of the plot,
-        _not_ the values' dimension.
-
-    Raises:
-        ValueError if the axis is not supported
-    """
-    try:
-        axis = axis.lower()
-    except AttributeError:
-        pass
-
-    if axis in (0, 'eg', 'x'):
-        return 0
-    elif axis in (1, 'ex', 'y'):
-        return 1
-    elif axis in (2, 'both', 'egex', 'exeg', 'xy', 'yx'):
-        return 2
-    else:
-        raise ValueError(f"Unrecognized axis: {axis}")
-
-
-def to_values_axis(axis: Union[int, str]) -> int:
-    """Maps axis to 0, 1 or 2 according to which axis is specified
-
-    Args:
-        axis: Can be 0, 1, 'Eg', 'Ex', 'both', 2
-
-    Returns:
-        An int describing the axis in the basis of values,
-        _not_ the plot's dimension.
-
-    Raises:
-        ValueError if the axis is not supported
-    """
-    try:
-        axis = axis.lower()
-    except AttributeError:
-        pass
-
-    axis = to_plot_axis(axis)
-    if axis == 2:
-        return axis
-    return (axis + 1) % 2
-
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):
