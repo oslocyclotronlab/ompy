@@ -289,6 +289,11 @@ class Ensemble:
 
         if step == 0:  # workaround
             firstgen.save(self.path / 'firstgen.npy')
+
+        assert(raw.shape == unfolded.shape and raw.shape == firstgen.shape), \
+            ("For now, all matrices have to have the same shape. Currently, "
+             f"shapes: raw: {raw.shape}, unfolded: {unfolded.shape} and "
+             f"firstgen: {firstgen.shape}")
         return raw.values, unfolded.values, firstgen.values
 
     def generate_perturbed(self, step: int, method: str, state: str,

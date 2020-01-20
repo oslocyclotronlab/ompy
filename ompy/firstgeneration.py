@@ -116,8 +116,9 @@ class FirstGeneration:
         """
         matrix = unfolded.copy()
         self.action.act_on(matrix)
-        # We don't want negative energies
-        matrix.cut('Ex', Emin=0.0)
+        if np.any(matrix.Ex < 0):
+            raise ValueError("input matrix has to have positive Ex entries"
+                             "only. Consider using `matrix.cut('Ex', Emin=0)`")
         if np.any(matrix.values < 0):
             raise ValueError("input matrix has to have positive entries only.")
 
