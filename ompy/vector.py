@@ -72,8 +72,12 @@ class Vector(AbstractArray):
             self.load(path)
         self.verify_integrity()
 
-    def verify_integrity(self):
+    def verify_integrity(self, check_equidistant: bool = False):
         """ Verify the internal consistency of the vector
+
+        Args:
+            check_equidistant (bool, optional): Check whether energy array
+                are equidistant spaced. Defaults to False.
 
         Raises:
             AssertionError or ValueError if any test fails
@@ -85,6 +89,9 @@ class Vector(AbstractArray):
         if self.std is not None:
             if self.std.shape != self.values.shape:
                 raise ValueError("std and values must have same shape")
+
+        if check_equidistant:
+            self.verify_equdistant(axis="x")
 
     def calibration(self) -> Dict[str, float]:
         """Calculate and return the calibration coefficients of the energy axes
