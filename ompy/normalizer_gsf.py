@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import copy
 from numpy import ndarray
-from typing import Optional, Tuple, Any, Callable
+from typing import Optional, Tuple, Any, Callable, Union
 import matplotlib.pyplot as plt
 
 from .library import log_interp1d, self_if_none
@@ -230,12 +230,11 @@ class NormalizerGSF():
         LOG.debug("Method to compute Gg: %s", self.method_Gg)
         if self.method_Gg == "standard":
             return self.Gg_standard()
-        elif self.method_Gg == "FJT":
-            raise NotImplementedError("Sorry, not implemented yet")
-            return self.Gg_FJT()
         else:
+            # placeholder if normalizations with
             NotImplementedError(f"Chosen normalization {self.method_Gg}"
                                 "method is not known.")
+
 
     def Gg_standard(self) -> float:
         """ Compute normalization from <Γγ> (Gg) integral, the "standard" way
@@ -262,12 +261,15 @@ class NormalizerGSF():
             available spins in dippole decays j=[-1,0,1]:
             spinsum = ∑ⱼ g(Sₙ-Eγ, Jₜ± ½+j).
 
-            and <Gg> is a shorthand for <Γγ(Sₙ, Jₜ± ½, πₜ)>
-            <Γγ(Sₙ, Jₜ± ½, πₜ)> =    <<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>>
-                                ≃ ½ * (<Γγ(Sₙ, Jₜ+ ½, πₜ)> + <Γγ(Sₙ, Jₜ- ½, πₜ)>)
-            [but I'm challenged to derive "additivee" 1/ρ part; this is
-             probably an approximation, although a *equal sign* is used in the
-             article]
+            and <Γγ> is a shorthand for <Γγ(Sₙ, Jₜ± ½, πₜ)>.
+
+            When Jₜ≠0 where we see resonances from both states Jₜ± ½, but
+            often only <Γγ> is provided. We assume this is calculated as the
+            average over all width: (dropping Sₙ and πₜ in notation)
+            <Γγ> = ( N(Jₜ+½) <Γγ(Jₜ+ ½)> + N(Jₜ-½) <Γγ(Jₜ-½)> )
+                    / ( N(Jₜ+½) + N(Jₜ-½) ),
+            where N(J) is the number of levels with spin J. This is by ρ(J).
+            N(Jₜ+½) + N(Jₜ-½) is the same as ρ(Sₙ, Jₜ± ½, πₜ).
 
             We can obtain ρ(Sₙ, Jₜ± ½, πₜ) from eq(19) via D0:
             ρ(Sₙ, Jₜ± ½, πₜ) = ρ(Sₙ, Jₜ+ ½, πₜ) + ρ(Sₙ, Jₜ+ ½, πₜ) = 1/D₀
@@ -275,6 +277,15 @@ class NormalizerGSF():
 
             Equi-parity means further that g(J,π) = 1/2 * g(J), for the calc.
             above: spinsum(π) =  1/2 * spinsum.
+
+            For the Jₜ≠0 case, we can now rewrite:
+            <Γγ> = D0 * (ρ(Sₙ, Jₜ+ ½) * <Γγ(Jₜ+ ½)>
+                         + ρ(Sₙ, Jₜ- ½) * <Γγ(Jₜ- ½)>),
+                 = D0 * (  ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(Jₜ- ½, π)
+                         + ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) spinsum(Jₜ+ ½, π) )
+                 = D0 ∫dEγ Eγ³ gsf(Eγ) ρ(Sₙ-Eγ) (  spinsum(Jₜ- ½, π)
+                                                 + spinsum(Jₜ+ ½, π))
+
 
             ** We set B to 1, so we get the <Γγ> before normalization. The
             normalization B is then `B = <Γγ>_exp/ <Γγ>_cal`
@@ -313,32 +324,48 @@ class NormalizerGSF():
                              model=self.norm_pars.spincutModel,
                              pars=self.norm_pars.spincutPars).distibution()
 
-    def SpinSum(self, Ex, J):
-        """ Sum of spin distributions of the available states """
+    def SpinSum(self, Ex: Union[float, np.ndarray],
+                J: float,
+                Ltransfer: float = 0) -> Union[float, np.ndarray]:
+        """Sum of spin distributions of the available states x 2
+           (assumes equiparity)
+
+        Note:
+            `∑_It ∑_Jr g(Jₜ- ½)`,
+            where the first sum is over the available states in the residual '
+            nuclus assuming a angular momentum transfer `l`: `It = Jₜ ± ½ ± l`.
+            The second sum assumes that we can reach states only b dipole
+            radiaton, so the available final states are: `Jr = It ± 1`.
+
+            As g(J) is normalized as `∑_J g(J) = 1`, and not `∑_J g(J, π) = ½`
+            the sum calculated here is actually 2x the sum of avaiable states.
+
+        Args:
+            Ex (Union[float, np.ndarray]): Excitation energy
+            J (float): Target spin (in neutron capture reaction)
+            Ltransfer (float, optional): Angular momentum transfer. Default is
+                 0, corresponding to "swave" transfer.
+
+        Returns:
+            Union[float, np.ndarray]: Sum of spin distributions. If `Ex` is
+                and array, this will be an array with the sum for each `Ex`.
+        """
         spin_dist = self.spin_dist
-        if J == 0:
-            # if(J == 0.0) I_i = 1/2 => I_f = 1/2, 3/2
-            return spin_dist(Ex, J + 1/2) \
-                + spin_dist(Ex, J + 3/2)
-        elif J == 1/2:
-            # if(J == 0.5)    I_i = 0, 1  => I_f = 0, 1, 2
-            return spin_dist(Ex, J - 1/2) \
-                + 2 * spin_dist(Ex, J + 1/2) \
-                + spin_dist(Ex, J + 3/2)
-        elif J == 1:
-            # if(J == 0.5) I_i = 1/2, 3/2  => I_f = 1/2, 3/2, 5/2
-            return 2 * spin_dist(Ex, J - 1/2) \
-                + 2 * spin_dist(Ex, J + 1/2) \
-                + spin_dist(Ex, J + 3/2)
-        elif J > 1:
-            # J > 1 > I_i = Jt-1/2, Jt+1/2
-            #                    => I_f = Jt-3/2, Jt-1/2, Jt+3/2, Jt+5/2
-            return spin_dist(Ex, J - 3/2) \
-                + 2 * spin_dist(Ex, J - 1/2) \
-                + 2 * spin_dist(Ex, J + 1/2) \
-                + spin_dist(Ex, J + 3/2)
-        else:
-            ValueError("Negative J not supported")
+
+        assert J >= 0 and Ltransfer >= 0, \
+            f"J={J} and l={Ltransfer} cannot be negative"
+
+        # sum over residual nucleus
+        total = 0
+        Jtarget_min = abs(J - 1/2 - Ltransfer)
+        Jtarget_max = J + 1/2 + Ltransfer
+        for Jtarget in np.arange(Jtarget_min, Jtarget_max+1):
+            # accessible spins in dipole transition
+            Jres_min = abs(Jtarget - 1)
+            Jres_min = Jtarget + 1
+            for Jfinal in np.arange(Jres_min, Jres_min + 1):
+                total += spin_dist(Ex, Jfinal)
+        return total
 
     def plot(self, ax: Optional[Any] = None, *,
              add_label: bool = True,
