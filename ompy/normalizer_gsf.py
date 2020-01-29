@@ -355,15 +355,15 @@ class NormalizerGSF():
         assert J >= 0 and Ltransfer >= 0, \
             f"J={J} and l={Ltransfer} cannot be negative"
 
-        # sum over residual nucleus
+        # accessible residual spins
+        Jres_min = abs(J - 1/2 - Ltransfer)
+        Jres_max = J + 1/2 + Ltransfer
         total = 0
-        Jtarget_min = abs(J - 1/2 - Ltransfer)
-        Jtarget_max = J + 1/2 + Ltransfer
-        for Jtarget in np.arange(Jtarget_min, Jtarget_max+1):
+        for Jres in np.arange(Jres_min, Jres_max+1):
             # accessible spins in dipole transition
-            Jres_min = abs(Jtarget - 1)
-            Jres_min = Jtarget + 1
-            for Jfinal in np.arange(Jres_min, Jres_min + 1):
+            Jfinal_min = abs(Jres - 1)
+            Jfinal_max = Jres + 1
+            for Jfinal in np.arange(Jfinal_min, Jfinal_max + 1):
                 total += spin_dist(Ex, Jfinal)
         return total
 
