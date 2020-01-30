@@ -356,7 +356,8 @@ class NormalizerGSF():
             f"J={J} and l={Ltransfer} cannot be negative"
 
         # accessible residual spins
-        Jres_min = abs(J - 1/2 - Ltransfer)
+        Jres_min = min(abs(J - 1/2 - Ltransfer), abs(J + 1/2 - Ltransfer),
+                       abs(J - 1/2 + Ltransfer))
         Jres_max = J + 1/2 + Ltransfer
         total = 0
         for Jres in np.arange(Jres_min, Jres_max+1):
