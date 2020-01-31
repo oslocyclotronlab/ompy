@@ -362,9 +362,11 @@ class NormalizerGSF():
         total = 0
         for Jres in np.arange(Jres_min, Jres_max+1):
             # accessible spins in dipole transition
-            Jfinal_min = abs(Jres - 1)
+            Jfinal_min = min(abs(Jres - 1), Jres)
             Jfinal_max = Jres + 1
             for Jfinal in np.arange(Jfinal_min, Jfinal_max + 1):
+                if Jres == Jfinal == 0:
+                    continue
                 total += spin_dist(Ex, Jfinal)
         return total
 
