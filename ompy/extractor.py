@@ -338,6 +338,8 @@ class Extractor:
             nld0 = self.x0_BSFG(E_nld)
         elif method == "CT-like":
             nld0 = self.x0_CT(E_nld)
+        elif method == "parabola":
+            nld0 = self.x0_parabola(E_nld)
         else:
             raise NotImplementedError(f"Method {method} not in "
                                       "['BSFG-like','CT-like'.")
@@ -393,6 +395,28 @@ class Extractor:
             nld0: Initial guess
         """
         return np.ones(E_nld.size)
+
+    @staticmethod
+    def x0_parabola(E_nld: np.ndarray, E0: float = 4,
+                    y0: float = 0.01, a: float = 1) -> np.ndarray:
+        """Initial guess as parabola a(E_nld - E0)² + y0
+
+        This is quite crazy; For E0 > 0: the NLD is not expected to
+        reduce for higher Ex
+
+        Args:
+            E_nld: Energy array of nld [in MeV]
+            E0: shift constant in x direction [in MeV]
+            y0: shift constant in y direction.
+            a: multiplier
+
+
+        Returns:
+            nld0: Initial guess
+        """
+        vals = a*(E_nld - E0)**2 + y0
+        assert (vals >= 0).all(), "Negative nld is meaningless"
+        return vals
 
     @staticmethod
     def constraining_counts(matrix: Matrix,
