@@ -52,6 +52,10 @@ class Extractor:
             the fit will be extended beyond Ex=Eg by the (FWHM) of the
             resolution. Remember to set the resolution according to your
             experiment
+        x0 (np.ndarray or str): Initial values. See `decompose`.
+        randomize_initial_values (bool): Randomize initial values for
+            decomposition. Defaults to True.
+        seed (int): Random seed for reproducibility of results.
         resolution_Ex (float or np.ndarray, optional): Resolution (FWHM) along
             Ex axis (particle detector resolution). Defaults to 150 keV
 
@@ -84,6 +88,11 @@ class Extractor:
         else:
             self.path = Path('extraction_ensemble')
             self.path.mkdir(exist_ok=True)
+
+        self.x0 = None
+        self.randomize_initial_values: bool = True
+        self.seed: int = 98743215
+        np.random.seed(self.seed)  # seed also in `extract_from`
 
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
@@ -127,6 +136,7 @@ class Extractor:
 
         nlds = []
         gsfs = []
+        np.random.seed(self.seed)  # seed also in `__init__`
         for i in tqdm(range(self.ensemble.size)):
             nld_path = self.path / f'nld_{i}.npy'
             gsf_path = self.path / f'gsf_{i}.npy'
@@ -200,7 +210,9 @@ class Extractor:
             std: The standard deviation for the matrix. Must
                 be the same size as the matrix. If no std is provided,
                 square error will be used instead of chi square.
-            x0: The initial guess for nld and gsf.
+            x0: The initial guess for nld and gsf. If `np.ndarray`, ordered as
+                (T0, nld0). Otherwise, if `str`, used as the method, see
+                `guess_initial_values` (where also defaults are given).
             product: Whether to return the first generation matrix
                resulting from the product of nld and gsf.
 
@@ -245,12 +257,12 @@ class Extractor:
         else:
             resolution = np.zeros_like(matrix.Ex)
 
-        if x0 is None:  # default initial guess
-            nld0 = np.ones(E_nld.size)
-            T0, _ = matrix.projection('Eg')
-            x0 = np.append(T0, nld0)
-            assert T0.size == matrix.Eg.size
-        assert len(x0) == matrix.Eg.size + E_nld.size
+        x0 = self.x0 if x0 is None else x0
+        if x0 is None or isinstance(x0, str):  # default initials or method
+            x0 = self.guess_initial_values(E_nld, matrix, x0)
+        assert len(x0) == E_nld.size + matrix.Eg.size
+        if self.randomize_initial_values:
+            x0 = np.random.uniform(x0/5, x0*5)  # arb. choice for bounds
 
         def errfun(x: np.ndarray) -> float:
             # Add a non-negative constraint
@@ -294,6 +306,117 @@ class Extractor:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg), mat
         else:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg)
+
+    def guess_initial_values(self, E_nld: np.ndarray, matrix: Matrix,
+                             method: Optional[str] = None) -> np.ndarray:
+        """Guess initial values `x0` for minimization rountine
+
+        Note:
+            Different initial guesses will affect the normalization constants
+            needed later. In order to minimize the effort when changing the
+            initial guess (`method`), one can try to provide initial guesses
+            where the nld is approx(!) 1 in all bins.
+
+        Args:
+            E_nld: Energy array of nld
+            matrix: Matrix to be sent to minimization
+            method (optional): Method for initial guesses. Defaults to
+                a backshifted Fermi-gas like initial value. This default is
+                choosen, because we often find a CT-like result -- so we
+                want something dissimilar as a start.
+
+        Returns:
+            x0: Initial guesses as a stacked array of (T0, nld0)
+        """
+
+        if E_nld[-1] > 100:
+            LOG.info("Infering calibration that calibration is in keV.")
+            E_nld = E_nld.copy()
+            E_nld /= 1000
+
+        if method is None or method == "BSFG-like":
+            nld0 = self.x0_BSFG(E_nld)
+        elif method == "CT-like":
+            nld0 = self.x0_CT(E_nld)
+        elif method == "parabola":
+            nld0 = self.x0_parabola(E_nld)
+        else:
+            raise NotImplementedError(f"Method {method} not in "
+                                      "['BSFG-like','CT-like'.")
+
+        T0, _ = matrix.projection('Eg')
+        assert T0.size == matrix.Eg.size
+        x0 = np.append(T0, nld0)
+        assert np.isfinite(x0).all
+        return x0
+
+    @staticmethod
+    def x0_BSFG(E_nld: np.ndarray, E0: float = -.2, a: float = 15):
+        """ Initial guess that resembles Backshifted Fermi-gas solution
+
+        Note that this is like a fermi-gas after transformation with
+        `Aexp(αE)`. Default parameters are chosen somewhat arbitrary, but
+        resembling fitted values reported in EB2005.
+
+        Args:
+            E_nld: Energy array of nld in [MeV]
+            E0 (optional): Back-shift in [MeV]. Defaults to -0.2.
+            a (optional): Level density parameter in [MeV⁻¹]. Defaults to 15.
+
+        Returns:
+            nld0: Initial guess
+        """
+
+        U = E_nld - E0
+        U[U <= 0] = 0.5  # workaround for negative energies (or E=0)
+        fg = np.exp(2*np.sqrt(a*U)) / (a**(1/4)*U**(5/4))
+
+        # transform for convenience, such that the result is close to 1
+        # for many bins -- here: same value at 1/4 of the length as at end
+        N = len(fg)
+        alpha = np.log(fg[N//4]/fg[-1]) / (E_nld[-1] - E_nld[N//4])
+        fg *= np.exp(alpha*E_nld)
+        fg /= fg[N//2] * 0.7  # at half of the array, values = 1/0.7 = 1.4
+
+        return fg
+
+    @staticmethod
+    def x0_CT(E_nld: np.ndarray) -> np.ndarray:
+        """Initial guess that resembles CT solution
+
+        This is the proposal of Schiller2000 -- however, note that
+        a constant nld of 1 after the transformation with `Aexp(αE)` is just
+        like the CT formula.
+
+        Args:
+            E_nld: Energy array of nld
+
+        Returns:
+            nld0: Initial guess
+        """
+        return np.ones(E_nld.size)
+
+    @staticmethod
+    def x0_parabola(E_nld: np.ndarray, E0: float = 4,
+                    y0: float = 0.01, a: float = 1) -> np.ndarray:
+        """Initial guess as parabola a(E_nld - E0)² + y0
+
+        This is quite crazy; For E0 > 0: the NLD is not expected to
+        reduce for higher Ex
+
+        Args:
+            E_nld: Energy array of nld [in MeV]
+            E0: shift constant in x direction [in MeV]
+            y0: shift constant in y direction.
+            a: multiplier
+
+
+        Returns:
+            nld0: Initial guess
+        """
+        vals = a*(E_nld - E0)**2 + y0
+        assert (vals >= 0).all(), "Negative nld is meaningless"
+        return vals
 
     @staticmethod
     def constraining_counts(matrix: Matrix,

@@ -105,8 +105,8 @@ class NormalizerNLD:
         self._D0 = None
         self._smooth_levels_fwhm = None
         self.norm_pars = norm_pars
-        self.bounds = {'A': (1, 100), 'alpha': (1e-1, 20), 'T': (0.1, 1),
-                       'Eshift': (-5, 5)}  # D0 bounds set later
+        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-1, 20], 'T': [0.1, 1],
+                       'Eshift': [-5, 5]}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
         self.multinest_path = Path('multinest')
