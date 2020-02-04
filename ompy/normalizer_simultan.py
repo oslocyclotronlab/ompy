@@ -369,7 +369,7 @@ class NormalizerSimultan():
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)
         else:
-            fig = ax.figure
+            fig = ax[0].figure
 
         self.normalizer_nld.plot(ax=ax[0], add_label=True, results=self.res,
                                  add_figlegend=False, **kwargs)
@@ -377,7 +377,7 @@ class NormalizerSimultan():
                                  add_figlegend=False, **kwargs)
 
         ax[0].set_title("Level density")
-        ax[1].set_title("γSF")
+        ax[1].set_title(r"$\gamma$SF")
 
         if add_figlegend:
             fig.legend(loc=9, ncol=4, frameon=True)

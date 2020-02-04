@@ -200,7 +200,7 @@ class EnsembleNormalizer:
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)
         else:
-            fig = ax.figure
+            fig = ax[0].figure
 
         norm_sim = self.normalizer_simultan
         if norm_sim is not None:
@@ -220,16 +220,18 @@ class EnsembleNormalizer:
                             n_plot=n_plot)
 
         # get median, 1 sigma, ...
+        prop_cycle = plt.rcParams['axes.prop_cycle']
+        colors = prop_cycle.by_key()['color']
         percentiles = [0.16, 0.84]
-        lines = self.plot_vector_stats(ax, samples, percentiles)
+        lines = self.plot_vector_stats(ax, samples, percentiles, colors[1])
 
         if plot_model_stats:
             Emin = samples["nld"].iloc[0].E[-1]
             x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=20)
-            color = lines.get_facecolor()
             self.plot_nld_ext_stats(ax[0], x=x, samples=samples,
                                     normalizer_nld=normalizer_nld,
-                                    percentiles=percentiles, color=color)
+                                    percentiles=percentiles, color=colors[2],
+                                    label="model")
 
             E = samples["gsf"].iloc[0].E
             xlow = np.linspace(0.001, E[0], num=20)
@@ -237,7 +239,7 @@ class EnsembleNormalizer:
             self.plot_gsf_ext_stats(ax[1], xlow=xlow, xhigh=xhigh,
                                     samples=samples,
                                     normalizer_gsf=normalizer_gsf,
-                                    percentiles=percentiles, color=color)
+                                    percentiles=percentiles, color=colors[2])
 
         if add_figlegend:
             fig.legend(loc=9, ncol=4, frameon=True)
@@ -298,8 +300,11 @@ class EnsembleNormalizer:
         if random_state is None:  # cannot move this to definition
             random_state = np.random.RandomState(98765)
 
+        # dummy to draw axis
+        n_plot_ = n_plot if n_plot > 0 else 1
+
         res = copy.deepcopy(self.res[0])  # dummy for later
-        selection = samples.sample(n=n_plot, random_state=random_state)
+        selection = samples.sample(n=n_plot_, random_state=random_state)
         for i, (_, row) in enumerate(selection.iterrows()):
             res.nld = row["nld"]
             res.gsf = row["gsf"]
@@ -321,13 +326,21 @@ class EnsembleNormalizer:
             add_label = True if i == 0 else False
             plot_fitregion = True if i == 0 else False
             normalizer_nld.plot(ax=ax[0], results=res,
-                                add_label=add_label, alpha=1/n_plot,
+                                add_label=add_label, alpha=1/n_plot_,
                                 add_figlegend=False,
                                 plot_fitregion=plot_fitregion)
             normalizer_gsf.plot(ax=ax[1], results=res, add_label=False,
-                                alpha=1/n_plot,
+                                alpha=1/n_plot_,
                                 add_figlegend=False,
                                 plot_fitregion=plot_fitregion)
+
+        if n_plot == 0:  # remove lines if dummy only
+            l_keep = []
+            for l in ax[0].lines:
+                if l._label in ["known levels", "_nld(Sn)"]:
+                    l_keep.append(l)
+            ax[0].lines = [*l_keep]
+            ax[1].lines = []
 
     @staticmethod
     def stats_from_df(df, fmap, shape_out, percentiles):
@@ -343,11 +356,13 @@ class EnsembleNormalizer:
         return stats
 
     @staticmethod
-    def plot_vector_stats(ax: Tuple[Any, Any], samples, percentiles):
+    def plot_vector_stats(ax: Tuple[Any, Any], samples, percentiles, color):
 
-        # workaround as dataframe changes limits
+        # workaround as dataframe changes limits & labels
         lim_ax0 = [ax[0].get_xlim(), ax[0].get_ylim()]
         lim_ax1 = [ax[1].get_xlim(), ax[1].get_ylim()]
+        label_ax0 = [ax[0].get_xlabel(), ax[0].get_ylabel()]
+        label_ax1 = [ax[1].get_xlabel(), ax[1].get_ylabel()]
 
         # define helper function
         def vec_to_values(x, out):  # noqa
@@ -360,7 +375,8 @@ class EnsembleNormalizer:
                                             shape_out=(len(df), len(E)),
                                             percentiles=percentiles)  # noqa
         stats_nld["x"] = E
-        stats_nld.plot(x="x", y="median", ax=ax[0], legend=False)
+        stats_nld.plot(x="x", y="median", ax=ax[0], legend=False,
+                       color=color)
 
         df = samples["gsf"]
         E = df.iloc[0].E
@@ -368,12 +384,14 @@ class EnsembleNormalizer:
                                             shape_out=(len(df), len(E)),
                                             percentiles=percentiles)  # noqa
         stats_gsf["x"] = df.iloc[0].E
-        stats_gsf.plot(x="x", y="median", ax=ax[1], legend=False)
+        stats_gsf.plot(x="x", y="median", ax=ax[1], legend=False,
+                       color=color)
 
         pc_diff = percentiles[1] - percentiles[0]
+        label = fr"{(pc_diff)*100:.0f}\% credibility interval"
         ax[0].fill_between(stats_nld.x, stats_nld["low"], stats_nld["high"],
                            alpha=0.3,
-                           label=f"{(pc_diff)*100:.0f}% credibility interval")
+                           label=label)
         lines = ax[1].fill_between(stats_gsf.x, stats_gsf["low"],
                                    stats_gsf["high"],
                                    alpha=0.3)
@@ -382,25 +400,29 @@ class EnsembleNormalizer:
         ax[0].set_ylim(lim_ax0[1])
         ax[1].set_xlim(lim_ax1[0])
         ax[1].set_ylim(lim_ax1[1])
+
+        ax[0].set_xlabel(label_ax0[0])
+        ax[0].set_ylabel(label_ax0[1])
+        ax[1].set_xlabel(label_ax1[0])
+        ax[1].set_ylabel(label_ax1[1])
+
         return lines
 
     @staticmethod
     def plot_nld_ext_stats(ax: Any, *, x: np.ndarray,
                            samples, normalizer_nld, percentiles,
-                           color):
+                           **kwargs):
         # define helper function
         def to_values(a, out):  # noqa
             idx, val = a
-            out[idx] = normalizer_nld.curried_model(T=val[0],
-                                                    D0=val[1],
-                                                    E=x)
+            out[idx] = normalizer_nld.model(E=x, T=val[0], Eshift=val[1])
 
-        df = samples[["T", "D0"]]
+        df = samples[["T", "Eshift"]]
         stats = EnsembleNormalizer.stats_from_df(df, fmap=to_values,
                                                  shape_out=(len(df), len(x)),
                                                  percentiles=percentiles)
         ax.fill_between(x, stats["low"], stats["high"],
-                        alpha=0.3, color=color)
+                        alpha=0.3, **kwargs)
 
     @staticmethod
     def plot_gsf_ext_stats(ax: Any, *, xlow: np.ndarray, xhigh: np.ndarray,

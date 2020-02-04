@@ -415,9 +415,10 @@ class NormalizerNLD:
             labelNld = 'exp.'
             labelNldSn = r'$\rho(S_n)$'
             labelModel = 'model'
+            labelDiscrete = "known levels"
         nld.plot(ax=ax, label=labelNld, **kwargs)
 
-        self.discrete.plot(ax=ax, c='k', label=labelDiscrete)
+        self.discrete.plot(ax=ax, kind='step', c='k', label=labelDiscrete)
 
         nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
         rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
@@ -430,6 +431,10 @@ class NormalizerNLD:
 
         ax.errorbar(self.norm_pars.Sn[0], nldSn[0], yerr=nldSn[1],
                     label=labelNldSn, fmt="s", markerfacecolor='none')
+        # workaround for enseble Normalizer; always keep these label
+        for i in range(3):
+            ax.lines[-(i+1)]._label = "_nld(Sn)"
+
         ax.plot(model.E, model.values, "--", label=labelModel, markersize=0,
                 c='g', **kwargs)
 
@@ -440,8 +445,8 @@ class NormalizerNLD:
                        alpha=0.1)
 
         ax.set_yscale('log')
-        ax.set_ylabel(r"$\rho(E_x) \quad [\mathrm{MeV}^{-1}]$")
-        ax.set_xlabel(r"$E_x \quad [\mathrm{MeV}]$")
+        ax.set_ylabel(r"Level density $\rho(E_x)~[\mathrm{MeV}^{-1}]$")
+        ax.set_xlabel(r"Excitation energy $E_x~[\mathrm{MeV}]$")
         ax.set_ylim(bottom=0.5/(nld.E[1]-nld.E[0]))
 
         if fig is not None and add_figlegend:

@@ -430,6 +430,8 @@ class NormalizerGSF():
                        color='grey', alpha=0.1)
 
         ax.set_yscale('log')
+        ax.set_xlabel(rf"$\gamma$-ray energy $E_\gamma$~[{gsf.units}]")
+        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[${gsf.units}^{-3}$]")
 
         if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
@@ -514,7 +516,10 @@ class NormalizerGSF():
 
 def fnld(E: ndarray, nld: Vector,
          nld_model: Callable) -> ndarray:
-    """ Function composed of nld and model, providing y = nld(E) """
+    """ Function composed of nld and model, providing y = nld(E)
+
+    It will take the extrapolation where no exp. data is available.
+    """
     fexp = log_interp1d(nld.E, nld.values)
 
     conds = [E <= nld.E[-1], E > nld.E[-1]]
@@ -523,7 +528,10 @@ def fnld(E: ndarray, nld: Vector,
 
 def fgsf(E: ndarray, gsf: Vector,
          gsf_low: Vector, gsf_high: Vector) -> ndarray:
-    """ Function composed of gsf and model, providing y = gsf(E) """
+    """ Function composed of gsf and model, providing y = gsf(E)
+
+    It will take the extrapolation where no exp. data is available.
+    """
     exp = log_interp1d(gsf.E, gsf.values)
     ext_low = log_interp1d(gsf_low.E, gsf_low.values)
     ext_high = log_interp1d(gsf_high.E, gsf_high.values)

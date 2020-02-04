@@ -146,14 +146,12 @@ class Ensemble:
         self.seed: int = 987654
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
-        if path is not None:
-            self.path = Path(path)
-            self.path.mkdir(exist_ok=True)
+        self.path = Path(path) if path is not None else Path('ensemble')
+        self.path.mkdir(exist_ok=True)
+        try:
             self.load()
-        else:
-            # Should the ensemble always try to load?
-            self.path = Path('ensemble')
-            self.path.mkdir(exist_ok=True)
+        except FileNotFoundError:
+            pass
 
         self.raw.state = "raw"
 
@@ -632,7 +630,8 @@ class Ensemble:
                 raise ValueError("Three axes must be provided")
             fig = ax.figure
         else:
-            fig, ax = plt.subplots(ncols=3, sharey=True, constrained_layout=True)
+            fig, ax = plt.subplots(ncols=3, sharey=True,
+                                   constrained_layout=True)
 
         extrema = lambda x: (np.min(x), np.max(x)) # noqa
         choices = {"raw": extrema(self.std_raw.values),
@@ -658,7 +657,8 @@ class Ensemble:
         self.std_unfolded.plot(ax=ax[1], title='Unfolded', add_cbar=False,
                                vmin=vmin, vmax=vmax, **kwargs)
         im, _, _ = self.std_firstgen.plot(ax=ax[2], title='First Generation',
-                               vmin=vmin, vmax=vmax, add_cbar=False, **kwargs)
+                                          vmin=vmin, vmax=vmax,
+                                          add_cbar=False, **kwargs)
 
         # Y labels only clutter
         ax[1].set_ylabel(None)

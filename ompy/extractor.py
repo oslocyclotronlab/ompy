@@ -546,7 +546,7 @@ class Extractor:
                            alpha=1/len(self.gsf), **kwargs)
 
         ax[0].set_title("Level density")
-        ax[1].set_title("γSF")
+        ax[1].set_title(r"$\gamma$SF")
         if scale == 'log':
             ax[0].set_yscale("log")
             ax[1].set_yscale("log")
