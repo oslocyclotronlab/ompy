@@ -148,15 +148,11 @@ class Ensemble:
 
         self.path = Path(path) if path is not None else Path('ensemble')
         self.path.mkdir(exist_ok=True)
-        try:
-            self.load()
-        except FileNotFoundError:
-            pass
 
         self.raw.state = "raw"
 
     def load(self, path: Optional[Union[str, Path]] = None):
-        """ Loads a saved ensamble
+        """ Loads a saved ensamble. Alternative to `regenerate`.
 
         Currently only supports '.npy' format.
 
