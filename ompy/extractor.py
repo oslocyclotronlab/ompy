@@ -175,6 +175,7 @@ class Extractor:
         assert self.trapezoid is not None
         matrix = self.ensemble.get_firstgen(num).copy()
         std = self.ensemble.std_firstgen.copy()
+        # following lines might be superfluous now:
         # ensure same cuts for all ensemble members if Eg_max is not given
         # (thus auto-determined) in the trapezoid.
         if num == 0:
@@ -250,7 +251,7 @@ class Extractor:
         # create nld energy array
         Emin = matrix.Ex.min()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
-        E_nld = np.linspace(Emin, Emax, np.ceil((Emax-Emin)/bin_width)+1)
+        E_nld = np.linspace(Emin, Emax, int(np.ceil((Emax-Emin)/bin_width))+1)
 
         if self.extend_fit_by_resolution:
             resolution = self.diagonal_resolution(matrix)
