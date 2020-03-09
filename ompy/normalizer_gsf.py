@@ -103,6 +103,11 @@ class NormalizerGSF():
 
         self.res: Optional[ResultsNormalized] = None
 
+        self._saved_SpinSum = None
+        self._saved_spincutModel = None
+        self._saved_spincutPars = None
+        self._saved_SpinSum_args = None
+
     def normalize(self, *, gsf: Optional[Vector] = None,
                   normalizer_nld: Optional[NormalizerNLD] = None,
                   alpha: Optional[float] = None,
@@ -316,14 +321,6 @@ class NormalizerGSF():
         Gg = integral * self.norm_pars.D0[0] * 1e3  # [eV] * 1e3 -> [meV]
         return Gg
 
-    def spin_dist(self, Ex, J):
-        """
-        Wrapper for :meth:`ompy.SpinFunctions` curried with model and pars
-        """
-        return SpinFunctions(Ex=Ex, J=J,
-                             model=self.norm_pars.spincutModel,
-                             pars=self.norm_pars.spincutPars).distibution()
-
     def SpinSum(self, Ex: Union[float, np.ndarray],
                 J: float,
                 Ltransfer: float = 0) -> Union[float, np.ndarray]:
@@ -350,25 +347,73 @@ class NormalizerGSF():
             Union[float, np.ndarray]: Sum of spin distributions. If `Ex` is
                 and array, this will be an array with the sum for each `Ex`.
         """
-        spin_dist = self.spin_dist
+        # load saved results if available
 
-        assert J >= 0 and Ltransfer >= 0, \
-            f"J={J} and l={Ltransfer} cannot be negative"
+        locals_wo_self = locals()
+        locals_wo_self.pop("self")
+        if self.SpinSum_save_reload(locals_wo_self):
+            return self._saved_SpinSum
+        else:
+            spin_dist = self.spin_dist
 
-        # accessible residual spins
-        Jres_min = min(abs(J - 1/2 - Ltransfer), abs(J + 1/2 - Ltransfer),
-                       abs(J - 1/2 + Ltransfer))
-        Jres_max = J + 1/2 + Ltransfer
-        total = 0
-        for Jres in np.arange(Jres_min, Jres_max+1):
-            # accessible spins in dipole transition
-            Jfinal_min = min(abs(Jres - 1), Jres)
-            Jfinal_max = Jres + 1
-            for Jfinal in np.arange(Jfinal_min, Jfinal_max + 1):
-                if Jres == Jfinal == 0:
-                    continue
-                total += spin_dist(Ex, Jfinal)
-        return total
+            assert J >= 0 and Ltransfer >= 0, \
+                f"J={J} and l={Ltransfer} cannot be negative"
+
+            # accessible residual spins
+            Jres_min = min(abs(J - 1/2 - Ltransfer), abs(J + 1/2 - Ltransfer),
+                           abs(J - 1/2 + Ltransfer))
+            Jres_max = J + 1/2 + Ltransfer
+            total = 0
+            for Jres in np.arange(Jres_min, Jres_max+1):
+                # accessible spins in dipole transition
+                Jfinal_min = min(abs(Jres - 1), Jres)
+                Jfinal_max = Jres + 1
+                for Jfinal in np.arange(Jfinal_min, Jfinal_max + 1):
+                    if Jres == Jfinal == 0:
+                        continue
+                    total += spin_dist(Ex, Jfinal)
+
+            # enabling fast reload
+            self._saved_SpinSum = total
+            self._saved_spincutModel = self.norm_pars.spincutModel
+            self._saved_spincutPars = self.norm_pars.spincutPars
+            self._saved_SpinSum_args = locals_wo_self
+
+            return total
+
+    def SpinSum_save_reload(self, SpinSum_args) -> bool:
+        """ Reload SpinSum if computed with the same parameters before
+
+        Note:
+            Note the most beautiful comparison, but we get a
+            significant speedup in the multinest calculations
+
+        Args:
+            SpinSum_args: Arguments sent to SpinSum
+
+        Return:
+            bool: True, if args of SpinSum are the same as before,
+                and self.spincutModel and self.spincutPars are unchanged
+        """
+        saved_args = self._saved_SpinSum_args
+        if self._saved_spincutModel is None or self._saved_spincutPars is None:
+            return False
+        elif (self._saved_spincutModel == self.norm_pars.spincutModel and
+              self._saved_spincutPars == self.norm_pars.spincutPars
+              and np.all(saved_args["Ex"] == SpinSum_args["Ex"])
+              and saved_args["J"] == SpinSum_args["J"]
+              and saved_args["Ltransfer"] == SpinSum_args["Ltransfer"]):
+            return True
+        else:
+            return False
+
+    def spin_dist(self, Ex, J):
+        """
+        Wrapper for :meth:`ompy.SpinFunctions` curried with model and pars
+        """
+        return SpinFunctions(Ex=Ex, J=J,
+                             model=self.norm_pars.spincutModel,
+                             pars=self.norm_pars.spincutPars).distibution()
 
     def plot(self, ax: Optional[Any] = None, *,
              add_label: bool = True,

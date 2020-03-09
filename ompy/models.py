@@ -245,7 +245,8 @@ class AbstractExtrapolationModel(Model):
             yerr = None
         else:
             yerr = gsf.std[idx1:idx2+1]
-        popt, pcov = curve_fit(model, x, y, sigma=yerr)
+        popt, pcov = curve_fit(model, x, y, sigma=yerr,
+                               p0=[1., -20.])
         self.scale = popt[0]
         self.shift = popt[1]
 
