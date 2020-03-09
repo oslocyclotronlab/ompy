@@ -27,16 +27,19 @@ class SpinFunctions:
         model = self.model
         pars = self.pars
 
-        if model == "EB05":
+        if model == "const":
+            pars_req = {"sigma"}
+            return call_model(self.gconst, pars, pars_req)
+        elif model == "EB05":
             pars_req = {"mass", "NLDa", "Eshift"}
             return call_model(self.gEB05, pars, pars_req)
-        if model == "EB09_CT":
+        elif model == "EB09_CT":
             pars_req = {"mass"}
             return call_model(self.gEB09_CT, pars, pars_req)
-        if model == "EB09_emp":
+        elif model == "EB09_emp":
             pars_req = {"mass", "Pa_prime"}
             return call_model(self.gEB09_emp, pars, pars_req)
-        if model == "Disc_and_EB05":
+        elif model == "Disc_and_EB05":
             pars_req = {"mass", "NLDa", "Eshift", "Sn", "sigma2_disc"}
             return call_model(self.gDisc_and_EB05, pars, pars_req)
         else:
@@ -61,6 +64,20 @@ class SpinFunctions:
         return np.squeeze(spinDist)  # return 1D if Ex or J is single entry
 
     # different spin cut models
+
+    def gconst(self, sigma: float,
+              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+        """
+        Constant spin-cutoff parameter
+
+        Args:
+            sigma (int): Spin cut-off parameter
+
+        Returns:
+            Union[float, Sequence]: Squared spincut
+        """
+        Ex = self.Ex if Ex is None else Ex
+        return np.full_like(Ex, sigma**2)
 
     def gEB05(self, mass: int, NLDa: float, Eshift: float,
               Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
