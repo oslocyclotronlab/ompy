@@ -96,7 +96,7 @@ class FirstGeneration:
 
         self.Ex_entry_total: float = 0.0          # MAMA ExEntry0t
 
-        self.valley_correction: Optional[np.ndarray] = None
+        self.valley_correction: Optional[Vector] = None
         self.use_slide: bool = False
 
         self.action = Action('matrix')
@@ -331,7 +331,7 @@ class FirstGeneration:
             raise TypeError("`valley_correction` must be a vector.")
         valley_correction.copy()
         valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max())
-        valley_correction.has_equal_binning(matrix)
+        assert np.allclose(valley_correction.E, matrix.Ex)
         if np.any(valley_correction.values < 0):
             raise ValueError("valley correction has to have positive entries only.")
 
