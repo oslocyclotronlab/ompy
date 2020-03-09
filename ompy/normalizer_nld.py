@@ -407,10 +407,10 @@ class NormalizerNLD:
         pars = res.pars
         nld = res.nld
 
-        labelNld = None
+        labelNld = '_exp.'
         labelNldSn = None
-        labelModel = None
-        labelDiscrete = None
+        labelModel = "_model"
+        labelDiscrete = "_known levels"
         if add_label:
             labelNld = 'exp.'
             labelNldSn = r'$\rho(S_n)$'
@@ -430,7 +430,7 @@ class NormalizerNLD:
                                               Eshift=pars['Eshift'][0]))
 
         ax.errorbar(self.norm_pars.Sn[0], nldSn[0], yerr=nldSn[1],
-                    label=labelNldSn, fmt="s", markerfacecolor='none')
+                    label=labelNldSn, fmt="ks", markerfacecolor='none')
         # workaround for enseble Normalizer; always keep these label
         for i in range(3):
             ax.lines[-(i+1)]._label = "_nld(Sn)"

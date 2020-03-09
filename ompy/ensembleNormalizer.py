@@ -2,7 +2,8 @@ import numpy as np
 import logging
 import matplotlib.pyplot as plt
 import os
-from typing import List, Optional, Any, Tuple, Union
+import itertools
+from typing import List, Optional, Any, Tuple, Union, Callable
 from operator import xor
 import pandas as pd
 from scipy.stats import norm as scipynorm
@@ -172,7 +173,9 @@ class EnsembleNormalizer:
              n_plot: bool = 5,
              plot_model_stats: bool = False,
              random_state: Optional[np.random.RandomState] = None,
-             **kwargs) -> Tuple[Any, Any]:
+             return_stats: bool =False,
+             **kwargs) -> Union[Tuple[Any, Any],
+                                Tuple[Any, Any, Tuple[Any, Any]]]:
         """Plots randomly drawn samples
 
         Args:
@@ -185,6 +188,7 @@ class EnsembleNormalizer:
             random_state (np.random.RandomState, optional): random state, set
                 by default such that a repeated use of the function gives the
                 same results.
+            return_stats: Whether to return vector stats (percentiles)
             **kwargs: Description
 
         TODO:
@@ -194,7 +198,8 @@ class EnsembleNormalizer:
             - Checks if extrapolating where nld or gsf is np.nan
 
         Returns:
-            fig, ax
+            Tuple: If `return_stats=False`, returns `fig, ax`,
+                otherwise `fig, ax, (stats_nld, stats_gsf)`
         """
 
         if ax is None:
@@ -219,33 +224,47 @@ class EnsembleNormalizer:
                             normalizer_gsf=normalizer_gsf,
                             n_plot=n_plot)
 
+        # unify Egrid (and values) in case vectors are not equally long
+        self.samples_unify_E(samples["nld"])
+        self.samples_unify_E(samples["gsf"])
+
         # get median, 1 sigma, ...
         prop_cycle = plt.rcParams['axes.prop_cycle']
         colors = prop_cycle.by_key()['color']
         percentiles = [0.16, 0.84]
-        lines = self.plot_vector_stats(ax, samples, percentiles, colors[1])
+        _, stats_nld, stats_gsf = self.plot_vector_stats(ax, samples,
+                                                         percentiles,
+                                                         colors[1])
 
         if plot_model_stats:
             Emin = samples["nld"].iloc[0].E[-1]
             x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=20)
-            self.plot_nld_ext_stats(ax[0], x=x, samples=samples,
-                                    normalizer_nld=normalizer_nld,
-                                    percentiles=percentiles, color=colors[2],
-                                    label="model")
+            stats_nld_model = \
+                self.plot_nld_ext_stats(ax[0], x=x, samples=samples,
+                                        normalizer_nld=normalizer_nld,
+                                        percentiles=percentiles,
+                                        color=colors[2],
+                                        label="model")
 
             E = samples["gsf"].iloc[0].E
             xlow = np.linspace(0.001, E[0], num=20)
             xhigh = np.linspace(E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
-            self.plot_gsf_ext_stats(ax[1], xlow=xlow, xhigh=xhigh,
-                                    samples=samples,
-                                    normalizer_gsf=normalizer_gsf,
-                                    percentiles=percentiles, color=colors[2])
+            stats_gsf_model = \
+                self.plot_gsf_ext_stats(ax[1], xlow=xlow, xhigh=xhigh,
+                                        samples=samples,
+                                        normalizer_gsf=normalizer_gsf,
+                                        percentiles=percentiles,
+                                        color=colors[2])
 
         if add_figlegend:
             fig.legend(loc=9, ncol=4, frameon=True)
             fig.subplots_adjust(left=0.1, right=0.9, top=0.8, bottom=0.1)
 
-        return fig, ax
+        if return_stats:
+            return fig, ax, (stats_nld, stats_gsf, stats_nld_model,
+                             stats_gsf_model)
+        else:
+            return fig, ax
 
     def samples_from_res(self,
                          random_state: Optional[np.random.RandomState] = None) -> pd.DataFrame:
@@ -303,6 +322,9 @@ class EnsembleNormalizer:
         # dummy to draw axis
         n_plot_ = n_plot if n_plot > 0 else 1
 
+        markers = itertools.cycle(('o', 'x', 'P', 'v', '^', '<', '>', '8',
+                                   's', 'p', '*', 'h', 'H', 'D', 'd', 'X'))
+
         res = copy.deepcopy(self.res[0])  # dummy for later
         selection = samples.sample(n=n_plot_, random_state=random_state)
         for i, (_, row) in enumerate(selection.iterrows()):
@@ -325,14 +347,18 @@ class EnsembleNormalizer:
 
             add_label = True if i == 0 else False
             plot_fitregion = True if i == 0 else False
+
+            marker = next(markers)
             normalizer_nld.plot(ax=ax[0], results=res,
                                 add_label=add_label, alpha=1/n_plot_,
                                 add_figlegend=False,
-                                plot_fitregion=plot_fitregion)
+                                plot_fitregion=plot_fitregion,
+                                marker=marker, linestyle="--")
             normalizer_gsf.plot(ax=ax[1], results=res, add_label=False,
                                 alpha=1/n_plot_,
                                 add_figlegend=False,
-                                plot_fitregion=plot_fitregion)
+                                plot_fitregion=plot_fitregion,
+                                marker=marker, linestyle="--")
 
         if n_plot == 0:  # remove lines if dummy only
             l_keep = []
@@ -342,23 +368,59 @@ class EnsembleNormalizer:
             ax[0].lines = [*l_keep]
             ax[1].lines = []
 
-    @staticmethod
-    def stats_from_df(df, fmap, shape_out, percentiles):
+    def samples_unify_E(self, df: pd.DataFrame) -> None:
+        """ Get nlds (or gsfs) on common energy grid, if diff. lengths
+
+        After applying, DataFrame with vectors are on common
+        energy grid. Missing values filled with np.nan.
+
+        Args:
+            df: DataFrame collumn with vectors to be put on unified energy grid
+        """
+        extend = np.array(list(map(vec_extend, df)))
+
+        # if equal already: no need to proceede
+        if np.equal(extend[0], extend).all():
+            return None
+
+        iEmin = np.argmin(extend[:, 0])
+        iEmax = np.argmax(extend[:, 1])
+
+        Eunion = np.union1d(df.iloc[iEmin].E, df.iloc[iEmax].E)
+
+        # define helper function
+        def vec_extend_values(vec, Eunion):  # noqa
+            Eold = vec.E
+            interEunion = np.in1d(Eunion, Eold, assume_unique=True)
+            interEold = np.in1d(Eold, Eunion, assume_unique=True)
+            vec.E = Eunion
+            val_union = np.full_like(Eunion, np.nan)
+            val_union[interEunion] = vec.values[interEold]
+            vec.values = val_union
+
+        # map function to each element
         array = df.to_numpy()
-        out = np.zeros(shape_out)
-        indexed = enumerate(array)
-        # apply fmap to each row of the dataframe
-        np.fromiter(map(fmap, indexed, repeat(out)), dtype=float)
-        stats = pd.DataFrame(out[:, :])
-        stats = pd.DataFrame({'median': stats.median(),
-                              'low': stats.quantile(percentiles[0], axis=0),
-                              'high': stats.quantile(percentiles[1], axis=0)})
-        return stats
+        np.array([vec_extend_values(xi, Eunion) for xi in array])
 
     @staticmethod
-    def plot_vector_stats(ax: Tuple[Any, Any], samples, percentiles, color):
+    def plot_vector_stats(ax: Tuple[Any, Any],
+                          samples: pd.DataFrame,
+                          percentiles: Tuple[float, float],
+                          color: Any) -> Tuple[Any,
+                                               pd.DataFrame, pd.DataFrame]:
+        """ Helper for plotting of stats from a vector
 
-        # workaround as dataframe changes limits & labels
+        Args:
+            ax: Axes to plot on
+            samples: Samples of (nld, gsf, transfromation parameters)
+            percentiles: Lower and upper percentile to plot the shading
+            color (Any): Color of nld and gsf
+
+        Returns:
+            Lines of fill between, and stats DataFrame of nld and gsf
+        """
+
+        # workaround as DataFrame changes limits & labels
         lim_ax0 = [ax[0].get_xlim(), ax[0].get_ylim()]
         lim_ax1 = [ax[1].get_xlim(), ax[1].get_ylim()]
         label_ax0 = [ax[0].get_xlabel(), ax[0].get_ylabel()]
@@ -406,12 +468,58 @@ class EnsembleNormalizer:
         ax[1].set_xlabel(label_ax1[0])
         ax[1].set_ylabel(label_ax1[1])
 
-        return lines
+        return lines, stats_nld, stats_gsf
+
+    @staticmethod
+    def stats_from_df(df: pd.DataFrame,
+                      fmap: Callable[[Vector, np.array], None],
+                      shape_out: Tuple[int, int],
+                      percentiles: Tuple[float, float]) -> pd.DataFrame:
+        """Helper to get median, 68% or similar from a collection of Vectors
+
+        Args:
+            df: DataFrame of Vectors
+            fmap: Applied to each row of df
+            shape_out: output shape
+            percentiles: Upper and lower percentiles for the stats
+                (eg. 16 and 84% for something like 1 sigma)
+
+        Returns:
+            DataFrame with collumns ['median', 'low', 'high'] and entries for
+            each energy of the Vectors.
+        """
+        array = df.to_numpy()
+        out = np.zeros(shape_out)
+        indexed = enumerate(array)
+        # apply fmap to each row of the DataFrame
+        np.fromiter(map(fmap, indexed, repeat(out)), dtype=float)
+        stats = pd.DataFrame(out[:, :])
+        stats = pd.DataFrame({'median': stats.median(),
+                              'low': stats.quantile(percentiles[0], axis=0),
+                              'high': stats.quantile(percentiles[1], axis=0)})
+        return stats
 
     @staticmethod
     def plot_nld_ext_stats(ax: Any, *, x: np.ndarray,
-                           samples, normalizer_nld, percentiles,
-                           **kwargs):
+                           samples: pd.DataFrame,
+                           normalizer_nld: NormalizerNLD,
+                           percentiles: Tuple[float, float],
+                           **kwargs) -> pd.DataFrame:
+        """Helper for plotting statistics of the nld extrapolation
+
+        Args:
+            ax: The matplotlib axis to plot onto.
+            x: x-axis values (Energies)
+            samples: Samples of (nld, gsf, transfromation parameters)
+            normalizer_nld: NormalizerNLD instance.
+            percentiles: Lower and upper percentile to plot
+                the shading
+            **kwargs: Additional keyword arguments for the plotting
+
+        Returns:
+            DataFrame with collumns ['median', 'low', 'high'] and entries for
+            each energy of the Vectors.
+        """
         # define helper function
         def to_values(a, out):  # noqa
             idx, val = a
@@ -421,13 +529,35 @@ class EnsembleNormalizer:
         stats = EnsembleNormalizer.stats_from_df(df, fmap=to_values,
                                                  shape_out=(len(df), len(x)),
                                                  percentiles=percentiles)
+        ax.plot(x, stats["median"], **kwargs)
         ax.fill_between(x, stats["low"], stats["high"],
                         alpha=0.3, **kwargs)
+        return stats
 
     @staticmethod
     def plot_gsf_ext_stats(ax: Any, *, xlow: np.ndarray, xhigh: np.ndarray,
-                           samples, normalizer_gsf, percentiles,
-                           color):
+                           samples: pd.DataFrame,
+                           normalizer_gsf: NormalizerGSF,
+                           percentiles: Tuple[float, float],
+                           color: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Helper for plotting statistics of the gsf extrapolations
+
+        Args:
+            ax: The matplotlib axis to plot onto.
+            xlow: x-axis values (Energies) of the lower extrapolation
+            xhigh: x-axis values (Energies) of the higher extrapolation
+            samples: Samples of (nld, gsf, transfromation parameters)
+            normalizer_gsf: NormalizerNLD instance.
+            percentiles: Lower and upper percentile to plot
+                the shading
+            **kwargs: Additional keyword arguments for the plotting
+
+        Returns:
+            Tuple of DataFrames with collumns ['median', 'low', 'high'] and
+            entries for each energy of the Vectors. First entry is for the
+            lower extrapolation, secondentry is for the higher extrapolation
+        """
+
         # define helper function
         def to_values(a, out):  # noqa
             idx, val = a
@@ -442,14 +572,19 @@ class EnsembleNormalizer:
 
         low, high = percentiles
         np.fromiter(map(to_values, indexed, repeat(out)), dtype=float)
+        # stats for upper and lower model
+        stats = []
         for i, arr in enumerate([out[0, :, :], out[1, :, :]]):
             stat = pd.DataFrame(arr)
             stat = pd.DataFrame({'median': stat.median(),
                                  'low': stat.quantile(low, axis=0),
                                  'high': stat.quantile(high, axis=0)})
+            ax.plot(xlow if i == 0 else xhigh, stat["median"], color=color)
             ax.fill_between(xlow if i == 0 else xhigh,
                             stat["low"], stat["high"],
                             alpha=0.3, color=color)
+            stats.append(stat)
+        return stats
 
 
 def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
@@ -473,7 +608,7 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
                                  results.
 
     Returns:
-        Dataframe with randomly selected samples of nld, gsf and the
+        DataFrame with randomly selected samples of nld, gsf and the
         corresponding parameters. The nld and gsf are transformed
 
     """
@@ -539,3 +674,16 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
     selected["gsf"] = gsf_trans
 
     return selected
+
+
+def vec_extend(vector: Vector) -> Tuple[float, float]:
+    """ Get the lowest and highest energy of the vector
+
+    Assumes that the energy array is sorted.
+
+    Args:
+        vector: input Vector
+
+    Returns:
+        Tuple of lowest and highest energies of the Vector"""
+    return vector.E[0], vector.E[-1]

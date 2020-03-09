@@ -406,9 +406,9 @@ class NormalizerGSF():
         model_low = res.gsf_model_low
         model_high = res.gsf_model_high
 
-        label_gsf = "exp." if add_label else None
-        label_model = "model" if add_label else None
-        label_limits = "fit limits" if add_label else None
+        label_gsf = "exp." if add_label else "_exp."
+        label_model = "model" if add_label else "_model"
+        label_limits = "fit limits" if add_label else "_fit limits"
         gsf.plot(ax=ax, label=label_gsf, **kwargs)
 
         # extend the plotting range to the fit range
@@ -417,11 +417,10 @@ class NormalizerGSF():
         xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
         gsf_high = model_high.extrapolate(xplot)
 
-        gsf_low.plot(ax=ax, c='g', linestyle="--",
-                     markersize=0, label=label_model,
-                     **kwargs)
-        gsf_high.plot(ax=ax, c='g', linestyle="--",
-                      markersize=0, **kwargs)
+        defaults = {"markersize": 0, "linestyle": "--"}
+        defaults.update(kwargs)
+        gsf_low.plot(ax=ax, c='g', label=label_model, **defaults)
+        gsf_high.plot(ax=ax, c='g', **defaults)
 
         if plot_fitregion:
             ax.axvspan(model_low.Efit[0], model_low.Efit[1],
@@ -431,7 +430,7 @@ class NormalizerGSF():
 
         ax.set_yscale('log')
         ax.set_xlabel(rf"$\gamma$-ray energy $E_\gamma$~[{gsf.units}]")
-        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[${gsf.units}^{-3}$]")
+        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[${gsf.units}^{{-3}}$]")
 
         if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
