@@ -112,7 +112,7 @@ def fill_negative(array: np.ndarray,
     The idea is that the negative counts are somehow connected to the (γ-ray)
     resolution and should thus be filled from a channel within the resolution.
 
-    This implementation loops through the closest channels with positive number
+    This implementation loops through the closest channels with maximum number
     of counts to fill the channle(s) with negative counts. Note that it can
     happen that some bins will remain with negative counts (if not enough bins
     with possitive counts are available within the window_size) .
@@ -121,7 +121,7 @@ def fill_negative(array: np.ndarray,
 
     Args:
         array: Input array, ordered as [Ex, Eg]
-        window_size (Union[int, np.array]): FWHM. If `int`
+        window_size (Union[int, np.array]): Window_size, eg. FWHM. If `int`
             `float`, the same FWHM will be applied for all `Eg` bins.
             Otherwise, provide an array with the FWHM for each `Eg` bin.
 
@@ -135,27 +135,23 @@ def fill_negative(array: np.ndarray,
         assert window_size.dtype == np.integer, "Check input"
 
     array = np.copy(array)
-
     N_Ex = array.shape[0]
     N_Eg = array.shape[1]
     for i_Ex in range(N_Ex):
         row = array[i_Ex, :]
-        for i_Eg in np.where(row < 0)[0]:  # select bins with negative entries
+        for i_Eg in np.where(row < 0)[0]:
             window_size_Eg = window_size[i_Eg]
-            i_low = max(0, i_Eg - window_size_Eg)
-            i_high = min(N_Eg, i_Eg + window_size_Eg + 1)
-
-            # array of possible bins, sorted by distance to i_Eg
-            window = np.arange(i_low, i_high)
-            diff = np.abs(window - i_Eg)
-            i_diff = np.argsort(diff)[1:]  # sorting, but exclude i_Eg itself
-            window = window[i_diff]
-            window = window[row[window] > 0]  # need positive counts
-
-            for i_from in window:
-                shuffle_counts(row, i_from, i_Eg)
-                if array[i_Ex, i_Eg] > 0:
+            max_distance = window_size_Eg
+            max_distance = int(np.ceil((window_size_Eg - 1) / 2))
+            i_Eg_low = max(0, i_Eg - max_distance)
+            i_Eg_high = min(N_Eg, i_Eg + max_distance)
+            while row[i_Eg] < 0:
+                i_max = np.argmax(row[i_Eg_low:i_Eg_high + 1])
+                i_max = i_Eg_low + i_max
+                if row[i_max] <= 0:
                     break
+                shuffle_counts(row, i_max, i_Eg)
+
     return array
 
 

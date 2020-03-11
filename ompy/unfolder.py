@@ -79,7 +79,7 @@ class Unfolder:
         minimum_iterations (int, optional): Minimum number of iterations.
             Defaults to 3.
         window_size (int or np.ndarray): window_size for  (fill and) remove
-            negatives on output. Defaults to 10.
+            negatives on output. Defaults to 20.
         use_compton_subtraction (bool, optional): Set usage of Compton
             subtraction method. Defaults to `True`.
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
@@ -105,7 +105,7 @@ class Unfolder:
         self.num_iter = num_iter
         self.weight_fluctuation: float = 0.2
         self.minimum_iterations: int = 3
-        self.window_size = 10
+        self.window_size = 20
 
         self._R: Optional[Matrix] = response
         self.raw: Optional[Matrix] = None
