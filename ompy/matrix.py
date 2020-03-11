@@ -759,9 +759,15 @@ class Matrix(AbstractArray):
         """ Entries with negative values are set to 0 """
         self.values = np.where(self.values > 0, self.values, 0)
 
-    def fill_and_remove_negative(self, window_size: int):
+    def fill_and_remove_negative(self,
+                                 window_size: Tuple[int, np.ndarray] = 10):
         """ Combination of :meth:`ompy.Matrix.fill_negative` and
-        :meth:`ompy.Matrix.remove_negative` """
+        :meth:`ompy.Matrix.remove_negative`
+
+        Args:
+            window_size: See `fill_negative`. Defaults to 10 (arbitrary)!.
+            """
+
         self.fill_negative(window_size=window_size)
         self.remove_negative()
 
