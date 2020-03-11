@@ -27,9 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 from scipy.interpolate import interp1d, RectBivariateSpline
+from scipy.stats import truncnorm
 import matplotlib
 from itertools import product
-from typing import Optional, Tuple, Iterator, Any
+from typing import Optional, Tuple, Iterator, Any, Union
 import inspect
 import re
 
@@ -104,39 +105,141 @@ def E_array_from_calibration(a0: float, a1: float, *,
         raise ValueError("Either N or E_max must be given")
 
 
-def fill_negative(matrix, window_size: int):
+def fill_negative_max(array: np.ndarray,
+                      window_size: Union[int, np.array]) -> np.ndarray:
     """
-    Fill negative channels with positive counts from neighbouring channels
+    Fill negative channels with positive counts from neighboring channels.
 
-    The MAMA routine for this is very complicated. It seems to basically
-    use a sliding window along the Eg axis, given by the FWHM, to look for
-    neighbouring bins with lots of counts and then take some counts from there.
-    Can we do something similar in an easy way?
+    The idea is that the negative counts are somehow connected to the (γ-ray)
+    resolution and should thus be filled from a channel within the resolution.
+
+    This implementation loops through the closest channels with maximum number
+    of counts to fill the channle(s) with negative counts. Note that it can
+    happen that some bins will remain with negative counts (if not enough bins
+    with possitive counts are available within the window_size) .
+
+    The routine is performed for each Ex row independently.
+
+    Args:
+        array: Input array, ordered as [Ex, Eg]
+        window_size (Union[int, np.array]): Window_size, eg. FWHM. If `int`
+            `float`, the same FWHM will be applied for all `Eg` bins.
+            Otherwise, provide an array with the FWHM for each `Eg` bin.
+
+    Returns:
+        array with negative counts filled, where possible
     """
-    matrix_out = np.copy(matrix)
-    # Loop over rows:
-    for i_Ex in range(matrix.shape[0]):
-        for i_Eg in np.where(matrix[i_Ex, :] < 0)[0]:
-            # print("i_Ex = ", i_Ex, "i_Eg =", i_Eg)
-            # window_size = 4  # Start with a constant window size.
-            # TODO relate it to FWHM by energy arrays
-            i_Eg_low = max(0, i_Eg - window_size)
-            i_Eg_high = min(matrix.shape[1], i_Eg + window_size)
-            # Fill from the channel with the larges positive count
-            # in the neighbourhood
-            i_max = np.argmax(matrix[i_Ex, i_Eg_low:i_Eg_high])
-            # print("i_max =", i_max)
-            if matrix[i_Ex, i_max] <= 0:
-                pass
-            else:
-                positive = matrix[i_Ex, i_max]
-                negative = matrix[i_Ex, i_Eg]
-                fill = min(0, positive + negative)  # Don't fill more than to 0
-                rest = positive
-                # print("fill =", fill, "rest =", rest)
-                matrix_out[i_Ex, i_Eg] = fill
-                # matrix_out[i_Ex, i_max] = rest
-    return matrix_out
+    if isinstance(window_size, int):
+        window_size = np.full(array.shape[1], window_size)
+    else:
+        assert len(window_size) == array.shape[1], "Array length incompatible"
+        assert window_size.dtype == np.integer, "Check input"
+
+    array = np.copy(array)
+    N_Ex = array.shape[0]
+    N_Eg = array.shape[1]
+    for i_Ex in range(N_Ex):
+        row = array[i_Ex, :]
+        for i_Eg in np.where(row < 0)[0]:
+            window_size_Eg = window_size[i_Eg]
+            max_distance = window_size_Eg
+            max_distance = int(np.ceil((window_size_Eg - 1) / 2))
+            i_Eg_low = max(0, i_Eg - max_distance)
+            i_Eg_high = min(N_Eg, i_Eg + max_distance)
+            while row[i_Eg] < 0:
+                i_max = np.argmax(row[i_Eg_low:i_Eg_high + 1])
+                i_max = i_Eg_low + i_max
+                if row[i_max] <= 0:
+                    break
+                shuffle_counts(row, i_max, i_Eg)
+
+    return array
+
+
+def fill_negative_gauss(array: np.ndarray, Eg: np.ndarray,
+                        window_size: Union[int, float, np.array],
+                        n_trunc: float = 3) -> np.ndarray:
+    """
+    Fill negative channels with positive counts from weighted neighbor chnls.
+
+    The idea is that the negative counts are somehow connected to the (γ-ray)
+    resolution and should thus be filled from a channel within the resolution.
+
+    This implementation loops through channels with the maximum "weight", where
+    the weight is given by
+        weight = gaussian(i, loc=i, scale ~ window_size) * counts(i),
+    to fill the channle(s) with negative counts. Note that it can
+    happen that some bins will remain with negative counts (if not enough bins
+    with possitive counts are available within the window_size) .
+
+    The routine is performed for each Ex row independently.
+
+    Args:
+        array: Input array, ordered as [Ex, Eg]
+        Eg: Gamma-ray energies
+        window_size: FWHM for the gaussian. If `int` or
+            `float`, the same FWHM will be applied for all `Eg` bins.
+            Otherwise, provide an array with the FWHM for each `Eg` bin.
+        n_trun (float, optional): Truncate gaussian for faster calculation.
+            Defaults to 3.
+
+    Returns:
+        array with negative counts filled, where possible
+    """
+    if isinstance(window_size, (int, float)):
+        sigma = window_size/2.355  # convert FWHM to sigma
+        window_size = np.full(array.shape[1], window_size)
+    else:
+        assert len(window_size) == array.shape[1], "Array length incompatible"
+        sigma = window_size/2.355  # convert FWHM to sigma
+
+    # generate truncated gauss for each Eg bin, format [Eg-bin, gauss-values]
+    lower, upper = Eg - n_trunc*sigma, Eg + n_trunc*sigma
+    a = (lower - Eg) / sigma
+    b = (upper - Eg) / sigma
+    gauss = [truncnorm(a=a, b=b, loc=p, scale=sig).pdf(Eg)
+             for p, sig in zip(Eg, sigma)]
+    gauss = np.array(gauss)
+
+    array = np.copy(array)
+    N_Ex = array.shape[0]
+    for i_Ex in range(N_Ex):
+        row = array[i_Ex, :]
+        for i_Eg in np.nonzero(row < 0)[0]:
+            positives = np.where(row < 0, 0, row)
+            weights = positives * gauss[i_Eg, :]
+
+            for i_from in np.argsort(weights):
+                if row[i_from] < 0:
+                    break
+                shuffle_counts(row, i_from, i_Eg)
+                if row[i_Eg] >= 0:
+                    break
+
+    return array
+
+
+def shuffle_counts(row: np.ndarray, i_from: int, i_to: int):
+    """Shuffles counts in `row` from bin `i_from` to `i_to`
+
+    Transfers at maximum row[i_from] counts, so that row[i_from] cannot be
+    negative after the shuffling.
+
+    Note:
+        Assumes that row[i_from] > 0 and row[i_to] < 0.
+
+    Args:
+        row: Input array
+        i_from: Index of bin to take counts from
+        i_to: Index of bin to fill
+
+    """
+    positive = row[i_from]
+    negative = row[i_to]
+    fill = min(0, positive + negative)
+    rest = max(0, positive + negative)
+    row[i_to] = fill
+    row[i_from] = rest
 
 
 def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
