@@ -252,9 +252,11 @@ class NormalizerNLD:
         rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
+        def neglnlike(*args, **kwargs):
+            return - self.lnlike(*args, **kwargs)
         args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
                 nldSn)
-        res = differential_evolution(self.errfn, bounds=bounds, args=args)
+        res = differential_evolution(neglnlike, bounds=bounds, args=args)
 
         LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
                  header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
@@ -271,7 +273,7 @@ class NormalizerNLD:
 
         Args:
             num (int): Loop number
-            args_nld (Iterable): Additional arguments for the nld errfn
+            args_nld (Iterable): Additional arguments for the nld lnlike
             guess (Dict[str, float]): The initial guess of the parameters
 
         Returns:
@@ -326,9 +328,7 @@ class NormalizerNLD:
                 LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
-            chi2 = self.errfn(cube, *args)
-            loglikelihood = -0.5 * chi2
-            return loglikelihood
+            return self.lnlike(cube, *args)
 
         self.multinest_path.mkdir(exist_ok=True)
         path = self.multinest_path / f"nld_norm_{num}_"
@@ -502,11 +502,13 @@ class NormalizerNLD:
         #self.res.save(path / f"nld_{num}")
 
     @staticmethod
-    def errfn(x: Tuple[float, float, float, float], nld_low: Vector,
-              nld_high: Vector, discrete: Vector,
-              model: Callable[..., ndarray],
-              Sn, nldSn) -> float:
-        """ Compute the χ² of the normalization fitting
+    def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
+               nld_high: Vector, discrete: Vector,
+               model: Callable[..., ndarray],
+               Sn, nldSn) -> float:
+        """ Compute log likelihood of the normalization fitting
+
+        This is the result up a, which is irrelevant for the maximization
 
         Args:
             x: The arguments ordered as A, alpha, T and Eshift
@@ -518,8 +520,9 @@ class NormalizerNLD:
             model: The model to use when fitting the upper region.
                 Must support the keyword arguments
                 ``model(E=..., T=..., Eshift=...) -> ndarray``
+
         Returns:
-            chi2 (float): The χ² value
+            lnlike: log likelihood
         """
         A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
         transformed_low = nld_low.transform(A, alpha, inplace=False)
@@ -534,7 +537,10 @@ class NormalizerNLD:
         nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
         err_nldSn = ((nldSn[0] - nldSn_model)/nldSn[1])**2
 
-        return err_low + err_high + err_nldSn
+        ln_stds = (np.log(transformed_low.std).sum()
+                   + np.log(transformed_high.std).sum())
+
+        return -0.5*(err_low + err_high + err_nldSn + ln_stds)
 
     @staticmethod
     def const_temperature(E: ndarray, T: float, Eshift: float) -> ndarray:

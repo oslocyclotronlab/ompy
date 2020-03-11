@@ -545,13 +545,13 @@ class NormalizerGSF():
                      scale_high=self.model_high.scale_high,
                      shift_high=self.model_high.shift_high)
 
-    def errfn(self):
-        """ Weighted chi2 """
+    def lnlike(self):
+        """ log likelihood """
         Gg = self.norm_pars.Gg[0]
         sigma_Gg = self.norm_pars.Gg[1]
         chi2 = (self.Gg_before_norm() - Gg)/(sigma_Gg)
         chi2 = chi2**2
-        return chi2
+        return -0.5*chi2
 
     def self_if_none(self, *args, **kwargs):
         """ wrapper for lib.self_if_none """

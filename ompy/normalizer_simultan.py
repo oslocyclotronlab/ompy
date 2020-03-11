@@ -197,7 +197,7 @@ class NormalizerSimultan():
 
         Args:
             num (int): Loop number
-            args_nld (Iterable): Additional arguments for the nld errfn
+            args_nld (Iterable): Additional arguments for the nld lnlike
             guess (Dict[str, float]): The initial guess of the parameters
 
         Returns:
@@ -261,11 +261,9 @@ class NormalizerSimultan():
                 LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
-            chi2 = self.errfn(cube, args_nld=args_nld)
-            loglikelihood = -0.5 * chi2
-            return loglikelihood
+            return self.lnlike(cube, args_nld=args_nld)
 
-        # parameters are changed in the errfn
+        # parameters are changed in the lnlike
         norm_pars_org = copy.deepcopy(self.normalizer_gsf.norm_pars)
 
         self.multinest_path.mkdir(exist_ok=True)
@@ -314,24 +312,27 @@ class NormalizerSimultan():
 
         return popt, samples
 
-    def errfn(self, x: Tuple[float, float, float, float, float],
-              args_nld: Iterable) -> float:
-        """Compute the χ² of the normalization fitting
+    def lnlike(self, x: Tuple[float, float, float, float, float],
+               args_nld: Iterable) -> float:
+        """Compute log likelihood  of the normalization fitting
+
+        This is the result up to the constant, which is irrelevant for the
+        maximization
 
         Args:
             x (Tuple[float, float, float, float, float]): The arguments
                 ordered as A, alpha, T and Eshift, B
-            args_nld (TYPE): Additional arguments for the nld errfn
+            args_nld (TYPE): Additional arguments for the nld lnlike
 
         Returns:
-            chi2 (float): The χ² value
+            lnlike: log likelihood
         """
         A, alpha, T, Eshift, B = x[:5]  # slicing needed for multinest?
 
         normalizer_gsf = self.normalizer_gsf
         normalizer_nld = self.normalizer_nld
 
-        err_nld = normalizer_nld.errfn(x[:4], *args_nld)
+        err_nld = normalizer_nld.lnlike(x[:4], *args_nld)
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
@@ -346,7 +347,7 @@ class NormalizerSimultan():
                                                               inplace=False)
         normalizer_gsf._gsf_low, normalizer_gsf._gsf_high = \
             normalizer_gsf.extrapolate()
-        err_gsf = normalizer_gsf.errfn()
+        err_gsf = normalizer_gsf.lnlike()
         return err_nld + err_gsf
 
     def plot(self, ax: Optional[Any] = None, add_label: bool = True,
