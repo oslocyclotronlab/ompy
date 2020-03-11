@@ -438,6 +438,7 @@ class Unfolder:
         """
         matrix.fill_and_remove_negative()
 
+
 def shift(counts_in, E_array_in, energy_shift):
     """
     Shift the counts_in array by amount energy_shift.

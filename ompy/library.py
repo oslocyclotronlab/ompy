@@ -143,7 +143,7 @@ def fill_negative(array: np.ndarray,
         for i_Eg in np.where(row < 0)[0]:  # select bins with negative entries
             window_size_Eg = window_size[i_Eg]
             i_low = max(0, i_Eg - window_size_Eg)
-            i_high = min(N_Eg, i_Eg + window_size_Eg +1)
+            i_high = min(N_Eg, i_Eg + window_size_Eg + 1)
 
             # array of possible bins, sorted by distance to i_Eg
             window = np.arange(i_low, i_high)
