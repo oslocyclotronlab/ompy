@@ -78,6 +78,8 @@ class Unfolder:
              fluctuations. Defaults to 0.2
         minimum_iterations (int, optional): Minimum number of iterations.
             Defaults to 3.
+        window_size (int or np.ndarray): window_size for  (fill and) remove
+            negatives on output. Defaults to 10.
         use_compton_subtraction (bool, optional): Set usage of Compton
             subtraction method. Defaults to `True`.
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
@@ -103,6 +105,7 @@ class Unfolder:
         self.num_iter = num_iter
         self.weight_fluctuation: float = 0.2
         self.minimum_iterations: int = 3
+        self.window_size = 10
 
         self._R: Optional[Matrix] = response
         self.raw: Optional[Matrix] = None
@@ -427,8 +430,7 @@ class Unfolder:
 
         return unfolded
 
-    @staticmethod
-    def remove_negative(matrix: Matrix):
+    def remove_negative(self, matrix: Matrix):
         """ (Fill and) remove negative counts
 
         Wrapper for Matrix.fill_and_remove_negative()
@@ -436,7 +438,7 @@ class Unfolder:
         Args:
             matrix: Input matrix
         """
-        matrix.fill_and_remove_negative()
+        matrix.fill_and_remove_negative(window_size=self.window_size)
 
 
 def shift(counts_in, E_array_in, energy_shift):
