@@ -30,7 +30,7 @@ import numpy as np
 import pandas
 import logging
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Callable
 import termtables as tt
 from scipy.ndimage import gaussian_filter1d
 from copy import copy
@@ -78,8 +78,8 @@ class Unfolder:
              fluctuations. Defaults to 0.2
         minimum_iterations (int, optional): Minimum number of iterations.
             Defaults to 3.
-        window_size (float or int?, optional): window_size for fill negatives
-            on output. Defaults to 10.
+        window_size (int or np.ndarray): window_size for  (fill and) remove
+            negatives on output. Defaults to 20.
         use_compton_subtraction (bool, optional): Set usage of Compton
             subtraction method. Defaults to `True`.
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
@@ -91,7 +91,6 @@ class Unfolder:
         iscores (np.ndarray, optional): Selected iteration number in the
             unfolding. The unfolding and selection is performed independently
             for each `Ex` row, thus this is an array with `len(raw.Ex)`.
-
     TODO:
         - Unfolding for a single spectrum (currently needs to be mocked as a
             Matrix).
@@ -106,7 +105,7 @@ class Unfolder:
         self.num_iter = num_iter
         self.weight_fluctuation: float = 0.2
         self.minimum_iterations: int = 3
-        self.window_size = 10
+        self.window_size = 20
 
         self._R: Optional[Matrix] = response
         self.raw: Optional[Matrix] = None
@@ -115,9 +114,6 @@ class Unfolder:
         self.use_compton_subtraction: bool = True
         self.response_tab: Optional[pandas.DataFrame] = None
         self.FWHM_tweak_multiplier: Optional[dict[str, float]] = None
-
-        # remove negs. in final unfolded spectrum
-        self.remove_negatives: bool = True
 
         self.iscores: Optional[np.ndarray] = None
 
@@ -217,8 +213,7 @@ class Unfolder:
         unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
 
-        if self.remove_negatives:
-            unfolded.fill_and_remove_negative(window_size=self.window_size)
+        self.remove_negative(unfolded)
         return unfolded
 
     def step(self, unfolded: np.ndarray, folded: np.ndarray,
@@ -434,6 +429,16 @@ class Unfolder:
         unfolded = div0(u, eff)
 
         return unfolded
+
+    def remove_negative(self, matrix: Matrix):
+        """ (Fill and) remove negative counts
+
+        Wrapper for Matrix.fill_and_remove_negative()
+
+        Args:
+            matrix: Input matrix
+        """
+        matrix.fill_and_remove_negative(window_size=self.window_size)
 
 
 def shift(counts_in, E_array_in, energy_shift):

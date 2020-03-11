@@ -32,7 +32,7 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from .matrix import Matrix
 from .vector import Vector
 from .library import div0
@@ -56,7 +56,8 @@ class FirstGeneration:
         multiplicity_estimation (str): Selects which method should be used
             for the multiplicity estimation. Can be either "statistical",
             or "total". Default is "statistical".
-
+        window_size (int or np.ndarray): window_size for (fill and) remove
+            negatives on output. Defaults to 20.
         statistical_upper (float): Threshold for upper limit in
             `statistical` multiplicity estimation. Defaults to 430 keV.
         statistical_lower (float): Threshold for lower limit in
@@ -86,6 +87,7 @@ class FirstGeneration:
     def __init__(self):
         self.num_iterations: int = 10
         self.multiplicity_estimation: str = 'statistical'
+        self.window_size = 20
 
         self.statistical_upper: float = 430.0  # MAMA ThresSta
         self.statistical_lower: float = 200.0  # MAMA ThresTot
@@ -136,8 +138,7 @@ class FirstGeneration:
 
         final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
         final.state = "firstgen"
-        final.fill_negative(window_size=10)
-        final.remove_negative()
+        self.remove_negative(final)
         return final
 
     def setup(self, matrix: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
@@ -398,6 +399,16 @@ class FirstGeneration:
                     ag[i, :] += xs[i] * w[i, j] * div0(ag[j, :], xs[j])
 
         return ag
+
+    def remove_negative(self, matrix: Matrix):
+        """ (Fill and) remove negative counts
+
+        Wrapper for Matrix.fill_and_remove_negative()
+
+        Args:
+            matrix: Input matrix
+        """
+        matrix.fill_and_remove_negative(window_size=self.window_size)
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:
