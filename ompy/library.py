@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
 from scipy.interpolate import interp1d, RectBivariateSpline
+from scipy.stats import truncnorm
 import matplotlib
 from itertools import product
 from typing import Optional, Tuple, Iterator, Any, Union
@@ -104,8 +105,8 @@ def E_array_from_calibration(a0: float, a1: float, *,
         raise ValueError("Either N or E_max must be given")
 
 
-def fill_negative(array: np.ndarray,
-                  window_size: Union[int, np.array]) -> np.ndarray:
+def fill_negative_max(array: np.ndarray,
+                      window_size: Union[int, np.array]) -> np.ndarray:
     """
     Fill negative channels with positive counts from neighboring channels.
 
@@ -151,6 +152,66 @@ def fill_negative(array: np.ndarray,
                 if row[i_max] <= 0:
                     break
                 shuffle_counts(row, i_max, i_Eg)
+
+    return array
+
+
+def fill_negative_gauss(array: np.ndarray,
+                        window_size: Union[int, float, np.array],
+                        n_trunc: float = 3) -> np.ndarray:
+    """
+    Fill negative channels with positive counts from weighted neighbor chnls.
+
+    The idea is that the negative counts are somehow connected to the (γ-ray)
+    resolution and should thus be filled from a channel within the resolution.
+
+    This implementation loops through channels with the maximum "weight", where
+    the weight is given by
+        weight = gaussian(i, loc=i, scale ~ window_size) * counts(i),
+    to fill the channle(s) with negative counts. Note that it can
+    happen that some bins will remain with negative counts (if not enough bins
+    with possitive counts are available within the window_size) .
+
+    The routine is performed for each Ex row independently.
+
+    Args:
+        array: Input array, ordered as [Ex, Eg]
+        window_size: FWHM for the gaussian. If `int` or
+            `float`, the same FWHM will be applied for all `Eg` bins.
+            Otherwise, provide an array with the FWHM for each `Eg` bin.
+        n_trun (float, optional): Truncate gaussian for faster calculation.
+            Defaults to 3.
+
+    Returns:
+        array with negative counts filled, where possible
+    """
+    if isinstance(window_size, (int, float)):
+        sigma = window_size/2.355  # convert FWHM to sigma
+        window_size = np.full(array.shape[1], window_size)
+    else:
+        assert len(window_size) == array.shape[1], "Array length incompatible"
+        sigma = window_size/2.355  # convert FWHM to sigma
+
+    # generate truncated gauss for each Eg bin, format [Eg-bin, gauss-values]
+    loc = array[0, :]
+    lower, upper = loc - n_trunc*sigma, loc + n_trunc*sigma
+    a = (lower - loc) / sigma
+    b = (upper - loc) / sigma
+    gauss = [truncnorm(a=a, b=b, loc=loc, scale=sigma).pdf(p) for p in loc]
+    gauss = np.array(gauss)
+
+    array = np.copy(array)
+    N_Ex = array.shape[0]
+    for i_Ex in range(N_Ex):
+        row = array[i_Ex, :]
+        for i_Eg in np.nonzero(row < 0)[0]:
+            positives = np.where(row < 0, 0, row)
+            weights = positives * gauss[i_Eg, :]
+
+            for i_from in np.argsort(weights):
+                shuffle_counts(row, i_from, i_Eg)
+                if row[i_Eg] >= 0:
+                    break
 
     return array
 

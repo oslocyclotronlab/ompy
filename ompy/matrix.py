@@ -42,7 +42,7 @@ from .decomposition import index
 from .filehandling import (mama_read, mama_write,
                            save_numpy_2D, load_numpy_2D, save_tar, load_tar,
                            filetype_from_suffix)
-from .library import div0, fill_negative, diagonal_elements
+from .library import div0, fill_negative_gauss, diagonal_elements
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
 from .vector import Vector
@@ -752,8 +752,8 @@ class Matrix(AbstractArray):
         return diagonal_elements(self.values)
 
     def fill_negative(self, window_size: int):
-        """ Wrapper for :func:`ompy.fill_negative` """
-        self.values = fill_negative(self.values, window_size)
+        """ Wrapper for :func:`ompy.fill_negative_gauss` """
+        self.values = fill_negative_gauss(self.values, window_size)
 
     def remove_negative(self):
         """ Entries with negative values are set to 0 """
