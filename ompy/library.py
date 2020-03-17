@@ -156,7 +156,7 @@ def fill_negative_max(array: np.ndarray,
     return array
 
 
-def fill_negative_gauss(array: np.ndarray,
+def fill_negative_gauss(array: np.ndarray, Eg: np.ndarray,
                         window_size: Union[int, float, np.array],
                         n_trunc: float = 3) -> np.ndarray:
     """
@@ -176,6 +176,7 @@ def fill_negative_gauss(array: np.ndarray,
 
     Args:
         array: Input array, ordered as [Ex, Eg]
+        Eg: Gamma-ray energies
         window_size: FWHM for the gaussian. If `int` or
             `float`, the same FWHM will be applied for all `Eg` bins.
             Otherwise, provide an array with the FWHM for each `Eg` bin.
@@ -193,11 +194,11 @@ def fill_negative_gauss(array: np.ndarray,
         sigma = window_size/2.355  # convert FWHM to sigma
 
     # generate truncated gauss for each Eg bin, format [Eg-bin, gauss-values]
-    loc = array[0, :]
-    lower, upper = loc - n_trunc*sigma, loc + n_trunc*sigma
-    a = (lower - loc) / sigma
-    b = (upper - loc) / sigma
-    gauss = [truncnorm(a=a, b=b, loc=loc, scale=sigma).pdf(p) for p in loc]
+    lower, upper = Eg - n_trunc*sigma, Eg + n_trunc*sigma
+    a = (lower - Eg) / sigma
+    b = (upper - Eg) / sigma
+    gauss = [truncnorm(a=a, b=b, loc=p, scale=sig).pdf(Eg)
+             for p, sig in zip(Eg, sigma)]
     gauss = np.array(gauss)
 
     array = np.copy(array)
@@ -209,6 +210,8 @@ def fill_negative_gauss(array: np.ndarray,
             weights = positives * gauss[i_Eg, :]
 
             for i_from in np.argsort(weights):
+                if row[i_from] < 0:
+                    break
                 shuffle_counts(row, i_from, i_Eg)
                 if row[i_Eg] >= 0:
                     break

@@ -753,7 +753,7 @@ class Matrix(AbstractArray):
 
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
-        self.values = fill_negative_gauss(self.values, window_size)
+        self.values = fill_negative_gauss(self.values, self.Eg, window_size)
 
     def remove_negative(self):
         """ Entries with negative values are set to 0 """
