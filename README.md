@@ -1,5 +1,5 @@
 # Oslo Method Python - OMpy
-![Travis (.org)](https://img.shields.io/travis/oslocyclotronlab/ompy?style=flat-square)
+[![Build Status](https://img.shields.io/travis/oslocyclotronlab/ompy/master?label=build%20%28master%29)](https://travis-ci.org/oslocyclotronlab/ompy)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square)
 [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
