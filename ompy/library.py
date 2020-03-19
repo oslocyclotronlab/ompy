@@ -187,8 +187,8 @@ def fill_negative_gauss(array: np.ndarray, Eg: np.ndarray,
         array with negative counts filled, where possible
     """
     if isinstance(window_size, (int, float)):
-        sigma = window_size/2.355  # convert FWHM to sigma
         window_size = np.full(array.shape[1], window_size)
+        sigma = window_size/2.355  # convert FWHM to sigma
     else:
         assert len(window_size) == array.shape[1], "Array length incompatible"
         sigma = window_size/2.355  # convert FWHM to sigma
