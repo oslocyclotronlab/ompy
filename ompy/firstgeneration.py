@@ -56,8 +56,6 @@ class FirstGeneration:
         multiplicity_estimation (str): Selects which method should be used
             for the multiplicity estimation. Can be either "statistical",
             or "total". Default is "statistical".
-        window_size (int or np.ndarray): window_size for (fill and) remove
-            negatives on output. Defaults to 20.
         statistical_upper (float): Threshold for upper limit in
             `statistical` multiplicity estimation. Defaults to 430 keV.
         statistical_lower (float): Threshold for lower limit in
@@ -87,7 +85,6 @@ class FirstGeneration:
     def __init__(self):
         self.num_iterations: int = 10
         self.multiplicity_estimation: str = 'statistical'
-        self.window_size = 20
 
         self.statistical_upper: float = 430.0  # MAMA ThresSta
         self.statistical_lower: float = 200.0  # MAMA ThresTot
@@ -401,14 +398,15 @@ class FirstGeneration:
         return ag
 
     def remove_negative(self, matrix: Matrix):
-        """ (Fill and) remove negative counts
+        """ Wrapper for Matrix.remove_negative()
 
-        Wrapper for Matrix.fill_and_remove_negative()
+        Put in as an extra method to facilitate replacing this by eg.
+        `fill_and_remove_negatve`
 
         Args:
             matrix: Input matrix
         """
-        matrix.fill_and_remove_negative(window_size=self.window_size)
+        matrix.remove_negative()
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:
