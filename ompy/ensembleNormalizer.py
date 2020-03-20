@@ -159,6 +159,7 @@ class EnsembleNormalizer(AbstractNormalizer):
             res (ResultsNormalized): results (/parameters) of normalization
         """
         self.normalizer_simultan._save_instance = False
+        self.normalizer_simultan.regenerate = True
         self.normalizer_simultan.normalize(gsf=gsf, nld=nld, num=num)
         return self.normalizer_simultan.res
 
