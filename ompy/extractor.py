@@ -39,7 +39,7 @@ class Extractor:
     Attributes:
         ensemble (Ensemble): The Ensemble instance to extract nld and gsf from.
         regenerate (bool): Whether to force extraction from matrices even if
-            previous results are found on disk. Defaults to True
+            previous results are found on disk. Defaults to False
         method (str): The scipy.minimization method to use. Defaults to Powell.
         options (dict): The scipy.minimization options to use.
         nld (list[Vector]): The nuclear level densities extracted.
@@ -577,6 +577,12 @@ class Extractor:
         values = self.gsf_mean()
         std = self.gsf_std()
         return Vector(values=values, E=energy, std=std)
+
+    def __getstate__(self):
+        """ `__getstate__` excluding `ensemble` attribute to save space """
+        state = self.__dict__.copy()
+        del state['ensemble']
+        return state
 
 
 def normalize(mat: Matrix,

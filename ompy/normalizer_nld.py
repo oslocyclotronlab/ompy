@@ -7,24 +7,23 @@ import pymultinest
 import matplotlib.pyplot as plt
 import warnings
 from contextlib import redirect_stdout
-from pathlib import Path
 from numpy import ndarray
 from scipy.optimize import differential_evolution
 from typing import Optional, Tuple, Any, Union, Callable, Dict
+from pathlib import Path
+
 from scipy.stats import truncnorm
 from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
 from .filehandling import load_discrete
 from .models import ResultsNormalized, NormalizationParameters
-
-
-LOG = logging.getLogger(__name__)
+from .abstract_normalizer import AbstractNormalizer
 
 TupleDict = Dict[str, Tuple[float, float]]
 
 
-class NormalizerNLD:
+class NormalizerNLD(AbstractNormalizer):
     """ Normalizes NLD to empirical data
 
     Normalizes nld/gsf according to::
@@ -62,13 +61,17 @@ class NormalizerNLD:
         res (ResultsNormalized): Results of the normalization
         smooth_levels_fwhm (float): FWHM with which the discrete levels shall
             be smoothed when loading from file. Defaults to 0.1 MeV.
-        path (Path): The path the transformed vectors to.
+        path (Path): The path save the results.
 
     """
+    LOG = logging.getLogger(__name__)  # overwrite parent variable
+    logging.captureWarnings(True)
+
     def __init__(self, *,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Union[str, Vector]] = None,
                  path: Optional[Union[str, Path]] = None,
+                 regenerate: bool = False,
                  norm_pars: Optional[NormalizationParameters] = None) -> None:
         """ Normalizes nld ang gSF.
 
@@ -99,6 +102,8 @@ class NormalizerNLD:
               samples from the pdf (not the importance weighted)
 
         """
+        super().__init__(regenerate)
+
         # Create the private variables
         self._discrete = None
         self._discrete_path = None
@@ -123,14 +128,8 @@ class NormalizerNLD:
         self.limit_high = None
         self.std_fake = None  # See `normalize`
 
-        # Load saved transformed vectors
-        if path is not None:
-            self.path = Path(path)
-            self.path.mkdir(exist_ok=True)
-            self.load(self.path)
-        else:
-            self.path = Path('normalizations')
-            self.path.mkdir(exist_ok=True)
+        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path.mkdir(exist_ok=True)
 
     def __call__(self, *args, **kwargs) -> None:
         """ Wrapper around normalize """
@@ -158,8 +157,17 @@ class NormalizerNLD:
             norm_pars (NormalizationParameters): Normalization parameters like
             experimental D₀, and spin(-cut) model
             num (optional): Loop number, defauts to 0
+            regenerate: Whether to use already generated files (False) or
+                generate them all anew (True).
 
         """
+        if not self.regenerate:
+            try:
+                self.load()
+                return
+            except FileNotFoundError:
+                pass
+
         # Update internal state
         self.limit_low = self.self_if_none(limit_low)
         self.limit_high = self.self_if_none(limit_high)
@@ -179,9 +187,9 @@ class NormalizerNLD:
         # ensure that it's updated if running again
         self.res = ResultsNormalized(name="Results NLD")
 
-        LOG.info(f"\n\n---------\nNormalizing nld #{num}")
+        self.LOG.info(f"\n\n---------\nNormalizing nld #{num}")
         nld = nld.copy()
-        LOG.debug("Setting NLD, convert to MeV")
+        self.LOG.debug("Setting NLD, convert to MeV")
         nld.to_MeV()
 
         # Need to give some sort of standard deviation for sensible results
@@ -212,7 +220,7 @@ class NormalizerNLD:
                                          Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
 
-        self.save(num=num)
+        self.save()  # save instance
 
     def initial_guess(self, limit_low: Optional[Tuple[float, float]] = None,
                       limit_high: Optional[Tuple[float, float]] = None
@@ -240,9 +248,9 @@ class NormalizerNLD:
         spinParsstring = json.dumps(self.norm_pars.spincutPars, indent=4,
                                     sort_keys=True)
 
-        LOG.debug("Using bounds %s", bounds)
-        LOG.debug("Using spincutModel %s", self.norm_pars.spincutModel)
-        LOG.debug("Using spincutPars %s", spinParsstring)
+        self.LOG.debug("Using bounds %s", bounds)
+        self.LOG.debug("Using spincutModel %s", self.norm_pars.spincutModel)
+        self.LOG.debug("Using spincutPars %s", spinParsstring)
 
         nld_low = self.nld.cut(*limit_low, inplace=False)
         discrete = self.discrete.cut(*limit_low, inplace=False)
@@ -258,8 +266,8 @@ class NormalizerNLD:
                 nldSn)
         res = differential_evolution(neglnlike, bounds=bounds, args=args)
 
-        LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
+        self.LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
+                      header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
 
@@ -325,7 +333,7 @@ class NormalizerNLD:
                                     scale=sigma_Eshift)
 
             if np.isinf(cube[3]):
-                LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
+                self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
             return self.lnlike(cube, *args)
@@ -334,11 +342,12 @@ class NormalizerNLD:
         path = self.multinest_path / f"nld_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        LOG.info("Starting multinest")
-        LOG.debug("with following keywords %s:", self.multinest_kwargs)
+        self.LOG.info("Starting multinest")
+        self.LOG.debug("with following keywords %s:", self.multinest_kwargs)
         #  Hack where stdout from Multinest is redirected as info messages
-        LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
-        with redirect_stdout(LOG):
+        self.LOG.write = lambda msg: (self.LOG.info(msg) if msg != '\n'
+                                      else None)
+        with redirect_stdout(self.LOG):
             pymultinest.run(loglike, prior, len(guess),
                             outputfiles_basename=str(path),
                             **self.multinest_kwargs)
@@ -367,8 +376,8 @@ class NormalizerNLD:
             fmts = '\t'.join([fmt + " ± " + fmt])
             vals.append(fmts % (med, sigma))
 
-        LOG.info("Multinest results:\n%s", tt.to_string([vals],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
+        self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
+                      header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         return popt, samples
 
@@ -453,53 +462,6 @@ class NormalizerNLD:
             fig.legend(loc=9, ncol=3, frameon=False)
 
         return fig, ax
-
-    def load(self, path: Optional[Union[str, Path]] = None) -> None:
-        """ Load already normalized NLD from `path`.
-
-        Args:
-            path: The path to the directory containing the
-                files.
-        TODO:
-            - Save/LOAD whole Results class
-        """
-        raise NotImplementedError()
-        if path is not None:
-            path = Path(path)
-        else:
-            path = Path(self.path)  # TODO: Fix pathing
-
-        if not path.exists():
-            raise IOError(f"The path {path} does not exist.")
-        if self.res.nld:
-            warnings.warn("Loading nld and gsf into non-empty instance")
-
-        LOG.debug("Loading from %s", str(path))
-
-        for fname in path.glob("nld_[0-9]+"):
-            LOG.debug("Loading %s", fname)
-            self.res.load(fname)
-            break
-
-        if not self.res.nld:
-            warnings.warn("Found no files")
-
-    def save(self, path: Optional[Union[str, Path]] = None,
-             num: int = None) -> None:
-        """ Save results to `path`.
-        TODO:
-            - Save/LOAD whole Results class
-            - Currently completely broken
-        """
-        if path is not None:
-            path = Path(path)
-        else:
-            path = Path(self.path)  # TODO: Fix pathing
-
-        LOG.debug("Saving to %s", str(path))
-
-        path.mkdir(exist_ok=True)
-        #self.res.save(path / f"nld_{num}")
 
     @staticmethod
     def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
@@ -650,14 +612,14 @@ class NormalizerNLD:
     def discrete(self, value: Optional[Union[Path, str, Vector]]) -> None:
         if value is None:
             self._discretes = None
-            LOG.debug("Set `discrete` to None")
+            self.LOG.debug("Set `discrete` to None")
         elif isinstance(value, (str, Path)):
             if self.nld is None:
                 raise ValueError(f"`nld` must be set before loading levels")
             nld = self.nld.copy()
             nld.to_MeV()
-            LOG.debug("Set `discrete` levels from file with FWHM %s",
-                      self.smooth_levels_fwhm)
+            self.LOG.debug("Set `discrete` levels from file with FWHM %s",
+                           self.smooth_levels_fwhm)
             self._discrete = load_levels_smooth(value, nld.E,
                                                 self.smooth_levels_fwhm)
             self._discrete.units = "MeV"
@@ -668,7 +630,7 @@ class NormalizerNLD:
                 raise ValueError("`nld` and `discrete` must"
                                  " have same energy binning")
             self._discrete = value
-            LOG.debug("Set `discrete` by Vector")
+            self.LOG.debug("Set `discrete` by Vector")
         else:
             raise ValueError(f"Value {value} is not supported"
                              " for discrete levels")

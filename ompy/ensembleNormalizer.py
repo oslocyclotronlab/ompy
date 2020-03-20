@@ -11,7 +11,9 @@ import copy
 from itertools import repeat
 from pathos.multiprocessing import ProcessPool
 from pathos.helpers import cpu_count
+from pathlib import Path
 
+from .abstract_normalizer import AbstractNormalizer
 from .models import ResultsNormalized
 from .vector import Vector
 from .extractor import Extractor
@@ -19,16 +21,14 @@ from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .normalizer_simultan import NormalizerSimultan
 
+
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
 else:
     from tqdm import tqdm
 
-LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
 
-
-class EnsembleNormalizer:
+class EnsembleNormalizer(AbstractNormalizer):
     """Normalizes NLD nad γSF extracted from the ensemble
 
     Usage:
@@ -60,11 +60,15 @@ class EnsembleNormalizer:
         nprocesses (int): Number of processes for multiprocessing.
             Defaults to number of available cpus-1 (with mimimum 1).
     """
+    LOG = logging.getLogger(__name__)  # overwrite parent variable
+    logging.captureWarnings(True)
 
     def __init__(self, *, extractor: Extractor,
                  normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None,
-                 normalizer_simultan: Optional[NormalizerSimultan] = None):
+                 normalizer_simultan: Optional[NormalizerSimultan] = None,
+                 path: Optional[Union[str, Path]] = None,
+                 regenerate: bool = False):
         """
         Args:
             extractor (Extractor): Extractor instance
@@ -73,19 +77,30 @@ class EnsembleNormalizer:
             normalizer_simultan (NormalizerSimultan, optional):
                 NormalizerSimultan instance
         """
+        super().__init__(regenerate)
         self.extractor = extractor
 
-        self.normalizer_nld = normalizer_nld
-        self.normalizer_gsf = normalizer_gsf
+        self.normalizer_nld = copy.deepcopy(normalizer_nld)
+        self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
 
-        self.normalizer_simultan = normalizer_simultan
+        self.normalizer_simultan = copy.deepcopy(normalizer_simultan)
 
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
         self.res: Optional[List[ResultsNormalized]] = None
 
+        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path.mkdir(exist_ok=True)
+
     def normalize(self) -> None:
         """ Normalize ensemble """
+        if not self.regenerate:
+            try:
+                self.load()
+                return
+            except FileNotFoundError:
+                pass
+
         assert xor((self.normalizer_nld is not None
                     and self.normalizer_gsf is not None),
                    self.normalizer_simultan is not None), \
@@ -95,7 +110,7 @@ class EnsembleNormalizer:
         gsfs = self.extractor.gsf
         nlds = self.extractor.nld
 
-        LOG.info(f"Start normalization with {self.nprocesses} cpus")
+        self.LOG.info(f"Start normalization with {self.nprocesses} cpus")
         pool = ProcessPool(nodes=self.nprocesses)
         N = len(nlds)
         iterator = pool.imap(self.step, range(N), nlds, gsfs)
@@ -103,6 +118,8 @@ class EnsembleNormalizer:
         pool.close()
         pool.join()
         pool.clear()
+
+        self.save()
 
     def step(self, i: int, nld: Vector, gsf: Vector):
         """ Normalization step for each ensemble member
@@ -115,7 +132,7 @@ class EnsembleNormalizer:
         Returns:
             res (ResultsNormalized): results (/parameters) of normalization
         """
-        LOG.info(f"\n\n---------\nNormalizing #{i}")
+        self.LOG.info(f"\n\n---------\nNormalizing #{i}")
         nld.copy()
         nld.cut_nan()
 
@@ -141,6 +158,7 @@ class EnsembleNormalizer:
         Returns:
             res (ResultsNormalized): results (/parameters) of normalization
         """
+        self.normalizer_simultan._save_instance = False
         self.normalizer_simultan.normalize(gsf=gsf, nld=nld, num=num)
         return self.normalizer_simultan.res
 
@@ -156,6 +174,10 @@ class EnsembleNormalizer:
         Returns:
             res (ResultsNormalized): results (/parameters) of normalization
         """
+        for norm in [self.normalizer_nld, self.normalizer_gsf]:
+            norm._save_instance = False
+            norm.regenerate = True
+
         self.normalizer_nld.normalize(nld=nld, num=num)
         self.normalizer_gsf.normalize(normalizer_nld=self.normalizer_nld,
                                       gsf=gsf, num=num)
@@ -173,7 +195,7 @@ class EnsembleNormalizer:
              n_plot: bool = 5,
              plot_model_stats: bool = False,
              random_state: Optional[np.random.RandomState] = None,
-             return_stats: bool =False,
+             return_stats: bool = False,
              **kwargs) -> Union[Tuple[Any, Any],
                                 Tuple[Any, Any, Tuple[Any, Any]]]:
         """Plots randomly drawn samples

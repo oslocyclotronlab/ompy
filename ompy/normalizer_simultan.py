@@ -11,6 +11,7 @@ import pymultinest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
 
+from .abstract_normalizer import AbstractNormalizer
 from .extractor import Extractor
 from .library import log_interp1d, self_if_none
 from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
@@ -20,10 +21,8 @@ from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
 
-LOG = logging.getLogger(__name__)
 
-
-class NormalizerSimultan():
+class NormalizerSimultan(AbstractNormalizer):
 
     """ Simultaneous normalization of nld and gsf. Composed of Normalizer and NormalizerGSF as input, so read more on the normalization there
 
@@ -42,17 +41,22 @@ class NormalizerSimultan():
             (see `normalize`)
         std_fake_nld (bool): Whether the std. deviation is faked
             (see `normalize`)
+        path (Path): The path save the results.
 
 
     TODO:
         Work with more general models, too, not just CT for nld
     """
+    LOG = logging.getLogger(__name__)
+    logging.captureWarnings(True)
 
     def __init__(self, *,
                  gsf: Optional[Vector] = None,
                  nld: Optional[Vector] = None,
                  normalizer_nld: Optional[NormalizerNLD] = None,
-                 normalizer_gsf: Optional[NormalizerGSF] = None):
+                 normalizer_gsf: Optional[NormalizerGSF] = None,
+                 path: Optional[Union[str, Path]] = None,
+                 regenerate: bool = False):
         """
         TODO:
             - currently have to set arguments here, an cannot set them in
@@ -65,6 +69,7 @@ class NormalizerSimultan():
             normalizer_gsf (optional): see above
 
         """
+        super().__init__(regenerate)
         if normalizer_nld is None:
             self.normalizer_nld = None
         else:
@@ -86,6 +91,9 @@ class NormalizerSimultan():
         self.multinest_path: Optional[Path] = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
+        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path.mkdir(exist_ok=True)
+
     def normalize(self, *, num: int = 0,
                   gsf: Optional[Vector] = None,
                   nld: Optional[Vector] = None,
@@ -97,14 +105,26 @@ class NormalizerSimultan():
             num (int, optional): Loop number
             gsf (Optional[Vector], optional): gsf before normalization
             nld (Optional[Vector], optional): nld before normalization
-            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD instance
-            normalizer_gsf (Optional[NormalizerGSF], optional): NormalizerGSF instance
+            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+                instance
+            normalizer_gsf (Optional[NormalizerGSF], optional): NormalizerGSF
+                instance
         """
+        if not self.regenerate:
+            try:
+                self.load()
+                return
+            except FileNotFoundError:
+                pass
+
         # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
 
-        normalizer_nld = copy.deepcopy(self.self_if_none(normalizer_nld))
-        normalizer_gsf = copy.deepcopy(self.self_if_none(normalizer_gsf))
+        self.normalizer_nld = copy.deepcopy(self.self_if_none(normalizer_nld))
+        self.normalizer_gsf = copy.deepcopy(self.self_if_none(normalizer_gsf))
+        for norm in [self.normalizer_nld, self.normalizer_gsf]:
+            norm._save_instance = False
+            norm.regenerate = True
 
         gsf = self.self_if_none(gsf)
         nld = self.self_if_none(nld)
@@ -158,6 +178,8 @@ class NormalizerSimultan():
         for model in [self.res.gsf_model_low, self.res.gsf_model_high]:
             model.shift_after = model.shift
 
+        self.save()  # save instance
+
     def initial_guess(self) -> None:
         """ Find an inital guess for normalization parameters
 
@@ -181,10 +203,10 @@ class NormalizerSimultan():
         guess["B"] = normalizer_gsf.res.pars["B"][0]
 
         guess_print = copy.deepcopy(guess)
-        LOG.info("DE results/initial guess:\n%s",
-                 tt.to_string([list(guess_print.values())],
-                              header=['A', 'α [MeV⁻¹]', 'T [MeV]',
-                                      'Eshift [MeV]', 'B']))
+        self.LOG.info("DE results/initial guess:\n%s",
+                      tt.to_string([list(guess_print.values())],
+                                   header=['A', 'α [MeV⁻¹]', 'T [MeV]',
+                                           'Eshift [MeV]', 'B']))
 
         return args_nld, guess
 
@@ -258,7 +280,7 @@ class NormalizerSimultan():
                                     scale=sigma_B)
 
             if np.isinf(cube[3]):
-                LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
+                self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
             return self.lnlike(cube, args_nld=args_nld)
@@ -270,12 +292,13 @@ class NormalizerSimultan():
         path = self.multinest_path / f"sim_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        LOG.info("Starting multinest: ")
-        LOG.debug("with following keywords %s:", self.multinest_kwargs)
+        self.LOG.info("Starting multinest: ")
+        self.LOG.debug("with following keywords %s:", self.multinest_kwargs)
         #  Hack where stdout from Multinest is redirected as info messages
-        LOG.write = lambda msg: LOG.info(msg) if msg != '\n' else None
+        self.LOG.write = lambda msg: (self.LOG.info(msg) if msg != '\n'
+                                      else None)
 
-        with redirect_stdout(LOG):
+        with redirect_stdout(self.LOG):
             pymultinest.run(loglike, prior, len(guess),
                             outputfiles_basename=str(path),
                             **self.multinest_kwargs)
@@ -304,8 +327,9 @@ class NormalizerSimultan():
             fmts = '\t'.join([fmt + " ± " + fmt])
             vals.append(fmts % (med, sigma))
 
-        LOG.info("Multinest results:\n%s", tt.to_string([vals],
-                 header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]', 'B']))
+        self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
+                      header=['A', 'α [MeV⁻¹]', 'T [MeV]',
+                              'Eshift [MeV]', 'B']))
 
         # reset state
         self.normalizer_gsf.norm_pars = norm_pars_org
