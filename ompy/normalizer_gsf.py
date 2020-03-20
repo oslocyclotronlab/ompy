@@ -3,8 +3,10 @@ import numpy as np
 import copy
 from numpy import ndarray
 from typing import Optional, Tuple, Any, Callable, Union
+from pathlib import Path
 import matplotlib.pyplot as plt
 
+from .abstract_normalizer import AbstractNormalizer
 from .library import log_interp1d, self_if_none
 from .models import ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
@@ -12,10 +14,8 @@ from .normalizer_nld import NormalizerNLD
 from .spinfunctions import SpinFunctions
 from .vector import Vector
 
-LOG = logging.getLogger(__name__)
 
-
-class NormalizerGSF():
+class NormalizerGSF(AbstractNormalizer):
 
     """Normalize γSF to a given` <Γγ> (Gg)
 
@@ -37,15 +37,20 @@ class NormalizerGSF():
         norm_pars (NormalizationParameters): Normalization parameters like
             experimental <Γγ>
         method_Gg (str): Method to use for the <Γγ> integral
+        path (Path): The path save the results.
         res (ResultsNormalized): Results
 
     """
+    LOG = logging.getLogger(__name__)  # overwrite parent variable
+    logging.captureWarnings(True)
 
     def __init__(self, *, normalizer_nld: Optional[NormalizerNLD] = None,
                  nld: Optional[Vector] = None,
                  nld_model: Optional[Callable[..., Any]] = None,
                  alpha: Optional[float] = None,
                  gsf: Optional[Vector] = None,
+                 path: Optional[Union[str, Path]] = None,
+                 regenerate: bool = False,
                  norm_pars: Optional[NormalizationParameters] = None,
                  ) -> None:
         """
@@ -78,6 +83,8 @@ class NormalizerGSF():
                 Normalization parameters like experimental <Γγ>
 
         """
+        super().__init__(regenerate)
+
         # use self._gsf internally, but separate from self._gsf
         # in order to not trasform self.gsf_in 2x, if normalize() is called 2x
         self.gsf_in = None if gsf is None else gsf.copy()
@@ -108,6 +115,9 @@ class NormalizerGSF():
         self._saved_spincutPars = None
         self._saved_SpinSum_args = None
 
+        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path.mkdir(exist_ok=True)
+
     def normalize(self, *, gsf: Optional[Vector] = None,
                   normalizer_nld: Optional[NormalizerNLD] = None,
                   alpha: Optional[float] = None,
@@ -131,6 +141,14 @@ class NormalizerGSF():
                 Normalization parameters like experimental <Γγ>
             num (Optional[int], optional): Loop number, defaults to 0.
         """
+        if not self.regenerate:
+            try:
+                print("regenerate is self.regenerate")
+                self.load()
+                return
+            except FileNotFoundError:
+                pass
+
         # Update internal state
         if gsf is None:
             gsf = self.gsf_in
@@ -139,21 +157,21 @@ class NormalizerGSF():
         normalizer_nld = self.self_if_none(normalizer_nld, nonable=True)
 
         if nld is None:
-            LOG.debug("Setting nld from from normalizer_nld")
+            self.LOG.debug("Setting nld from from normalizer_nld")
             self.nld = normalizer_nld.res.nld
         else:
             self.nld = self.self_if_none(nld)
 
         alpha = self.self_if_none(alpha, nonable=True)
         if alpha is None:
-            LOG.debug("Setting alpha from from normalizer_nld")
+            self.LOG.debug("Setting alpha from from normalizer_nld")
             alpha = normalizer_nld.res.pars["alpha"][0]
         assert alpha is not None, \
             "Provide alpha or normalizer_nld with alpha"
 
         self.nld_model = self.self_if_none(nld_model, nonable=True)
         if nld_model is None:
-            LOG.debug("Setting nld_model from from normalizer_nld")
+            self.LOG.debug("Setting nld_model from from normalizer_nld")
             self.nld_model = normalizer_nld.res.nld_model
         assert alpha is not None, \
             "Provide nld_model or normalizer_nld with nld_model"
@@ -167,7 +185,7 @@ class NormalizerGSF():
         else:
             self.res = ResultsNormalized(name="Results NLD and GSF, stepwise")
 
-        LOG.info(f"Normalizing #{num}")
+        self.LOG.info(f"Normalizing #{num}")
         self._gsf = gsf.copy()  # make a copy as it will be transformed
         gsf.to_MeV()
         gsf = gsf.transform(alpha=alpha, inplace=False)
@@ -187,7 +205,7 @@ class NormalizerGSF():
         self.model_low.norm_to_shift_after(B_norm)
         self.model_high.norm_to_shift_after(B_norm)
 
-        # save results
+        # transfer results
         self.res.gsf = self._gsf
         self.res.gsf_model_low = copy.deepcopy(self.model_low)
         self.res.gsf_model_high = copy.deepcopy(self.model_high)
@@ -195,6 +213,8 @@ class NormalizerGSF():
             self.res.pars["B"] = [B_norm, B_norm_unc]
         else:
             self.res.pars = {"B": [B_norm, B_norm_unc]}
+
+        self.save()  # saves instance
 
     def extrapolate(self,
                     gsf: Optional[Vector] = None,
@@ -215,14 +235,14 @@ class NormalizerGSF():
             gsf = self._gsf
 
         if self.model_low.method == "fit":
-            LOG.debug("Fitting extrapolation parameters")
+            self.LOG.debug("Fitting extrapolation parameters")
             self.model_low.fit(gsf)
             self.model_high.fit(gsf)
 
-        LOG.debug("Extrapolating low: %s", self.model_low)
+        self.LOG.debug("Extrapolating low: %s", self.model_low)
         extrapolated_low = self.model_low.extrapolate(scaled=False, E=E[0])
 
-        LOG.debug("Extrapolating high: %s", self.model_high)
+        self.LOG.debug("Extrapolating high: %s", self.model_high)
         extrapolated_high = self.model_high.extrapolate(scaled=False, E=E[1])
         return extrapolated_low, extrapolated_high
 
@@ -232,7 +252,7 @@ class NormalizerGSF():
         Returns:
             Gg (float): <Γγ> before normalization, in meV
         """
-        LOG.debug("Method to compute Gg: %s", self.method_Gg)
+        self.LOG.debug("Method to compute Gg: %s", self.method_Gg)
         if self.method_Gg == "standard":
             return self.Gg_standard()
         else:
