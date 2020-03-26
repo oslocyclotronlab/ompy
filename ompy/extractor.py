@@ -582,7 +582,10 @@ class Extractor:
     def __getstate__(self):
         """ `__getstate__` excluding `ensemble` attribute to save space """
         state = self.__dict__.copy()
-        del state['ensemble']
+        try:
+            del state['ensemble']
+        except KeyError:
+            pass
         return state
 
 
