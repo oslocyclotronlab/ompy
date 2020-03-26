@@ -16,8 +16,10 @@ else:
         # not beeing installed correctly
     except ImportError:
         msg = """Error importing ompy: you should not try to import ompy from
-        its source directory; please exit the ompy source tree, and relaunch
-        your python interpreter from there."""
+        its source directory unless it is a submodule; please exit the ompy
+        source tree, and relaunch your python interpreter from there.
+        If it is a submodule, you probably forgor to run
+        `python setup.py build_ext --inplace` in the folder."""
         raise ImportError(msg)
     from .version import GIT_REVISION as __git_revision__
     from .version import VERSION as __version__
