@@ -148,7 +148,7 @@ class Ensemble:
 
         self.path = (Path(path) if path is not None
                      else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=False)
+        self.path.mkdir(exist_ok=True, parents=True)
 
         self.raw.state = "raw"
 
