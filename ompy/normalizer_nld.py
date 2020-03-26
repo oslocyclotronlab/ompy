@@ -128,7 +128,8 @@ class NormalizerNLD(AbstractNormalizer):
         self.limit_high = None
         self.std_fake = None  # See `normalize`
 
-        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
         self.path.mkdir(exist_ok=True)
 
     def __call__(self, *args, **kwargs) -> None:

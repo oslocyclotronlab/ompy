@@ -86,7 +86,7 @@ class Extractor:
             self.path.mkdir(exist_ok=True)
             self.load(self.path)
         else:
-            self.path = Path('extraction_ensemble')
+            self.path = Path('saved_run/extraction_ensemble')
             self.path.mkdir(exist_ok=True)
 
         self.x0 = None
@@ -305,6 +305,7 @@ class Extractor:
                                    E_nld, matrix.Eg, matrix.Ex)
             mat = Matrix(values=values, Ex=matrix.Ex, Eg=matrix.Eg)
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg), mat
+
         else:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg)
 

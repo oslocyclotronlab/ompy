@@ -146,8 +146,9 @@ class Ensemble:
         self.seed: int = 987654
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
-        self.path = Path(path) if path is not None else Path('ensemble')
-        self.path.mkdir(exist_ok=True)
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
+        self.path.mkdir(exist_ok=True, parents=False)
 
         self.raw.state = "raw"
 

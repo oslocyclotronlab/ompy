@@ -115,7 +115,8 @@ class NormalizerGSF(AbstractNormalizer):
         self._saved_spincutPars = None
         self._saved_SpinSum_args = None
 
-        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
         self.path.mkdir(exist_ok=True)
 
     def normalize(self, *, gsf: Optional[Vector] = None,

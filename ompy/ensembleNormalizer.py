@@ -89,7 +89,8 @@ class EnsembleNormalizer(AbstractNormalizer):
 
         self.res: Optional[List[ResultsNormalized]] = None
 
-        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
         self.path.mkdir(exist_ok=True)
 
     def normalize(self) -> None:

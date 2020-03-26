@@ -91,7 +91,8 @@ class NormalizerSimultan(AbstractNormalizer):
         self.multinest_path: Optional[Path] = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
-        self.path = Path(path) if path is not None else Path('normalizers')
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
         self.path.mkdir(exist_ok=True)
 
     def normalize(self, *, num: int = 0,
