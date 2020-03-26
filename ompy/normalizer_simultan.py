@@ -93,7 +93,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
         self.path = (Path(path) if path is not None
                      else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True)
+        self.path.mkdir(exist_ok=True, parents=True)
 
     def normalize(self, *, num: int = 0,
                   gsf: Optional[Vector] = None,

@@ -83,11 +83,11 @@ class Extractor:
 
         if path is not None:
             self.path = Path(path)
-            self.path.mkdir(exist_ok=True)
+            self.path.mkdir(exist_ok=True, parents=True)
             self.load(self.path)
         else:
             self.path = Path('saved_run/extraction_ensemble')
-            self.path.mkdir(exist_ok=True)
+            self.path.mkdir(exist_ok=True, parents=True)
 
         self.x0 = None
         self.randomize_initial_values: bool = True

@@ -130,7 +130,7 @@ class NormalizerNLD(AbstractNormalizer):
 
         self.path = (Path(path) if path is not None
                      else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True)
+        self.path.mkdir(exist_ok=True, parents=True)
 
     def __call__(self, *args, **kwargs) -> None:
         """ Wrapper around normalize """
