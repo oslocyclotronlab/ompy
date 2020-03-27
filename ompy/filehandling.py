@@ -290,7 +290,7 @@ def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
 
 def save_numpy_1D(values: np.ndarray, E: np.ndarray,
                   path: Union[str, Path]) -> None:
-    mat = np.vstack(E, values)
+    mat = np.vstack((E, values))
     np.save(path, mat)
 
 
@@ -302,7 +302,7 @@ def load_txt_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
 def save_txt_1D(values: np.ndarray, E: np.ndarray,
                 path: Union[str, Path], header='E[keV] values') -> None:
     """ E default in keV """
-    mat = np.vstack(E, values)
+    mat = np.vstack((E, values))
     np.savetxt(path, mat, header=header)
 
 
