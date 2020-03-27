@@ -496,7 +496,7 @@ class NormalizerGSF(AbstractNormalizer):
 
         ax.set_yscale('log')
         ax.set_xlabel(rf"$\gamma$-ray energy $E_\gamma$~[{gsf.units}]")
-        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[${gsf.units}^{{-3}}$]")
+        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[{gsf.units}$^{{-3}}$]")
 
         if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)
