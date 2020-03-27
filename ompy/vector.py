@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Optional, Iterable, Union, Any, Tuple, Dict
+from typing import Optional, Iterable, Union, Any, Tuple, Dict, Sequence
+import logging
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +12,11 @@ from .filehandling import (load_numpy_1D, save_numpy_1D,
                            load_tar, save_tar)
 from .decomposition import index
 from .library import div0
+from .rebin import rebin_1D
 from .abstractarray import AbstractArray
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class Vector(AbstractArray):
@@ -334,6 +339,46 @@ class Vector(AbstractArray):
             self.E = E
         else:
             return Vector(values=values, E=E, units=self.units)
+
+    def rebin(self, mids: Optional[Sequence[float]] = None,
+              factor: Optional[float] = None,
+              inplace: bool = True) -> Optional[Vector]:
+        """ Rebins vector
+
+        Args:
+            mids: The new energy mids. Can not be
+                given alongside 'factor'.
+            factor: The factor by which the step size shall be
+                changed. Can not be given alongside 'mids'.
+            inplace: Whether to change E and values
+                inplace or return the rebinned vector.
+        Returns:
+            The rebinned vector if inplace is 'False'.
+        """
+        if not (mids is None) ^ (factor is None):
+            raise ValueError("Either 'mids' or 'factor' must be"
+                             " specified, but not both.")
+        mids_old = self.E
+
+        if factor is not None:
+            if factor <= 0:
+                raise ValueError("'factor' must be positive")
+            num_mids = int(len(mids_old)/factor)
+            mids, step = np.linspace(mids_old[0], mids_old[-1],
+                                     num=num_mids, retstep=True)
+            LOG.debug("Rebinning with factor %g, giving %g mids",
+                      factor, num_mids)
+            LOG.debug("Old step size: %g\nNew step size: %g",
+                      mids_old[1] - mids_old[0], step)
+            mids = np.asarray(mids, dtype=float)
+
+        rebinned = rebin_1D(self.values, mids_old, mids)
+        if inplace:
+            self.values = rebinned
+            self.E = mids
+            self.verify_integrity()
+        else:
+            return Vector(E=mids, values=rebinned)
 
     def to_MeV(self) -> Vector:
         """ Convert E from keV to MeV if necessary """

@@ -683,17 +683,17 @@ class Matrix(AbstractArray):
             return matrix
 
     def rebin(self, axis: Union[int, str],
-              edges: Optional[Sequence[float]] = None,
+              mids: Optional[Sequence[float]] = None,
               factor: Optional[float] = None,
               inplace: bool = True) -> Optional[Matrix]:
         """ Rebins one axis of the matrix
 
         Args:
             axis: the axis to rebin.
-            edges: The new edges along the axis. Can not be
+            mids: The new mids along the axis. Can not be
                 given alongside 'factor'.
             factor: The factor by which the step size shall be
-                changed. Can not be given alongside 'edges'.
+                changed. Can not be given alongside 'mids'.
             inplace: Whether to change the axis and values
                 inplace or return the rebinned matrix.
         Returns:
@@ -705,46 +705,37 @@ class Matrix(AbstractArray):
         axis: int = to_plot_axis(axis)
         if axis not in (0, 1):
             raise ValueError("Axis must be 0 or 1")
-        if not (edges is None) ^ (factor is None):
-            raise ValueError("Either 'edges' or 'factor' must be"
+        if not (mids is None) ^ (factor is None):
+            raise ValueError("Either 'mids' or 'factor' must be"
                              " specified, but not both.")
-        edges_old = self.Ex if axis else self.Eg
+        mids_old = self.Ex if axis else self.Eg
 
         if factor is not None:
             if factor <= 0:
                 raise ValueError("'factor' must be positive")
-            num_edges = int(len(edges_old)/factor)
-            old_step = edges_old[1] - edges_old[0]
-            step = factor*old_step
-            edge = edges_old[0]
-            edges = []
-            while len(edges) < num_edges:
-                edges.append(edge)
-                edge += step
-            LOG.debug("Rebinning with factor %g, giving %g edges",
-                      factor, num_edges)
+            num_mids = int(len(mids_old)/factor)
+            mids, step = np.linspace(mids_old[0], mids_old[-1],
+                                     num=num_mids, retstep=True)
+            LOG.debug("Rebinning with factor %g, giving %g mids",
+                      factor, num_mids)
             LOG.debug("Old step size: %g\nNew step size: %g",
-                      old_step, step)
-            edges = np.asarray(edges, dtype=float)
+                      mids_old[1] - mids_old[0], step)
+            mids = np.asarray(mids, dtype=float)
 
         naxis = (axis + 1) % 2
-        rebinned = rebin_2D(self.values, edges_old, edges, naxis)
+        rebinned = rebin_2D(self.values, mids_old, mids, naxis)
         if inplace:
             self.values = rebinned
             if axis:
-                self.Ex = edges
+                self.Ex = mids
             else:
-                self.Eg = edges
+                self.Eg = mids
             self.verify_integrity()
         else:
             if naxis:
-                return Matrix(Eg=edges, Ex=self.Ex, values=rebinned)
+                return Matrix(Eg=mids, Ex=self.Ex, values=rebinned)
             else:
-                return Matrix(Eg=self.Eg, Ex=edges, values=rebinned)
-
-    def copy(self) -> Matrix:
-        """ Return a copy of the matrix """
-        return copy.deepcopy(self)
+                return Matrix(Eg=self.Eg, Ex=mids, values=rebinned)
 
     def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
         """ Iterates over the last non-zero elements
