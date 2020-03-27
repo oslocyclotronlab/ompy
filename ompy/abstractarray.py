@@ -48,6 +48,20 @@ class AbstractArray:
             except AssertionError:
                 raise ValueError(f"{name} array is not equispaced")
 
+    def __eq__(self, other) -> None:
+        if self.__class__ != other.__class__:
+            return False
+        else:
+            dicother = other.__dict__
+            truth = []
+            for key, value in self.__dict__.items():
+                if isinstance(value, np.ndarray):
+                    test = np.allclose(value, dicother[key])
+                else:
+                    test = (value == dicother[key])
+                truth.append(test)
+            return all(truth)
+
     def __sub__(self, other) -> AbstractArray:
         result = self.copy()
         if isinstance(other, (int, float)):
