@@ -2,6 +2,9 @@ import logging
 from pathlib import Path
 from typing import Optional, Union
 import dill
+import numpy as np
+
+from .vector import Vector
 
 
 class AbstractNormalizer():
@@ -63,3 +66,41 @@ class AbstractNormalizer():
             saved = dill.load(fobj)
         self.__dict__.update(saved.__dict__)
         self.LOG.info(f"Loaded")
+
+    def save_results_txt(self, path: Optional[Union[str, Path]] = None,
+                         nld: Vector = None,
+                         gsf: Vector = None,
+                         samples: dict = None,
+                         suffix: str = None):
+        """ Save results as txt
+
+        Uses a folder to save nld, gsf, and the samples (converted to an array)
+
+        Args:
+            path: The path to the save directory. If the
+                value is None, 'self.path' will be used.
+            nld: (unnormalized) NLD to save
+            gsf: (unnormalized) gSF to save
+            samples: samples to use for normalization
+            suffix: suffix to append to filename, eg. iteration number
+        """
+        path = Path(path) if path is not None else Path(self.path)
+
+        fname = (path / f"nld_{suffix}").with_suffix('.txt')
+        self.LOG.debug(f"Saving nld to {fname}")
+        nld.save(fname)
+        fname = (path / f"gsf_{suffix}").with_suffix('.txt')
+        self.LOG.debug(f"Saving gsf to {fname}")
+        gsf.save(fname)
+
+        # copy dict to an array
+        first_values = next(iter(samples.items()))[1]
+        array = np.zeros((len(samples), len(first_values)))
+        for i, values in enumerate(samples.values()):
+            array[i, :] = values
+        seperator = " "
+        header = seperator.join(samples.keys())
+
+        fname = (path / f"samples_{suffix}").with_suffix('.txt')
+        self.LOG.debug(f"Saving samples to {fname}")
+        np.savetxt(fname, array, header=header)

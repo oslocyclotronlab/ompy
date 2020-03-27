@@ -610,6 +610,23 @@ class EnsembleNormalizer(AbstractNormalizer):
             stats.append(stat)
         return stats
 
+    def save_results_txt(self, path: Optional[Union[str, Path]] = None,
+                         suffix: str = None):
+        """ Save results as txt
+
+        Uses a folder to save nld, gsf, and the samples (converted to an array)
+
+        Args:
+            path: The path to the save directory. If the
+                value is None, 'self.path' will be used.
+        """
+        path = Path(path) if path is not None else Path(self.path)
+        path.mkdir(exist_ok=True, parents=True)
+        for i, res in enumerate(self.res):
+
+            super().save_results_txt(path, nld=res.nld, gsf=res.gsf,
+                                     samples=res.samples, suffix=i)
+
 
 def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
                      N_max: int = 100,
