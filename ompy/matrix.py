@@ -40,7 +40,8 @@ from typing import (Dict, Iterable, Any, Union, Tuple,
 from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
 from .filehandling import (mama_read, mama_write,
-                           save_numpy_2D, load_numpy_2D, save_tar, load_tar,
+                           save_numpy_2D, load_numpy_2D,
+                           save_txt_2D, load_txt_2D, save_tar, load_tar,
                            filetype_from_suffix)
 from .library import div0, fill_negative_gauss, diagonal_elements
 from .matrixstate import MatrixState
@@ -211,6 +212,8 @@ class Matrix(AbstractArray):
 
         if filetype == 'numpy':
             self.values, self.Eg, self.Ex = load_numpy_2D(path)
+        elif filetype == 'txt':
+            self.values, self.Eg, self.Eg = load_txt_2D(path)
         elif filetype == 'tar':
             self.values, self.Eg, self.Eg = load_tar(path)
         elif filetype == 'mama':
@@ -222,13 +225,15 @@ class Matrix(AbstractArray):
                 raise ValueError(f"Unknown filetype {filetype}")
         self.verify_integrity()
 
-    def save(self, path: Union[str, Path], filetype: Optional[str] = None):
+    def save(self, path: Union[str, Path], filetype: Optional[str] = None,
+             **kwargs):
         """Save matrix to file
 
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
                 auto-recognition. Options: ["numpy", "tar", "mama"]
+            **kwargs: additional keyword arguments
 
         Raises:
             ValueError: If filetype is unknown
@@ -240,6 +245,8 @@ class Matrix(AbstractArray):
 
         if filetype == 'numpy':
             save_numpy_2D(self.values, self.Eg, self.Ex, path)
+        elif filetype == 'txt':
+            save_txt_2D(self.values, self.Eg, self.Ex, path, **kwargs)
         elif filetype == 'tar':
             save_tar([self.values, self.Eg, self.Ex], path)
         elif filetype == 'mama':

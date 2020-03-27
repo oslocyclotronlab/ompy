@@ -257,17 +257,53 @@ def load_numpy_2D(path: Union[str, Path]
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
+def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
+                Ex: np.ndarray, path: Union[str, Path],
+                header=None):
+    if header is None:
+        header = ("Format:\n"
+                  "     Eg0    Eg1    Eg2   ...\n"
+                  "Ex0  val00  val01  val02\n"
+                  "Ex1  val10  val11  ...\n"
+                  "Ex2  ...\n"
+                  "...")
+    elif header is False:
+        header = None
+    mat = np.empty((matrix.shape[0] + 1, matrix.shape[1] + 1))
+    mat[0, 0] = -0
+    mat[0, 1:] = Eg
+    mat[1:, 0] = Ex
+    mat[1:, 1:] = matrix
+    np.savetxt(path, mat, header=header)
+
+
+def load_txt_2D(path: Union[str, Path]
+                ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    mat = np.loadtxt(path)
+    return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
+
+
 def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
-    mat = np.load(path)
-    half = int(mat.shape[0] / 2)
-    return mat[:half], mat[half:]
+    E, values = np.load(path)
+    return values, E
 
 
 def save_numpy_1D(values: np.ndarray, E: np.ndarray,
                   path: Union[str, Path]) -> None:
-    mat = np.append(values, E)
-    assert mat.size % 2 == 0
+    mat = np.vstack(E, values)
     np.save(path, mat)
+
+
+def load_txt_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
+    E, values = np.loadtxt(path)
+    return values, E
+
+
+def save_txt_1D(values: np.ndarray, E: np.ndarray,
+                path: Union[str, Path], header='E[keV] values') -> None:
+    """ E default in keV """
+    mat = np.vstack(E, values)
+    np.savetxt(path, mat, header=header)
 
 
 def filetype_from_suffix(path: Path) -> str:
@@ -276,6 +312,8 @@ def filetype_from_suffix(path: Path) -> str:
         return 'tar'
     elif suffix == '.npy':
         return 'numpy'
+    elif suffix == '.txt':
+        return 'txt'
     elif suffix == '.m':
         return 'mama'
     else:

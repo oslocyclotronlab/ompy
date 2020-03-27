@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 from .filehandling import (load_numpy_1D, save_numpy_1D,
+                           load_txt_1D, save_txt_1D,
                            mama_read, mama_write,
                            filetype_from_suffix,
                            load_tar, save_tar)
@@ -145,13 +146,16 @@ class Vector(AbstractArray):
         return fig, ax
 
     def save(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
+             filetype: Optional[str] = None,
+             **kwargs) -> None:
         """Save to a file of specified format
 
         Args:
             path (str or Path): Path to save
             filetype (str, optional): Filetype. Default uses
-                auto-recognition from suffix. Options: ["numpy", "tar", "mama"]
+                auto-recognition from suffix.
+                Options: ["numpy", "txt", "tar", "mama"]
+            **kwargs: additional keyword arguments
 
         Raises:
             ValueError: Filetype is not supported
@@ -164,6 +168,8 @@ class Vector(AbstractArray):
         filetype = filetype.lower()
         if filetype == 'numpy':
             save_numpy_1D(vector.values, vector.E, path)
+        elif filetype == 'txt':
+            save_txt_1D(vector.values, vector.E, path, **kwargs)
         elif filetype == 'tar':
             save_tar([vector.values, vector.E], path)
         elif filetype == 'mama':
@@ -190,6 +196,8 @@ class Vector(AbstractArray):
 
         if filetype == 'numpy':
             self.values, self.E = load_numpy_1D(path)
+        elif filetype == 'txt':
+            self.values, self.E = load_txt_1D(path)
         elif filetype == 'tar':
             self.values, self.E = load_tar(path)
         elif filetype == 'mama':
