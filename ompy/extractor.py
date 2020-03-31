@@ -533,7 +533,7 @@ class Extractor:
         if ax is None:
             fig, ax = plt.subplots(1, 2, constrained_layout=True)
         else:
-            fig = ax.figure
+            fig = ax[0].figure
 
         if plot_mean:
             ax[0].errorbar(self.nld[0].E, self.nld_mean(), yerr=self.nld_std(),
