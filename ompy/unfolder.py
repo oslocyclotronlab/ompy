@@ -43,13 +43,13 @@ class Unfolder:
 
     Attributes:
         num_iter (int, optional): The number of iterations to perform. defaults
-             to 33. The best iteration is then selected based on the `score`
+             to 200. The best iteration is then selected based on the `score`
              method
         R (Matrix): The response matrix
         weight_fluctuation (float, optional): A attempt to penalize
-             fluctuations. Defaults to 0.2
+             fluctuations. Defaults to 1e-3
         minimum_iterations (int, optional): Minimum number of iterations.
-            Defaults to 3.
+            Defaults to 5.
         use_compton_subtraction (bool, optional): Set usage of Compton
             subtraction method. Defaults to `True`.
         response_tab (DataFrame, optional): If `use_compton_subtraction=True`
@@ -65,7 +65,7 @@ class Unfolder:
         - Unfolding for a single spectrum (currently needs to be mocked as a
             Matrix).
     """
-    def __init__(self, num_iter: int = 33, response: Optional[Matrix] = None):
+    def __init__(self, num_iter: int = 200, response: Optional[Matrix] = None):
         """Unfolds the gamma-detector response of a spectrum
 
         Args:
@@ -73,8 +73,8 @@ class Unfolder:
             reponse: see above
         """
         self.num_iter = num_iter
-        self.weight_fluctuation: float = 0.2
-        self.minimum_iterations: int = 3
+        self.weight_fluctuation: float = 1e-3
+        self.minimum_iterations: int = 5
 
         self._R: Optional[Matrix] = response
         self.raw: Optional[Matrix] = None
@@ -144,7 +144,8 @@ class Unfolder:
         self.update_values()
         unfolded_cube = np.zeros((self.num_iter, *self.r.shape))
         chisquare = np.zeros((self.num_iter, self.r.shape[0]))
-        fluctuations = np.zeros((self.num_iter, self.r.shape[0]))
+        fluctuations = np.ones((self.num_iter, self.r.shape[0]))
+        fluctuations /= self.fluctuations(self.r)
         folded = np.zeros_like(self.r)
 
         # Use u⁰ = r as initial guess
@@ -152,16 +153,16 @@ class Unfolder:
         for i in range(self.num_iter):
             unfolded, folded = self.step(unfolded, folded, i)
             unfolded_cube[i, :, :] = unfolded
-            chisquare[i, :] = self.chi_square_red(folded)
-            fluctuations[i, :] = self.fluctuations(unfolded)
+            chisquare[i, :] = self.chi_square(folded)
+            fluctuations[i, :] *= self.fluctuations(unfolded)
 
             if LOG.level >= logging.DEBUG:
                 chisq = np.mean(chisquare[i, :])
-                LOG.debug(f"Iteration {i}: Avg χ²/ν {chisq}")
+                fluct = np.nanmean(fluctuations[i, :])
+                LOG.debug(f"Iteration {i}: χ² {chisq:.2e}; Fluct: {fluct:.2e}")
 
         # Score the solutions based on χ² value for each Ex bin
         # and select the best one.
-        fluctuations /= self.fluctuations(self.r)
         iscores = self.score(chisquare, fluctuations)
         self.iscores = iscores  # keep if interesting for later
         unfolded = np.zeros_like(self.r)
@@ -211,20 +212,22 @@ class Unfolder:
 
         return unfolded, folded
 
-    def chi_square_red(self, folded: np.ndarray) -> np.ndarray:
-        """ Compute reduced Χ² of the folded spectrum
+    def chi_square(self, folded: np.ndarray) -> np.ndarray:
+        """ Compute Χ² of the folded spectrum
 
         Uses the familiar Χ² = Σᵢ (fᵢ-rᵢ)²/rᵢ
         """
         chi2 = div0(np.power(folded - self.r, 2),
                     np.where(self.r > 0, self.r, 0)).sum(axis=1)
-        return chi2/self.r.shape[1]
+        return chi2
 
     def fluctuations(self, counts: np.ndarray,
-                     sigma: float = 20) -> np.ndarray:
+                     sigma: float = 50) -> np.ndarray:
         """
-        Calculates fluctuations in each Ex bin gamma spectrum by summing
-        the absolute diff between the spectrum and a smoothed version of it.
+        Calculates fluctuations in each Ex bin gamma spectrum S by summing
+        the relative diff between the spectrum and a smoothed version of it.
+
+        ∑ | (S - ⟨S⟩) / ⟨S⟩ |
 
         Args:
             counts (np.ndarray): counts of spectrum to act on
@@ -237,10 +240,9 @@ class Unfolder:
         """
 
         a1 = self.raw.Eg[1] - self.raw.Eg[0]
-        counts_matrix_smoothed = gaussian_filter1d(
-            counts, sigma=sigma / a1, axis=1)
-        fluctuations = np.sum(
-            np.abs(counts_matrix_smoothed - counts), axis=1)
+        couns_smoothed = gaussian_filter1d(counts, sigma=sigma / a1, axis=1)
+        fluctuations = div0(couns_smoothed - counts, couns_smoothed)
+        fluctuations = np.sum(np.abs(fluctuations), axis=1)
 
         return fluctuations
 
