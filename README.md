@@ -6,7 +6,6 @@
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
 
 <p align="center">
-<b><a href="#citing">Citing</a></b>
 |
 <b><a href="#installation">Installation</a></b>
 |
@@ -17,9 +16,11 @@
 </p>
 
 <p align="center">
-<b><a href="#credits">Credits</a></b>
+<b><a href="#package-structure-summary">Package structure summary</a></b>
 |
-<b><a href="#license">License</a></b>
+<b><a href="#citing">Citing</a></b>
+|
+<b><a href="LICENSE.md">License</a></b>
 </p>
 <br>
 
@@ -37,7 +38,7 @@ If you cite OMpy, please use the version-specific DOI found by clicking the Zeno
 
 The full version (including the git commit) can also be obtained from `ompy.__full_version__` after installation.
 
-An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with complete uncertainty propagation](https://arxiv.org/abs/1904.13248).
+An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with rigorous statistical uncertainty propagation](https://arxiv.org/abs/1904.13248).
 
 
 ## Installation
@@ -68,8 +69,8 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
  - We require `python>=3.7`. Make sure you use the correct python version and the correct `pip`.
    You may need to replace `python` by `python3` and `pip` by `pip3` in the examples below. Run
    `python --version` and `pip --version` to check whether you have a sufficient python version.
- - All other dependencies can be installed automatically by `pip` (see below). Alternatively,
-   make sure to install all requirements listed in `requirements.txt`, eg. using `conda` or `apt-get`.
+ - All other dependencies can be installed automatically by `pip` (see below). *Alternatively*,
+   make sure to install all requirements listed in `requirements.txt`, eg. using `conda` or `apt-get`. 
    You may try following in `conda` (untested)
     ``` bash
    conda install --file requirements.txt
@@ -123,3 +124,30 @@ All the functions and classes in the package are available in the main module. Y
 ```py
 import ompy
 ```
+## Package structure summary
+
+Below you can find a summary of the most important files and directories of this repository. You can find a full documentation of the packages functionality [here](https://ompy.readthedocs.io/en/latest/API/index.html).  
+
+.`ompy` - main repository    
+├── `Dockerfile` - [Dockerfile](https://docs.docker.com/engine/reference/builder/) for easy & reproducible installation  
+├── `docs` - documentation, rendered at https://ompy.readthedocs.io/  
+│   └── ...    
+├── `example_data` - some example data for calculations  
+│   ├── ...   
+├── `hooks` - helper file for [MyBinder](https://mybinder.org/)  
+│   └── ...    
+├── `LICENSE.md` - License file  
+├── `notebooks` - usage example(s)  
+│   └── ...  
+├── `OCL_response_functions` - *submodule* facilitating the *unfolding* method   
+│   └── ...    
+├── `ompy` - **package code**, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+│   └── ...    
+├── `README.md` - Readme with short instructions. See also the [online documentation](https://ompy.readthedocs.io/)  
+├── `requirements.txt` - dependencies, see also [pip](https://pip.pypa.io/en/stable/user_guide/#requirements-files)  
+├── `resources` - miscellaneous files  
+│   └── ...    
+├── `setup.py` - setup, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+└── `tests` unit test files, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+    └── ...    
+    

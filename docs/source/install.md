@@ -26,8 +26,8 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
  - We require `python>=3.7`. Make sure you use the correct python version and the correct `pip`.
    You may need to replace `python` by `python3` and `pip` by `pip3` in the examples below. Run
    `python --version` and `pip --version` to check whether you have a sufficient python version.
- - All other dependencies can be installed automatically by `pip` (see below). Alternatively,
-   make sure to install all requirements listed in `requirements.txt`, eg. using `conda` or `apt-get`.
+ - All other dependencies can be installed automatically by `pip` (see below). *Alternatively*,
+   make sure to install all requirements listed in `requirements.txt`, eg. using `conda` or `apt-get`. 
    You may try following in `conda` (untested)
     ``` bash
    conda install --file requirements.txt
@@ -88,3 +88,31 @@ import ompy
 The overarching philosophy is that the package shall be flexible and transparent to use and modify. All of the "steps" in the Oslo method are implemented as classes with a common structure and call signature. If you understand one class, you'll understand them all, making extending the code easy.
 
 As the Oslo method is a complex method involving dozen of variables which can be daunting for the uninitiated, many class attributes have default values that should give satisfying results. Attributes that _should_ be modified even though it is not strictly necessary to do so will give annoying warnings. The documentation and docstrings give in-depth explanation of each variable and its usage.
+
+## Package structure summary
+
+Below you can find a summary of the most important files and directories of this repository. You can find a full documentation of the packages functionality [here](https://ompy.readthedocs.io/en/latest/API/index.html).  
+
+.`ompy` - main repository    
+├── `Dockerfile` - [Dockerfile](https://docs.docker.com/engine/reference/builder/) for easy & reproducible installation  
+├── `docs` - documentation, rendered at https://ompy.readthedocs.io/  
+│   └── ...    
+├── `example_data` - some example data for calculations  
+│   ├── ...   
+├── `hooks` - helper file for [MyBinder](https://mybinder.org/)  
+│   └── ...    
+├── `LICENSE.md` - License file  
+├── `notebooks` - usage example(s)  
+│   └── ...  
+├── `OCL_response_functions` - *submodule* facilitating the *unfolding* method   
+│   └── ...    
+├── `ompy` - **package code**, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+│   └── ...    
+├── `README.md` - Readme with short instructions. See also the [online documentation](https://ompy.readthedocs.io/)  
+├── `requirements.txt` - dependencies, see also [pip](https://pip.pypa.io/en/stable/user_guide/#requirements-files)  
+├── `resources` - miscellaneous files  
+│   └── ...    
+├── `setup.py` - setup, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+└── `tests` unit test files, see also [packaging projects](https://packaging.python.org/tutorials/packaging-projects/)  
+    └── ...    
+    

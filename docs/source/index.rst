@@ -19,7 +19,7 @@ If you cite OMpy, please use the version-specific DOI found by clicking the Zeno
 
 The full version (including the git commit) can also be obtained from `ompy.__full_version__` after installation.
 
-An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with complete uncertainty propagation](https://arxiv.org/abs/1904.13248).
+An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with rigorous statistical uncertainty propagation](https://arxiv.org/abs/1904.13248).
 
 
 .. toctree::
