@@ -45,6 +45,7 @@ RUN pip install -U \
 # Configuration required for using Binder
 ARG NB_USER=jovyan
 ARG NB_UID=1000
+ARG NB_GID=100
 ENV NB_USER $NB_USER
 ENV HOME /home/${NB_USER}
 
@@ -52,18 +53,19 @@ ENV HOME /home/${NB_USER}
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
+    --gid ${NB_GID} \
     ${NB_USER}
 
 WORKDIR ${HOME}
 
 USER root
-RUN chown -R ${NB_USER}:${NB_USER} ${HOME}
+RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
 USER ${NB_USER}
 
 ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
-COPY --chown=1000:100 . ompy
+COPY --chown=${NB_USER}:${NB_GID} . ompy
 
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
