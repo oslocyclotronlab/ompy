@@ -44,7 +44,8 @@ ENV LD_LIBRARY_PATH=/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # COPY postInstall /
 # RUN /postInstall
 
-# For MyBinder
+# Rest is for MyBinder
+
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
@@ -53,5 +54,16 @@ RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e .
 
-# Mbinder: Specify the default command to run
-CMD ["jupyter", "notebook", "--ip", "0.0.0.0"]
+# create a user, since we don't want to run as root
+RUN useradd -m jovyan
+ENV HOME=/home/jovyan
+WORKDIR $HOME
+USER jovyan
+
+COPY --chown=jovyan:jovyan entrypoint.sh /home/jovyan
+
+EXPOSE 8888
+
+ENTRYPOINT ["/home/jovyan/entrypoint.sh"]
+
+
