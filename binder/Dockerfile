@@ -62,7 +62,7 @@ WORKDIR ${HOME}
 USER root
 RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
 
-ENV LD_LIBRARY_PATH=${Home}/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/home/jovyan/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ompy
