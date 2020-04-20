@@ -2,7 +2,7 @@
 # FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
 
 # MyBinder
-FROM jupyter/minimal-notebook:edeb4ee7f24d8c22272bd45bf573f1e1b1eba612
+FROM jupyter/minimal-notebook:859aaa228cca
 
 ARG DEBIAN_FRONTEND=noninteractive
 
