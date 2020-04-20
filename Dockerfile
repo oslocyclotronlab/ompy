@@ -58,6 +58,7 @@ RUN cd ompy &&\
 ARG NB_USER="jovyan"
 ARG NB_UID="1000"
 ARG NB_GID="100"
+RUN useradd -m $NB_USER
 ENV HOME=/home/$NB_USER
 WORKDIR $HOME
 USER $NB_UID
