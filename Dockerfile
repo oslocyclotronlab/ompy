@@ -55,15 +55,36 @@ RUN cd ompy &&\
     pip install -e .
 
 # create a user, since we don't want to run as root
-RUN useradd -m jovyan
-ENV HOME=/home/jovyan
+ARG NB_USER="jovyan"
+ARG NB_UID="1000"
+ARG NB_GID="100"
+ENV HOME=/home/$NB_USER
 WORKDIR $HOME
-USER jovyan
+USER $NB_UID
 
-COPY --chown=jovyan:jovyan entrypoint.sh /home/jovyan
+COPY --chown=$NB_USER:$NB_GID start-notebook.sh /home/$NB_USER
 
 EXPOSE 8888
 
-ENTRYPOINT ["/home/jovyan/entrypoint.sh"]
+# Install Tini
+RUN conda install --quiet --yes 'tini=0.18.0' && \
+    conda list tini | grep tini | tr -s ' ' | cut -d ' ' -f 1,2 >> $CONDA_DIR/conda-meta/pinned && \
+    conda clean --all -f -y && \
+    fix-permissions $CONDA_DIR && \
+    fix-permissions /home/$NB_USER
+
+# Configure container startup
+ENTRYPOINT ["tini", "-g", "--"]
+CMD ["start-notebook.sh"]
+
+# Copy local files as late as possible to avoid cache busting
+COPY start.sh start-notebook.sh start-singleuser.sh /usr/local/bin/
+
+# Fix permissions on /etc/jupyter as root
+USER root
+RUN fix-permissions /etc/jupyter/
+
+# Switch back to jovyan to avoid accidental container runs as root
+USER $NB_UID
 
 
