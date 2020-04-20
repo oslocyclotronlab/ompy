@@ -68,20 +68,21 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ompy
 
-RUN cd ompy &&\
-    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-    pip install --no-cache -e . && \
-    cd ../
-
-USER ${NB_USER}
-RUN [ "/bin/bash", "-c", \
-      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
-      tar -xzvf MultiNest-3.10.tar.gz && \
-      rm MultiNest-3.10.tar.gz &&\
-      cd MultiNest-3.10/build/ && \
-      cmake .. && \
-      make && \
-      cd ../../" ]
+#USER ${NB_USER}
+#RUN cd ompy &&\
+#    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
+#    pip install --no-cache -e . && \
+#    cd ../
+#
+#
+#RUN [ "/bin/bash", "-c", \
+#      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
+#      tar -xzvf MultiNest-3.10.tar.gz && \
+#      rm MultiNest-3.10.tar.gz &&\
+#      cd MultiNest-3.10/build/ && \
+#      cmake .. && \
+#      make && \
+#      cd ../../" ]
 
 # specify jupyterhub configuration
 RUN ls -lash ${HOME}/ompy/binder/start.sh
