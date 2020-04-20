@@ -70,7 +70,7 @@ COPY --chown=${NB_USER}:${NB_GID} . ompy
 
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-    pip install -e . && \
+    pip install --no-cache -e . && \
     cd ../
 
 USER ${NB_USER}
@@ -84,5 +84,5 @@ RUN [ "/bin/bash", "-c", \
       cd ../../" ]
 
 # specify jupyterhub configuration
-RUN ls -lash ${HOME}/binder/start.sh
+# RUN ls -lash ${HOME}/binder/start.sh
 ENTRYPOINT /bin/bash ${HOME}/binder/start.sh
