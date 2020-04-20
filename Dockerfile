@@ -1,4 +1,8 @@
-FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
+# CodeOcean
+# FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
+
+# MyBinder
+FROM jupyter/minimal-notebook:edeb4ee7f24d8c22272bd45bf573f1e1b1eba612
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -32,7 +36,7 @@ RUN pip install -U --no-cache-dir \
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
       tar -xzvf MultiNest-3.10.tar.gz && \
-      rm MultiNest-3.10.tar.gz && \
+      rm MultiNest-3.10.tar.gz &&\
       cd MultiNest-3.10/build/ && \
       cmake .. && \
       make && \
@@ -44,8 +48,7 @@ ENV LD_LIBRARY_PATH=/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # COPY postInstall /
 # RUN /postInstall
 
-# Rest is for MyBinder
-
+# For MyBinder
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
@@ -53,39 +56,3 @@ COPY --chown=1000:100 . ompy
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e .
-
-# create a user, since we don't want to run as root
-ARG NB_USER="jovyan"
-ARG NB_UID="1000"
-ARG NB_GID="100"
-RUN useradd -m $NB_USER
-ENV HOME=/home/$NB_USER
-WORKDIR $HOME
-USER $NB_UID
-
-COPY --chown=$NB_USER:$NB_GID start-notebook.sh /home/$NB_USER
-
-EXPOSE 8888
-
-# Install Tini
-RUN conda install --quiet --yes 'tini=0.18.0' && \
-    conda list tini | grep tini | tr -s ' ' | cut -d ' ' -f 1,2 >> $CONDA_DIR/conda-meta/pinned && \
-    conda clean --all -f -y && \
-    fix-permissions $CONDA_DIR && \
-    fix-permissions /home/$NB_USER
-
-# Configure container startup
-ENTRYPOINT ["tini", "-g", "--"]
-CMD ["start-notebook.sh"]
-
-# Copy local files as late as possible to avoid cache busting
-COPY start.sh start-notebook.sh start-singleuser.sh /usr/local/bin/
-
-# Fix permissions on /etc/jupyter as root
-USER root
-RUN fix-permissions /etc/jupyter/
-
-# Switch back to jovyan to avoid accidental container runs as root
-USER $NB_UID
-
-
