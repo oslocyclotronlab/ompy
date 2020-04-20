@@ -67,9 +67,8 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ${Home}
 
-RUN cd ompy &&\
+RUN pip install --no-cache -e . && \
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-    pip install --no-cache -e . && \
     cd ../
 
 USER ${NB_USER}
