@@ -15,7 +15,7 @@ RUN apt-get update \
         liblapack-dev=3.7.1-4ubuntu1 \
         libomp-dev=5.0.1-1 \
         libopenmpi-dev=2.1.1-8 \
-        wget=1.19.4-1ubuntu2.2 \
+        wget=1.19.4-1ubuntu2.2
     # comment out for Mybinder
     # && rm -rf /var/lib/apt/lists/*
 
