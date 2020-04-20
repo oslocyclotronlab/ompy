@@ -71,7 +71,7 @@ COPY --chown=${NB_USER}:${NB_GID} . ompy
 USER ${NB_USER}
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-    pip install -e . && \
+    pip install -e --install-dir ompy . && \
     cd ../
 
 RUN [ "/bin/bash", "-c", \
