@@ -84,5 +84,5 @@ RUN [ "/bin/bash", "-c", \
       cd ../../" ]
 
 # specify jupyterhub configuration
-# RUN ls -lash ${HOME}/binder/start.sh
-ENTRYPOINT /bin/bash ${HOME}/binder/start.sh
+RUN ls -lash ${HOME}/ompy/binder/start.sh
+ENTRYPOINT /bin/bash ${HOME}/ompy/binder/start.sh
