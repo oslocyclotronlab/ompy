@@ -101,7 +101,7 @@ python setup.py build_ext --inplace
 
 ### Troubleshooting
 #### Docker container
-If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine
+If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine. The dockerfile is in the [.binder][.binder] folder.
 
 #### Python version
 If you had some failed attempts, you might try to uninstall `ompy` before retrying the stepts above:
@@ -129,13 +129,12 @@ import ompy
 Below you can find a summary of the most important files and directories of this repository. You can find a full documentation of the packages functionality [here](https://ompy.readthedocs.io/en/latest/API/index.html).  
 
 .`ompy` - main repository    
-├── `Dockerfile` - [Dockerfile](https://docs.docker.com/engine/reference/builder/) for easy & reproducible installation  
+├── `.binder` - [Dockerfile](https://docs.docker.com/engine/reference/builder/) for easy & reproducible installation and hooks for [MyBinder](https://mybinder.org/) 
+├── `Dockerfile` - [Dockerfile](https://docs.docker.com/engine/reference/builder/) link   
 ├── `docs` - documentation, rendered at https://ompy.readthedocs.io/  
 │   └── ...    
 ├── `example_data` - some example data for calculations  
-│   ├── ...   
-├── `hooks` - helper file for [MyBinder](https://mybinder.org/)  
-│   └── ...    
+│   └── ...      
 ├── `LICENSE.md` - License file  
 ├── `notebooks` - usage example(s)  
 │   └── ...  
