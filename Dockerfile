@@ -16,7 +16,8 @@ RUN apt-get update \
         libomp-dev=5.0.1-1 \
         libopenmpi-dev=2.1.1-8 \
         wget=1.19.4-1ubuntu2.2 \
-    && rm -rf /var/lib/apt/lists/*
+    # comment out for Mybinder
+    # && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
     cython==0.29.14 \
