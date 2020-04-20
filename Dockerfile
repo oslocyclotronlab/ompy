@@ -6,7 +6,7 @@ FROM jupyter/minimal-notebook:859aaa228cca
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-USER root
+USER root # only for MyBinder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -35,6 +35,23 @@ RUN pip install -U \
     tqdm==4.35.0 \
     uncertainties==3.1.2
 
+# Codeocean: MultiNest is installed in the postInstall script
+ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
+
+# For CodeOCEAN
+# COPY postInstall /
+# RUN /postInstall
+
+# Rest: For MyBinder
+# Due to some cache issue with MyBinder we ought to use COPY instead
+# of git clone.
+COPY --chown=1000:100 . ompy
+# REMBEBER TO checkout the BRANCH you want
+RUN cd ompy &&\
+    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
+    pip install -e . && \
+    cd .. &&\
+
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
       tar -xzvf MultiNest-3.10.tar.gz && \
@@ -43,18 +60,3 @@ RUN [ "/bin/bash", "-c", \
       cmake .. && \
       make && \
       cd ../../" ]
-# MultiNest is installed in the postInstall script
-ENV LD_LIBRARY_PATH=/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
-
-# For CodeOCEAN
-# COPY postInstall /
-# RUN /postInstall
-
-# For MyBinder
-# Due to some cache issue with MyBinder we ought to use COPY instead
-# of git clone.
-COPY --chown=1000:100 . ompy
-# REMBEBER TO checkout the BRANCH you want
-RUN cd ompy &&\
-    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-    pip install -e .
