@@ -59,7 +59,7 @@ RUN adduser --disabled-password \
 WORKDIR ${HOME}
 
 USER root
-RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
+RUN chown -R ${NB_USER}:${NB_GID} ${HOME} /opt/conda/
 
 ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
