@@ -89,5 +89,3 @@ CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--al
 
 EXPOSE 8888
 
-RUN ls -lash ${HOME}/ompy/binder/start.sh
-ENTRYPOINT /bin/bash ${HOME}/ompy/binder/start.sh
