@@ -60,12 +60,12 @@ RUN pip install --no-cache -U\
 # Rest: For MyBinder
 WORKDIR ${HOME}
 USER root
-RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
+RUN chown -R 1000:100 ${HOME}
 
 ENV LD_LIBRARY_PATH=/home/jovyan/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
-COPY --chown=${NB_USER}:${NB_GID} . ompy
+COPY --chown=1000:100 . ompy
 
 RUN cd ompy &&\
     pip install --no-cache -e . && \

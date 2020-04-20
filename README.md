@@ -101,7 +101,7 @@ python setup.py build_ext --inplace
 
 ### Troubleshooting
 #### Docker container
-If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine. The dockerfile is in the [.binder][.binder] folder.
+If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine. The dockerfile is in the [.binder](.binder) folder.
 
 #### Python version
 If you had some failed attempts, you might try to uninstall `ompy` before retrying the stepts above:
