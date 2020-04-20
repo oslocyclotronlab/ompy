@@ -36,8 +36,6 @@ RUN adduser --disabled-password \
     --gid ${NB_GID} \
     ${NB_USER}
 
-WORKDIR ${HOME}
-
 RUN pip install --no-cache -U\
     cython==0.29.14 \
     ipywidgets==7.5.0 \
@@ -60,6 +58,7 @@ RUN pip install --no-cache -U\
 #RUN /postInstall
 
 # Rest: For MyBinder
+WORKDIR ${HOME}
 USER root
 RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
 
@@ -68,11 +67,12 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ompy
 
-USER ${NB_USER}
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install --no-cache -e . && \
     cd ../
+
+USER ${NB_USER}
 
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
