@@ -84,5 +84,5 @@ USER ${NB_USER}
 #       cd ../../" ]
 
 # specify jupyterhub configuration
-RUN ls -lash ${HOME}/binder/start.sh
-ENTRYPOINT /bin/bash ${HOME}/binder/start.sh
+CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+EXPOSE 8888
