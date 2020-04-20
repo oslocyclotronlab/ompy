@@ -19,7 +19,7 @@ RUN apt-get update \
     # comment out for Mybinder
     # && rm -rf /var/lib/apt/lists/*
 
-RUN pip install -U --no-cache-dir \
+RUN pip install -U \
     cython==0.29.14 \
     ipywidgets==7.5.0 \
     matplotlib==3.1.1 \
