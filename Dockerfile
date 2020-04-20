@@ -5,13 +5,7 @@
 # CodeOcean
 FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
 
-# MyBinder
-#FROM jupyter/minimal-notebook:859aaa228cca
-
 ARG DEBIAN_FRONTEND=noninteractive
-
-# only for MyBinder
-#USER root
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -40,14 +34,14 @@ RUN pip install -U \
     tqdm==4.35.0 \
     uncertainties==3.1.2
 
-# Codeocean: MultiNest is installed in the postInstall script
-ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
-
 # For CodeOCEAN
-# COPY postInstall /
-# RUN /postInstall
+# MultiNest is installed in the postInstall script; ENV needs to be set here
+#ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
+#COPY postInstall /
+#RUN /postInstall
 
 # Rest: For MyBinder
+
 # Configuration required for using Binder
 ARG NB_USER=jovyan
 ARG NB_UID=1000
@@ -63,14 +57,14 @@ RUN adduser --disabled-password \
 WORKDIR ${HOME}
 
 USER root
-RUN chown -R ${NB_USER}:${NB_USER} ${HOME} /srv/conda/envs/
+RUN chown -R ${NB_USER}:${NB_USER} ${HOME}
 USER ${NB_USER}
 
 ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
-# REMBEBER TO checkout the BRANCH you want
+
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e . && \
