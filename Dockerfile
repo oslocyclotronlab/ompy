@@ -6,6 +6,8 @@ FROM jupyter/minimal-notebook:859aaa228cca
 
 ARG DEBIAN_FRONTEND=noninteractive
 
+USER root
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         cm-super=0.3.4-11 \
@@ -15,9 +17,8 @@ RUN apt-get update \
         liblapack-dev=3.7.1-4ubuntu1 \
         libomp-dev=5.0.1-1 \
         libopenmpi-dev=2.1.1-8 \
-        wget=1.19.4-1ubuntu2.2
-    # comment out for Mybinder
-    # && rm -rf /var/lib/apt/lists/*
+        wget=1.19.4-1ubuntu2.2 \
+        && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U \
     cython==0.29.14 \
