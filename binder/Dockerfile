@@ -84,7 +84,7 @@ COPY --chown=${NB_USER}:${NB_GID} . ompy
 #      make && \
 #      cd ../../" ]
 
-RUN [ "/bin/bash", "-c", "ls" ]
+RUN [ "/bin/bash", "-c", "ls ompy" ]
 
 # specify jupyterhub configuration
 RUN ls -lash ${HOME}/binder/start.sh
