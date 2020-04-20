@@ -62,19 +62,18 @@ WORKDIR ${HOME}
 
 USER root
 RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
-RUN chown -R ${NB_USER}:${NB_GID} /opt/conda/lib/python3.7/site-packages
 
 ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ompy
 
-USER ${NB_USER}
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e . && \
     cd ../
 
+USER ${NB_USER}
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
       tar -xzvf MultiNest-3.10.tar.gz && \
