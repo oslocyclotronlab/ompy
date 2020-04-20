@@ -6,7 +6,8 @@ FROM jupyter/minimal-notebook:859aaa228cca
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-USER root # only for MyBinder
+# only for MyBinder
+USER root
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -43,6 +44,10 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # RUN /postInstall
 
 # Rest: For MyBinder
+# only for MyBinder
+USER $NBUSER
+
+
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
