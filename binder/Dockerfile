@@ -84,5 +84,6 @@ USER ${NB_USER}
 #       cd ../../" ]
 
 # specify jupyterhub configuration
-CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
-EXPOSE 8888
+ARG OMPY_JUPYTER_TOKEN
+ENV JUPYTER_TOKEN=${OMPY_JUPYTER_TOKEN}
+ENTRYPOINT []
