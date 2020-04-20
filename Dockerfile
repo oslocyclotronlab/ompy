@@ -1,3 +1,7 @@
+# The Dockerfile is an attempt to combine
+# the Dockerfiles for CodeOcean and MyBinder
+# currently one will need to comment/uncomment by hand
+
 # CodeOcean
 # FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
 
@@ -54,7 +58,7 @@ COPY --chown=1000:100 . ompy
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e . && \
-    cd .. &&\
+    cd ../
 
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
