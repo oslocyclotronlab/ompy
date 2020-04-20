@@ -3,15 +3,15 @@
 # currently one will need to comment/uncomment by hand
 
 # CodeOcean
-# FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
+FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
 
 # MyBinder
-FROM jupyter/minimal-notebook:859aaa228cca
+#FROM jupyter/minimal-notebook:859aaa228cca
 
 ARG DEBIAN_FRONTEND=noninteractive
 
 # only for MyBinder
-USER root
+#USER root
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -24,9 +24,6 @@ RUN apt-get update \
         libopenmpi-dev=2.1.1-8 \
         wget=1.19.4-1ubuntu2.2 \
         && rm -rf /var/lib/apt/lists/*
-
-# only for MyBinder
-USER $NBUSER
 
 RUN pip install -U \
     cython==0.29.14 \
@@ -51,6 +48,25 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # RUN /postInstall
 
 # Rest: For MyBinder
+# Configuration required for using Binder
+ARG NB_USER=jovyan
+ARG NB_UID=1000
+ENV NB_USER $NB_USER
+ENV HOME /home/${NB_USER}
+
+# create the notebook user
+RUN adduser --disabled-password \
+    --gecos "Default user" \
+    --uid ${NB_UID} \
+    ${NB_USER}
+
+WORKDIR ${HOME}
+
+USER root
+RUN chown -R ${NB_USER}:${NB_USER} ${HOME} /srv/conda/envs/
+USER ${NB_USER}
+
+ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
@@ -68,3 +84,5 @@ RUN [ "/bin/bash", "-c", \
       cmake .. && \
       make && \
       cd ../../" ]
+
+ENTRYPOINT ["exec "$@""]
