@@ -29,12 +29,12 @@ RUN pip install -U --no-cache-dir \
     tqdm==4.35.0 \
     uncertainties==3.1.2
 
-RUN [ "/bin/bash", "-c",
-      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz &&
-      tar -xzvf MultiNest-3.10.tar.gz
-      cd MultiNest-3.10/build/ &&
-      cmake .. &&
-      make &&
+RUN [ "/bin/bash", "-c", \
+      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
+      tar -xzvf MultiNest-3.10.tar.gz \
+      cd MultiNest-3.10/build/ && \
+      cmake .. && \
+      make && \
       cd ../../" ]
 # MultiNest is installed in the postInstall script
 ENV LD_LIBRARY_PATH=/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
