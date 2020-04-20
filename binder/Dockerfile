@@ -1,7 +1,7 @@
 # The Dockerfile is an attempt to combine
 # the Dockerfiles for CodeOcean and MyBinder
 # currently one will need to comment/uncomment by hand
-# Note: The Dockerfile needs to be in the parrent dir for MyBinder
+# Note: The Dockerfile in the main dir is just a link
 
 # CodeOcean
 FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
@@ -62,19 +62,21 @@ WORKDIR ${HOME}
 USER root
 RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
 
-ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=${Home}/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
-COPY --chown=${NB_USER}:${NB_GID} . ${Home}
+COPY --chown=${NB_USER}:${NB_GID} . ompy
 
-RUN pip install --no-cache -e . && \
+RUN cd ompy &&\
+    pip install --no-cache -e . && \
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     cd ../
 
 USER ${NB_USER}
 
 RUN [ "/bin/bash", "-c", \
-      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
+      "cd ${HOME} && \
+      wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
       tar -xzvf MultiNest-3.10.tar.gz && \
       rm MultiNest-3.10.tar.gz &&\
       cd MultiNest-3.10/build/ && \
@@ -84,4 +86,8 @@ RUN [ "/bin/bash", "-c", \
 
 # specify jupyterhub configuration
 CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root"]
+
 EXPOSE 8888
+
+RUN ls -lash ${HOME}/ompy/binder/start.sh
+ENTRYPOINT /bin/bash ${HOME}/ompy/binder/start.sh
