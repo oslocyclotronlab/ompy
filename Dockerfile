@@ -52,3 +52,6 @@ COPY --chown=1000:100 . ompy
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install -e .
+
+# Mbinder: Specify the default command to run
+CMD ["jupyter", "notebook", "--ip", "0.0.0.0"]
