@@ -11,7 +11,7 @@ RUN apt-get update \
         liblapack-dev=3.7.1-4ubuntu1 \
         libomp-dev=5.0.1-1 \
         libopenmpi-dev=2.1.1-8 \
-        wget=1.19.4 \
+        wget=1.19.4-1ubuntu2.2 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U --no-cache-dir \
@@ -31,7 +31,8 @@ RUN pip install -U --no-cache-dir \
 
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
-      tar -xzvf MultiNest-3.10.tar.gz \
+      tar -xzvf MultiNest-3.10.tar.gz && \
+      rm MultiNest-3.10.tar.gz && \
       cd MultiNest-3.10/build/ && \
       cmake .. && \
       make && \
