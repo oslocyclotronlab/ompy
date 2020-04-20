@@ -71,10 +71,9 @@ COPY --chown=${NB_USER}:${NB_GID} . ompy
 #USER ${NB_USER}
 #RUN cd ompy &&\
 #    # git submodule update --init --recursive &&\ # now in hooks/post_checkout
-#    pip install --no-cache -e . && \
+#    pip install -e . && \
 #    cd ../
-#
-#
+
 #RUN [ "/bin/bash", "-c", \
 #      "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
 #      tar -xzvf MultiNest-3.10.tar.gz && \
@@ -84,8 +83,6 @@ COPY --chown=${NB_USER}:${NB_GID} . ompy
 #      make && \
 #      cd ../../" ]
 
-RUN [ "/bin/bash", "-c", "ls ompy" ]
-
 # specify jupyterhub configuration
-RUN ls -lash ${HOME}/ompy/binder/start.sh
-ENTRYPOINT /bin/bash ${HOME}/ompy/binder/start.sh
+RUN ls -lash ${HOME}/binder/start.sh
+ENTRYPOINT /bin/bash ${HOME}/binder/start.sh
