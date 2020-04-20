@@ -1,7 +1,7 @@
 # The Dockerfile is an attempt to combine
 # the Dockerfiles for CodeOcean and MyBinder
 # currently one will need to comment/uncomment by hand
-# Note: The Dockerfile needs to be in the parrent dir for MyBinder(?)
+# Note: The Dockerfile needs to be in the parrent dir for MyBinder
 
 # CodeOcean
 FROM registry.codeocean.com/codeocean/miniconda3:4.7.10-python3.7-ubuntu18.04
@@ -21,8 +21,24 @@ RUN apt-get update \
         && rm -rf /var/lib/apt/lists/*
 
 
-# For CodeOcean: add -U flag on pip install
-RUN pip install --no-cache\
+# User spevification needed for MyBinder only
+# Configuration required for using Binder
+ARG NB_USER=jovyan
+ARG NB_UID=1000
+ARG NB_GID=100
+ENV NB_USER $NB_USER
+ENV HOME /home/${NB_USER}
+
+# create the notebook user
+RUN adduser --disabled-password \
+    --gecos "Default user" \
+    --uid ${NB_UID} \
+    --gid ${NB_GID} \
+    ${NB_USER}
+
+WORKDIR ${HOME}
+
+RUN pip install --no-cache -U\
     cython==0.29.14 \
     ipywidgets==7.5.0 \
     matplotlib==3.1.1 \
@@ -44,23 +60,6 @@ RUN pip install --no-cache\
 #RUN /postInstall
 
 # Rest: For MyBinder
-
-# Configuration required for using Binder
-ARG NB_USER=jovyan
-ARG NB_UID=1000
-ARG NB_GID=100
-ENV NB_USER $NB_USER
-ENV HOME /home/${NB_USER}
-
-# create the notebook user
-RUN adduser --disabled-password \
-    --gecos "Default user" \
-    --uid ${NB_UID} \
-    --gid ${NB_GID} \
-    ${NB_USER}
-
-WORKDIR ${HOME}
-
 USER root
 RUN chown -R ${NB_USER}:${NB_GID} ${HOME}
 
@@ -69,12 +68,12 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # of git clone.
 COPY --chown=${NB_USER}:${NB_GID} . ompy
 
+USER ${NB_USER}
 RUN cd ompy &&\
     # git submodule update --init --recursive &&\ # now in hooks/post_checkout
     pip install --no-cache -e . && \
     cd ../
 
-USER ${NB_USER}
 RUN [ "/bin/bash", "-c", \
       "wget --content-disposition https://github.com/JohannesBuchner/MultiNest/archive/v3.10.tar.gz && \
       tar -xzvf MultiNest-3.10.tar.gz && \
