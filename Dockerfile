@@ -21,6 +21,9 @@ RUN apt-get update \
         wget=1.19.4-1ubuntu2.2 \
         && rm -rf /var/lib/apt/lists/*
 
+# only for MyBinder
+USER $NBUSER
+
 RUN pip install -U \
     cython==0.29.14 \
     ipywidgets==7.5.0 \
@@ -44,10 +47,6 @@ ENV LD_LIBRARY_PATH=$PWD/MultiNest-3.10/lib/:$LD_LIBRARY_PATH
 # RUN /postInstall
 
 # Rest: For MyBinder
-# only for MyBinder
-USER $NBUSER
-
-
 # Due to some cache issue with MyBinder we ought to use COPY instead
 # of git clone.
 COPY --chown=1000:100 . ompy
