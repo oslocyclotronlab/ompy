@@ -132,22 +132,24 @@ class Vector(AbstractArray):
         """
         fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
 
-        if kind in ["plot", "line"]:
-            kwargs.setdefault("markersize", "3")
-            ax.plot(self.E, self.values, "o-", **kwargs)
-        elif kind == "step":
-            kwargs.setdefault("where", "mid")
-            ax.step(self.E, self.values, **kwargs)
+        if self.std is None:
+            if kind in ["plot", "line"]:
+                kwargs.setdefault("markersize", 3)
+                kwargs.setdefault("marker", "o")
+                kwargs.setdefault("linestyle", "-")
+                ax.plot(self.E, self.values, "o-", **kwargs)
+            elif kind == "step":
+                kwargs.setdefault("where", "mid")
+                ax.step(self.E, self.values, **kwargs)
+            else:
+                raise NotImplementedError()
         else:
-            raise NotImplementedError()
-        # ax.xaxis.set_major_locator(MeshLocator(self.E))
+            kwargs.setdefault("markersize", 3)
+            kwargs.setdefault("linewidth", 2)
+            kwargs.setdefault("fmt", "o")
+            ax.errorbar(self.E, self.values, yerr=self.std, **kwargs)
         ax.set_yscale(scale)
         ax.set_xlabel("Energy")
-
-        if self.std is not None:
-            # TODO: Fix color
-            ax.errorbar(self.E, self.values, yerr=self.std,
-                        fmt='o', ms=1, lw=1, color='k')
         return fig, ax
 
     def save(self, path: Union[str, Path],
