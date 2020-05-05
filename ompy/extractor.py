@@ -3,11 +3,10 @@ import matplotlib.pyplot as plt
 import warnings
 import logging
 from contextlib import redirect_stdout
-from uncertainties import unumpy
 import os
 
 from pathlib import Path
-from typing import Optional, Union, Any, Tuple, List
+from typing import Optional, Union, Any, Tuple, List, Dict
 from scipy.optimize import minimize
 from .ensemble import Ensemble
 from .matrix import Matrix
@@ -67,7 +66,9 @@ class Extractor:
     """
     def __init__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None,
-                 path: Optional[Union[str, Path]] = None):
+                 path: Optional[Union[str, Path]] = None,
+                 lazy: bool = False,
+                 options: Dict[str, Any] = {}):
         """
         ensemble (Ensemble, optional): see above
         trapezoid (Action[Matrix], optional): see above
@@ -76,15 +77,18 @@ class Extractor:
         self.ensemble = ensemble
         self.regenerate = False
         self.method = 'Powell'
-        self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
+        self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None, **options}
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
 
         if path is not None:
             self.path = Path(path)
-            self.path.mkdir(exist_ok=True, parents=True)
-            self.load(self.path)
+            if not self.path.exists():
+                LOG.warn("Path does not exists, skipping loading: %s", path)
+                self.path.mkdir(exist_ok=True, parents=True)
+            else:
+                self.load(self.path)
         else:
             self.path = Path('saved_run/extraction_ensemble')
             self.path.mkdir(exist_ok=True, parents=True)
@@ -93,6 +97,7 @@ class Extractor:
         self.randomize_initial_values: bool = True
         self.seed: int = 98743215
         np.random.seed(self.seed)  # seed also in `extract_from`
+        self.lazy = lazy
 
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
@@ -138,17 +143,20 @@ class Extractor:
         gsfs = []
         np.random.seed(self.seed)  # seed also in `__init__`
         for i in tqdm(range(self.ensemble.size)):
+            LOG.debug("Extracting from %i", i)
             nld_path = self.path / f'nld_{i}.npy'
             gsf_path = self.path / f'gsf_{i}.npy'
             if nld_path.exists() and gsf_path.exists() and not regenerate:
+                LOG.debug("Already exists, loading.")
                 nlds.append(Vector(path=nld_path))
                 gsfs.append(Vector(path=gsf_path))
             else:
                 nld, gsf = self.step(i)
                 nld.save(nld_path)
                 gsf.save(gsf_path)
-                nlds.append(nld)
-                gsfs.append(gsf)
+                if not self.lazy:
+                    nlds.append(nld)
+                    gsfs.append(gsf)
 
         self.nld = nlds
         self.gsf = gsfs
@@ -173,8 +181,9 @@ class Extractor:
         """
         assert self.ensemble is not None
         assert self.trapezoid is not None
+        LOG.debug("Getting matrix and std from ensemble.")
         matrix = self.ensemble.get_firstgen(num).copy()
-        std = self.ensemble.std_firstgen.copy()
+        std = self.ensemble.std_firstgen_norm
         # following lines might be superfluous now:
         # ensure same cuts for all ensemble members if Eg_max is not given
         # (thus auto-determined) in the trapezoid.
@@ -185,6 +194,7 @@ class Extractor:
         else:
             self.trapezoid.act_on(matrix)
             self.trapezoid.act_on(std)
+        LOG.debug("Decomposing")
         nld, gsf = self.decompose(matrix, std)
         return nld, gsf
 
@@ -211,6 +221,7 @@ class Extractor:
             std: The standard deviation for the matrix. Must
                 be the same size as the matrix. If no std is provided,
                 square error will be used instead of chi square.
+                Must be already have taken normalization into account!
             x0: The initial guess for nld and gsf. If `np.ndarray`, ordered as
                 (T0, nld0). Otherwise, if `str`, used as the method, see
                 `guess_initial_values` (where also defaults are given).
@@ -225,39 +236,45 @@ class Extractor:
         """
         if np.any(matrix.values < 0):
             raise ValueError("input matrix has to have positive entries only.")
+
         if std is not None:
+            LOG.debug("Copying std")
             std = std.copy()
             if np.any(std.values < 0):
                 raise ValueError("std has to have positive entries only.")
             assert matrix.shape == std.shape, \
                 f"matrix.shape: {matrix.shape} != std.shape : {std.shape}"
-            std.values = std.values.copy(order='C')
-            matrix.values, std.values = normalize(matrix, std)
-            matrix.Ex = matrix.Ex.copy(order='C')
-            matrix.Eg = matrix.Eg.copy(order='C')
-        else:
-            matrix.values, _ = normalize(matrix)
+            LOG.debug("Using std. (Assuming from normalized ensemble)")
+            std.set_order('C')
+
+        LOG.debug("Normalizing matrix")
+        matrix.normalize('Ex', inplace=True)
+        matrix.set_order('C')
 
         # Eg and Ex *must* have the same step size for the
         # decomposition to make sense.
+        LOG.debug("Verifying step sizes")
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
-        assert dEx == dEg, \
-            "Ex and Eg must have the same bin width. Currently they have"\
+        assert dEx - dEg < 0.01, \
+            "Ex and Eg must have the same bin width. Currently they have "\
             f"dEx: {dEx:.1f} and dEg: {dEg:.1f}. You have to rebin.\n"\
             "The `ensemble` class has a `rebin` method."
         bin_width = dEx
 
         # create nld energy array
+        LOG.debug("Creating nld energy array")
         Emin = matrix.Ex.min()-matrix.Eg.max()
         Emax = matrix.Ex.max()-matrix.Eg.min()
         E_nld = np.linspace(Emin, Emax, int(np.ceil((Emax-Emin)/bin_width))+1)
 
+        LOG.debug("Setting resolution")
         if self.extend_fit_by_resolution:
             resolution = self.diagonal_resolution(matrix)
         else:
             resolution = np.zeros_like(matrix.Ex)
 
+        LOG.debug("Getting initial values")
         x0 = self.x0 if x0 is None else x0
         if x0 is None or isinstance(x0, str):  # default initials or method
             x0 = self.guess_initial_values(E_nld, matrix, x0)
@@ -290,7 +307,7 @@ class Extractor:
         nld = res.x[matrix.Eg.size:]
 
         # Set elements that couldn't be constrained (no entries) to np.na
-        nld_counts0, T_counts0 = self.constraining_counts(matrix, resolution)
+        nld_counts0, T_counts0 = self.constraining_counts(matrix, resolution, len(nld))
         T[T_counts0 == 0] = np.nan
         nld[nld_counts0 == 0] = np.nan
 
@@ -299,6 +316,7 @@ class Extractor:
         gsf = T/(2*np.pi*matrix.Eg**3)
 
         if product:
+            LOG.debug("performing product")
             nld_0 = np.where(np.isnan(nld), np.zeros_like(nld), nld)
             T_0 = np.where(np.isnan(T), np.zeros_like(T), T)
             values = nld_T_product(nld_0, T_0, resolution,
@@ -311,7 +329,7 @@ class Extractor:
 
     def guess_initial_values(self, E_nld: np.ndarray, matrix: Matrix,
                              method: Optional[str] = None) -> np.ndarray:
-        """Guess initial values `x0` for minimization rountine
+        """Guess initial values `x0` for minimization routine
 
         Note:
             Different initial guesses will affect the normalization constants
@@ -422,8 +440,9 @@ class Extractor:
 
     @staticmethod
     def constraining_counts(matrix: Matrix,
-                            resolution: np.ndarray) -> Tuple[np.ndarray,
-                                                             np.ndarray]:
+                            resolution: np.ndarray,
+                            nld_len: int) -> Tuple[np.ndarray,
+                                                   np.ndarray]:
         """ Number of counts constraining each nld bin and gsf bin
 
         Args:
@@ -444,8 +463,12 @@ class Extractor:
         matrix.values = np.ma.masked_array(matrix.values, Egs > Emax)
 
         # sum counts along diagonals
-        start = - (matrix.shape[0] - 1)
+        start = - matrix.shape[0]
         stop = matrix.shape[1]
+        # something fishy is going on. Hack to circumvent it,
+        # by padding on the missing offset
+        start -= nld_len - abs(stop-start)
+
         nld_counts = np.array([matrix.values.trace(offset=d)
                               for d in range(start, stop)])
         nld_counts = nld_counts[::-1]
@@ -587,31 +610,3 @@ class Extractor:
         except KeyError:
             pass
         return state
-
-
-def normalize(mat: Matrix,
-              std: Optional[Matrix]) -> Tuple[np.ndarray, np.ndarray]:
-    """Matrix normalization per row taking into account the std. dev
-
-    Error propagation assuming gaussian error propagation.
-
-    Args:
-        mat (Matrix): input matrix
-        std (Matrix, optional): Standard deviation at each bin
-
-    Returns:
-        Values of normalized matrix and normalized standard deviation
-
-
-    """
-    matrix = unumpy.uarray(mat.values, std.values if std is not None else None)
-
-    # normalize each Ex row to 1 (-> get decay probability)
-    for i, total in enumerate(matrix.sum(axis=1)):
-        if total == 0:
-            continue
-        matrix[i, :] = np.true_divide(matrix[i, :], total)
-    values = unumpy.nominal_values(matrix)
-    std = unumpy.std_devs(matrix)
-
-    return values, std

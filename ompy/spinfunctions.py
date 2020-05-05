@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from .library import call_model
 from scipy.interpolate import interp1d
 from typing import Optional, Sequence, Tuple, Any, Union, Dict
@@ -46,7 +47,7 @@ class SpinFunctions:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
 
-    def distibution(self) -> Tuple[float, np.ndarray]:
+    def distribution(self) -> Tuple[float, np.ndarray]:
         """Get spin distribution
 
         Note: Assuming equal parity
@@ -173,10 +174,17 @@ class SpinFunctions:
         Ex = self.Ex if Ex is None else Ex
         Ex = np.atleast_1d(Ex)
         sigma2_Sn = self.gEB05(mass, NLDa, Eshift, Ex=Sn)
-        sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex)
+        sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex) # noqa
         x = [sigma2_disc[0], Sn]
         y = [sigma2_disc[1], sigma2_EB05(Sn)]
         sigma2 = interp1d(x, y,
                           bounds_error=False,
                           fill_value=(sigma2_disc[1], sigma2_Sn))
         return np.where(Ex < Sn, sigma2(Ex), sigma2_EB05(Ex))
+
+    def plot(self, ax=None, **kwargs):
+        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
+
+        dist = self.distribution()
+        ax.plot(self.J, dist.T)
+        return fig, ax

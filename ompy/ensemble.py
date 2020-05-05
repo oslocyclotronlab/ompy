@@ -139,18 +139,26 @@ class Ensemble:
         self.std_unfolded: Optional[Matrix] = None
         self.std_firstgen: Optional[Matrix] = None
 
+        self.std_raw_norm: Optional[Matrix] = None
+        self.std_unfolded_norm: Optional[Matrix] = None
+        self.std_firstgen_norm: Optional[Matrix] = None
+
         self.raw_ensemble: Optional[Matrix] = None
         self.unfolded_ensemble: Optional[Matrix] = None
         self.firstgen_ensemble: Optional[Matrix] = None
 
+        self.firstgen: Optional[Matrix] = None
+
         self.seed: int = 987654
-        self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
+        self.nprocesses: int = 1  # cpu_count()-1 if cpu_count() > 1 else 1
 
         self.path = (Path(path) if path is not None
                      else Path('saved_run/normalizers'))
         self.path.mkdir(exist_ok=True, parents=True)
+        self.mmap = {}
 
-        self.raw.state = "raw"
+        if self.raw is not None:
+            self.raw.state = "raw"
 
     def load(self, path: Optional[Union[str, Path]] = None):
         """ Loads a saved ensamble. Alternative to `regenerate`.
@@ -189,6 +197,10 @@ class Ensemble:
         self.std_unfolded = Matrix(path=path / 'unfolded_std.npy')
         self.std_firstgen = Matrix(path=path / 'firstgen_std.npy')
 
+        self.std_raw_norm = Matrix(path=path / 'raw_std_norm.npy')
+        self.std_unfolded_norm = Matrix(path=path / 'unfolded_std_norm.npy')
+        self.std_firstgen_norm = Matrix(path=path / 'firstgen_std_norm.npy')
+
     def generate(self, number: int, method: str = 'poisson',
                  regenerate: bool = False) -> None:
         """Generates an ensemble of matrices and estimates standard deviation
@@ -212,19 +224,25 @@ class Ensemble:
         self.size = number
         self.regenerate = regenerate
 
-        LOG.info(f"Start normalization with {self.nprocesses} cpus")
-        pool = ProcessPool(nodes=self.nprocesses)
+        LOG.info(f"Start normalization of {number} matrices with {self.nprocesses} cpus")
+        #pool = ProcessPool(nodes=self.nprocesses)
         ss = np.random.SeedSequence(self.seed)
-        iterator = pool.imap(self.step, range(number), ss.spawn(number),
-                             repeat(method))
-        ensembles = np.array(list(tqdm(iterator, total=number)))
-        pool.close()
-        pool.join()
-        pool.clear()
+        #iterator = pool.imap(self.step, range(number), ss.spawn(number),
+        #                     repeat(method))
+        #ensembles = np.array(list(tqdm(iterator, total=number)))
+        ensembles = []
+        sses = ss.spawn(number)
+        for i in tqdm(range(number)):
+            ensembles.append(self.step(i, sses[i], method))
 
+        ensembles = np.asarray(ensembles)
         raw_ensemble = ensembles[:, 0, :, :]
         unfolded_ensemble = ensembles[:, 1, :, :]
         firstgen_ensemble = ensembles[:, 2, :, :]
+        #pool.close()
+        #pool.join()
+        #pool.clear()
+
 
         # TODO Move this to a save step
         self.raw.save(self.path / 'raw.npy')
@@ -246,6 +264,22 @@ class Ensemble:
         firstgen_std = Matrix(firstgen_ensemble_std, self.firstgen.Eg,
                               self.firstgen.Ex, state='std')
         firstgen_std.save(self.path / "firstgen_std.npy")
+
+        # Compute normalized std
+        _, std_raw_norm = normalize(raw_ensemble)
+        self.std_raw_norm = Matrix(std_raw_norm, self.raw.Eg,
+                                   self.raw.Ex, state='std')
+        self.std_raw_norm.save(self.path / 'raw_std_norm.npy')
+
+        _, std_firstgen_norm = normalize(firstgen_ensemble)
+        self.std_firstgen_norm = Matrix(std_firstgen_norm, self.firstgen.Eg,
+                                        self.firstgen.Ex, state='std')
+        self.std_firstgen_norm.save(self.path / 'firstgen_std_norm.npy')
+
+        _, std_unfolded_norm = normalize(unfolded_ensemble)
+        self.std_unfolded_norm = Matrix(std_unfolded_norm, self.raw.Eg,
+                                        self.raw.Ex, state='std')
+        self.std_unfolded_norm.save(self.path / 'unfolded_std_norm.npy')
 
         self.std_raw = raw_std
         self.std_unfolded = unfolded_std
@@ -279,6 +313,7 @@ class Ensemble:
         else:
             raw = self.generate_perturbed(step, method, state="raw",
                                           rstate=rstate)
+        LOG.debug("[Seed check] Raw sum %i", raw.values.sum())
         unfolded = self.unfold(step, raw)
         firstgen = self.first_generation(step, unfolded)
 
@@ -345,12 +380,12 @@ class Ensemble:
         LOG.debug(f"Subtracting bg from prompt+bg {step}")
         path = self.path / f"raw_{step}.npy"
         raw = self.load_matrix(path)
+        self.action_raw.act_on(raw)
         if raw is None:
             LOG.debug("Raw matrix")
             raw = matrix - self.bg_ratio * bg
             raw.remove_negative()
             raw.save(path)
-        self.action_raw.act_on(raw)
         return raw
 
     def unfold(self, step: int, raw: Matrix) -> Matrix:
@@ -369,8 +404,8 @@ class Ensemble:
         if unfolded is None:
             LOG.debug("Unfolding matrix")
             unfolded = self.unfolder(raw)
+            self.action_unfolded.act_on(unfolded)
             unfolded.save(path)
-        self.action_unfolded.act_on(unfolded)
         return unfolded
 
     def first_generation(self, step: int, unfolded: Matrix) -> Matrix:
@@ -389,11 +424,11 @@ class Ensemble:
         if firstgen is None:
             LOG.debug("Calculating first generation matrix")
             firstgen = self.first_generation_method(unfolded)
+            self.action_firstgen.act_on(firstgen)
             firstgen.save(path)
-        self.action_firstgen.act_on(firstgen)
         return firstgen
 
-    def rebin(self, out_array: np.ndarray, member: str) -> None:
+    def rebin(self, bins, member: str = 'firstgen') -> None:
         """ Rebins the first generations matrixes and recals std
 
         Args:
@@ -405,41 +440,47 @@ class Ensemble:
             raise NotImplementedError("Not implemented for raw and unfolding "
                                       "yet. if done, need to redo unfolding "
                                       "and/or first gen method")
-
         ensemble = self.firstgen_ensemble
         matrix = self.firstgen
 
-        do_Ex = not np.array_equal(out_array, matrix.Ex)
-        do_Eg = not np.array_equal(out_array, matrix.Eg)
-        if (not do_Ex) and (not do_Eg):
+        if isinstance(bins, int):
+            bins = np.linspace(min(matrix.Ex), max(matrix.Ex), bins)
+
+        do_Ex = not np.array_equal(bins, matrix.Ex)
+        do_Eg = not np.array_equal(bins, matrix.Eg)
+        if not (do_Ex or do_Eg):
             return
 
-        rebinned = np.zeros((self.size, out_array.size, out_array.size))
+        rebinned = np.zeros((self.size, bins.size, bins.size))
         for i in tqdm(range(self.size)):
             values = ensemble[i]
             if do_Ex:
                 values = rebin_2D(values, mids_in=matrix.Ex,
-                                  mids_out=out_array, axis=0)
+                                  mids_out=bins, axis=0)
             if do_Eg:
                 values = rebin_2D(values, mids_in=matrix.Eg,
-                                  mids_out=out_array, axis=1)
+                                  mids_out=bins, axis=1)
             rebinned[i] = values
 
         # correct fg matrix (different attribute) and axis
         values = matrix.values
         if do_Ex:
             values = rebin_2D(values, mids_in=matrix.Ex,
-                              mids_out=out_array, axis=0)
+                              mids_out=bins, axis=0)
         if do_Eg:
             values = rebin_2D(values, mids_in=matrix.Eg,
-                              mids_out=out_array, axis=1)
-        matrix = Matrix(values, out_array, out_array)
+                              mids_out=bins, axis=1)
+        matrix = Matrix(values, bins, bins)
 
         # recalculate std
         firstgen_ensemble_std = np.std(rebinned, axis=0)
         firstgen_std = Matrix(firstgen_ensemble_std, matrix.Eg,
                               matrix.Ex, state='std')
         firstgen_std.save(self.path / "firstgen_std.npy")
+
+        normed, std = normalize(rebinned)
+        self.std_firstgen_norm = Matrix(std, matrix.Eg, matrix.Ex, state='std')
+        self.std_firstgen_norm.save(self.path / "firstgen_std_normed.npy")
 
         self.firstgen = matrix
         self.firstgen_ensemble = rebinned
@@ -464,7 +505,8 @@ class Ensemble:
         return perturbed
 
     def generate_poisson(self, state: str,
-                         rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:  # noqa
+                         rstate: Optional[np.random.Generator] = np.random.default_rng
+    ) -> np.ndarray:  # noqa
         """Generates an array with Poisson perturbations of a matrix
 
         Args:
@@ -673,3 +715,24 @@ class Ensemble:
                 fig.colorbar(im)
         fig.suptitle("Standard Deviation")
         return fig, ax
+
+
+def normalize(ensemble: ndarray) -> Tuple[ndarray, ndarray]:
+    """Matrix normalization per row taking into account the std. dev
+
+    Error propagation assuming gaussian error propagation.
+
+    Args:
+        mat (ndarray): input matrix
+
+    Returns:
+        The normalized ensemble and standard deviation
+    """
+    # normalize each Ex row to 1 (-> get decay probability)
+    LOG.debug("Normalizing each row (Ex)")
+    total_ex = ensemble.sum(axis=2)[:, :, None]
+    ensemble = np.divide(ensemble, total_ex, np.zeros_like(ensemble),
+                         where=total_ex != 0)
+    std = np.std(ensemble, axis=0)
+
+    return ensemble, std

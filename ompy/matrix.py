@@ -47,6 +47,7 @@ from .library import div0, fill_negative_gauss, diagonal_elements
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
 from .vector import Vector
+from .turbo import *
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -107,7 +108,8 @@ class Matrix(AbstractArray):
                  std: Optional[np.ndarray] = None,
                  path: Optional[Union[str, Path]] = None,
                  shape: Optional[Tuple[int, int]] = None,
-                 state: Union[str, MatrixState] = None):
+                 state: Union[str, MatrixState] = None,
+                 copy: bool = False):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
@@ -135,7 +137,10 @@ class Matrix(AbstractArray):
         if shape is not None:
             self.values = np.zeros(shape, dtype=float)
         else:
-            self.values = np.asarray(values, dtype=float).copy()
+            if copy:
+                self.values = np.asarray(values, dtype=float).copy()
+            else:
+                self.values = np.asarray(values, dtype=float)
 
         if (values is not None or shape is not None) and Ex is None:
             Ex = range(self.values.shape[0])
@@ -153,6 +158,8 @@ class Matrix(AbstractArray):
         self.verify_integrity()
 
         self.state = state
+        self.loc = ValueLocator(self)
+        self.iloc = IndexLocator(self)
 
     def verify_integrity(self, check_equidistant: bool = False):
         """ Runs checks to verify internal structure
@@ -325,7 +332,8 @@ class Matrix(AbstractArray):
         mask = np.isnan(self.values) | (self.values == 0)
         masked = np.ma.array(self.values, mask=mask)
 
-        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
+        cmap = kwargs.pop('cmap', 'turbo')
+        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, cmap=cmap, **kwargs)
         if midbin_ticks:
             ax.xaxis.set_major_locator(MeshLocator(self.Eg))
             ax.tick_params(axis='x', rotation=40)
@@ -407,6 +415,20 @@ class Matrix(AbstractArray):
 
         ax.set_yscale(scale)
 
+        return ax
+
+    def plot_diagonal(self, intercept=0, *, ax=None, point=None, **kwargs):
+        if ax is None:
+            (_, ax, fig) = self.plot(**kwargs)
+        if point is not None:
+            intercept = point[1] - point[0]
+
+        ylim = ax.get_ylim()
+        xlim = ax.get_xlim()
+        X = np.linspace(*xlim, 2)
+        Y = X + intercept
+        ax.plot(X, Y, c='r', lw=0.5)
+        ax.set_ylim(ylim)
         return ax
 
     def projection(self, axis: Union[int, str], Emin: float = None,
@@ -570,6 +592,7 @@ class Matrix(AbstractArray):
 
     def cut_diagonal(self, E1: Optional[Iterable[float]] = None,
                      E2: Optional[Iterable[float]] = None,
+                     scale: Optional[float] = None,
                      inplace: bool = True) -> Optional[Matrix]:
         """Cut away counts to the right of a diagonal line defined by indices
 
@@ -853,7 +876,7 @@ class Matrix(AbstractArray):
             ValueError: If any of the bins in any of the arrays are not equal.
 
         """
-        if not isinstance(other, Matrix):
+        if not isinstance(other, type(self)):
             raise TypeError("Other must be a Matrix")
         if np.any(self.shape != other.shape):
             raise ValueError("Must have equal number of energy bins.")
@@ -877,6 +900,97 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
+    def sum(self, axis='both') -> Union[float, Vector]:
+        axis = to_plot_axis(axis)
+        if axis == 2:
+            return self.values.sum(axis=None)
+        elif axis == 0:
+            return Vector(E=self.Eg, values=self.values.sum(axis=0),
+                          E_label="$\gamma$-ray energy")
+        elif axis == 1:
+            return Vector(E=self.Ex, values=self.values.sum(axis=1),
+                          E_label=r"Excitation energy")
+
+    def normalize(self, ax: Union[int, str],
+                  inplace: bool = True) -> Optional[Matrix]:
+        ax = to_plot_axis(ax)
+        if ax == 0:
+            total = self.values.sum(axis=ax)[None, :]
+        elif ax == 1:
+            total = self.values.sum(axis=ax)[:, None]
+        else:
+            raise ValueError(f"Ax must be 0 or 1, not {ax}")
+
+        if inplace:
+            self.values = np.divide(self.values, total,
+                                    np.zeros_like(self.values),
+                                    where=total != 0)
+        else:
+            values = np.divide(self.values, total,
+                               np.zeros_like(self.values),
+                               where=total != 0)
+            return Matrix(values=values, Eg=self.Eg, Ex=self.Ex)
+
+    def set_order(self, order: str) -> None:
+        self.values = self.values.copy(order=order)
+        self.Ex = self.Ex.copy(order=order)
+        self.Eg = self.Eg.copy(order=order)
+
+
+class IndexLocator:
+    def __init__(self, matrix: Matrix):
+        self.mat = matrix
+
+    def __getitem__(self, key):
+        if len(key) == 2:
+            eg, ex = key
+            Eg = self.mat.Eg.__getitem__(eg)
+            Ex = self.mat.Ex.__getitem__(ex)
+            values = self.mat.values.__getitem__(key)
+            return Matrix(Eg=Eg, Ex=Ex, values=values)
+        else:
+            raise ValueError("Give two indices [x, y]")
+
+
+class ValueLocator:
+    def __init__(self, matrix: Matrix):
+        self.mat = matrix
+
+    def __getitem__(self, key):
+        if len(key) == 2:
+            eg, ex = key
+            if isinstance(eg, (int, float)):
+                ieg = self.mat.index_Eg(eg)
+            else:
+                start = None if eg.start is None else self.mat.index_Eg(eg.start)
+                stop = None if eg.stop is None else self.mat.index_Eg(eg.stop)
+                if eg.step is not None:
+                    dx = self.mat.Eg[1] - self.mat.Eg[0]
+                    step = np.ceil(eg.step / dx)
+                else:
+                    step = None
+                ieg = slice(start, stop, step)
+
+            if isinstance(ex, (int, float)):
+                iex = self.mat.index_Ex(ex)
+            else:
+                start = None if ex.start is None else self.mat.index_Ex(ex.start)
+                stop = None if ex.stop is None else self.mat.index_Ex(ex.stop)
+                if ex.step is not None:
+                    dx = self.mat.Ex[1] - self.mat.Ex[0]
+                    step = np.ceil(ex.step / dx)
+                else:
+                    step = None
+                iex = slice(start, stop, step)
+
+            Eg = self.mat.Eg.__getitem__(ieg)
+            Ex = self.mat.Ex.__getitem__(iex)
+            values = self.mat.values.__getitem__((iex, ieg))
+            return Matrix(Eg=Eg, Ex=Ex, values=values)
+        else:
+            raise ValueError("Give two indices [x, y]")
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):
@@ -911,3 +1025,55 @@ class MeshLocator(ticker.Locator):
             i = max(i, 1)
             ticks = np.unique(np.around(ticks, -i))
         return self.raise_if_exceeds(ticks)
+
+
+
+def zeros_like(mat: Matrix) -> Matrix:
+    return Matrix(Ex=mat.Ex, Eg=mat.Eg, values=np.zeros_like(mat.values))
+
+
+def empty_like(mat: Matrix) -> Matrix:
+    return Matrix(Ex=mat.Ex, Eg=mat.Eg, values=np.empty_like(mat.values))
+
+
+from .action import Action
+from matplotlib import patches
+class Cut:
+    def __init__(self, matrix, Ex_min, Ex_max, Eg_min, Eg_max=None):
+        self.Ex_min = Ex_min
+        self.Ex_max = Ex_max
+        self.Eg_min = Eg_min
+        if Eg_max is None:
+            lastEx = matrix[-1, :]
+            try:
+                iEg_max = np.nonzero(lastEx)[0][-1]
+            except IndexError():
+                raise ValueError("Last Ex column has no non-zero elements")
+            Eg_max = matrix.Eg[iEg_max]
+        self.Eg_max = Eg_max
+        self.mat = matrix.trapezoid(Ex_min=Ex_min, Ex_max=Ex_max,
+                                    Eg_min=Eg_min, Eg_max=Eg_max,
+                                    inplace=False)
+        self.action = Action().trapezoid(Ex_min=Ex_min, Ex_max=Ex_max,
+                                         Eg_min=Eg_min, Eg_max=Eg_max)
+
+    def __call__(self, matrix):
+        self.action(matrix)
+
+    def plot(self, ax, **kwargs):
+        iex, ieg = list(zip(*self.mat.diagonal_elements()))
+        ieg = list(ieg)
+        for i, v in enumerate(ieg):
+            if v >= len(self.mat.Eg):
+                ieg[i] = len(self.mat.Eg) - 1
+        eg, ex = [self.mat.Eg[i] for i in ieg], [self.mat.Ex[i] for i in iex]
+
+        dEg = self.Eg_max - self.Ex_max
+        if dEg > 0:
+            binwidth = self.mat.Eg[1]-self.mat.Eg[0]
+            dEg = np.ceil(dEg/binwidth) * binwidth
+        print(f"{dEg=}")
+        x = [self.Eg_min, self.Ex_min+dEg, self.Ex_max+dEg, self.Eg_min]
+        y = [self.Ex_min, self.Ex_min, self.Ex_max, self.Ex_max]
+        ax.add_patch(patches.Polygon(xy=list(zip(x, y)), fill=False),
+                     **kwargs)

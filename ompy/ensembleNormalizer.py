@@ -112,13 +112,17 @@ class EnsembleNormalizer(AbstractNormalizer):
         nlds = self.extractor.nld
 
         self.LOG.info(f"Start normalization with {self.nprocesses} cpus")
-        pool = ProcessPool(nodes=self.nprocesses)
+        #pool = ProcessPool(nodes=self.nprocesses)
         N = len(nlds)
-        iterator = pool.imap(self.step, range(N), nlds, gsfs)
-        self.res = list(tqdm(iterator, total=N))
-        pool.close()
-        pool.join()
-        pool.clear()
+        res = []
+        for i in range(N):
+            res.append(self.step(i, nlds[i], gsfs[i]))
+        self.res = res
+        #iterator = pool.imap(self.step, range(N), nlds, gsfs)
+        #self.res = list(tqdm(iterator, total=N))
+        #pool.close()
+        #pool.join()
+        #pool.clear()
 
         self.save()
 

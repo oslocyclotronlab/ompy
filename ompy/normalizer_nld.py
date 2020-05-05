@@ -110,7 +110,7 @@ class NormalizerNLD(AbstractNormalizer):
         self._D0 = None
         self._smooth_levels_fwhm = None
         self.norm_pars = norm_pars
-        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-1, 20], 'T': [0.1, 1],
+        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-4, 2e-3], 'T': [0.1, 1],
                        'Eshift': [-5, 5]}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
@@ -217,7 +217,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.res.nld = transformed
         self.res.pars = popt
         self.res.samples = samples
-        ext_model = lambda E: self.model(E, T=popt['T'][0],
+        ext_model = lambda E: self.model(E, T=popt['T'][0],  # noqa
                                          Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
 
@@ -239,7 +239,7 @@ class NormalizerNLD(AbstractNormalizer):
                 energies.
 
         Returns:
-           The arguments used for chi^2 minimization and the
+           The arguments used for χ² minimization and the
            minimizer.
         """
         limit_low = self.self_if_none(limit_low)
@@ -258,19 +258,27 @@ class NormalizerNLD(AbstractNormalizer):
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
         nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
+        self.LOG.debug("NLD Sn from D0: %g", nldSn)
         rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        self.LOG.debug("Relative uncertainty: %g", rel_uncertainty)
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
+        self.LOG.debug("NLD Sn: %g ± %g", nldSn[0], nldSn[1])
 
         def neglnlike(*args, **kwargs):
             return - self.lnlike(*args, **kwargs)
+
         args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
                 nldSn)
         res = differential_evolution(neglnlike, bounds=bounds, args=args)
 
-        self.LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
+        p0 = res.x.tolist()
+        self.LOG.info("DE results:\n%s", tt.to_string([p0],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
-        p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
+        p0 = dict(zip(["A", "alpha", "T", "Eshift"], p0))
+        #p0['Eshift'] = 0.875
+        #p0['A'] = 2
+        #p0['alpha'] = 0.00017
 
         return args, p0
 
@@ -278,7 +286,7 @@ class NormalizerNLD(AbstractNormalizer):
                  guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Find parameters given model constraints and an initial guess
 
-        Employs Multinest
+        Starts Multinest
 
         Args:
             num (int): Loop number
@@ -502,6 +510,7 @@ class NormalizerNLD(AbstractNormalizer):
 
         ln_stds = (np.log(transformed_low.std).sum()
                    + np.log(transformed_high.std).sum())
+        #err_high=0
 
         return -0.5*(err_low + err_high + err_nldSn + ln_stds)
 
@@ -551,7 +560,7 @@ class NormalizerNLD(AbstractNormalizer):
         def g(J):
             return SpinFunctions(Ex=Sn, J=J,
                                  model=spincutModel,
-                                 pars=spincutPars).distibution()
+                                 pars=spincutPars).distribution()
 
         if Jtarget == 0:
             summe = 1 / 2 * g(Jtarget + 1 / 2)
@@ -595,7 +604,7 @@ class NormalizerNLD(AbstractNormalizer):
         def g(J):
             return SpinFunctions(Ex=Sn, J=J,
                                  model=spincutModel,
-                                 pars=spincutPars).distibution()
+                                 pars=spincutPars).distribution()
 
         if Jtarget == 0:
             summe = 1 / 2 * g(Jtarget + 1 / 2)
@@ -616,7 +625,7 @@ class NormalizerNLD(AbstractNormalizer):
             self.LOG.debug("Set `discrete` to None")
         elif isinstance(value, (str, Path)):
             if self.nld is None:
-                raise ValueError(f"`nld` must be set before loading levels")
+                raise ValueError("`nld` must be set before loading levels")
             nld = self.nld.copy()
             nld.to_MeV()
             self.LOG.debug("Set `discrete` levels from file with FWHM %s",

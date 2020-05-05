@@ -30,7 +30,7 @@ else:
     from .library import div0, fill_negative_gauss, fill_negative_max
     from .spinfunctions import SpinFunctions
     from .abstractarray import AbstractArray
-    from .matrix import Matrix
+    from .matrix import Matrix, Cut
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .vector import Vector
     from .unfolder import Unfolder
@@ -47,5 +47,9 @@ else:
     from .normalizer_gsf import NormalizerGSF
     from .normalizer_simultan import NormalizerSimultan
     from .ensembleNormalizer import EnsembleNormalizer
+    from .shape import Shape
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
+    from .peakpaint import Painter, Paint
+    #from .lazyensemble import LazyEnsemble
+    #from .nndc import NNDC

@@ -35,7 +35,8 @@ class Vector(AbstractArray):
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
                  std: Optional[Iterable[float]] = None,
-                 units: Optional[str] = "keV"):
+                 units: Optional[str] = "keV",
+                 E_label: str = 'Energy'):
         """
         There are several ways to initialize
 
@@ -64,6 +65,9 @@ class Vector(AbstractArray):
         elif values is None and E is not None:
             self.E = np.asarray(E, dtype=float).copy()
             self.values = np.zeros_like(E)
+        elif values is not None and E is None:
+            self.values = np.asarray(values, dtype=float)
+            self.E = np.arange(0, len(self.values))
         else:
             self.values = None
             self.E = None
@@ -73,6 +77,7 @@ class Vector(AbstractArray):
         self.std: Optional[ndarray] = std
 
         self.units = units
+        self.E_label = E_label
 
         if path is not None:
             self.load(path)
@@ -138,11 +143,14 @@ class Vector(AbstractArray):
         elif kind == "step":
             kwargs.setdefault("where", "mid")
             ax.step(self.E, self.values, **kwargs)
+        elif kind == 'bar':
+            kwargs.setdefault("align", "edge")
+            ax.bar(self.E, self.values, **kwargs)
         else:
             raise NotImplementedError()
         # ax.xaxis.set_major_locator(MeshLocator(self.E))
         ax.set_yscale(scale)
-        ax.set_xlabel("Energy")
+        ax.set_xlabel(self.E_label + f" [{self.units}]")
 
         if self.std is not None:
             # TODO: Fix color

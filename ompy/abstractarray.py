@@ -48,8 +48,10 @@ class AbstractArray:
             except AssertionError:
                 raise ValueError(f"{name} array is not equispaced")
 
-    def __eq__(self, other) -> None:
-        if self.__class__ != other.__class__:
+    def __eq__(self, other) -> bool:
+        if isinstance(other, (int, float, np.ndarray)):
+            return other.values == other
+        elif self.__class__ != other.__class__:
             return False
         else:
             dicother = other.__dict__
@@ -61,6 +63,9 @@ class AbstractArray:
                     test = (value == dicother[key])
                 truth.append(test)
             return all(truth)
+
+    def __ne__(self, other):
+        return not self == other
 
     def __sub__(self, other) -> AbstractArray:
         result = self.copy()
@@ -82,7 +87,7 @@ class AbstractArray:
 
     def __add__(self, other) -> AbstractArray:
         result = self.copy()
-        if isinstance(other, (int, float)):
+        if isinstance(other, (int, float, np.ndarray)):
             result.values += other
         else:
             self.has_equal_binning(other)
@@ -127,6 +132,26 @@ class AbstractArray:
         Implemented in subclasses
         """
         raise NotImplementedError()
+
+    def __lt__(self, other) -> np.ndarray:
+        if isinstance(other, (int, float, np.ndarray)):
+            return self.values < other
+        else:
+            self.has_equal_binning(other)
+            return self.values < other.values
+
+    def __le__(self, other) -> np.ndarray:
+        if isinstance(other, (int, float, np.ndarray)):
+            return self.values <= other
+        else:
+            self.has_equal_binning(other)
+            return self.values <= other.values
+
+    def __gt__(self, other) -> np.ndarray:
+        return not self <= other
+
+    def __ge__(self, other) -> np.ndarray:
+        return not self < other
 
     @property
     def shape(self) -> Union[Tuple[int], Tuple[int, int]]:
