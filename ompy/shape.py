@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import logging
 from .turbo import *
-from typing import Optional, Tuple, List, Iterable
+from typing import Optional, Tuple, List, Iterable, Callable
 from .matrix import Matrix, zeros_like, empty_like
 from .vector import Vector
 
@@ -22,27 +22,29 @@ class Diagonal:
         self.spin = spin
         self.parity = parity
 
-    def compute_gsf(self, spinmodel) -> Vector:
+    def compute_gsf(self, spinmodel) -> Tuple[Vector]:
         values = np.nan_to_num(self.values)
         centroid = self.Eg@values
         # Sum along Eg
         summed = values.sum(axis=0)
         centroid /= summed
-        centroid = np.nan_to_num(centroid)
+        #centroid = np.nan_to_num(centroid)
         gsf = summed / (centroid**3 * self.spinfactor(spinmodel))
-        gsf = np.nan_to_num(gsf)
-        return Vector(E=self.Ex, values=gsf)
+        #gsf = np.nan_to_num(gsf)
+        return Vector(E=self.Ex, values=gsf), Vector(E=self.Ex, values=centroid)
 
-    def spinfactor(self, spinmodel) -> float:
-        spinmodel.Ex = self.matrix.Ex
+    def spinfactor(self, spinmodel) -> array:
+        spinmodel.Ex = self.Ex
         spinmodel.J = self.spin + 1
         S = spinmodel.distribution()
-        if self.spin < 1/2:
+        if self.spin == 0:
             return S
-        spinmodel.J = self.spin + 1
+
+        spinmodel.J = self.spin
         S += spinmodel.distribution()
-        if 1/2 <= self.spin < 1:
+        if self.spin == 1/2:
             return S
+
         spinmodel.J = self.spin - 1
         return S + spinmodel.distribution()
 
@@ -72,6 +74,7 @@ class Shape:
                      spin: float, parity: float,
                      points: Iterable[Point2D] = [],
                      thickness: float = 10):
+        # TODO ensure that the order of Eg is preserved
         if not points:
             points = points_from_ab(intercept, slope)
         elif len(points) == 1:
@@ -81,22 +84,68 @@ class Shape:
         diagonal.values = diagonal_stripe(self.matrix, *points, thickness)
         self.diagonals.append(Diagonal(diagonal, spin, parity))
 
-    def compute_gsf(self) -> List[Vector]:
-        gsfs: List[Vector] = []
+    def compute_gsf(self) -> Vector:
+        unsewed: List[Tuple[Vector, Vector]] = self.compute_gsf_unsewed()
+        return self.sew(unsewed)
+
+    def compute_gsf_unsewed(self) -> List[Tuple[Vector, Vector]]:
+        gsfs: List[Tuple[Vector, Vector]] = []
         for diagonal in self.diagonals:
             gsf = diagonal.compute_gsf(self.spinmodel)
             gsfs.append(gsf)
 
         return gsfs
 
+    def sew(self, gsfs: List[Tuple[Vector, Vector]]) -> Vector:
+        (diagonal_1, Egs_1), (diagonal_2, Egs_2) = gsfs
+        # Assumes all have same E = Ex
+        Ex_bins = diagonal_1.E
+        Eg_final = []
+        gsf_final = []
+        for i in range(len(Ex_bins)-1):
+            Eg1 = Egs_1[i], Egs_1[i+1]
+            Eg2 = Egs_2[i], Egs_2[i+1]
+            I1 = diagonal_1[i], diagonal_1[i+1]
+            I2 = diagonal_2[i], diagonal_2[i+1]
+
+            if not allnonzero(*Eg1, *Eg2, *I1, *I2):
+                continue
+
+            f1 = interpolate(Eg1[0], Eg2[0], I1[0], I2[0])
+            f2 = interpolate(Eg1[1], Eg2[1], I1[1], I2[1])
+            middle = (min(Eg1) + max(Eg2)) / 2
+
+            factor = f1(middle)/f2(middle)
+            diagonal_1[i+1] *= factor
+            diagonal_2[i+1] *= factor
+
+            Eg_final.extend([*Eg1, *Eg2])
+            gsf_final.extend([diagonal_1[i], diagonal_1[i+1],
+                              diagonal_2[i], diagonal_2[i+1]])
+
+        gsf_final = [x for _, x in sorted(zip(Eg_final, gsf_final))]
+        Eg_final = list(sorted(Eg_final))
+
+        gsf = Vector(E=Eg_final, values=gsf_final)
+        return gsf
+
     def plot(self, ax=None, **kwargs):
         fig, ax = plt.subplots()
-        for i, gsf in enumerate(self.compute_gsf()):
+        gsf = self.compute_gsf()
+        gsf.plot(ax=ax, **kwargs)
+        ax.set_xlabel(r"$E_\gamma$ [keV]")
+        ax.set_ylabel(r"$counts / E_{\gamma}^3\times p $")
+        ax.set_yscale('log')
+        return ax
+
+    def plot_unsewed(self, ax=None, **kwargs):
+        fig, ax = plt.subplots()
+        for i, (gsf, _) in enumerate(self.compute_gsf_unsewed()):
             spin = self.diagonals[i].spin
             pi = self.diagonals[i].parity
             pi = '+' if pi > 0 else '-'
             gsf.plot(ax=ax, label=f'Diagonal ${spin}^{pi}$')
-        ax.set_xlabel(r"$E_\gamma$ [keV]")
+        ax.set_xlabel(r"$E_x$ [keV]")
         ax.set_ylabel(r"$counts / E_{\gamma}^3\times p $")
         ax.set_yscale('log')
         ax.legend()
@@ -165,3 +214,19 @@ def parallel_line(mat: Matrix, p1: Point2D, p2: Point2D,
     Y = Y + dy
 
     return X.astype(int), Y.astype(int)
+
+
+def interpolate(x0: float, x1: float,
+                y0: float, y1: float) -> Callable[[float],
+                                                  float]:
+    a = (y1 - y0)/(x1 - x0)
+    b = y0 - a*x0
+    return lambda x: a*x + b
+
+
+def allnonzero(*X):
+    for x in X:
+        if not np.isfinite(x) or x <= 0:
+            return False
+
+    return True
