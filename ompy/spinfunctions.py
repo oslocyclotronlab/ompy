@@ -109,7 +109,7 @@ class SpinFunctions:
                  Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence]:
         """
         The constant temperature (CT) formula
-        - Von Egidy & B PRC80,054310, below Eq. (8)
+        - Von Egidy & B PRC80,054310, see sec. IV, p7 refering to ref. below
         - original ref: Von Egidy et al., NPA 481 (1988) 189, Eq. (3)
 
         Args:
