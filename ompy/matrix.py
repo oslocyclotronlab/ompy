@@ -708,6 +708,7 @@ class Matrix(AbstractArray):
     def rebin(self, axis: Union[int, str],
               mids: Optional[Sequence[float]] = None,
               factor: Optional[float] = None,
+              binwidth: Optional[float] = None,
               inplace: bool = True) -> Optional[Matrix]:
         """ Rebins one axis of the matrix
 
@@ -717,6 +718,8 @@ class Matrix(AbstractArray):
                 given alongside 'factor'.
             factor: The factor by which the step size shall be
                 changed. Can not be given alongside 'mids'.
+            binwidth: The new bin width. Can not be given
+                alongside `factor` or `mids`.
             inplace: Whether to change the axis and values
                 inplace or return the rebinned matrix.
         Returns:
@@ -728,9 +731,9 @@ class Matrix(AbstractArray):
         axis: int = to_plot_axis(axis)
         if axis not in (0, 1):
             raise ValueError("Axis must be 0 or 1")
-        if not (mids is None) ^ (factor is None):
-            raise ValueError("Either 'mids' or 'factor' must be"
-                             " specified, but not both.")
+        if not only_one_not_none(mids, factor, binwidth):
+            raise ValueError("Either 'mids', 'factor' or 'binwidth' must be"
+                             " specified, but not more than one.")
         mids_old = self.Ex if axis else self.Eg
 
         if factor is not None:
@@ -744,6 +747,9 @@ class Matrix(AbstractArray):
             LOG.debug("Old step size: %g\nNew step size: %g",
                       mids_old[1] - mids_old[0], step)
             mids = np.asarray(mids, dtype=float)
+        if binwidth is not None:
+            mids = np.arange(mids_old[0], mids_old[-1],
+                              binwidth, dtype=float)
 
         naxis = (axis + 1) % 2
         rebinned = rebin_2D(self.values, mids_old, mids, naxis)
@@ -1077,3 +1083,19 @@ class Cut:
         y = [self.Ex_min, self.Ex_min, self.Ex_max, self.Ex_max]
         ax.add_patch(patches.Polygon(xy=list(zip(x, y)), fill=False),
                      **kwargs)
+
+
+def only_one_not_none(*args):
+    x = only_one(*[arg is not None for arg in args])
+    return x
+
+
+def only_one(*args):
+    """ One and exactly one of the arguments evaluate to true """
+    already_true = False
+    for arg in args:
+        if arg and not already_true:
+            already_true = True
+        elif arg and already_true:
+            return False
+    return already_true

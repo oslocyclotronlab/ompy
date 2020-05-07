@@ -1,18 +1,21 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from sklearn.linear_model import LinearRegression
+from scipy.optimize import minimize
 import logging
-from .turbo import *
-from typing import Optional, Tuple, List, Iterable, Callable
+from typing import Optional, Tuple, List, Iterable, Callable, Any, Union
 from .matrix import Matrix, zeros_like, empty_like
 from .vector import Vector
+from .library import log_interp1d
+from .extractor import Extractor
 
-logger = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 Point2D = Tuple[float, float]
 Points2D = Tuple[Point2D, Point2D]
+Interval = Tuple[float, float]
 array = np.ndarray
 
 
@@ -24,17 +27,23 @@ class Diagonal:
 
     def compute_gsf(self, spinmodel) -> Tuple[Vector]:
         values = np.nan_to_num(self.values)
-        centroid = self.Eg@values
         # Sum along Eg
         summed = values.sum(axis=0)
+        # Compute the centroid along Eg for each Ex row
+        centroid = self.Eg@values
         centroid /= summed
-        #centroid = np.nan_to_num(centroid)
+        # Correct for Eγ³ and the population difference due to spin
         gsf = summed / (centroid**3 * self.spinfactor(spinmodel))
-        #gsf = np.nan_to_num(gsf)
-        return Vector(E=self.Ex, values=gsf), Vector(E=self.Ex, values=centroid)
+        gsf = Vector(E=self.Ex, values=gsf)
+        # Need to keep track of the central Eg values used for the sewing
+        Eg = Vector(E=self.Ex, values=centroid)
+        return gsf, Eg
 
     def spinfactor(self, spinmodel) -> array:
-        spinmodel.Ex = self.Ex
+        #if self.spin == 0:
+        #    return 1
+
+        spinmodel.Ex = self.Ex/1e3
         spinmodel.J = self.spin + 1
         S = spinmodel.distribution()
         if self.spin == 0:
@@ -46,7 +55,12 @@ class Diagonal:
             return S
 
         spinmodel.J = self.spin - 1
-        return S + spinmodel.distribution()
+        S += spinmodel.distribution()
+
+        #spinmodel.J = 1
+        #S /= spinmodel.distribution()
+        return S
+
 
     @property
     def values(self) -> array:
@@ -69,6 +83,9 @@ class Shape:
         self.diagonals: List[Diagonal] = []
         self.matrix: Matrix = matrix
         self.spinmodel = None
+        self.gsf: Vector = Vector([0], [0])
+        self.reg: Optional[Any] = None
+        self.fit_region: Optional[array] = None
 
     def add_diagonal(self, intercept=0, slope=1, *,
                      spin: float, parity: float,
@@ -84,9 +101,10 @@ class Shape:
         diagonal.values = diagonal_stripe(self.matrix, *points, thickness)
         self.diagonals.append(Diagonal(diagonal, spin, parity))
 
-    def compute_gsf(self) -> Vector:
+    def compute_gsf(self, kind='log') -> Vector:
         unsewed: List[Tuple[Vector, Vector]] = self.compute_gsf_unsewed()
-        return self.sew(unsewed)
+        self.gsf = self.sew(unsewed, kind=kind)
+        return self.gsf
 
     def compute_gsf_unsewed(self) -> List[Tuple[Vector, Vector]]:
         gsfs: List[Tuple[Vector, Vector]] = []
@@ -96,47 +114,83 @@ class Shape:
 
         return gsfs
 
-    def sew(self, gsfs: List[Tuple[Vector, Vector]]) -> Vector:
+    def sew(self, gsfs: List[Tuple[Vector, Vector]], kind='log') -> Vector:
+        # TODO Prettify
         (diagonal_1, Egs_1), (diagonal_2, Egs_2) = gsfs
-        # Assumes all have same E = Ex
-        Ex_bins = diagonal_1.E
+        # Assumes all have same Ex, diagonal_1.E == diagonal_2.E
+        Ex_dim = len(diagonal_1.E)
+
         Eg_final = []
         gsf_final = []
-        for i in range(len(Ex_bins)-1):
-            Eg1 = Egs_1[i], Egs_1[i+1]
-            Eg2 = Egs_2[i], Egs_2[i+1]
-            I1 = diagonal_1[i], diagonal_1[i+1]
-            I2 = diagonal_2[i], diagonal_2[i+1]
 
-            if not allnonzero(*Eg1, *Eg2, *I1, *I2):
-                continue
+        if kind == 'log':
+            interpolate = lambda *x: log_interp1d([x[0], x[1]], [x[2], x[3]]) # noqa
+        elif kind == 'linear':
+            interpolate = lin_interp1d
+        else:
+            raise ValueError(f"Unsupported interpolation {kind}")
+
+        j = 0
+        while (i := j) < Ex_dim:
+            # Find a pair that has no zeros or NaNs
+            i, j = good_pair(i, Ex_dim, Egs_1, Egs_2, diagonal_1, diagonal_2)
+            if j >= Ex_dim:
+                break
+
+            Eg1 = Egs_1[i], Egs_1[j]
+            Eg2 = Egs_2[i], Egs_2[j]
+            I1 = diagonal_1[i], diagonal_1[j]
+            I2 = diagonal_2[i], diagonal_2[j]
 
             f1 = interpolate(Eg1[0], Eg2[0], I1[0], I2[0])
             f2 = interpolate(Eg1[1], Eg2[1], I1[1], I2[1])
             middle = (min(Eg1) + max(Eg2)) / 2
 
             factor = f1(middle)/f2(middle)
-            diagonal_1[i+1] *= factor
-            diagonal_2[i+1] *= factor
+            diagonal_1[j] *= factor
+            diagonal_2[j] *= factor
 
             Eg_final.extend([*Eg1, *Eg2])
-            gsf_final.extend([diagonal_1[i], diagonal_1[i+1],
-                              diagonal_2[i], diagonal_2[i+1]])
+            gsf_final.extend([diagonal_1[i], diagonal_1[j],
+                              diagonal_2[i], diagonal_2[j]])
 
+        # Sort list by Eg
         gsf_final = [x for _, x in sorted(zip(Eg_final, gsf_final))]
         Eg_final = list(sorted(Eg_final))
 
         gsf = Vector(E=Eg_final, values=gsf_final)
         return gsf
 
+    def fit(self, region: Interval) -> float:
+        self.fit_region = region
+        region = self.gsf.loc[region[0]:region[1]]
+        E = region.E.reshape(-1, 1)
+        logvalues = np.log(region.values)
+        reg = LinearRegression().fit(E, logvalues)
+        LOG.info("Fit score: %f", reg.score(E, logvalues))
+        slope = reg.coef_
+        LOG.info("Slope = %f", slope)
+        self.reg = reg
+        return slope
+
     def plot(self, ax=None, **kwargs):
-        fig, ax = plt.subplots()
-        gsf = self.compute_gsf()
-        gsf.plot(ax=ax, **kwargs)
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        self.gsf.plot(ax=ax, **kwargs)
         ax.set_xlabel(r"$E_\gamma$ [keV]")
         ax.set_ylabel(r"$counts / E_{\gamma}^3\times p $")
+
+        if self.reg is not None:
+            ax.axvspan(self.fit_region[0], self.fit_region[1], color='grey',
+                       alpha=0.1, label='Fit limits')
+            region = self.gsf.loc[self.fit_region[0]:self.fit_region[1]]
+            E = region.E.reshape(-1, 1)
+            ax.plot(region.E, np.exp(self.reg.predict(E)),
+                    label='Log linear fit', zorder=10)
+
         ax.set_yscale('log')
-        return ax
+        return ax.figure, ax
 
     def plot_unsewed(self, ax=None, **kwargs):
         fig, ax = plt.subplots()
@@ -154,14 +208,12 @@ class Shape:
     def plot_diagonals(self, ax=None, **kwargs):
         if ax is None:
             fig, ax = plt.subplots()
-        else:
-            fig = ax.figure
 
         values = zeros_like(self.matrix)
         for diagonal in self.diagonals:
             values += np.nan_to_num(diagonal.values)
         values.plot(ax=ax, **kwargs)
-        return ax
+        return ax.figure, ax
 
 
 def points_from_partial(slope: float, point: Point2D) -> Points2D:
@@ -216,9 +268,9 @@ def parallel_line(mat: Matrix, p1: Point2D, p2: Point2D,
     return X.astype(int), Y.astype(int)
 
 
-def interpolate(x0: float, x1: float,
-                y0: float, y1: float) -> Callable[[float],
-                                                  float]:
+def lin_interp1d(x0: float, x1: float,
+                 y0: float, y1: float) -> Callable[[float],
+                                                   float]:
     a = (y1 - y0)/(x1 - x0)
     b = y0 - a*x0
     return lambda x: a*x + b
@@ -230,3 +282,70 @@ def allnonzero(*X):
             return False
 
     return True
+
+
+def good_pair(start: int, N: int, Eg_1, Eg_2, diagonal_1, diagonal_2):
+    for i in range(start, N):
+        if allnonzero(Eg_1[i], Eg_2[i], diagonal_1[i], diagonal_2[i]):
+            break
+        LOG.debug("Bad pair for i = %i", i)
+
+    # Find the next pair that has no zeros or NaNs
+    j = i+1
+    for j in range(i+1, N):
+        if allnonzero(Eg_1[j], Eg_2[j],
+                      diagonal_1[j], diagonal_2[j]):
+            break
+        LOG.debug("Bad pair for j = %i", j)
+    # Returns i and/or j > N in case of failure
+    return i, j
+
+
+def normalize_to_shape(extractor: Extractor, shape: Union[float, Shape],
+                       region: Optional[Interval] = None):
+    if isinstance(shape, (int, float)):
+        slope = shape
+        if region is None:
+            raise ValueError("Supply the fit `region`")
+    else:
+        slope = shape.reg.coef_[0]
+        if region is None:
+            region = shape.fit_region
+
+    fig, ax = plt.subplots(1, 2, constrained_layout=True)
+    ax[1].axvspan(region[0], region[1], color='grey',
+                  alpha=0.1, label='Fit limits')
+    N = 10
+    alphas = []
+    for nld, gsf in zip(extractor.nld, extractor.gsf):
+        alpha = fit_to_region(gsf, slope, region)
+        nld.transform(const=0.15, alpha=alpha, inplace=False).plot(ax=ax[0], scale='log',
+                                                       kind='step',
+                                                       color='k', alpha=1/N)
+        gsf.transform(alpha=alpha, inplace=False).plot(ax=ax[1], scale='log',
+                                                       kind='step',
+                                                       color='k', alpha=1/N)
+        alphas.append(alpha)
+
+    ax[0].set_title("NLD")
+    ax[1].set_title("γSF")
+    return alphas, (fig, ax)
+
+
+def fit_to_region(gsf: Vector, slope: float, region: Interval):
+    region = gsf.loc[region[0]:region[1]]
+    E = region.E.reshape(-1, 1)
+
+    def err(x) -> float:
+        alpha = x[0]
+        if alpha <= 0 or alpha > 0.01:
+            return np.inf
+
+        trans = region.transform(alpha=alpha, inplace=False)
+        logvalues = np.log(trans.values)
+        reg = LinearRegression().fit(E, logvalues)
+        error = abs(reg.coef_[0] - slope)
+        return error
+
+    res = minimize(err, [0.001], method='Powell')
+    return float(res.x)

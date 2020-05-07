@@ -79,6 +79,8 @@ class Vector(AbstractArray):
         self.units = units
         self.E_label = E_label
 
+        self.loc = ValueLocator(self)
+
         if path is not None:
             self.load(path)
         self.verify_integrity()
@@ -445,3 +447,25 @@ class Vector(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
+
+class ValueLocator:
+    def __init__(self, vector: Vector):
+        self.vec = vector
+
+    def __getitem__(self, value):
+        if isinstance(value, (int, float)):
+            indices = self.vec.index(value)
+        else:
+            start = None if value.start is None else self.vec.index(value.start)
+            stop = None if value.stop is None else self.vec.index(value.stop)
+            if value.step is not None:
+                dx = self.vec[1] - self.vec[0]
+                step = np.ceil(value.step / dx)
+            else:
+                step = None
+            indices = slice(start, stop, step)
+
+        E = self.vec.E.__getitem__(indices)
+        values = self.vec.values.__getitem__(indices)
+        return Vector(E=E, values=values)

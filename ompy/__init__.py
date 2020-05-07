@@ -47,9 +47,8 @@ else:
     from .normalizer_gsf import NormalizerGSF
     from .normalizer_simultan import NormalizerSimultan
     from .ensembleNormalizer import EnsembleNormalizer
-    from .shape import Shape
+    from .shape import Shape, normalize_to_shape
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
     from .peakpaint import Painter, Paint
-    #from .lazyensemble import LazyEnsemble
-    #from .nndc import NNDC
+    from .nndc import NNDC
