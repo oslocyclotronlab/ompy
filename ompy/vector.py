@@ -336,11 +336,13 @@ class Vector(AbstractArray):
 
         values = np.delete(self.values, inan)
         E = np.delete(self.E, inan)
+        std = None if self.std is None else np.delete(self.std, inan)
         if inplace:
             self.values = values
             self.E = E
+            self.std = std
         else:
-            return Vector(values=values, E=E, units=self.units)
+            return Vector(values=values, E=E, std=std, units=self.units)
 
     def rebin(self, mids: Optional[Sequence[float]] = None,
               factor: Optional[float] = None,
