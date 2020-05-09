@@ -72,7 +72,7 @@ class Diagonal:
 
     @property
     def Ex(self) -> array:
-        return self.matrix.Eg
+        return self.matrix.Ex
 
 
 class Shape:
