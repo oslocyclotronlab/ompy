@@ -1078,7 +1078,7 @@ class Cut:
         if dEg > 0:
             binwidth = self.mat.Eg[1]-self.mat.Eg[0]
             dEg = np.ceil(dEg/binwidth) * binwidth
-        print(f"{dEg=}")
+
         x = [self.Eg_min, self.Ex_min+dEg, self.Ex_max+dEg, self.Eg_min]
         y = [self.Ex_min, self.Ex_min, self.Ex_max, self.Ex_max]
         ax.add_patch(patches.Polygon(xy=list(zip(x, y)), fill=False),
