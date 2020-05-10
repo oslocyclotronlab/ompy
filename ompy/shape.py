@@ -131,7 +131,8 @@ class Shape:
             raise ValueError(f"Unsupported interpolation {kind}")
 
         j = 0
-        while (i := j) < Ex_dim:
+        while j < Ex_dim:
+            i = j
             # Find a pair that has no zeros or NaNs
             i, j = good_pair(i, Ex_dim, Egs_1, Egs_2, diagonal_1, diagonal_2)
             if j >= Ex_dim:
