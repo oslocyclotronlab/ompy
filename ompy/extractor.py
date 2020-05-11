@@ -48,10 +48,10 @@ class Extractor:
             Ensemble into the desired shape where from the nld and gsf will be
             extracted from.
         path (path): The path to save and/or load nld and gsf to/from.
-        extend_diagonal_by_resolution (bool, optional): If `True` (default),
+        extend_diagonal_by_resolution (bool, optional): If `True`,
             the fit will be extended beyond Ex=Eg by the (FWHM) of the
             resolution. Remember to set the resolution according to your
-            experiment
+            experiment. Defaults to False.
         x0 (np.ndarray or str): Initial values. See `decompose`.
         randomize_initial_values (bool): Randomize initial values for
             decomposition. Defaults to True.
