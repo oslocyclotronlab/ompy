@@ -146,7 +146,7 @@ def mama_write2D(mat, filename, comment=""):
 
     # Write mandatory header:
     header_string = '!FILE=Disk \n'
-    header_string += '!KIND=Spectrum \n'
+    header_string += '!KIND=Matrix \n'
     header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
     header_string += '!EXPERIMENT= oslo_method_python \n'
     header_string += '!COMMENT={:s} \n'.format(comment)
