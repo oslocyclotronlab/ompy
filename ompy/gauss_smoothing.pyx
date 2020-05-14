@@ -107,8 +107,8 @@ def gauss_smoothing(double[:] array_in, number[:] E_array,
             pdf = np.zeros(len(array_in), dtype=DTYPE)
             # if using lower bin instead of center bin in both E_mid and mu
             # below-> canceles out
-            pdf[i_cut_low:i_cut_high] =\
-                gaussian(E_array[i_cut_low:i_cut_high],
+            pdf[i_cut_low:i_cut_high+1] =\
+                gaussian(E_array[i_cut_low:i_cut_high+1],
                          mu=E_array[i],
                          sigma=sigma_current
                          )
