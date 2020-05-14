@@ -100,7 +100,7 @@ def gauss_smoothing(double[:] array_in, number[:] E_array,
     for i in range(len(array_out)):
         counts = array_in_view[i]
         if counts > 0:
-            E_centroid_current = E_array[i] + a1/2
+            E_centroid_current = E_array[i]
             sigma_current = fwhm[i]/2.355
             i_cut_low, i_cut_high = find_truncation_indices(E_centroid_current,
                                                             sigma_current)
