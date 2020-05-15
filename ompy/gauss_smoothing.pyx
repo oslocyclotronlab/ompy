@@ -120,7 +120,7 @@ def gauss_smoothing(double[:] array_in, number[:] E_array,
 
 def gauss_smoothing_matrix_1D(matrix_in, E_array,
                               fwhm,
-                              axis="Eg"):
+                              axis="Eg", truncate=3):
     """ Smooth a matrix with a Gaussian
 
     Function which smooths an array of counts by a Gaussian
@@ -133,6 +133,9 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
         fwhm (double or array of doubles): The full-width-half-maximums
         axis (int or str, optional): The axis along which to smooth.
               Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
+        truncate (double, optional): The window width of the Gaussian that is
+                                     used to smoothe, in units of sigma.
+                                     Defaults to 3.
     """
     cdef int i
     matrix_out = np.zeros(matrix_in.shape, dtype=DTYPE)
@@ -146,10 +149,12 @@ def gauss_smoothing_matrix_1D(matrix_in, E_array,
     if is_Eg:
         for i in range(matrix_in.shape[0]):
             matrix_out[i, :] = gauss_smoothing(matrix_in[i, :],
-                                               E_array, fwhm)
+                                               E_array, fwhm,
+                                               truncate=truncate)
     else:
         for i in range(matrix_in.shape[1]):
             matrix_out[:, i] = gauss_smoothing(matrix_in[:, i],
-                                               E_array, fwhm)
+                                               E_array, fwhm,
+                                               truncate=truncate)
 
     return matrix_out
