@@ -42,6 +42,8 @@ cdef double overlap(double edge_in_l, double edge_in_u,
 def rebin_1D(np.ndarray counts, np.ndarray mids_in, np.ndarray mids_out):
     """Rebin an array of counts from binning mids_in to binning mids_out
 
+    Assumes equidistant binning.
+
     Args:
         counts: Array of counts to be rebinned
         mids_in: Array of mid-bins energies giving

@@ -55,6 +55,7 @@ def test_numericals():
     assert_equal((vector2@vector1).values, values2@values1)
     assert_equal((vector1@vector2).values, values1@values2)
 
+
 # This does not work as of now...
 # def test_mutable():
 #     E = np.array([0, 1, 2])

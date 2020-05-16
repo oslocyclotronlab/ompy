@@ -347,7 +347,7 @@ class Vector(AbstractArray):
     def rebin(self, mids: Optional[Sequence[float]] = None,
               factor: Optional[float] = None,
               inplace: bool = True) -> Optional[Vector]:
-        """ Rebins vector
+        """ Rebins vector, assuming equidistant binning
 
         Args:
             mids: The new energy mids. Can not be
