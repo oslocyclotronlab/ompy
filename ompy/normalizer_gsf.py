@@ -49,7 +49,7 @@ class NormalizerGSF(AbstractNormalizer):
                  nld_model: Optional[Callable[..., Any]] = None,
                  alpha: Optional[float] = None,
                  gsf: Optional[Vector] = None,
-                 path: Optional[Union[str, Path]] = None,
+                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
                  regenerate: bool = False,
                  norm_pars: Optional[NormalizationParameters] = None,
                  ) -> None:
@@ -71,7 +71,8 @@ class NormalizerGSF(AbstractNormalizer):
 
         Args:
             normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
-                to retrieve parameters. If `nld` and/or `nld_model` are not set, they are taken from `normalizer_nld.res` in `normalize`.
+                to retrieve parameters. If `nld` and/or `nld_model` are not
+                set, they are taken from `normalizer_nld.res` in `normalize`.
             nld (Optional[Vector], optional): NLD. If not set it is taken from
                 `normalizer_nld.res` in `normalize`.
             nld_model (Optional[Callable[..., Any]], optional): Model for nld
@@ -115,9 +116,11 @@ class NormalizerGSF(AbstractNormalizer):
         self._saved_spincutPars = None
         self._saved_SpinSum_args = None
 
-        self.path = (Path(path) if path is not None
-                     else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=True)
+        if path is None:
+            self.path = None
+        else:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True, parents=True)
 
     def normalize(self, *, gsf: Optional[Vector] = None,
                   normalizer_nld: Optional[NormalizerNLD] = None,

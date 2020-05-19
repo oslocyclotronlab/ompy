@@ -55,7 +55,7 @@ class NormalizerSimultan(AbstractNormalizer):
                  nld: Optional[Vector] = None,
                  normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None,
-                 path: Optional[Union[str, Path]] = None,
+                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
                  regenerate: bool = False):
         """
         TODO:
@@ -91,9 +91,11 @@ class NormalizerSimultan(AbstractNormalizer):
         self.multinest_path: Optional[Path] = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
-        self.path = (Path(path) if path is not None
-                     else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=True)
+        if path is None:
+            self.path = None
+        else:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True, parents=True)
 
     def normalize(self, *, num: int = 0,
                   gsf: Optional[Vector] = None,

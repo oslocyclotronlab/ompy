@@ -67,7 +67,8 @@ class Extractor:
     """
     def __init__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None,
-                 path: Optional[Union[str, Path]] = None):
+                 path: Optional[Union[str, Path]] =
+                 'saved_run/extractor'):
         """
         ensemble (Ensemble, optional): see above
         trapezoid (Action[Matrix], optional): see above
@@ -81,12 +82,10 @@ class Extractor:
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
 
-        if path is not None:
-            self.path = Path(path)
-            self.path.mkdir(exist_ok=True, parents=True)
-            self.load(self.path)
+        if path is None:
+            self.path = None
         else:
-            self.path = Path('saved_run/extraction_ensemble')
+            self.path = Path(path)
             self.path.mkdir(exist_ok=True, parents=True)
 
         self.x0 = None
@@ -132,7 +131,7 @@ class Extractor:
             raise ValueError("A 'trapezoid' cut must be given'")
         if regenerate is None:
             regenerate = self.regenerate
-        self.path = Path(self.path)  # TODO: Fix
+        self.path = Path(self.path)
 
         nlds = []
         gsfs = []
@@ -141,6 +140,7 @@ class Extractor:
             nld_path = self.path / f'nld_{i}.npy'
             gsf_path = self.path / f'gsf_{i}.npy'
             if nld_path.exists() and gsf_path.exists() and not regenerate:
+                LOG.debug(f"loading from {nld_path} and {gsf_path}")
                 nlds.append(Vector(path=nld_path))
                 gsfs.append(Vector(path=gsf_path))
             else:
@@ -488,37 +488,6 @@ class Extractor:
             return np.sqrt(p[0] + p[1] * E + p[2] * E**2)
         fwhm_pars = np.array([73.2087, 0.50824, 9.62481e-05])
         return fFWHM(matrix.Ex, fwhm_pars)
-
-    def load(self, path: Optional[Union[str, Path]] = None) -> None:
-        """ Load already extracted nld and gsf from file
-
-        Args:
-            path: The path to the directory containing the
-                files.
-        """
-        if path is not None:
-            path = Path(path)
-        else:
-            path = Path(self.path)  # TODO: Fix pathing
-        LOG.debug("Loading from %s", path)
-
-        if not path.exists():
-            raise IOError(f"The path {path} does not exist.")
-        if self.nld or self.gsf:
-            warnings.warn("Loading nld and gsf into non-empty instance")
-
-        for fname in path.glob("nld_[0-9]*.npy"):
-            self.nld.append(Vector(path=fname))
-
-        for fname in path.glob("gsf_[0-9]*.npy"):
-            self.gsf.append(Vector(path=fname))
-
-        assert len(self.nld) == len(self.gsf), "Corrupt files"
-
-        if not self.nld:
-            warnings.warn("Found no files")
-
-        self.size = len(self.nld)
 
     def plot(self, ax: Optional[Any] = None, scale: str = 'log',
              plot_mean: bool = False,

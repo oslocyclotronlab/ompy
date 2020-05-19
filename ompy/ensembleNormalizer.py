@@ -67,7 +67,7 @@ class EnsembleNormalizer(AbstractNormalizer):
                  normalizer_nld: Optional[NormalizerNLD] = None,
                  normalizer_gsf: Optional[NormalizerGSF] = None,
                  normalizer_simultan: Optional[NormalizerSimultan] = None,
-                 path: Optional[Union[str, Path]] = None,
+                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
                  regenerate: bool = False):
         """
         Args:
@@ -89,9 +89,11 @@ class EnsembleNormalizer(AbstractNormalizer):
 
         self.res: Optional[List[ResultsNormalized]] = None
 
-        self.path = (Path(path) if path is not None
-                     else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=True)
+        if path is None:
+            self.path = None
+        else:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True, parents=True)
 
     def normalize(self) -> None:
         """ Normalize ensemble """
@@ -623,7 +625,6 @@ class EnsembleNormalizer(AbstractNormalizer):
         path = Path(path) if path is not None else Path(self.path)
         path.mkdir(exist_ok=True, parents=True)
         for i, res in enumerate(self.res):
-
             super().save_results_txt(path, nld=res.nld, gsf=res.gsf,
                                      samples=res.samples, suffix=i)
 

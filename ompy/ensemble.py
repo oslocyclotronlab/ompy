@@ -76,7 +76,7 @@ class Ensemble:
     def __init__(self, raw: Optional[Matrix] = None,
                  bg: Optional[Matrix] = None,
                  bg_ratio: float = 1,
-                 path: Optional[Union[str, Path]] = None):
+                 path: Optional[Union[str, Path]] = 'saved_run/ensemble'):
         """ Sets up attributes and loads a saved ensemble if provided.
 
         Args:
@@ -97,7 +97,8 @@ class Ensemble:
         self.prompt_w_bg: Optional[Matrix] = raw
 
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
-        self.first_generation_method: Optional[Callable[[Matrix], Matrix]] = None
+        self.first_generation_method: \
+            Optional[Callable[[Matrix], Matrix]] = None
         self.size = 0
         self.regenerate = False
         self.action_prompt_w_bg = Action('matrix')
@@ -117,9 +118,11 @@ class Ensemble:
         self.seed: int = 987654
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
-        self.path = (Path(path) if path is not None
-                     else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=True)
+        if path is None:
+            self.path = None
+        else:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True, parents=True)
 
         self.raw.state = "raw"
 
@@ -133,6 +136,7 @@ class Ensemble:
                 value is None, 'self.path' will be used.
         """
         path = Path(path) if path is not None else Path(self.path)
+        LOG.info(f"loading from {path}")
 
         self.raw = Matrix(path=path / 'raw.npy')
         self.firstgen = Matrix(path=path / 'firstgen.npy')
@@ -238,7 +242,7 @@ class Ensemble:
         Returns:
             raw, unfolded, firstgen
         """
-        LOG.info(f"Generating {step}")
+        LOG.info(f"Generating/loading {step}")
         rstate = np.random.default_rng(rsequence)
         if self.bg is not None:
             prompt_w_bg = self.generate_perturbed(step, method,
@@ -281,14 +285,10 @@ class Ensemble:
         allowed = ["raw", "prompt+bg", "bg"]
         if state not in allowed:
             raise NotImplementedError(f"Matrix must be a state in {allowed}")
-        LOG.debug(f"Generating {state} ensemble {step}")
+        LOG.debug(f"Working on {state} ensemble {step}")
         path = self.path / f"{state}_{step}.npy"
         mat = self.load_matrix(path)
         if mat is None:
-            # if np.any(self.mat.values < 0):
-            #     raise ValueError("input matrix has to have positive"
-            #                      "entries only. Consider using fill and or"
-            #                      "remove negatives")
             LOG.debug(f"(Re)generating {path} using {method} process")
             if method == 'gaussian':
                 values = self.generate_gaussian(state, rstate)

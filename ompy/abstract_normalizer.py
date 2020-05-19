@@ -8,7 +8,7 @@ from .vector import Vector
 
 
 class AbstractNormalizer():
-    """ Abstract class for Matrix and Vector.
+    """ Abstract class for Normalizers.
 
         Do not initialize itself.
 
