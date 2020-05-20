@@ -70,7 +70,7 @@ class NormalizerNLD(AbstractNormalizer):
     def __init__(self, *,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = None,
+                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
                  regenerate: bool = False,
                  norm_pars: Optional[NormalizationParameters] = None) -> None:
         """ Normalizes nld ang gSF.
@@ -128,9 +128,11 @@ class NormalizerNLD(AbstractNormalizer):
         self.limit_high = None
         self.std_fake = None  # See `normalize`
 
-        self.path = (Path(path) if path is not None
-                     else Path('saved_run/normalizers'))
-        self.path.mkdir(exist_ok=True, parents=True)
+        if path is None:
+            self.path = None
+        else:
+            self.path = Path(path)
+            self.path.mkdir(exist_ok=True, parents=True)
 
     def __call__(self, *args, **kwargs) -> None:
         """ Wrapper around normalize """
