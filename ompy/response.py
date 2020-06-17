@@ -10,7 +10,7 @@ import zipfile as zf
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Dict, Any
 from scipy.interpolate import interp1d
 import logging
 
@@ -144,7 +144,8 @@ class Response():
             compton_matrix[i, 0:len(cmp_current)] = cmp_current
             i += 1
 
-        return resp, compton_matrix, np.linspace(a0_cmp, a1_cmp * (N_cmp - 1), N_cmp)
+        return resp, compton_matrix, np.linspace(a0_cmp, a1_cmp * (N_cmp - 1),
+                                                 N_cmp)
 
     def LoadDir(self,
                 path: Union[str, Path],
@@ -200,7 +201,6 @@ class Response():
         Eg_sim_array, fwhm_rel, Eff_tot, FE, SE, DE, c511 = resp.T
         # "Eg_sim" means "gamma, simulated", and refers to the gamma energies
         # where we have simulated Compton spectra.
-
 
         # Get calibration and array length from highest-energy spectrum,
         # because the spectra may have differing length,
@@ -270,7 +270,7 @@ class Response():
         fwhm_rel_1330 = (self.fwhm_abs / 1330 * 100)
         self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm']
                                               * fwhm_rel_1330)
-        def f_fwhm_abs(E):
+        def f_fwhm_abs(E):  # noqa
             return E * self.f_fwhm_rel_perCent(E)/100
 
         self.f_fwhm_abs = f_fwhm_abs
@@ -278,7 +278,8 @@ class Response():
     def interpolate(self,
                     Eout: np.ndarray = None,
                     fwhm_abs: float = None,
-                    return_table: bool = False) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
+                    return_table: bool = False
+                    ) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
         """ Interpolated the response matrix
 
         Perform the interpolation for the energy range specified in Eout with
@@ -287,7 +288,13 @@ class Response():
         The interpolation is split into energy regions. Below the
         back-scattering energy Ebsc we interpolate linearly, then we apply the
         "fan method" (Guttormsen 1996) in the region from Ebsc up to the
-        Compton edge, then linear extrapolation again the rest of the way.
+        Compton edge, with a Compton scattering angle dependent interpolation.
+        From the Compton edge to Egmax we also use a fan, but with a linear
+        interpolation.
+
+        Note:
+            Below the ~350 keV we only use a linear interpolation, as the
+            fan method does not work. This is not described in Guttormsen 1996.
 
         Args:
             folderpath: The path to the folder containing Compton spectra and
@@ -319,25 +326,26 @@ class Response():
         # Loop over rows of the response matrix
         # TODO for speedup: Change this to a cython
         for j, E in enumerate(Eout):
-
-            # Find maximal energy for current response (+n*sigma) function,
-            # -> Better if the lowest energies of the simulated spectra are
-            #    above the gamma energy to be extrapolated
-            oneSigma = fwhm_abs * self.f_fwhm_rel_perCent_norm(E) / 2.35
+            oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma
             i_Egmax = min(index(Eout, Egmax), N_out-1)
-            # LOG.debug("Response for E: {E:.0f} calc. up to {Egmax:.0f}")
+            LOG.debug(f"Response for E {E:.0f} calc up to {Eout[i_Egmax]:.0f}")
 
             compton = self.get_closest_compton(E)
 
             R_low, i_bsc = self.linear_backscatter(E, compton)
-            R_fan, i_last = self.fan_method(E, compton,
+            R_fan, i_last = \
+                self.fan_method_compton(E, compton,
+                                        i_start=i_bsc+1, i_stop=i_Egmax)
+            if i_last <= i_bsc+2:  # fan method didn't do anything
+                R_high = self.linear_to_end(E, compton,
                                             i_start=i_bsc+1, i_stop=i_Egmax)
-            if i_last == i_bsc+1:  # fan method didn't do anything
-                i_last -= 1
-            R_high = self.linear_to_end(E, compton,
-                                        i_start=i_last+1, i_stop=i_Egmax)
-            R[j, :] += R_low + R_fan + R_high
+                R[j, :] += R_low + R_high
+            else:
+                R_high = self.fan_to_end(E, compton,
+                                         i_start=i_last+1, i_stop=i_Egmax,
+                                         fwhm_abs_array=fwhm_abs_array)
+                R[j, :] += R_low + R_fan + R_high
 
             # coorecton below E_sim[0]
             if E < self.resp['Eg'][0]:
@@ -364,7 +372,8 @@ class Response():
         response = Matrix(values=R, Eg=Eout, Ex=Eout)
 
         if return_table:
-            # Return the response matrix, as well as the other structures, FWHM and efficiency, interpolated to the Eout_array
+            # Return the response matrix, as well as the other structures,
+            # FWHM and efficiency, interpolated to the Eout_array
             response_table = {'E': Eout,
                               'fwhm_abs': fwhm_abs_array,
                               'fwhm_rel_%': self.f_fwhm_rel_perCent(Eout),
@@ -400,7 +409,7 @@ class Response():
         LOG.info(f"Note: Spectra outside of {self.resp['Eg'].min()} and "
                  f"{self.resp['Eg'].max()} are extrapolation only.")
 
-    def get_closest_compton(self, E: float) -> Tuple[int, int]:
+    def get_closest_compton(self, E: float) -> Dict[str, Any]:
         """Find and rebin closest energies from available response functions
 
         If `E < self.resp['Eg'].min()` the compton matrix will be replaced
@@ -410,7 +419,9 @@ class Response():
             E (float): Description
 
         Returns:
-            Tuple[int, int]: `ilow` and `ihigh` are indices of closest energies
+            Dict with entries `Elow` and `Ehigh`, and `ilow` and `ihigh`, the
+            (indices) of closest energies. The arrays `counts_low` and
+            `counts_high` are the corresponding arrays of `compton` spectra.
         """
         N = len(self.resp['Eg'])
         # ilow = 0
@@ -429,8 +440,10 @@ class Response():
             Elow = self.resp['Eg'][ilow]
             cmp_low = self.cmp_matrix[ilow, :]
 
-        cmp_low = rebin_1D(cmp_low, self.Ecmp_array, self.Eout)
-        cmp_high = rebin_1D(cmp_high, self.Ecmp_array, self.Eout)
+        Enew = np.arange(self.Eout[0], self.Ecmp_array[-1],
+                         self.Eout[1] - self.Eout[0])
+        cmp_low = rebin_1D(cmp_low, self.Ecmp_array, Enew)
+        cmp_high = rebin_1D(cmp_high, self.Ecmp_array, Enew)
 
         compton = {"ilow": ilow,
                    "ihigh": ihigh,
@@ -442,7 +455,8 @@ class Response():
         return compton
 
     def linear_cmp_interpolation(self, E: float, compton: dict,
-                                 fill_value: str = "extrapolate")-> np.ndarray:
+                                 fill_value: str = "extrapolate"
+                                 ) -> np.ndarray:
         """Linear interpolation between the compton spectra
 
         Args:
@@ -505,8 +519,77 @@ class Response():
         R[R < 0] = 0
         return R
 
-    def fan_method(self, E: float, compton: dict,
-                   i_start: int, i_stop: int) -> Tuple[np.ndarray, int]:
+    def fan_to_end(self, E: float, compton: dict,
+                   i_start: int, i_stop: int,
+                   fwhm_abs_array: np.ndarray) -> np.ndarray:
+        """Linear(!) fan interpolation from Compton edge to Emax
+
+        The fan-part is "scaled" by the distance between the Compton edge and
+        max(E). To get a reasonable scaling, we have to use ~6 sigma.
+
+        Note:
+            We extrapolate up to self.N_out, and not i_stop, as a workaround
+            connected to Magne's 1/10th FWHM unfolding [which results
+            in a very small i_stop.]
+
+        Args:
+            E (float): Incident energy
+            compton (dict): Dict. with information about the compton spectra
+               to interpolate between
+            i_start (int): Index where to start (usually end of fan method)
+            i_stop (int): Index where to stop (usually E+n*resolution)
+            fwhm_abs_array (np.ndarray): FHWM array, absolute values
+
+        Returns:
+            np.ndarray: Response for `E`
+        """
+
+        R = np.zeros(self.N_out)
+
+        Esim_low = compton["Elow"]
+        Esim_high = compton["Ehigh"]
+        Ecmp1 = self.E_compton(Esim_low, np.pi)
+        Ecmp2 = self.E_compton(Esim_high, np.pi)
+        i_low_edge = index(self.Eout, Ecmp1)
+        i_high_edge = index(self.Eout, Ecmp2)
+
+        oneSigma = fwhm_abs_array[index(self.Eout, Esim_low)] / 2.35
+        Egmax1 = Esim_low + 6 * oneSigma
+        scale1 = (Egmax1 - Ecmp1) / (self.Eout[i_stop] - self.Eout[i_start])
+
+        oneSigma = fwhm_abs_array[index(self.Eout, Esim_high)] / 2.35
+        Egmax2 = Esim_high + 6 * oneSigma
+        scale2 = (Egmax2 - Ecmp2) / (self.Eout[i_stop] - self.Eout[i_start])
+
+        def lin_interpolation(x, x0, y0, x1, y1):
+            return y0 + (y1-y0)*(x-x0)/(x1-x0)
+
+        i_edge = i_start-1
+        # for i in range(i_edge+1, i_stop):
+        for i in range(i_edge+1, self.N_out):
+            i1 = int(i_low_edge + scale1 * (i - i_edge))
+            i2 = int(i_high_edge + scale2 * (i - i_edge))
+
+            if i1 >= len(compton["counts_low"]):
+                i1 = len(compton["counts_low"])-1
+            if i2 >= len(compton["counts_high"]):
+                i2 = len(compton["counts_high"])-1
+
+            c1 = compton["counts_low"][i1]
+            c2 = compton["counts_high"][i2]
+            y = lin_interpolation(E, Esim_low, c1, Esim_high, c2)
+            R[i] = y
+
+        if len(R[R < 0]) != 0:
+            LOG.debug(f"In linear fan method, {len(R[R < 0])} entries in R"
+                      "are negative and now set to 0")
+            R[R < 0] = 0
+
+        return R
+
+    def fan_method_compton(self, E: float, compton: dict,
+                           i_start: int,
+                           i_stop: int) -> Tuple[np.ndarray, int]:
         """Fan method
 
         Args:
@@ -628,21 +711,19 @@ class Response():
         """
         Calculates the energy of an electron that is scattered an angle
         theta by a gamma-ray of energy Eg.
-        Adapted from MAMA, file "folding.f", which references
-        Canberra catalog ed.7, p.2.
 
         Note:
             For `Eg <= 0.1` it returns `Eg`. (workaround)
 
         Args:
-            Eg: Energy of gamma-ray in keV
+            Eg: Energy of incident gamma-ray in keV
             theta: Angle of scatter in radians
 
         Returns:
             Energy Ee of scattered electron
         """
-        scattered = Eg / (1 + Eg / 511 * (1 - np.cos(theta)))
-        electron = scattered * Eg / 511 * (1 - np.cos(theta))
+        Eg_scattered = Eg / (1 + Eg / 511 * (1 - np.cos(theta)))
+        electron = Eg - Eg_scattered
         return np.where(Eg > 0.1, electron, Eg)
 
     @staticmethod
