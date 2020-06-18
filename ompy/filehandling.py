@@ -342,7 +342,7 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
     energies = np.loadtxt(path)
     energies /= 1e3  # convert to MeV
     if len(energies) > 1:
-        assert energies.mean() < 5, "Probably energies are not in keV"
+        assert energies.mean() < 10, "Probably energies are not in keV"
 
     binsize = energy[1] - energy[0]
     bin_edges = np.append(energy, energy[-1] + binsize)
