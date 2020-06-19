@@ -675,8 +675,6 @@ class Matrix(AbstractArray):
         """
 
         axis: int = to_plot_axis(axis)
-        if axis not in (0, 1, 2):
-            raise ValueError("Axis must be 0, 1 or 2")
         if not (mids is None) ^ (factor is None):
             raise ValueError("Either 'mids' or 'factor' must be"
                              " specified, but not both.")
