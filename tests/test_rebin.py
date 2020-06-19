@@ -13,6 +13,26 @@ def test_rebin_vector():
     assert_equal(rebinned.E, after.E)
     assert_allclose(rebinned.values, after.values)
 
+def test_rebin_both():
+  shape = (1001, 1001)
+  Elim = (0, 10000)
+  before = om.Matrix(values=np.ones(shape),
+                     Eg=np.linspace(Elim[0], Elim[1], shape[0]),
+                     Ex=np.linspace(Elim[0], Elim[1], shape[1]))
+
+  new_shape = (101, 101)
+  new_Elim = Elim
+  after = before.rebin(axis='both', mids=np.linspace(new_Elim[0], new_Elim[1], new_shape[0]), inplace=False)
+  
+  assert len(after.Eg) != len(before.Eg)
+  assert len(after.Ex) != len(before.Ex)
+  assert_equal(after.Eg, after.Ex)
+
+  before.rebin(axis='both', mids=np.linspace(new_Elim[0], new_Elim[1], new_shape[0]), inplace=True)
+  assert len(after.Eg) == len(before.Eg)
+  assert len(after.Ex) == len(before.Ex)
+  assert_equal(before.Eg, before.Ex)
+  assert_equal(before.Eg, after.Eg)
 
 @pytest.mark.xfail
 def test_rebin_vector_non_equidistant(before, after):

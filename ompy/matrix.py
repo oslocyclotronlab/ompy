@@ -675,12 +675,22 @@ class Matrix(AbstractArray):
         """
 
         axis: int = to_plot_axis(axis)
-        if axis not in (0, 1):
-            raise ValueError("Axis must be 0 or 1")
+        if axis not in (0, 1, 2):
+            raise ValueError("Axis must be 0, 1 or 2")
         if not (mids is None) ^ (factor is None):
             raise ValueError("Either 'mids' or 'factor' must be"
                              " specified, but not both.")
         mids_old = self.Ex if axis else self.Eg
+
+        if axis == 2:
+            if inplace:
+                self.rebin(axis=0, mids=mids, factor=factor, inplace=inplace)
+                self.rebin(axis=1, mids=mids, factor=factor, inplace=inplace)
+                return None
+            else:
+                new = self.rebin(axis=0, mids=mids, factor=factor, inplace=False)
+                new.rebin(axis=1, mids=mids, factor=factor, inplace=True)
+                return new
 
         if factor is not None:
             if factor <= 0:
