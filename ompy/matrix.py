@@ -687,7 +687,7 @@ class Matrix(AbstractArray):
                 return None
             else:
                 new = self.rebin(axis=0, mids=mids,
-                    factor=factor, inplace=False)
+                                 factor=factor, inplace=False)
                 new.rebin(axis=1, mids=mids, factor=factor, inplace=True)
                 return new
 
