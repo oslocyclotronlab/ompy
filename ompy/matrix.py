@@ -185,9 +185,9 @@ class Matrix(AbstractArray):
         if filetype == 'numpy':
             self.values, self.Eg, self.Ex = load_numpy_2D(path)
         elif filetype == 'txt':
-            self.values, self.Eg, self.Eg = load_txt_2D(path)
+            self.values, self.Eg, self.Ex = load_txt_2D(path)
         elif filetype == 'tar':
-            self.values, self.Eg, self.Eg = load_tar(path)
+            self.values, self.Eg, self.Ex = load_tar(path)
         elif filetype == 'mama':
             self.values, self.Eg, self.Ex = mama_read(path)
         else:
