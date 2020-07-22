@@ -5,6 +5,7 @@ import logging
 from contextlib import redirect_stdout
 from uncertainties import unumpy
 import os
+import fnmatch
 
 from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
@@ -556,6 +557,33 @@ class Extractor:
         except KeyError:
             pass
         return state
+
+    @staticmethod
+    def load(path: Union[str, Path]):
+        """ Load an ensemble of from disk.
+        Args:
+            path: Path to folder with ensemble
+        Returns:
+            extractor object with gSF and NLD set.
+        """
+        if path is None:
+            raise ValueError("path must be given")
+        path = Path(path)
+
+        # Count number of files with name gsf_*.npy
+        num_gsf = len(fnmatch.filter(next(os.walk(path))[2], 'gsf_*.npy'))
+        num_nld = len(fnmatch.filter(next(os.walk(path))[2], 'nld_*.npy'))
+
+        assert num_gsf == num_nld, \
+            "The number of gsf files and nld files should be the same."
+        extractor = Extractor(path=path)
+        for i in range(num_gsf):
+            gsf_path = path / f'gsf_{i}.npy'
+            extractor.gsf.append(Vector(path=gsf_path))
+        for i in range(num_nld):
+            nld_path = path / f'nld_{i}.npy'
+            extractor.nld.append(Vector(path=nld_path))
+        return extractor
 
 
 def normalize(mat: Matrix,
