@@ -218,7 +218,7 @@ class NormalizerSimultan(AbstractNormalizer):
                  guess: Dict[str, float]) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[float]]]:  # noqa
         """Find parameters given model constraints and an initial guess
 
-        Employs Multinest
+        Employs Multinest.
 
         Args:
             num (int): Loop number
@@ -235,13 +235,20 @@ class NormalizerSimultan(AbstractNormalizer):
 
         Raises:
             ValueError: Invalid parameters for automatix prior
+
+        Note:
+            You might want to adjust the priors for your specific case! Here
+            we just propose a general solution that might often work out of
+            the box.
         """
         if guess['alpha'] < 0:
-            raise ValueError("Prior selection not implemented for α < 0")
+            raise NotImplementedError("Prior selection not implemented for "
+                                      "α < 0")
         alpha_exponent = np.log10(guess['alpha'])
 
         if guess['T'] < 0:
-            raise ValueError("Prior selection not implemented for T < 0")
+            raise ValueError("Prior selection not implemented for T < 0; "
+                             "negative temperature is unphysical")
         T_exponent = np.log10(guess['T'])
 
         A = guess['A']
