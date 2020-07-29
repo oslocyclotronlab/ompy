@@ -188,8 +188,8 @@ class Vector(AbstractArray):
         elif filetype == 'mama':
             mama_write(self, path)
             if self.std is not None:
-                warnings.warn("MaMa cannot store std.\
-                    Consider using another format")
+                warnings.warn("MaMa cannot store std. " 
+                              "Consider using another format")
         elif filetype == 'csv':
             save_csv_1D(vector.values, vector.E, vector.std, path)
         else:
