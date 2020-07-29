@@ -253,7 +253,7 @@ def save_numpy_2D(matrix: np.ndarray, Eg: np.ndarray,
 
 
 def load_numpy_2D(path: Union[str, Path]
-                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Union]:
     mat = np.load(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
@@ -284,7 +284,8 @@ def load_txt_2D(path: Union[str, Path]
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
-def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+def load_numpy_1D(path: Union[str, Path]
+                  )-> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -295,7 +296,8 @@ def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, Union
     return values, E, std
 
 
-def save_numpy_1D(values: np.ndarray, E: np.ndarray, std: Union[np.ndarray, None],
+def save_numpy_1D(values: np.ndarray, E: np.ndarray,
+                  std: Union[np.ndarray, None],
                   path: Union[str, Path]) -> None:
     mat = None
     if std is None:
@@ -304,16 +306,18 @@ def save_numpy_1D(values: np.ndarray, E: np.ndarray, std: Union[np.ndarray, None
         mat = np.column_stack((E, values, std))
     np.save(path, mat)
 
-def save_csv_1D(values: np.ndarray, E: np.ndarray, std: Union[np.ndarray, None],
+def save_csv_1D(values: np.ndarray, E: np.ndarray,
+                std: Union[np.ndarray, None],
                 path: Union[str, Path]) -> None:
-    
     df = {'E': E, 'values': values}
     if std is not None:
         df['std'] = std
     df = pd.DataFrame(df)
     df.to_csv(path, index=False)
 
-def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
+                                                 np.ndarray,
+                                                 Union[np.ndarray, None]]:
     df = pd.read_csv(path)
     E = df['E'].to_numpy(copy=True)
     values = df['values'].to_numpy(copy=True)
@@ -394,5 +398,3 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
     else:
         smoothed = None
     return hist, smoothed
-
-
