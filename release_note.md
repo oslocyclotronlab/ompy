@@ -1,5 +1,9 @@
 # Release notes for OMpy
 
+## [Unreleased]
+Changes:
+- Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+
 ## v.1.1.0
 Most important changes:
 - Changed response function interpolation between Compton edge and he chosen max. energy. Before, there was a 
