@@ -163,7 +163,7 @@ class Vector(AbstractArray):
             path (str or Path): Path to save
             filetype (str, optional): Filetype. Default uses
                 auto-recognition from suffix.
-                Options: ["numpy", "txt", "tar", "mama","csv"]
+                Options: ["numpy", "txt", "tar", "mama", "csv"]
             **kwargs: additional keyword arguments
 
         Raises:
@@ -223,7 +223,8 @@ class Vector(AbstractArray):
             elif len(from_file) == 2:
                 self.values, self.E = from_file
             else:
-                raise ValueError("Expected two or three columns in file '%s', got %d" % (path, len(from_file)) )
+                raise ValueError(f"Expected two or three columns\
+                 in file '{path}', got {len(from_file)}")
         elif filetype == 'mama':
             self.values, self.E = mama_read(path)
         elif filetype == 'csv':
