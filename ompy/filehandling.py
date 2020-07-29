@@ -253,7 +253,7 @@ def save_numpy_2D(matrix: np.ndarray, Eg: np.ndarray,
 
 
 def load_numpy_2D(path: Union[str, Path]
-                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Union]:
+                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     mat = np.load(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
