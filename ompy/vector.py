@@ -1,11 +1,13 @@
 from __future__ import annotations
 from typing import Optional, Iterable, Union, Any, Tuple, Dict, Sequence
 import logging
+import warnings
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 from .filehandling import (load_numpy_1D, save_numpy_1D,
+                           load_csv_1D, save_csv_1D,
                            load_txt_1D, save_txt_1D,
                            mama_read, mama_write,
                            filetype_from_suffix,
@@ -161,7 +163,7 @@ class Vector(AbstractArray):
             path (str or Path): Path to save
             filetype (str, optional): Filetype. Default uses
                 auto-recognition from suffix.
-                Options: ["numpy", "txt", "tar", "mama"]
+                Options: ["numpy", "txt", "tar", "mama","csv"]
             **kwargs: additional keyword arguments
 
         Raises:
@@ -173,14 +175,22 @@ class Vector(AbstractArray):
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
+
         if filetype == 'numpy':
-            save_numpy_1D(vector.values, vector.E, path)
+            save_numpy_1D(vector.values, vector.E, vector.std, path)
         elif filetype == 'txt':
-            save_txt_1D(vector.values, vector.E, path, **kwargs)
+            save_txt_1D(vector.values, vector.E, vector.std, path, **kwargs)
         elif filetype == 'tar':
-            save_tar([vector.values, vector.E], path)
+            if vector.std is not None:
+                save_tar([vector.values, vector.E, vector.std], path)
+            else:
+                save_tar([vector.values, vector.E], path)
         elif filetype == 'mama':
             mama_write(self, path)
+            if self.std is not None:
+                warnings.warn("MaMa cannot store std. Consider using another format")
+        elif filetype == 'csv':
+            save_csv_1D(vector.values, vector.E, vector.std, path)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
@@ -202,13 +212,21 @@ class Vector(AbstractArray):
         filetype = filetype.lower()
 
         if filetype == 'numpy':
-            self.values, self.E = load_numpy_1D(path)
+            self.values, self.E, self.std = load_numpy_1D(path)
         elif filetype == 'txt':
-            self.values, self.E = load_txt_1D(path)
+            self.values, self.E, self.std = load_txt_1D(path)
         elif filetype == 'tar':
-            self.values, self.E = load_tar(path)
+            from_file = load_tar(path)
+            if len(from_file) == 3:
+                self.values, self.E, self.std = from_file
+            elif len(from_file) == 2:
+                self.values, self.E = from_file
+            else:
+                raise ValueError("Expected two or three columns in file '%s', got %d" % (path, len(from_file)) )
         elif filetype == 'mama':
             self.values, self.E = mama_read(path)
+        elif filetype == 'csv':
+            self.values, self.E, self.std = load_csv_1D(path)
         else:
             try:
                 self.values, self.E = mama_read(path)
