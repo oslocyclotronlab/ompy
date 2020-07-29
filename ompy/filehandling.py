@@ -1,4 +1,4 @@
-from typing import Union, Iterable, List, Tuple, Optional
+from typing import Union, Iterable, List, Tuple
 from pathlib import Path
 import tarfile
 import time
@@ -154,15 +154,15 @@ def mama_write2D(mat, filename, comment=""):
     header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
                                                    time.localtime()) + '   \n'
     header_string += (
-        '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
-        % (
-            cal["a0x"],
-            cal["a1x"],
-            cal["a2x"],
-            cal["a0y"],
-            cal["a1y"],
-            cal["a2y"],
-        ))
+      '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
+       % (
+          cal["a0x"],
+          cal["a1x"],
+          cal["a2x"],
+          cal["a0y"],
+          cal["a1y"],
+          cal["a2y"],
+          ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
         mat.shape[1] - 1, mat.shape[0] - 1)
@@ -285,7 +285,7 @@ def load_txt_2D(path: Union[str, Path]
 
 
 def load_numpy_1D(path: Union[str, Path]
-                  )-> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+                  ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -306,6 +306,7 @@ def save_numpy_1D(values: np.ndarray, E: np.ndarray,
         mat = np.column_stack((E, values, std))
     np.save(path, mat)
 
+
 def save_csv_1D(values: np.ndarray, E: np.ndarray,
                 std: Union[np.ndarray, None],
                 path: Union[str, Path]) -> None:
@@ -314,6 +315,7 @@ def save_csv_1D(values: np.ndarray, E: np.ndarray,
         df['std'] = std
     df = pd.DataFrame(df)
     df.to_csv(path, index=False)
+
 
 def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
                                                  np.ndarray,
@@ -327,7 +329,8 @@ def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
     return values, E, std
 
 
-def load_txt_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+def load_txt_1D(path: Union[str, Path]
+                ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
     vec = np.loadtxt(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -338,7 +341,8 @@ def load_txt_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, Union[n
     return values, E, std
 
 
-def save_txt_1D(values: np.ndarray, E: np.ndarray, std: Union[np.ndarray, None],
+def save_txt_1D(values: np.ndarray, E: np.ndarray,
+                std: Union[np.ndarray, None],
                 path: Union[str, Path], header='E[keV] values') -> None:
     """ E default in keV """
     mat = None
