@@ -1,6 +1,7 @@
 import pytest
 import ompy as om
-from numpy.testing import assert_equal
+import warnings
+from numpy.testing import assert_equal, assert_allclose
 import numpy as np
 
 
@@ -22,6 +23,55 @@ def test_init():
     with pytest.raises(ValueError):
         om.Vector(vals, [1, 2, 3, 4, 5])
 
+def test_save_load_no_std():
+    E = np.linspace(0, 1, 100)
+    vals = np.linspace(2, 3.4, 100)
+    vec = om.Vector(values=vals, E=E)
+
+    formats = ['.npy', '.txt', '.tar', '.m', '.csv']
+    for form in formats:
+        print(form)
+        vec.save('/tmp/no_std'+form)
+        vec_from_file = om.Vector(path='/tmp/no_std'+form)
+        assert_allclose(vec_from_file.E, E)
+        assert_allclose(vec_from_file.values, vals)
+
+
+def test_save_load():
+    E = np.linspace(0, 1, 100)
+    vals = np.linspace(2, 3.4, 100)
+    std = np.random.randn(100)*0.1
+
+    vec = om.Vector(values=vals, E=E, std=std)
+
+    formats = ['.npy', '.txt', '.tar', '.csv']
+    for form in formats:
+        vec.save('/tmp/std'+form)
+        vec_from_file = om.Vector(path='/tmp/std'+form)
+        assert_allclose(vec_from_file.E, vec.E)
+        assert_allclose(vec_from_file.values, vec.values)
+        assert_allclose(vec_from_file.std, vec.std)
+
+def test_save_load_tar():
+    E = np.linspace(0, 1, 100)
+    vals = np.random.random((100,100))
+
+    mat = om.Matrix(values=vals, Ex=E, Eg=E)
+    mat.save('/tmp/mat.tar')
+
+    with pytest.raises(ValueError):
+        vec = om.Vector(path='/tmp/mat.tar')
+
+def test_save_std_warning():
+    E = np.linspace(0, 1, 100)
+    vals = np.linspace(2, 3.4, 100)
+    std = np.random.randn(100)*0.1
+
+    vec = om.Vector(values=vals, E=E, std=std)
+
+    with pytest.warns(UserWarning):
+        vec.save('/tmp/error.m')
+    
 
 def test_cut():
     E = np.arange(-1, 10, 1)

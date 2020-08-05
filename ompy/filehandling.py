@@ -3,6 +3,7 @@ from pathlib import Path
 import tarfile
 import time
 import numpy as np
+import pandas as pd
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 
@@ -153,15 +154,15 @@ def mama_write2D(mat, filename, comment=""):
     header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
                                                    time.localtime()) + '   \n'
     header_string += (
-        '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
-        % (
-            cal["a0x"],
-            cal["a1x"],
-            cal["a2x"],
-            cal["a0y"],
-            cal["a1y"],
-            cal["a2y"],
-        ))
+      '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
+       % (
+          cal["a0x"],
+          cal["a1x"],
+          cal["a2x"],
+          cal["a0y"],
+          cal["a1y"],
+          cal["a2y"],
+          ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
         mat.shape[1] - 1, mat.shape[0] - 1)
@@ -283,30 +284,72 @@ def load_txt_2D(path: Union[str, Path]
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
-def load_numpy_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
+def load_numpy_1D(path: Union[str, Path]
+                  ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
-    return values, E
+    std = None
+    _, col = vec.shape
+    if col >= 3:
+        std = vec[:, 2]
+    return values, E, std
 
 
 def save_numpy_1D(values: np.ndarray, E: np.ndarray,
+                  std: Union[np.ndarray, None],
                   path: Union[str, Path]) -> None:
-    mat = np.column_stack((E, values))
+    mat = None
+    if std is None:
+        mat = np.column_stack((E, values))
+    else:
+        mat = np.column_stack((E, values, std))
     np.save(path, mat)
 
 
-def load_txt_1D(path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray]:
+def save_csv_1D(values: np.ndarray, E: np.ndarray,
+                std: Union[np.ndarray, None],
+                path: Union[str, Path]) -> None:
+    df = {'E': E, 'values': values}
+    if std is not None:
+        df['std'] = std
+    df = pd.DataFrame(df)
+    df.to_csv(path, index=False)
+
+
+def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
+                                                 np.ndarray,
+                                                 Union[np.ndarray, None]]:
+    df = pd.read_csv(path)
+    E = df['E'].to_numpy(copy=True)
+    values = df['values'].to_numpy(copy=True)
+    std = None
+    if 'std' in df.columns:
+        std = df['std'].to_numpy(copy=True)
+    return values, E, std
+
+
+def load_txt_1D(path: Union[str, Path]
+                ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
     vec = np.loadtxt(path)
     E = vec[:, 0]
     values = vec[:, 1]
-    return values, E
+    std = None
+    _, col = vec.shape
+    if col >= 3:
+        std = vec[:, 2]
+    return values, E, std
 
 
 def save_txt_1D(values: np.ndarray, E: np.ndarray,
+                std: Union[np.ndarray, None],
                 path: Union[str, Path], header='E[keV] values') -> None:
     """ E default in keV """
-    mat = np.column_stack([E, values])
+    mat = None
+    if std is None:
+        mat = np.column_stack((E, values))
+    else:
+        mat = np.column_stack((E, values, std))
     np.savetxt(path, mat, header=header)
 
 
@@ -320,6 +363,8 @@ def filetype_from_suffix(path: Path) -> str:
         return 'txt'
     elif suffix == '.m':
         return 'mama'
+    elif suffix == '.csv':
+        return 'csv'
     else:
         return "unknown"
 
@@ -357,5 +402,3 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
     else:
         smoothed = None
     return hist, smoothed
-
-
