@@ -71,7 +71,57 @@ def test_save_std_warning():
 
     with pytest.warns(UserWarning):
         vec.save('/tmp/error.m')
+
+def test_closest():
     
+    E = np.array([0., 1., 2., 3., 4.])
+    values = np.array([10., 9., 8., 7., 6.])
+    std = 0.1*values
+
+    E_new = np.array([0.5, 1.5, 3.])
+    values_new = np.array([10., 9., 7.])
+    std_new = 0.1*values_new
+
+
+    vector = om.Vector(values=values, E=E)
+    vector_res = vector.closest(E_new)
+
+    assert_equal(vector_res.E, E_new)
+    assert_equal(vector_res.values, values_new)
+
+    vector = om.Vector(values=values, E=E, std=std)
+    vector_res = vector.closest(E_new)
+    assert_equal(vector_res.E, E_new)
+    assert_equal(vector_res.values, values_new)
+    assert_equal(vector_res.std, std_new)
+
+def test_cumsum():
+
+    E = np.array([0., 1.5, 3., 4.5, 6., 7.5])
+    values = np.array([0., 0., 1., 2., 3., 4.])
+
+    expect = np.cumsum(values)
+
+    vec = om.Vector(values=values, E=E)
+
+    vec_cum = vec.cumulative(factor=None, inplace=False)
+    assert_equal(vec_cum.E, E)
+    assert_equal(vec_cum.values, expect)
+
+    vec_cum = vec.cumulative(factor=2., inplace=False)
+    assert_equal(vec_cum.E, E)
+    assert_equal(vec_cum.values, 2.*expect)
+
+    vec_cum = vec.cumulative(factor='de', inplace=False)
+    assert_equal(vec_cum.E, E)
+    assert_equal(vec_cum.values, (E[1]-E[0])*expect)
+
+    vec.cumulative(factor=None, inplace=True)
+
+    with pytest.raises(AssertionError):
+        assert_equal(vec.values, values)
+
+
 
 def test_cut():
     E = np.arange(-1, 10, 1)

@@ -424,6 +424,68 @@ class Vector(AbstractArray):
         else:
             raise NotImplementedError("Units must be keV or MeV")
 
+    def closest(self, E: ndarray, side: Optional[str]='right',
+                inplace=False) -> Union[Vector,None]:
+        """ Returns a vector with the values are set by
+            E[i] <= E[j] < E[i+1], values[i].
+
+            
+            Args:
+                E: Bin value to find. Value or array.
+                side: 'left': E[i] < E[j] <= E[i+1], 'right': E[i] <= E[j] <= E[i+1]
+                inplace: Whether to make the change inplace or not.
+            Returns:
+                Vector with the new E axis and the bin content of the bins
+                that contains E.
+        """
+
+        indices = np.searchsorted(self.E, E, side=side)-1
+
+        values = self.values[indices]
+        std = None
+        if self.std is not None:
+            std = self.std[indices]
+        if inplace:
+            self.E = E
+            self.values = values
+            self.std = std
+        else:
+            return Vector(values=values, E=E, std=std, units=self.units)
+
+
+    def cumulative(self,
+                   factor: Optional[Union[float,str]]=None,
+                   inplace=False) -> Union[Vector,None]:
+        """ Calculate the cumulative sum of the vector.
+
+            Args:
+                factor: A factor to multiply to the resulting vector.
+                        Possible values are None, a float or string 'de',
+                        meaning that the factor is determined by the
+                        bin width of the vector.
+                inplace: Whether to make the change inplace or not.
+            Returns:
+                The cumulative sum vector if inplace is 'False'
+        """
+
+        if factor is None:
+            factor = 1.0
+        elif isinstance(factor, str):
+            if factor.lower() != 'de':
+                raise ValueError(f"Unkown option for factor {factor}")
+            factor = float(self.E[1] - self.E[0])
+        
+        cumsum = np.cumsum(self.values)*factor
+        cumerr = None
+        if self.std is not None:
+            cumerr = np.sqrt(np.cumsum(self.std**2))*factor
+
+        if inplace:
+            self.values = cumsum
+            self.std = cumerr
+        else:
+            return Vector(values=cumsum, E=self.E, std=cumerr, units=self.units)
+
     def has_equal_binning(self, other: Vector, **kwargs) -> bool:
         """ Check whether `other` has equal_binning as `self` within precision.
 
