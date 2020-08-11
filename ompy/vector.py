@@ -428,7 +428,7 @@ class Vector(AbstractArray):
                 inplace=False) -> Union[Vector, None]:
         """ Returns a vector with the values are set by
             E[i] <= E[j] < E[i+1], values[i].
- 
+
             Args:
                 E: Bin value to find. Value or array.
                 side: 'left': E[i] < E[j] <= E[i+1], 
@@ -472,7 +472,7 @@ class Vector(AbstractArray):
             if factor.lower() != 'de':
                 raise ValueError(f"Unkown option for factor {factor}")
             factor = float(self.E[1] - self.E[0])
-        
+
         cumsum = np.cumsum(self.values)*factor
         cumerr = None
         if self.std is not None:
