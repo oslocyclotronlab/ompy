@@ -452,7 +452,6 @@ class Vector(AbstractArray):
         else:
             return Vector(values=values, E=E, std=std, units=self.units)
 
-
     def cumulative(self, factor: Optional[Union[float, str]]=None,
                    inplace=False) -> Union[Vector, None]:
         """ Calculate the cumulative sum of the vector.
@@ -483,7 +482,8 @@ class Vector(AbstractArray):
             self.values = cumsum
             self.std = cumerr
         else:
-            return Vector(values=cumsum, E=self.E, std=cumerr, units=self.units)
+            return Vector(values=cumsum, E=self.E,
+                          std=cumerr, units=self.units)
 
     def has_equal_binning(self, other: Vector, **kwargs) -> bool:
         """ Check whether `other` has equal_binning as `self` within precision.
