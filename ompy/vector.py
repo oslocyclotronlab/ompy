@@ -425,14 +425,14 @@ class Vector(AbstractArray):
             raise NotImplementedError("Units must be keV or MeV")
 
     def closest(self, E: ndarray, side: Optional[str]='right',
-                inplace=False) -> Union[Vector,None]:
+                inplace=False) -> Union[Vector, None]:
         """ Returns a vector with the values are set by
             E[i] <= E[j] < E[i+1], values[i].
-
-            
+ 
             Args:
                 E: Bin value to find. Value or array.
-                side: 'left': E[i] < E[j] <= E[i+1], 'right': E[i] <= E[j] <= E[i+1]
+                side: 'left': E[i] < E[j] <= E[i+1], 
+                      'right': E[i] <= E[j] <= E[i+1]
                 inplace: Whether to make the change inplace or not.
             Returns:
                 Vector with the new E axis and the bin content of the bins
@@ -453,9 +453,8 @@ class Vector(AbstractArray):
             return Vector(values=values, E=E, std=std, units=self.units)
 
 
-    def cumulative(self,
-                   factor: Optional[Union[float,str]]=None,
-                   inplace=False) -> Union[Vector,None]:
+    def cumulative(self, factor: Optional[Union[float, str]]=None,
+                   inplace=False) -> Union[Vector, None]:
         """ Calculate the cumulative sum of the vector.
 
             Args:
