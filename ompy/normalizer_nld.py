@@ -291,12 +291,12 @@ class NormalizerNLD(AbstractNormalizer):
             Tuple:
             - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
                 parameters
-            - samples (Dict[str, List[float]]): Multinest samplesø.
+            - samples (Dict[str, List[float]]): Multinest samples.
                 Note: They are still importance weighted, not random draws
                 from the posterior.
 
         Raises:
-            ValueError: Invalid parameters for automatix prior
+            ValueError: Invalid parameters for automatic prior
 
         Note:
             You might want to adjust the priors for your specific case! Here
