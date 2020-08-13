@@ -424,46 +424,70 @@ class Vector(AbstractArray):
         else:
             raise NotImplementedError("Units must be keV or MeV")
 
-    def closest(self, E: ndarray, side: Optional[str]='right',
+    def closest(self, E_new: ndarray, side: Optional[str] = 'right',
                 inplace=False) -> Union[Vector, None]:
-        """ Returns a vector with the values are set by
-            E[i] <= E[j] < E[i+1], values[i].
+        """ Re-bin the vector without merging bins.
+
+            The resulting vector will have E_new as the x-axis while
+            the jth y-value will be given by the ith value of the original
+            y-values where E[i] < E_new[j] <= E[i+1] or
+            E[i] <= E_new[j] < E[i+1].
 
             Args:
-                E: Bin value to find. Value or array.
-                side: 'left': E[i] < E[j] <= E[i+1], 
+                E_new: Bin value to find. Value or array.
+                side: 'left': E[i] < E[j] <= E[i+1],
                       'right': E[i] <= E[j] <= E[i+1]
                 inplace: Whether to make the change inplace or not.
             Returns:
                 Vector with the new E axis and the bin content of the bins
                 that contains E.
+            Raises:
+                RuntimeError if the x-axis of the original vector is
+                not sorted.
         """
 
-        indices = np.searchsorted(self.E, E, side=side)-1
+        if not np.all(self.E[:-1] <= self.E[1:]):
+            raise RuntimeError("x-axis not sorted.")
 
-        values = self.values[indices]
+        indices = np.searchsorted(self.E, E_new, side=side)
+
+        # Ensure that any element outside the range of E will get indice
+        # -1.
+        indices[indices >= len(self.E)] = 0
+        indices -= 1
+
+        # We need to append 0 to the end to ensure that we fill 0 if any
+        # element E_new is outside of the bounds of self.E
+        values = np.append(self.values, [0])
+        values = values[indices]
+
         std = None
         if self.std is not None:
-            std = self.std[indices]
+            std = np.append(self.std, [0])
+            std = std[indices]
+
         if inplace:
-            self.E = E
+            self.E = E_new
             self.values = values
             self.std = std
         else:
-            return Vector(values=values, E=E, std=std, units=self.units)
+            return Vector(values=values, E=E_new, std=std, units=self.units)
 
-    def cumulative(self, factor: Optional[Union[float, str]]=None,
+    def cumulative(self, factor: Optional[Union[float, str]] = None,
                    inplace=False) -> Union[Vector, None]:
-        """ Calculate the cumulative sum of the vector.
+        """ Cumulative sum of the vector.
 
             Args:
-                factor: A factor to multiply to the resulting vector.
-                        Possible values are None, a float or string 'de',
-                        meaning that the factor is determined by the
-                        bin width of the vector.
+                factor: A factor to multiply to the resulting vector. Possible
+                values are None (default), a float or string 'de'. If 'de' the
+                factor will be calculated by E[1] - E[0].
                 inplace: Whether to make the change inplace or not.
             Returns:
                 The cumulative sum vector if inplace is 'False'
+            Raises:
+                RuntimeError if elements in self.E are not equidistant
+                and factor='de'.
+                ValueError if factor is a string other than 'de'.
         """
 
         if factor is None:
@@ -472,6 +496,8 @@ class Vector(AbstractArray):
             if factor.lower() != 'de':
                 raise ValueError(f"Unkown option for factor {factor}")
             factor = float(self.E[1] - self.E[0])
+            if not np.all(np.diff(self.E) == factor):
+                raise RuntimeError(f"Vector x-axis isn't equidistant.")
 
         cumsum = np.cumsum(self.values)*factor
         cumerr = None
