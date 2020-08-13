@@ -79,7 +79,6 @@ class Extractor:
         self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
-        self.trapezoid = trapezoid
 
         if path is not None:
             self.path = Path(path)
