@@ -7,6 +7,7 @@ from uncertainties import unumpy
 import os
 import fnmatch
 
+import fnmatch
 from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 from scipy.optimize import minimize
@@ -66,16 +67,13 @@ class Extractor:
           it is not created. This is a very common pattern. Consider
           superclassing the disk book-keeping.
     """
-    def __init__(self, ensemble: Optional[Ensemble] = None,
-                 trapezoid: Optional[Action] = None,
-                 path: Optional[Union[str, Path]] =
-                 'saved_run/extractor'):
+    def __init__(self,
+                 path: Optional[Union[str, Path]] = None):
         """
         ensemble (Ensemble, optional): see above
         trapezoid (Action[Matrix], optional): see above
         path (Path or str, optional): see above
         """
-        self.ensemble = ensemble
         self.regenerate = False
         self.method = 'Powell'
         self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
@@ -83,9 +81,11 @@ class Extractor:
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
 
-        if path is None:
-            self.path = None
+        if path is not None:
+            self.path = Path(path)
+            self.load(self.path)
         else:
+            self.path = 'saved_run/extractor'
             self.path = Path(path)
             self.path.mkdir(exist_ok=True, parents=True)
 
@@ -97,12 +97,11 @@ class Extractor:
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
 
-    def __call__(self, ensemble: Optional[Ensemble] = None,
-                 trapezoid: Optional[Action] = None):
+    def __call__(self, ensemble: Ensemble, trapezoid: Action):
         return self.extract_from(ensemble, trapezoid)
 
-    def extract_from(self, ensemble: Optional[Ensemble] = None,
-                     trapezoid: Optional[Action] = None,
+    def extract_from(self, ensemble: Ensemble,
+                     trapezoid: Action = None,
                      regenerate: Optional[bool] = None):
         """Decompose each first generation matrix in an Ensemble
 
@@ -122,14 +121,7 @@ class Extractor:
         Raises:
             ValueError: If no Ensemble instance is provided here or earlier.
         """
-        if ensemble is not None:
-            self.ensemble = ensemble
-        elif self.ensemble is None:
-            raise ValueError("ensemble must be given")
-        if trapezoid is not None:
-            self.trapezoid = trapezoid
-        elif self.trapezoid is None:
-            raise ValueError("A 'trapezoid' cut must be given'")
+
         if regenerate is None:
             regenerate = self.regenerate
         self.path = Path(self.path)
@@ -154,39 +146,51 @@ class Extractor:
         self.nld = nlds
         self.gsf = gsfs
 
-    def step(self, num: int) -> Tuple[Vector, Vector]:
-        """ Wrapper around _extract in order to be consistent with other classes
+    def step(self, ensemble: Ensemble, trapezoid: Action,
+             num: int) -> Tuple[Vector, Vector]:
+        """ Wrapper around _extract in order to be consistent with other
+        classes
 
         Args:
+            ensemble (Ensemble): The ensemble to extract nld and gsf
+                from. Can be provided in when initializing instead.
+            trapezoid (Action): An Action describing the cut to apply
+                to the matrices to obtain the desired region for extracting nld
+                and gsf.
             num: Number of the fg matrix to extract
         """
         nld, gsf = self._extract(num)
         return nld, gsf
 
-    def _extract(self, num: int) -> Tuple[Vector, Vector]:
+    def _extract(self, ensemble: Ensemble, trapezoid: Action,
+                 num: int) -> Tuple[Vector, Vector]:
         """ Extract nld and gsf from matrix number i from Ensemble
 
         Args:
+            ensemble (Ensemble): The ensemble to extract nld and gsf
+                from. Can be provided in when initializing instead.
+            trapezoid (Action): An Action describing the cut to apply
+                to the matrices to obtain the desired region for extracting nld
+                and gsf.
             num: Number of the fg matrix to extract
 
         Returns:
             The nld and gsf as Vectors
         """
-        assert self.ensemble is not None
-        assert self.trapezoid is not None
-        matrix = self.ensemble.get_firstgen(num).copy()
-        std = self.ensemble.std_firstgen.copy()
+
+        matrix = ensemble.get_firstgen(num).copy()
+        std = ensemble.std_firstgen.copy()
         # following lines might be superfluous now:
         # ensure same cuts for all ensemble members if Eg_max is not given
         # (thus auto-determined) in the trapezoid.
         if num == 0:
-            self.trapezoid.act_on(matrix)
-            self.trapezoid.curry(Eg_max=matrix.Eg[-1])
-            self.trapezoid.act_on(std)
+            trapezoid.act_on(matrix)
+            trapezoid.curry(Eg_max=matrix.Eg[-1])
+            trapezoid.act_on(std)
         else:
-            self.trapezoid.act_on(matrix)
-            self.trapezoid.act_on(std)
-        nld, gsf = self.decompose(matrix, std)
+            trapezoid.act_on(matrix)
+            trapezoid.act_on(std)
+        nld, gsf = decompose(matrix, std)
         return nld, gsf
 
     def decompose(self, matrix: Matrix,
@@ -353,6 +357,34 @@ class Extractor:
         assert np.isfinite(x0).all
         return x0
 
+    def load(self, path: Union[str, Path]):
+        """Load an ensemble of from disk.
+
+        Args:
+            path: Path to folder with ensemble
+
+        Returns:
+            extractor object with gSF and NLD set.
+        Raises:
+            RuntimeError if the number of NLD and GSF doesn't match.
+        """
+
+        path = Path(path)
+
+        # Count number of files with name gsf_*.npy and nld_*.npy
+        # in the folder where these are stored.
+        num_gsf = len(fnmatch.filter(next(os.walk(path))[2], 'gsf_*.npy'))
+        num_nld = len(fnmatch.filter(next(os.walk(path))[2], 'nld_*.npy'))
+
+        if num_gsf != num_nld:
+            raise RuntimeError("The number of GSF and NLD files doesn't match")
+        for i in range(num_gsf):
+            gsf_path = path / f'gsf_{i}.npy'
+            self.gsf.append(Vector(path=gsf_path))
+        for i in range(num_nld):
+            nld_path = path / f'nld_{i}.npy'
+            self.nld.append(Vector(path=nld_path))
+
     @staticmethod
     def x0_BSFG(E_nld: np.ndarray, E0: float = -.2, a: float = 15):
         """ Initial guess that resembles Backshifted Fermi-gas solution
@@ -477,7 +509,8 @@ class Extractor:
 
     @staticmethod
     def resolution_Eg(matrix: Matrix) -> np.ndarray:
-        """Resolution along Eg axis for each Ex. Defaults in this class are for OSCAR.
+        """Resolution along Eg axis for each Ex. Defaults in this class are for
+        OSCAR.
 
         Args:
             matrix (Matrix): Matrix for which the sesoluton shall be calculated
@@ -557,33 +590,6 @@ class Extractor:
         except KeyError:
             pass
         return state
-
-    @staticmethod
-    def load(path: Union[str, Path]):
-        """ Load an ensemble of from disk.
-        Args:
-            path: Path to folder with ensemble
-        Returns:
-            extractor object with gSF and NLD set.
-        """
-        if path is None:
-            raise ValueError("path must be given")
-        path = Path(path)
-
-        # Count number of files with name gsf_*.npy
-        num_gsf = len(fnmatch.filter(next(os.walk(path))[2], 'gsf_*.npy'))
-        num_nld = len(fnmatch.filter(next(os.walk(path))[2], 'nld_*.npy'))
-
-        assert num_gsf == num_nld, \
-            "The number of gsf files and nld files should be the same."
-        extractor = Extractor(path=path)
-        for i in range(num_gsf):
-            gsf_path = path / f'gsf_{i}.npy'
-            extractor.gsf.append(Vector(path=gsf_path))
-        for i in range(num_nld):
-            nld_path = path / f'nld_{i}.npy'
-            extractor.nld.append(Vector(path=nld_path))
-        return extractor
 
 
 def normalize(mat: Matrix,
