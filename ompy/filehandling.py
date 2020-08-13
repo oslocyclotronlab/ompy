@@ -263,7 +263,7 @@ def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
                 header=None):
     if header is None:
         header = ("Format:\n"
-                  "     Eg0    Eg1    Eg2   ...\n"
+                  " 0   Eg0    Eg1    Eg2   ...\n"
                   "Ex0  val00  val01  val02\n"
                   "Ex1  val10  val11  ...\n"
                   "Ex2  ...\n"

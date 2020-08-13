@@ -204,7 +204,7 @@ class Matrix(AbstractArray):
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
-                auto-recognition. Options: ["numpy", "tar", "mama"]
+                auto-recognition. Options: ["numpy", "tar", "mama", "txt"]
             **kwargs: additional keyword arguments
 
         Raises:
