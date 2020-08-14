@@ -66,6 +66,7 @@ class Extractor:
         - If path is given, it tries to load. If path is later set,
           it is not created. This is a very common pattern. Consider
           superclassing the disk book-keeping.
+        - Add proper unit test
     """
     def __init__(self,
                  path: Optional[Union[str, Path]] = None):
@@ -116,9 +117,6 @@ class Extractor:
                 and gsf.
             regenerate (bool, optional): Whether to regenerate all nld and gsf
                 even if they are found on disk.
-
-        Raises:
-            ValueError: If no Ensemble instance is provided here or earlier.
         """
 
         if regenerate is None:
@@ -127,20 +125,23 @@ class Extractor:
 
         nlds = []
         gsfs = []
+
+        if regenerate:
+            try:  # If successfully loaded, we are done!
+                LOG.debug(f"loading from {path}")
+                self.load(self.path)
+                return None
+            except RuntimeError:  # We still need to do some number crunching
+                LOG.debug(f"Error loading, regenerating NLD and GSF")
+                pass
+
         np.random.seed(self.seed)  # seed also in `__init__`
         for i in tqdm(range(self.ensemble.size)):
-            nld_path = self.path / f'nld_{i}.npy'
-            gsf_path = self.path / f'gsf_{i}.npy'
-            if nld_path.exists() and gsf_path.exists() and not regenerate:
-                LOG.debug(f"loading from {nld_path} and {gsf_path}")
-                nlds.append(Vector(path=nld_path))
-                gsfs.append(Vector(path=gsf_path))
-            else:
-                nld, gsf = self.step(i)
-                nld.save(nld_path)
-                gsf.save(gsf_path)
-                nlds.append(nld)
-                gsfs.append(gsf)
+            nld, gsf = self.step(i)
+            nld.save(nld_path)
+            gsf.save(gsf_path)
+            nlds.append(nld)
+            gsfs.append(gsf)
 
         self.nld = nlds
         self.gsf = gsfs
@@ -356,16 +357,42 @@ class Extractor:
         assert np.isfinite(x0).all
         return x0
 
+    def save(self, path: Union[str, Path]):
+        """Save an ensemble of extracted NLD & GSF from disk.
+
+        Args:
+            path: Path to folder to save the ensemble
+
+        Raises:
+            RuntimeError if no NLD and GSF are set.
+            AssertionError if the number NLD and GSF are unequal.
+        """
+
+        path = Path(path)
+
+        assert len(self.nld) == len(self.gsf), \
+            "Number of NLD files doesn't match the number of GSF files."
+
+        # Due to the assertion above, we are sure that NLD and GSF have
+        # the same length. We only need to check one of them!
+        if len(self.nld) <= 0:
+            raise RuntimeError("No NLD or GSF set")
+
+        for (i, (nld, gsf)) in enumerate(zip(self.nld, self.gsf)):
+            nld_path = self.path / f'nld_{i}.npy'
+            gsf_path = self.path / f'gsf_{i}.npy'
+            nld.save(nld_path)
+            gsf.save(gsf_path)
+
     def load(self, path: Union[str, Path]):
-        """Load an ensemble of from disk.
+        """Load an ensemble of extracted NLD & GSF from disk.
 
         Args:
             path: Path to folder with ensemble
 
-        Returns:
-            extractor object with gSF and NLD set.
         Raises:
-            RuntimeError if the number of NLD and GSF doesn't match.
+            RuntimeError if there are no NLD & GSF files in the provided path.
+            AssertionError if the number NLD and GSF are unequal.
         """
 
         path = Path(path)
@@ -375,13 +402,18 @@ class Extractor:
         num_gsf = len(fnmatch.filter(next(os.walk(path))[2], 'gsf_*.npy'))
         num_nld = len(fnmatch.filter(next(os.walk(path))[2], 'nld_*.npy'))
 
-        if num_gsf != num_nld:
-            raise RuntimeError("The number of GSF and NLD files doesn't match")
-        for i in range(num_gsf):
+        assert num_gsf == num_nld, \
+            "Number of NLD files doesn't match the number of GSF files."
+
+        num = num_gsf
+
+        if num_gsf == num_nld == 0:
+            raise RuntimeError("No NLD and GSF files found.")
+
+        for i in range(num):
             gsf_path = path / f'gsf_{i}.npy'
-            self.gsf.append(Vector(path=gsf_path))
-        for i in range(num_nld):
             nld_path = path / f'nld_{i}.npy'
+            self.gsf.append(Vector(path=gsf_path))
             self.nld.append(Vector(path=nld_path))
 
     @staticmethod
