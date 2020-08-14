@@ -137,14 +137,13 @@ class Extractor:
 
         np.random.seed(self.seed)  # seed also in `__init__`
         for i in tqdm(range(ensemble.size)):
-            nld, gsf = self.step(i)
-            nld.save(nld_path)
-            gsf.save(gsf_path)
+            nld, gsf = self.step(ensemble, trapezoid, i)
             nlds.append(nld)
             gsfs.append(gsf)
 
         self.nld = nlds
         self.gsf = gsfs
+        self.save(self.path)
 
     def step(self, ensemble: Ensemble, trapezoid: Action,
              num: int) -> Tuple[Vector, Vector]:
@@ -159,7 +158,7 @@ class Extractor:
                 and gsf.
             num: Number of the fg matrix to extract
         """
-        nld, gsf = self._extract(num)
+        nld, gsf = self._extract(ensemble, trapezoid, num)
         return nld, gsf
 
     def _extract(self, ensemble: Ensemble, trapezoid: Action,
@@ -190,7 +189,7 @@ class Extractor:
         else:
             trapezoid.act_on(matrix)
             trapezoid.act_on(std)
-        nld, gsf = decompose(matrix, std)
+        nld, gsf = self.decompose(matrix, std)
         return nld, gsf
 
     def decompose(self, matrix: Matrix,
