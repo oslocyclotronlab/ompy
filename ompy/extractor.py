@@ -86,7 +86,7 @@ class Extractor:
             self.load(self.path)
         else:
             self.path = 'saved_run/extractor'
-            self.path = Path(path)
+            self.path = Path(self.path)
             self.path.mkdir(exist_ok=True, parents=True)
 
         self.x0 = None
