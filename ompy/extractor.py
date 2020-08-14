@@ -49,7 +49,9 @@ class Extractor:
         trapezoid (Action[Matrix]): The Action cutting the matrices of the
             Ensemble into the desired shape where from the nld and gsf will be
             extracted from.
-        path (path): The path to save and/or load nld and gsf to/from.
+        path (path): The path to save and/or load nld and gsf to/from. If given
+            the class will load nld and gsf if such files are found.
+            Defaults to 'saved_run/extractor' if nothing is given.
         extend_diagonal_by_resolution (bool, optional): If `True`,
             the fit will be extended beyond Ex=Eg by the (FWHM) of the
             resolution. Remember to set the resolution according to your
@@ -83,10 +85,13 @@ class Extractor:
 
         if path is not None:
             self.path = Path(path)
-            self.load(self.path)
+            try:
+                self.load(self.path)
+            except ValueError:  # Error given if no folder exist
+                self.path.mkdir(exist_ok=True, parents=True)
         else:
-            self.path = 'saved_run/extractor'
-            self.path = Path(self.path)
+            path = 'saved_run/extractor'
+            self.path = Path(path)
             self.path.mkdir(exist_ok=True, parents=True)
 
         self.x0 = None
@@ -390,11 +395,15 @@ class Extractor:
             path: Path to folder with ensemble
 
         Raises:
+            ValueError if path isn't a folder or doesn't exist.
             RuntimeError if there are no NLD & GSF files in the provided path.
             AssertionError if the number NLD and GSF are unequal.
         """
 
         path = Path(path)
+
+        if not path.isdir():
+            raise ValueError(f"Path '{path}' does not exist.")
 
         # Count number of files with name gsf_*.npy and nld_*.npy
         # in the folder where these are stored.
