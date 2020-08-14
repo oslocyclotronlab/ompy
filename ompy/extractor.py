@@ -121,7 +121,7 @@ class Extractor:
 
         if regenerate is None:
             regenerate = self.regenerate
-        self.path = Path(self.path)
+        path = Path(self.path)
 
         nlds = []
         gsfs = []
@@ -136,7 +136,7 @@ class Extractor:
                 pass
 
         np.random.seed(self.seed)  # seed also in `__init__`
-        for i in tqdm(range(self.ensemble.size)):
+        for i in tqdm(range(ensemble.size)):
             nld, gsf = self.step(i)
             nld.save(nld_path)
             gsf.save(gsf_path)
