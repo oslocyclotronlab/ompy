@@ -129,7 +129,7 @@ class Extractor:
         nlds = []
         gsfs = []
 
-        if regenerate:
+        if not regenerate:
             try:  # If successfully loaded, we are done!
                 LOG.debug(f"loading from {path}")
                 self.load(self.path)
