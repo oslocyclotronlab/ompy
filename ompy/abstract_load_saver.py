@@ -9,7 +9,8 @@ class abstract_load_saver:
         way for derived classes to save and load data from disk.
     """
 
-    def __init__(self, path: Union[Union[str, Path], None], is_dir: bool = True):
+    def __init__(self, path: Union[Union[str, Path], None],
+                 is_dir: bool = True):
         """ Set the default save position at this point.
             Args:
                 path: Where to save and/or load from disk.
@@ -21,25 +22,12 @@ class abstract_load_saver:
         else:
             self.path = Path(path)
             self.is_dir = is_dir
-
-            try:
-                self.load(self.path)
-            except ValueError:
-                if is_dir:
-                    self.path.mkdir(exist_ok=True, parents=True)
-                else:
-                    pass
-
-        def try_load(self):
-            """ Tries to load from file or folder set in self.path.
-            """
-
             if is_dir:
                 try:
                     self.load(self.path)
                 except ValueError:
                     self.path.mkdir(exist_ok=True, parents=True)
-            else:  # For files the exception should be handled elsewhere.
+            else:
                 self.load(self.path)
 
     def load(self, path: Union[str, Path],
@@ -53,7 +41,7 @@ class abstract_load_saver:
                     filetype from suffix if not given. Only applicable for
                     subclasses that loads a single file.
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def save(self, path: Union[str, Path],
              filetype: Optional[str] = None,
@@ -67,4 +55,4 @@ class abstract_load_saver:
                     filetype from suffix if not given. Only applicable for
                     subclasses that saves a single file.
         """
-        raise NotImplemented
+        raise NotImplementedError
