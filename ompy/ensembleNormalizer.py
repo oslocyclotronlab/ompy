@@ -262,11 +262,15 @@ class EnsembleNormalizer(AbstractNormalizer):
                                                          percentiles,
                                                          colors[1])
 
-        if plot_model_stats:
+        if plot_model_stats or return_stats:
+            if plot_model_stats:
+                ax_stats = ax
+            else:
+                fig, ax_stats = plt.subplots(2, 1)  # dummy
             Emin = samples["nld"].iloc[0].E[-1]
             x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=20)
             stats_nld_model = \
-                self.plot_nld_ext_stats(ax[0], x=x, samples=samples,
+                self.plot_nld_ext_stats(ax_stats[0], x=x, samples=samples,
                                         normalizer_nld=normalizer_nld,
                                         percentiles=percentiles,
                                         color=colors[2],
@@ -276,7 +280,7 @@ class EnsembleNormalizer(AbstractNormalizer):
             xlow = np.linspace(0.001, E[0], num=20)
             xhigh = np.linspace(E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
             stats_gsf_model = \
-                self.plot_gsf_ext_stats(ax[1], xlow=xlow, xhigh=xhigh,
+                self.plot_gsf_ext_stats(ax_stats[1], xlow=xlow, xhigh=xhigh,
                                         samples=samples,
                                         normalizer_gsf=normalizer_gsf,
                                         percentiles=percentiles,
