@@ -14,6 +14,7 @@ from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
+from .abstract_load_saver import abstract_load_saver
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -23,7 +24,7 @@ else:
 LOG = logging.getLogger(__name__)
 
 
-class Extractor:
+class Extractor(abstract_load_saver):
     """Extracts nld and γSF from an Ensemble or a Matrix
 
     Basically a wrapper around a minimization routine with bookeeping.
@@ -75,22 +76,15 @@ class Extractor:
         trapezoid (Action[Matrix], optional): see above
         path (Path or str, optional): see above
         """
+
         self.regenerate = False
         self.method = 'Powell'
         self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
 
-        if path is not None:
-            self.path = Path(path)
-            try:
-                self.load(self.path)
-            except ValueError:  # Error given if no folder exist
-                self.path.mkdir(exist_ok=True, parents=True)
-        else:
+        if path is None:
             path = 'saved_run/extractor'
-            self.path = Path(path)
-            self.path.mkdir(exist_ok=True, parents=True)
 
         self.x0 = None
         self.randomize_initial_values: bool = True
@@ -99,6 +93,8 @@ class Extractor:
 
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
+
+        super(Extractor, self).__init__(path, True)
 
     def __call__(self, ensemble: Ensemble, trapezoid: Action):
         return self.extract_from(ensemble, trapezoid)
@@ -406,22 +402,18 @@ class Extractor:
 
         # Count number of files with name gsf_*.npy and nld_*.npy
         # in the folder where these are stored.
-        num_gsf = len(fnmatch.filter(next(os.walk(path))[2], 'gsf_*.npy'))
-        num_nld = len(fnmatch.filter(next(os.walk(path))[2], 'nld_*.npy'))
+        gsfs = list(path.glob("gsf_[0-9]*.*"))
+        nlds = list(path.glob("nld_[0-9]*.*"))
 
-        assert num_gsf == num_nld, \
-            "Number of NLD files doesn't match the number of GSF files."
+        assert len(gsfs) == len(nlds), \
+            "Ensemble NLD/GSF corrupt"
 
-        num = num_gsf
-
-        if num_gsf == num_nld == 0:
+        if len(gsfs) == 0:
             raise RuntimeError("No NLD and GSF files found.")
 
-        for i in range(num):
-            gsf_path = path / f'gsf_{i}.npy'
-            nld_path = path / f'nld_{i}.npy'
-            self.gsf.append(Vector(path=gsf_path))
-            self.nld.append(Vector(path=nld_path))
+        for (gsf, nld) in zip(gsfs, nlds):
+            self.gsf.append(Vector(path=gsf))
+            self.nld.append(Vector(path=nld))
 
     @staticmethod
     def x0_BSFG(E_nld: np.ndarray, E0: float = -.2, a: float = 15):
