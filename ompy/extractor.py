@@ -6,8 +6,6 @@ from contextlib import redirect_stdout
 from uncertainties import unumpy
 import os
 import fnmatch
-
-import fnmatch
 from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 from scipy.optimize import minimize
@@ -68,7 +66,7 @@ class Extractor:
         - If path is given, it tries to load. If path is later set,
           it is not created. This is a very common pattern. Consider
           superclassing the disk book-keeping.
-        - Add proper unit test
+        - Add unit tests
     """
     def __init__(self,
                  path: Optional[Union[str, Path]] = None):
@@ -402,8 +400,9 @@ class Extractor:
 
         path = Path(path)
 
-        if not path.isdir():
-            raise ValueError(f"Path '{path}' does not exist.")
+        if not path.is_dir():
+            raise ValueError(f"Path '{path}' does not exist \
+            or is not a folder.")
 
         # Count number of files with name gsf_*.npy and nld_*.npy
         # in the folder where these are stored.
