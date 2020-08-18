@@ -9,26 +9,24 @@ class AbstractLoadSaver(object):
         way for derived classes to save and load data from disk.
     """
 
-    def __init__(self, path: Optional[Union[str, Path]],
+    def __init__(self, path: Optional[Union[str, Path]] = None,
                  is_dir: bool = True):
         """ Set the default save position at this point.
             Args:
                 path: Where to save and/or load from disk.
-                is_dir: If the target path is a folder or a file.
+                is_dir: If the target path is a folder or a file. Defaults to
+                    True.
         """
-
         if path is None:
             self.path = None
         else:
             self.path = Path(path)
             self.is_dir = is_dir
-            if is_dir:
-                try:
-                    self.load(self.path)
-                except ValueError:
-                    self.path.mkdir(exist_ok=True, parents=True)
-            else:
+            try:
                 self.load(self.path)
+            except ValueError:
+                if is_dir:
+                    self.path.mkdir(exist_ok=True, parents=True)
 
     def load(self, path: Union[str, Path],
              filetype: Optional[str] = None):
