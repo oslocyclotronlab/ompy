@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 
 
-class abstract_load_saver(object):
+class AbstractLoadSaver(object):
     """ An abstract super class to define the standard
         way for derived classes to save and load data from disk.
     """

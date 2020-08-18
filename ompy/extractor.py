@@ -14,7 +14,7 @@ from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
-from .abstract_load_saver import abstract_load_saver
+from .abstract_load_saver import AbstractLoadSaver
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -24,7 +24,7 @@ else:
 LOG = logging.getLogger(__name__)
 
 
-class Extractor(abstract_load_saver):
+class Extractor(AbstractLoadSaver):
     """Extracts nld and γSF from an Ensemble or a Matrix
 
     Basically a wrapper around a minimization routine with bookeeping.
@@ -32,7 +32,8 @@ class Extractor(abstract_load_saver):
     the desired shape, nuclear level density (nld) and gamma strength function
     (gsf/γSF) are extracted. The results are exposed in the attributes
     self.nld and self.gsf, as well as saved to disk. The saved results are
-    used if filenames match, or can be loaded manually with `load()`.
+    used if filenames match (and `regenerate` is `False`, or can be loaded
+    manually with `load()`.
 
     The method `decompose(matrix, [std])` extracts the nld and gsf from a
     single Matrix.
@@ -72,9 +73,8 @@ class Extractor(abstract_load_saver):
     def __init__(self,
                  path: Optional[Union[str, Path]] = None):
         """
-        ensemble (Ensemble, optional): see above
-        trapezoid (Action[Matrix], optional): see above
-        path (Path or str, optional): see above
+        Args:
+            path (Path or str, optional): see above
         """
 
         self.regenerate = False
@@ -100,7 +100,7 @@ class Extractor(abstract_load_saver):
         return self.extract_from(ensemble, trapezoid)
 
     def extract_from(self, ensemble: Ensemble,
-                     trapezoid: Action = None,
+                     trapezoid: Action,
                      regenerate: Optional[bool] = None):
         """Decompose each first generation matrix in an Ensemble
 
@@ -109,9 +109,8 @@ class Extractor(abstract_load_saver):
         attributes self.nld and self.gsf.
 
         Args:
-            ensemble (Ensemble, optional): The ensemble to extract nld and gsf
-                from. Can be provided in when initializing instead.
-            trapezoid (Action, optional): An Action describing the cut to apply
+            ensemble (Ensembl): The ensemble to extract nld and gsf from.
+            trapezoid (Action): An Action describing the cut to apply
                 to the matrices to obtain the desired region for extracting nld
                 and gsf.
             regenerate (bool, optional): Whether to regenerate all nld and gsf
@@ -150,8 +149,7 @@ class Extractor(abstract_load_saver):
         classes
 
         Args:
-            ensemble (Ensemble): The ensemble to extract nld and gsf
-                from. Can be provided in when initializing instead.
+            ensemble (Ensemble): The ensemble to extract nld and gsf from.
             trapezoid (Action): An Action describing the cut to apply
                 to the matrices to obtain the desired region for extracting nld
                 and gsf.
@@ -165,8 +163,7 @@ class Extractor(abstract_load_saver):
         """ Extract nld and gsf from matrix number i from Ensemble
 
         Args:
-            ensemble (Ensemble): The ensemble to extract nld and gsf
-                from. Can be provided in when initializing instead.
+            ensemble (Ensemble): The ensemble to extract nld and gsf from.
             trapezoid (Action): An Action describing the cut to apply
                 to the matrices to obtain the desired region for extracting nld
                 and gsf.
