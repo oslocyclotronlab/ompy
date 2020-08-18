@@ -9,7 +9,7 @@ class AbstractLoadSaver(object):
         way for derived classes to save and load data from disk.
     """
 
-    def __init__(self, path: Union[Union[str, Path], None],
+    def __init__(self, path: Optional[Union[str, Path]],
                  is_dir: bool = True):
         """ Set the default save position at this point.
             Args:
