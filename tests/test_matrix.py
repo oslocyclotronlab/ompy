@@ -1,7 +1,7 @@
 import pytest
 import ompy as om
 import numpy as np
-from numpy.testing import assert_equal
+from numpy.testing import assert_equal, assert_almost_equal
 from typing import Tuple
 
 
@@ -98,6 +98,27 @@ def test_numericals():
     assert_equal((matrix2@matrix1).values, values2@values1)
     assert_equal((matrix1@matrix2).values, values1@values2)
 
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_bin_shift(Ex, Eg):
+    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    mat = om.Matrix(values=values, Ex=Ex, Eg=Eg)
+
+    assert_almost_equal(Ex, mat.Ex)
+    assert_almost_equal(Eg, mat.Eg)
+
+    mat.to_lower_bin()
+    mat.to_mid_bin()
+    assert_almost_equal(Ex, mat.Ex)
+    assert_almost_equal(Eg, mat.Eg)
+
+    mat.to_mid_bin()
+    mat.to_lower_bin()
+    assert_almost_equal(Ex, mat.Ex)
+    assert_almost_equal(Eg, mat.Eg)
 
 # This does not work as of now...
 # def test_mutable():

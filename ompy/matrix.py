@@ -36,6 +36,9 @@ class Matrix(AbstractArray):
     y-direction and M is columns going in the x-direction, the "x-dimension"
     of the matrix has the same shape as the Ex array (Excitation axis)
 
+    Note:
+        Many functions will implicity assume linear binning.
+
     .. parsed-literal::
                    Diagonal Ex=Eγ
                                   v
@@ -284,8 +287,8 @@ class Matrix(AbstractArray):
         # Move all bins down to lower bins
         self.to_lower_bin()
         # Must extend it the range to make pcolormesh happy
-        dEg = self.Eg[1] - self.Eg[0]
-        dEx = self.Ex[1] - self.Ex[0]
+        dEg = self.Eg[-1] - self.Eg[-2]
+        dEx = self.Ex[-1] - self.Ex[-2]
         Eg = np.append(self.Eg, self.Eg[-1] + dEg)
         Ex = np.append(self.Ex, self.Ex[-1] + dEx)
         # Move the bins back up
