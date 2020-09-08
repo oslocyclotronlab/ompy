@@ -319,7 +319,6 @@ class Ensemble:
         if raw is None:
             LOG.debug("Raw matrix")
             raw = matrix - self.bg_ratio * bg
-            raw.remove_negative()
             raw.save(path)
         self.action_raw.act_on(raw)
         return raw
@@ -431,7 +430,6 @@ class Ensemble:
         std = np.sqrt(np.where(mat.values > 0, mat.values, 0))
         perturbed = rstate.normal(size=mat.shape, loc=mat.values,
                                   scale=std)
-        perturbed[perturbed < 0] = 0
         return perturbed
 
     def generate_poisson(self, state: str,

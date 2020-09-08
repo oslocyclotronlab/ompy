@@ -89,7 +89,7 @@ class FirstGeneration:
             raise ValueError("input matrix has to have positive Ex entries"
                              "only. Consider using `matrix.cut('Ex', Emin=0)`")
         if np.any(matrix.values < 0):
-            raise ValueError("input matrix has to have positive entries only.")
+            LOG.debug("input matrix has negative counts.")
 
         valley_correction = self.cut_valley_correction(matrix)
 
@@ -105,7 +105,6 @@ class FirstGeneration:
 
         final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
         final.state = "firstgen"
-        self.remove_negative(final)
         return final
 
     def setup(self, matrix: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
@@ -366,17 +365,6 @@ class FirstGeneration:
                     ag[i, :] += xs[i] * w[i, j] * div0(ag[j, :], xs[j])
 
         return ag
-
-    def remove_negative(self, matrix: Matrix):
-        """ Wrapper for Matrix.remove_negative()
-
-        Put in as an extra method to facilitate replacing this by eg.
-        `fill_and_remove_negatve`
-
-        Args:
-            matrix: Input matrix
-        """
-        matrix.remove_negative()
 
 
 def normalize_rows(array: np.ndarray) -> np.ndarray:

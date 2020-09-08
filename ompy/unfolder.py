@@ -112,11 +112,12 @@ class Unfolder:
             raise ValueError("Must have equal energy binning.")
 
         LOG.debug("Check for negative counts.")
-        if np.any(self.raw.values < 0) or np.any(self.R.values < 0):
-            raise ValueError("Raw and response cannot have negative counts."
+        if np.any(self.R.values < 0):
+            raise ValueError("Response cannot have negative counts."
                              "Consider using fill_negatives and "
                              "remove_negatives on the input matixes.")
-
+        if np.any(self.raw.values < 0):
+            LOG.debug("Raw matrix has negative counts.")
         self.r = self.raw.values
 
     def apply(self, raw: Matrix,
@@ -182,8 +183,6 @@ class Unfolder:
 
         unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
         unfolded.state = "unfolded"
-
-        self.remove_negative(unfolded)
         return unfolded
 
     def step(self, unfolded: np.ndarray, folded: np.ndarray,

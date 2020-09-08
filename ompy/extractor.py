@@ -224,7 +224,7 @@ class Extractor:
 
         """
         if np.any(matrix.values < 0):
-            raise ValueError("input matrix has to have positive entries only.")
+            LOG.debug("input matrix has negative entries.")
         if std is not None:
             std = std.copy()
             if np.any(std.values < 0):

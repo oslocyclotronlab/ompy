@@ -1,8 +1,16 @@
 # Release notes for OMpy
 
-## [Unreleased]
-Changes:
-- Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+## v.1.2.0
+Most important changes:
+Changed:
+  - No removal of negative counts in Ensemble generation, Unfolder and Firstgen
+    any longer. These can de applied, if wanted, through actions, see #119.
+
+Fixed:
+  - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+
+Added:
+  - New response matrixes of OSCAR
 
 ## v.1.1.0
 Most important changes:
