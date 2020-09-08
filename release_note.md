@@ -8,6 +8,7 @@ Changed:
 
 Fixed:
   - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+  - Fixed trapezoidal cut (binwidth resulted in `nan`)
 
 Added:
   - New response matrixes of OSCAR

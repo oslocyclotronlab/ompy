@@ -612,7 +612,7 @@ class Matrix(AbstractArray):
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: Optional[float] = None,
                   inplace: bool = True) -> Optional[Matrix]:
-        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
+        """Trapezoidal cut delimited by the Ex=Eg diagonal of the matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
@@ -645,7 +645,7 @@ class Matrix(AbstractArray):
 
         dEg = Eg_max - Ex_max
         if dEg > 0:
-            binwidth = Eg[1]-Eg[0]
+            binwidth = matrix.Eg[1]-matrix.Eg[0]
             dEg = np.ceil(dEg/binwidth) * binwidth
         mask[Eg >= Ex + dEg] = True
         matrix[mask] = 0
