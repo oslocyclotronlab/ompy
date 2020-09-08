@@ -225,7 +225,8 @@ class Matrix(AbstractArray):
         elif filetype == 'tar':
             save_tar([self.values, self.Eg, self.Ex], path)
         elif filetype == 'mama':
-            mama_write(self, path, comment="Made by Oslo Method Python")
+            mama_write(self, path, comment="Made by OMpy",
+                       **kwargs)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 

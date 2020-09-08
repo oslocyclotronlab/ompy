@@ -72,23 +72,24 @@ def mama_read(filename: str) -> Union[Tuple[ndarray, ndarray],
         return counts, x_array, y_array
 
 
-def mama_write(mat, filename, comment=""):
+def mama_write(mat, filename, comment="", **kwargs):
     ndim = mat.values.ndim
     if ndim == 1:
-        mama_write1D(mat, filename, comment)
+        mama_write1D(mat, filename, comment, **kwargs)
     elif ndim == 2:
-        mama_write2D(mat, filename, comment)
+        mama_write2D(mat, filename, comment, **kwargs)
     else:
         NotImplementedError("Mama cannot read ojects with more then 2D.")
 
 
-def mama_write1D(mat, filename, comment=""):
-    assert(mat.shape[0] <= 8192),\
-        "Mama cannot handle vectors with dimensions > 8192. "\
-        "Rebin before saving."
+def mama_write1D(vec, filename, comment="", _assert=True):
+    if _assert:
+        assert(vec.shape[0] <= 8192),\
+            "Mama cannot handle vectors with dimensions > 8192. "\
+            "Rebin before saving."
 
     # Calculate calibration coefficients.
-    calibration = mat.calibration()
+    calibration = vec.calibration()
     cal = {
         "a0x": calibration['a0'],
         "a1x": calibration['a1'],
@@ -111,16 +112,15 @@ def mama_write1D(mat, filename, comment=""):
             cal["a2x"],
         ))
     header_string += '!PRECISION=16 \n'
-    header_string += "!DIMENSION=1,0:{:4d} \n".format(
-        mat.shape[0] - 1)
-    header_string += '!CHANNEL=(0:%4d) ' % (mat.shape[0] - 1)
+    header_string += "!DIMENSION=1,0:{:4d} \n".format(vec.shape[0] - 1)
+    header_string += '!CHANNEL=(0:%4d) ' % (vec.shape[0] - 1)
 
     footer_string = "!IDEND=\n"
 
     # Write matrix:
     np.savetxt(
         filename,
-        mat.values,
+        vec.values,
         fmt="%-17.8E",
         delimiter=" ",
         newline="\n",
@@ -129,10 +129,11 @@ def mama_write1D(mat, filename, comment=""):
         comments="")
 
 
-def mama_write2D(mat, filename, comment=""):
-    assert(mat.shape[0] <= 2048 and mat.shape[1] <= 2048),\
-        "Mama cannot handle matrixes with any of the dimensions > 2048. "\
-        "Rebin before saving."
+def mama_write2D(mat, filename, comment="", _assert=True):
+    if _assert:
+        assert(mat.shape[0] <= 2048 and mat.shape[1] <= 2048),\
+            "Mama cannot handle matrixes with any of the dimensions > 2048. "\
+            "Rebin before saving."
 
     # Calculate calibration coefficients.
     calibration = mat.calibration()

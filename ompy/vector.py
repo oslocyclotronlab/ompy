@@ -186,9 +186,9 @@ class Vector(AbstractArray):
             else:
                 save_tar([vector.values, vector.E], path)
         elif filetype == 'mama':
-            mama_write(self, path)
+            mama_write(self, path, comment="Made by OMpy", **kwargs)
             if self.std is not None:
-                warnings.warn("MaMa cannot store std. " 
+                warnings.warn("MaMa cannot store std. "
                               "Consider using another format")
         elif filetype == 'csv':
             save_csv_1D(vector.values, vector.E, vector.std, path)
