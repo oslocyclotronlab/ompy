@@ -3,6 +3,10 @@
 ## [Unreleased]
 Changes:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+- Changed the way the `Extractor` class are called. The ensamble and trapezoid are no longer given in the
+  constructor, but are mandatory arguments in the `extract_from()` method. The class also now uses the same
+  convention for loading and saving from file as the `Vector` and `Matrix` classes.
+- Initial work to unify the way objects are saved/loaded from disk.
 
 ## v.1.1.0
 Most important changes:
