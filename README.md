@@ -61,7 +61,7 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
     ``` bash
     git clone https://github.com/JohannesBuchner/MultiNest
     cd MultiNest/build
-    cmake -DCMAKE_Fortran_FLAGS=-std=legacy ..
+    cmake -DCMAKE_Fortran_FLAGS="-std=legacy" ..
     make
     sudo make install
     ```
