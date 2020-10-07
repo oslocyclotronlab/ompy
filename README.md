@@ -49,7 +49,7 @@ git clone --recurse https://github.com/oslocyclotronlab/ompy/
 where the `--recurse` flag specifies, that all submodules shall be downloaded as well.
 
 ### Dependencies
- - Get and compile MultiNest (use the cmake version from [github.com/JohannesBuchner/MultiNest](https://github.com/JohannesBuchner/MultiNest)). The goal is to create lib/libmultinest.so
+ - Get and compile MultiNest (use the cmake version from [github.com/JohannesBuchner/MultiNest](https://github.com/JohannesBuchner/MultiNest)). The goal is to create lib/libmultinest.so    
     ``` bash
     git clone https://github.com/JohannesBuchner/MultiNest
     cd MultiNest/build
@@ -57,7 +57,16 @@ where the `--recurse` flag specifies, that all submodules shall be downloaded as
     make
     sudo make install
     ```
-    Multinest had following hard dependencies: `lapack` and `blas`. To use MPI, additionally openmp has to be installed (probably does not work for MAC users, see below.). With apt-get you may fix the dependencies by:
+    :warning: If the `make` steps above fails it might be that you have gcc/gfortran version 10 or higher. To fix this issue use the following steps instead
+    ``` bash
+    git clone https://github.com/JohannesBuchner/MultiNest
+    cd MultiNest/build
+    cmake -DCMAKE_Fortran_FLAGS="-std=legacy" ..
+    make
+    sudo make install
+    ```
+    
+    Multinest has following hard dependencies: `lapack` and `blas`. To use MPI, additionally openmp has to be installed (probably does not work for MAC users, see below.). With apt-get you may fix the dependencies by:
     ```bash
     sudo apt-get install liblapack-dev libblas-dev libomp-dev
     ```
