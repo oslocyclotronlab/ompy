@@ -202,7 +202,7 @@ class NormalizerSimultan(AbstractNormalizer):
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
 
-        normalizer_gsf.normalize(nld=nld, nld_model=nld_model)
+        normalizer_gsf.normalize(nld=nld, nld_model=nld_model, alpha=alpha)
         guess["B"] = normalizer_gsf.res.pars["B"][0]
 
         guess_print = copy.deepcopy(guess)
