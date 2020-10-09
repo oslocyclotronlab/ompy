@@ -54,6 +54,9 @@ class NormalizerNLD(AbstractNormalizer):
             values are on the form (min, max).
         model (Callable[..., ndarray]): The model to use at high energies
             to estimate the NLD. Defaults to constant temperature model.
+        de_kwargs(dict): Additional keywords to differential evolution.
+             Defaults to `{"seed": 65424}`. Note that `bounds` has been
+             taken out as a separate attribute, but is a keyword of de.
         multinest_path (Path): Where to save the multinest output.
             defaults to 'multinest'.
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
@@ -114,6 +117,7 @@ class NormalizerNLD(AbstractNormalizer):
                        'Eshift': [-5, 5]}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
+        self.de_kwargs = {"seed": 65424}
         self.multinest_path = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
@@ -267,12 +271,18 @@ class NormalizerNLD(AbstractNormalizer):
             return - self.lnlike(*args, **kwargs)
         args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
                 nldSn)
-        res = differential_evolution(neglnlike, bounds=bounds, args=args)
+        res = differential_evolution(neglnlike, bounds=bounds, args=args,
+                                     **self.de_kwargs)
 
         self.LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
+        for key, res in p0.items():
+            if res in self.bounds[key]:
+                self.LOG.warning(f"DE result for {key} is at edge its bound:"
+                                 f"{self.bounds[key]}. This will probably lead"
+                                 f"to wrong estimations in multinest, too.")
 
         return args, p0
 
