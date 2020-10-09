@@ -273,6 +273,11 @@ class NormalizerNLD(AbstractNormalizer):
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
+        for key, res in p0.items():
+            if res in self.bounds[key]:
+                self.LOG.warning(f"DE result for {key} is at edge its bound:"
+                                 f"{self.bounds[key]}. This will probably lead"
+                                 f"to wrong estimations in multinest, too.")
 
         return args, p0
 
