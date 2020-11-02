@@ -49,3 +49,4 @@ else:
     from .ensembleNormalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
+    from .stats import normal, truncnorm
