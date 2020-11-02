@@ -156,7 +156,8 @@ ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
                           ["src/stats.cpp"],
                           extra_compile_args=["-std=c++11", "-mfpmath=sse",
-                                              "-O3", "-funroll-loops", "-march=native"])
+                                              "-O3", "-funroll-loops",
+                                              "-march=native"])
 ]
 
 install_requires = numpy.loadtxt("requirements.txt", dtype="str").tolist()

@@ -6,7 +6,6 @@ import termtables as tt
 from numpy import ndarray
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any, Callable, Dict, Iterable, List
-#from scipy.stats import truncnorm
 import pymultinest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
