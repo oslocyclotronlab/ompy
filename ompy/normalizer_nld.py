@@ -380,7 +380,6 @@ class NormalizerNLD(AbstractNormalizer):
                                         outputfiles_basename=str(path))
 
         stats = analyzer.get_stats()
-        
         evidence = (stats['global evidence'], stats['global evidence error'])
 
         samples = analyzer.get_equal_weighted_posterior()[:, :-1]
