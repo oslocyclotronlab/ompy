@@ -6,7 +6,7 @@ import termtables as tt
 from numpy import ndarray
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any, Callable, Dict, Iterable, List
-from scipy.stats import truncnorm
+#from scipy.stats import truncnorm
 import pymultinest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
@@ -20,6 +20,7 @@ from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
+from .stats import truncnorm
 
 
 class NormalizerSimultan(AbstractNormalizer):
@@ -273,8 +274,8 @@ class NormalizerSimultan(AbstractNormalizer):
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm.ppf(cube[0], a_A, b_A, loc=mu_A,
-                                    scale=sigma_A)
+            cube[0] = truncnorm(cube[0], a_A, b_A)*sigma_A + mu_A
+
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -282,12 +283,10 @@ class NormalizerSimultan(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm.ppf(cube[3], a_Eshift, b_Eshift,
-                                    loc=mu_Eshift,
-                                    scale=sigma_Eshift)
+            cube[3] = truncnorm(cube[3], a_Eshift, b_Eshift)*sigma_Eshift \
+                + mu_Eshift
             # truncated normal prior
-            cube[4] = truncnorm.ppf(cube[4], a_B, b_B, loc=mu_B,
-                                    scale=sigma_B)
+            cube[4] = truncnorm(cube[4], a_B, b_B)*sigma_B + mu_B
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
