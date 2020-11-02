@@ -456,6 +456,7 @@ class ResultsNormalized(Model):
         gsf: see below
         pars: see below
         samples: see below
+        evidence: see below
         nld_model: see below
         gsf_model_low: see below
         gsf_model_high: see below
@@ -472,6 +473,10 @@ class ResultsNormalized(Model):
     #: (List[Dict[str, Any]]): Samples from the posterior of the parameters
     samples: List[Dict[str, Any]] = field(default_factory=list,
             metadata='Samples from the posterior of the parameters')  # noqa
+    #: (Tuple of List[Tuple]): Evidence and error in evidence for model
+    evidence: Union[Tuple[float, float], List[Tuple[float, float]]] \
+        = field(default_factory=list,
+                metadata='Global evidence for the model')
     #: (List[Callable[..., Any]]): nld model for each nld
     nld_model: List[Callable[..., Any]] = field(default_factory=list,
             metadata='nld model')  # noqa
