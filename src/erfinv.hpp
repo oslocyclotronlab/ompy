@@ -45,6 +45,7 @@ constexpr double erfinv_d2 = 1.637067800;
 constexpr double erfinv_d1 = 3.543889200;
 constexpr double erfinv_d0 = 1;
 
+/* Compute the inverse error function */
 inline double erfinv(double x)
 {
 
