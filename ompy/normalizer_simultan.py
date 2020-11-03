@@ -19,7 +19,7 @@ from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
-from .stats import truncnorm
+from .stats import truncnorm_ppf
 
 
 class NormalizerSimultan(AbstractNormalizer):
@@ -273,7 +273,7 @@ class NormalizerSimultan(AbstractNormalizer):
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm(cube[0], a_A, b_A)*sigma_A + mu_A
+            cube[0] = truncnorm_ppf(cube[0], a_A, b_A)*sigma_A + mu_A
 
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
@@ -282,10 +282,10 @@ class NormalizerSimultan(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm(cube[3], a_Eshift, b_Eshift)*sigma_Eshift \
-                + mu_Eshift
+            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
+                                    b_Eshift)*sigma_Eshift + mu_Eshift
             # truncated normal prior
-            cube[4] = truncnorm(cube[4], a_B, b_B)*sigma_B + mu_B
+            cube[4] = truncnorm_ppf(cube[4], a_B, b_B)*sigma_B + mu_B
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
