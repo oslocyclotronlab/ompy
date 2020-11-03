@@ -7,6 +7,7 @@ import os
 import builtins
 import platform
 from ctypes.util import find_library
+from pybind11.setup_helpers import Pybind11Extension
 
 try:
     from Cython.Build import cythonize
@@ -151,6 +152,14 @@ ext_modules = [
         Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
         ]
 
+ext_modules_pybind11 = [
+        Pybind11Extension("ompy.stats",
+                          ["src/stats.cpp"],
+                          extra_compile_args=["-std=c++11", "-mfpmath=sse",
+                                              "-O3", "-funroll-loops",
+                                              "-march=native"])
+]
+
 install_requires = numpy.loadtxt("requirements.txt", dtype="str").tolist()
 setup(name='OMpy',
       version=get_version_info()[0],
@@ -164,7 +173,7 @@ setup(name='OMpy',
                             compiler_directives={'language_level': "3",
                                                  'embedsignature': True},
                             compile_time_env={"OPENMP": openmp}
-                            ),
+                            )+ext_modules_pybind11,
       zip_safe=False,
       install_requires=install_requires
       )

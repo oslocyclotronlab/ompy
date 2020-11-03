@@ -3,6 +3,7 @@
 ## [Unreleased]
 Changes:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+- Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
 
 ## v.1.1.0
 Most important changes:

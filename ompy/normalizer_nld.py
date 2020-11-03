@@ -12,7 +12,7 @@ from scipy.optimize import differential_evolution
 from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
-from scipy.stats import truncnorm
+from .stats import truncnorm_ppf
 from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
@@ -339,8 +339,7 @@ class NormalizerNLD(AbstractNormalizer):
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm.ppf(cube[0], a_A, b_A, loc=mu_A,
-                                    scale=sigma_A)
+            cube[0] = truncnorm_ppf(cube[0], a_A, b_A)*sigma_A+mu_A
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -348,9 +347,8 @@ class NormalizerNLD(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm.ppf(cube[3], a_Eshift, b_Eshift,
-                                    loc=mu_Eshift,
-                                    scale=sigma_Eshift)
+            cube[3] = truncnorm_ppf.ppf(cube[3], a_Eshift,
+                                        b_Eshift)*sigma_Eshift + mu_Eshift
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
