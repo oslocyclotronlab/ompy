@@ -53,6 +53,6 @@ PYBIND11_MODULE(stats, m) {
             x: (float) quantile.
             alpha: (float)
             beta: (float)
-        Returns: Inverse of the cumulative normal distribution.)PREFIX");
+        Returns: Inverse of the cumulative normal distribution.)PREFIX", py::arg("alpha") = -INFINITY, py::arg("beta") = INFINITY);
     m.def("truncnorm_ppf_vec", py::vectorize(truncnorm_ppf), "Vectorized version of truncnorm_ppf accepting numpy arrays.");
 }
