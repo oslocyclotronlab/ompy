@@ -347,8 +347,8 @@ class NormalizerNLD(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf.ppf(cube[3], a_Eshift,
-                                        b_Eshift)*sigma_Eshift + mu_Eshift
+            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
+                                    b_Eshift)*sigma_Eshift + mu_Eshift
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
