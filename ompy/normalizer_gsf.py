@@ -437,7 +437,7 @@ class NormalizerGSF(AbstractNormalizer):
         """
         return SpinFunctions(Ex=Ex, J=J,
                              model=self.norm_pars.spincutModel,
-                             pars=self.norm_pars.spincutPars).distibution()
+                             pars=self.norm_pars.spincutPars).distribution()
 
     def plot(self, ax: Optional[Any] = None, *,
              add_label: bool = True,

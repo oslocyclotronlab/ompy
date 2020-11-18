@@ -46,7 +46,7 @@ class SpinFunctions:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
 
-    def distibution(self) -> Tuple[float, np.ndarray]:
+    def distribution(self) -> Tuple[float, np.ndarray]:
         """Get spin distribution
 
         Note: Assuming equal parity

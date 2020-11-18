@@ -13,7 +13,7 @@ def test_missing_parameter(spinpars):
     Js = 20
     with pytest.raises(TypeError):
         spindist = om.SpinFunctions(E, Js,
-                                    model="EB05", pars=spinpars).distibution()
+                                    model="EB05", pars=spinpars).distribution()
         spindist /= spindist.sum(axis=1)[:, np.newaxis]
 
 

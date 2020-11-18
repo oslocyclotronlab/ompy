@@ -568,7 +568,7 @@ class NormalizerNLD(AbstractNormalizer):
         def g(J):
             return SpinFunctions(Ex=Sn, J=J,
                                  model=spincutModel,
-                                 pars=spincutPars).distibution()
+                                 pars=spincutPars).distribution()
 
         if Jtarget == 0:
             summe = 1 / 2 * g(Jtarget + 1 / 2)
@@ -612,7 +612,7 @@ class NormalizerNLD(AbstractNormalizer):
         def g(J):
             return SpinFunctions(Ex=Sn, J=J,
                                  model=spincutModel,
-                                 pars=spincutPars).distibution()
+                                 pars=spincutPars).distribution()
 
         if Jtarget == 0:
             summe = 1 / 2 * g(Jtarget + 1 / 2)
