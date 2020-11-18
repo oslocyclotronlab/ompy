@@ -8,4 +8,4 @@
  uncertainties>=3.0.3
  tqdm
  pathos
- pybind11
+ pybind11>=2.6.0
