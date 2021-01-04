@@ -23,6 +23,7 @@ def test_init():
     with pytest.raises(ValueError):
         om.Vector(vals, [1, 2, 3, 4, 5])
 
+
 def test_len():
     N = 100
     E = np.linspace(0, 1, N)
@@ -191,7 +192,8 @@ def test_cut():
     assert_equal(vector.E, Ecut)
     assert_equal(vector.values, valcut)
 
-@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')
+
+@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')  # noqa
 def test_numericals():
     E = np.array([0, 1, 2])
     values1 = np.array([0, 1, -2.])
