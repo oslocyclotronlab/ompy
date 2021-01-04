@@ -391,6 +391,12 @@ class NormalizationParameters(Model):
     """Storage for normalization parameters + some convenience functions
     """
 
+    #: Element number of the nucleus
+    Z: Optional[int] = field(default=None,
+            metadata="Element number of the nucleus")  # noqa
+    #: Mass number of the nucleus
+    A: Optional[int] = field(default=None,
+            metadata="Mass number of the nucleus")  # noqa
     #: Average s-wave resonance spacing D0 [eV]
     D0: Optional[Tuple[float, float]] = field(default=None,
             metadata='Average s-wave resonance spacing D0 [eV]')  # noqa
