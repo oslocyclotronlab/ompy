@@ -23,6 +23,13 @@ def test_init():
     with pytest.raises(ValueError):
         om.Vector(vals, [1, 2, 3, 4, 5])
 
+def test_len():
+    N = 100
+    E = np.linspace(0, 1, N)
+    vals = np.linspace(2, 3.4, N)
+    vec = om.Vector(values=vals, E=E)
+    assert_equal(len(vec), N)
+
 
 def test_save_load_no_std():
     E = np.linspace(0, 1, 100)
