@@ -202,34 +202,50 @@ class Matrix(AbstractArray):
         self.verify_integrity()
 
     def save(self, path: Union[str, Path], filetype: Optional[str] = None,
-             **kwargs):
+             which: Optional[str] = 'values', **kwargs):
         """Save matrix to file
 
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
                 auto-recognition. Options: ["numpy", "tar", "mama", "txt"]
+            which (str, optional): Which attribute to save. Default is
+                'values'. Options: ["values", "std"]
             **kwargs: additional keyword arguments
-
         Raises:
             ValueError: If filetype is unknown
+            RuntimeError: If `std` attribute not set.
+            NotImplementedError: If which is unknown
         """
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
-        if self.std is not None:
-            warnings.warn(UserWarning(
-                "The `std` attribute of Matrix class cannot be saved to file."))
+        values = None
+        if which.lower() == 'values':
+            values = self.values
+            if self.std is not None:
+                warnings.warn(UserWarning("The std attribute of Matrix class has to be saved to file 'manually'. Call with which='std'."))  # noqa
+        elif which.lower() == 'std':
+            if self.std is None:
+                raise RuntimeError(f"Attribute `std` not set.")
+            values = self.std
+        else:
+            raise NotImplementedError(
+                f"{which} is unsupported: Use 'values' or 'std'")
 
         if filetype == 'numpy':
-            save_numpy_2D(self.values, self.Eg, self.Ex, path)
+            save_numpy_2D(values, self.Eg, self.Ex, path)
         elif filetype == 'txt':
-            save_txt_2D(self.values, self.Eg, self.Ex, path, **kwargs)
+            save_txt_2D(values, self.Eg, self.Ex, path, **kwargs)
         elif filetype == 'tar':
-            save_tar([self.values, self.Eg, self.Ex], path)
+            save_tar([values, self.Eg, self.Ex], path)
         elif filetype == 'mama':
+            if which.lower() == 'std':
+                warnings.warn(UserWarning(
+                    "Cannot write std attrbute to MaMa format."))
+
             mama_write(self, path, comment="Made by OMpy",
                        **kwargs)
         else:
