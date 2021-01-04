@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import warnings
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -217,6 +218,10 @@ class Matrix(AbstractArray):
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
+
+        if self.std is not None:
+            warnings.warn("The `std` attribute of Matrix class cannot be saved to file",
+                          category=UserWarning)
 
         if filetype == 'numpy':
             save_numpy_2D(self.values, self.Eg, self.Ex, path)
