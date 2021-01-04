@@ -467,9 +467,6 @@ class NormalizationParameters(Model):
     def A(self) -> Union[int, None]:
         if self._A is None:
             return self.spinMass
-        if self.spinMass is not None:
-            if self.spinMass != self._A:
-                warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
         return self._A
 
     @A.setter

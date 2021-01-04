@@ -21,9 +21,10 @@ def test_set_mass():
     with pytest.warns(UserWarning):
         normpar.spincutPars = {'mass': 18}
 
-    # We expect this to trigger a warning.
-    with pytest.warns(UserWarning):
+    # We expect this to NOT trigger a warning.
+    with pytest.warns(None) as record:
         A = normpar.A
+        assert len(record) == 0
 
     # We do not expect this to trigger a warning.
     with pytest.warns(None) as record:
