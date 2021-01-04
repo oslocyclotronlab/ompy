@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import pickle
+import warnings
 from pathlib import Path
 from dataclasses import dataclass, field, fields, asdict
 from typing import Optional, Union, Tuple, Any, Dict, Callable, List
@@ -395,7 +396,7 @@ class NormalizationParameters(Model):
     Z: Optional[int] = field(default=None,
             metadata="Element number of the nucleus")  # noqa
     #: Mass number of the nucleus
-    A: Optional[int] = field(default=None,
+    _A: Optional[int] = field(default=None,
             metadata="Mass number of the nucleus")  # noqa
     #: Average s-wave resonance spacing D0 [eV]
     D0: Optional[Tuple[float, float]] = field(default=None,
@@ -422,7 +423,7 @@ class NormalizationParameters(Model):
     spincutModel: str = field(default=None,
             metadata='Spincut model')  # noqa
     #: Parameters necessary for the spin cut model
-    spincutPars: Dict[str, Any] = field(default=None,
+    _spincutPars: Dict[str, Any] = field(default=None,
             metadata='parameters necessary for the spin cut model')  # noqa
 
     def E_grid(self,
@@ -438,6 +439,46 @@ class NormalizationParameters(Model):
         """
         return np.linspace(self.Emin, self.Sn[0], num=self.steps,
                            retstep=retstep)
+
+    @property
+    def spinMass(self) -> Union[int, None]:
+        try:
+            mass = self._spincutPars['mass']
+            return mass
+        except:  # noqa
+            return None
+
+    @property
+    def spincutPars(self) -> Dict[str, Any]:
+        return self._spincutPars
+
+    @spincutPars.setter
+    def spincutPars(self, value: Dict[str, Any]):
+        try:
+            mass = value['mass']
+            if self._A is not None:
+                if mass != self._A:
+                    warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
+        except KeyError:
+            pass
+        self._spincutPars = value
+
+    @property
+    def A(self) -> Union[int, None]:
+        if self._A is None:
+            return self.spinMass
+        if self.spinMass is not None:
+            if self.spinMass != self._A:
+                warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
+        return self._A
+
+    @A.setter
+    def A(self, value: int) -> None:
+        self._A = value
+        if self.spinMass is not None:
+            if self.spinMass != value:
+                warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
+        self._A = value
 
     @property
     def Emax(self) -> float:
