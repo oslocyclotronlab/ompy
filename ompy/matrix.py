@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import warnings
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -201,30 +202,50 @@ class Matrix(AbstractArray):
         self.verify_integrity()
 
     def save(self, path: Union[str, Path], filetype: Optional[str] = None,
-             **kwargs):
+             which: Optional[str] = 'values', **kwargs):
         """Save matrix to file
 
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
                 auto-recognition. Options: ["numpy", "tar", "mama", "txt"]
+            which (str, optional): Which attribute to save. Default is
+                'values'. Options: ["values", "std"]
             **kwargs: additional keyword arguments
-
         Raises:
             ValueError: If filetype is unknown
+            RuntimeError: If `std` attribute not set.
+            NotImplementedError: If which is unknown
         """
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
+        values = None
+        if which.lower() == 'values':
+            values = self.values
+            if self.std is not None:
+                warnings.warn(UserWarning("The std attribute of Matrix class has to be saved to file 'manually'. Call with which='std'."))  # noqa
+        elif which.lower() == 'std':
+            if self.std is None:
+                raise RuntimeError(f"Attribute `std` not set.")
+            values = self.std
+        else:
+            raise NotImplementedError(
+                f"{which} is unsupported: Use 'values' or 'std'")
+
         if filetype == 'numpy':
-            save_numpy_2D(self.values, self.Eg, self.Ex, path)
+            save_numpy_2D(values, self.Eg, self.Ex, path)
         elif filetype == 'txt':
-            save_txt_2D(self.values, self.Eg, self.Ex, path, **kwargs)
+            save_txt_2D(values, self.Eg, self.Ex, path, **kwargs)
         elif filetype == 'tar':
-            save_tar([self.values, self.Eg, self.Ex], path)
+            save_tar([values, self.Eg, self.Ex], path)
         elif filetype == 'mama':
+            if which.lower() == 'std':
+                warnings.warn(UserWarning(
+                    "Cannot write std attrbute to MaMa format."))
+
             mama_write(self, path, comment="Made by OMpy",
                        **kwargs)
         else:
@@ -307,7 +328,7 @@ class Matrix(AbstractArray):
             ax.tick_params(axis='x', rotation=40)
             ax.yaxis.set_major_locator(MeshLocator(self.Ex))
         # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
+        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
@@ -612,7 +633,8 @@ class Matrix(AbstractArray):
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: Optional[float] = None,
                   inplace: bool = True) -> Optional[Matrix]:
-        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
+        """Create a trapezoidal cut or mask delimited by the diagonal of the
+            matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
@@ -729,8 +751,8 @@ class Matrix(AbstractArray):
             entries with `Eg > Ex + dE`.
         Args:
             mat: The matrix to iterate over
-            Iterator[Tuple[int, int]]: Indicies (i, j) over the last non-zero (=diagonal)
-            elements.
+            Iterator[Tuple[int, int]]: Indicies (i, j) over the last
+                non-zero(=diagonal) elements.
         """
         return diagonal_elements(self.values)
 
@@ -862,6 +884,7 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):
