@@ -80,6 +80,9 @@ class Vector(AbstractArray):
             self.load(path)
         self.verify_integrity()
 
+    def __len__(self):
+        return len(self.values)
+
     def verify_integrity(self, check_equidistant: bool = False):
         """ Verify the internal consistency of the vector
 
