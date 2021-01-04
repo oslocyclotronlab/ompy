@@ -220,8 +220,8 @@ class Matrix(AbstractArray):
         filetype = filetype.lower()
 
         if self.std is not None:
-            warnings.warn("The `std` attribute of Matrix class cannot be saved to file",
-                          category=UserWarning)
+            warnings.warn(UserWarning(
+                "The `std` attribute of Matrix class cannot be saved to file."))
 
         if filetype == 'numpy':
             save_numpy_2D(self.values, self.Eg, self.Ex, path)
@@ -312,7 +312,7 @@ class Matrix(AbstractArray):
             ax.tick_params(axis='x', rotation=40)
             ax.yaxis.set_major_locator(MeshLocator(self.Ex))
         # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
+        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
@@ -617,7 +617,8 @@ class Matrix(AbstractArray):
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: Optional[float] = None,
                   inplace: bool = True) -> Optional[Matrix]:
-        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
+        """Create a trapezoidal cut or mask delimited by the diagonal of the
+            matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
@@ -734,8 +735,8 @@ class Matrix(AbstractArray):
             entries with `Eg > Ex + dE`.
         Args:
             mat: The matrix to iterate over
-            Iterator[Tuple[int, int]]: Indicies (i, j) over the last non-zero (=diagonal)
-            elements.
+            Iterator[Tuple[int, int]]: Indicies (i, j) over the last
+                non-zero(=diagonal) elements.
         """
         return diagonal_elements(self.values)
 
@@ -867,6 +868,7 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):
