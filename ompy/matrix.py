@@ -770,7 +770,6 @@ class Matrix(AbstractArray):
         """
         self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
 
-
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
         self.values = fill_negative_gauss(self.values, self.Eg, window_size)
