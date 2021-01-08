@@ -166,7 +166,7 @@ def test_save_which_error(Ex, Eg):
          ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
          ])
 def test_infere_shape(Ex, Eg):
-    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    values = np.zeros((len(Ex), len(Eg)), dtype="float")
     mat = om.Matrix(Ex=Ex, Eg=Eg)
     assert_equal(mat.values, values)
 
