@@ -99,7 +99,7 @@ class Matrix(AbstractArray):
             Ex: The excitation energies using midbinning.
             std: The standard deviations at each bin of `values`
             path: Load a Matrix from a given path
-            shape: Tuple (len(Ex), len(Ex)) to create a matrix with 0 counts.
+            shape: Tuple (len(Ex), len(Eg)) to create a matrix with 0 counts.
             state: An enum to keep track of what has been done to the matrix.
                 Can also be a str. like in ["raw", "unfolded", ...]
 
