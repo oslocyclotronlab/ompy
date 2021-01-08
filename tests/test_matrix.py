@@ -160,6 +160,17 @@ def test_save_which_error(Ex, Eg):
         mat.save("/tmp/mat.npy", which='Im not real')
 
 
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_infere_shape(Ex, Eg):
+    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    mat = om.Matrix(Ex=Ex, Eg=Eg)
+    assert_equal(mat.values, values)
+
+
 # This does not work as of now...
 # def test_mutable():
 #     E = np.array([0, 1, 2])

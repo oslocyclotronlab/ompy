@@ -108,6 +108,10 @@ class Matrix(AbstractArray):
         if shape is not None and values is not None:
             raise ValueError("'shape' and 'values' are exclusive")
 
+        # Case if Eg and Ex are given but no shape
+        if Eg is not None and Ex is not None and shape is None and values is None:  # noqa
+            shape = (len(Ex), len(Eg))
+
         if shape is not None:
             self.values = np.zeros(shape, dtype=float)
         else:
