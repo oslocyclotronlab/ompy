@@ -171,6 +171,24 @@ def test_infere_shape(Ex, Eg):
     assert_equal(mat.values, values)
 
 
+def test_fill_matrix():
+    """ TODO: add more cases such as making sure we are close to the correct
+    number, etc.
+    """
+    Ex = np.array([1., 2., 3.])
+    Eg = np.array([1., 2., 3., 4., 5., 6.])
+    values = np.zeros((len(Ex), len(Eg)))
+    mat = om.Matrix(Ex=Ex, Eg=Eg)
+
+    mat.fill(1.9, 2.4)
+    values[1][1] += 1
+    assert_equal(mat.values, values)
+
+    mat.fill(0., 6.)
+    values[-1][0] += 1
+    assert_equal(mat.values, values)
+
+
 # This does not work as of now...
 # def test_mutable():
 #     E = np.array([0, 1, 2])

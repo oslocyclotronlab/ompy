@@ -760,6 +760,17 @@ class Matrix(AbstractArray):
         """
         return diagonal_elements(self.values)
 
+    def fill(self, Eg: float, Ex: float, count: Optional[float] = 1) -> None:
+        """ Add counts to the bin containing Eg and Ex.
+        Args:
+            Eg: (float) x-axis value
+            Ex: (float) y-axis values
+            count: (Optional) number to add to the bin.
+        Returns: None
+        """
+        self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
+
+
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
         self.values = fill_negative_gauss(self.values, self.Eg, window_size)
