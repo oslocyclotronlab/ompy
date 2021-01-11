@@ -165,10 +165,18 @@ def test_save_which_error(Ex, Eg):
         [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
          ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
          ])
-def test_infere_shape(Ex, Eg):
+def test_shape_ZerosMatrix(Ex, Eg):
     values = np.zeros((len(Ex), len(Eg)), dtype="float")
-    mat = om.Matrix(Ex=Ex, Eg=Eg)
+    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
     assert_equal(mat.values, values)
+
+
+def test_ZerosMatrix_fail_without_enough_info():
+    energies = np.array([1, 2, 3])
+    with pytest.raises(AssertionError):
+        om.ZerosMatrix(Ex=energies)
+    with pytest.raises(AssertionError):
+        om.ZerosMatrix(Eg=energies)
 
 
 def test_fill_matrix():

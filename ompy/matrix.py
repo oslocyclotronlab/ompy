@@ -10,6 +10,7 @@ from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     Sequence, Optional, Iterator)
+import warnings
 from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
 from .filehandling import (mama_read, mama_write,
@@ -66,6 +67,7 @@ class Matrix(AbstractArray):
         std: Array of standard deviations
         path: Load a Matrix from a given path
         state: An enum to keep track of what has been done to the matrix
+        shape: Tuple (len(Ex), len(Eg)), the shape of `values`
 
 
     TODO:
@@ -99,28 +101,24 @@ class Matrix(AbstractArray):
             Ex: The excitation energies using midbinning.
             std: The standard deviations at each bin of `values`
             path: Load a Matrix from a given path
-            shape: Tuple (len(Ex), len(Eg)) to create a matrix with 0 counts.
             state: An enum to keep track of what has been done to the matrix.
                 Can also be a str. like in ["raw", "unfolded", ...]
+            shape: Depreciated. Use `ZerosMatrix` instead.
 
         """
-
-        if shape is not None and values is not None:
-            raise ValueError("'shape' and 'values' are exclusive")
-
-        # Case if Eg and Ex are given but no shape
-        if Eg is not None and Ex is not None and shape is None and values is None:  # noqa
-            shape = (len(Ex), len(Eg))
-
         if shape is not None:
-            self.values = np.zeros(shape, dtype=float)
-        else:
-            self.values = np.asarray(values, dtype=float).copy()
+            warnings.warn("Creating a Matrix with zeros as entries by the "
+                          "shape argument is depreciated. Use ZerosMatrix "
+                          "instead.", DeprecationWarning())
+            return ZerosMatrix(shape=shape, Ex=Ex, Eg=Eg,
+                               std=std, state=state)
 
-        if (values is not None or shape is not None) and Ex is None:
+        self.values = np.asarray(values, dtype=float).copy()
+
+        if (values is not None) and Ex is None:
             Ex = range(self.values.shape[0])
             Ex = np.asarray(Ex) + 0.5
-        if (values is not None or shape is not None) and Eg is None:
+        if (values is not None) and Eg is None:
             Eg = range(self.values.shape[1])
             Eg = np.asarray(Eg) + 0.5
 
@@ -821,6 +819,10 @@ class Matrix(AbstractArray):
         return np.arange(0, len(self.Ex), dtype=int)
 
     @property
+    def shape(self) -> Tuple[int, int]:
+        return self.values.shape
+
+    @property
     def counts(self) -> float:
         return self.values.sum()
 
@@ -898,6 +900,42 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
+
+class ZerosMatrix(Matrix):
+    """ Return new Matrix of given shape, filled with zeros.
+
+    Args:
+        shape: Shape of the new Matrix as [len(Ex), len(Eg)].
+            If Ex and Eg are provided, the shape is inferred.
+        Eg: The gamma ray energies using midbinning. Defaults to an array
+            with the length inferred from shape, if not provided.
+        Ex: The excitation energies using midbinning. Defaults to an array
+            with the length inferred from shape, if not provided.
+        std: Whether to create an array for the `std`, too
+    """
+    def __init__(self, shape: Optional[Tuple[int, int]] = None,
+                 Ex: Optional[np.ndarray] = None,
+                 Eg: Optional[np.ndarray] = None,
+                 std: bool = False,
+                 state: Union[str, MatrixState] = None):
+
+        # Case if Eg and Ex are given but no shape
+        if shape is None:
+            if (Eg is not None) and (Ex is not None):
+                shape = (len(Ex), len(Eg))
+            else:
+                raise AssertionError("Shape can only be inferred if"
+                                     "*both* Eg and Ex are given.")
+
+        values = np.zeros(shape, dtype=float)
+
+        if std:
+            self.std = np.zeros(shape, dtype=float)
+        else:
+            std = None
+
+        super().__init__(values=values, Ex=Ex, Eg=Eg, std=std, state=state)
 
 
 class MeshLocator(ticker.Locator):
