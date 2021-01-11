@@ -109,9 +109,14 @@ class Matrix(AbstractArray):
         if shape is not None:
             warnings.warn("Creating a Matrix with zeros as entries by the "
                           "shape argument is depreciated. Use ZerosMatrix "
-                          "instead.", DeprecationWarning())
-            return ZerosMatrix(shape=shape, Ex=Ex, Eg=Eg,
-                               std=std, state=state)
+                          "instead.", DeprecationWarning)
+            values = ZerosMatrix(shape=shape, Ex=Ex, Eg=Eg).values
+
+        if values is None and Ex is not None and Eg is not None:
+            warnings.warn("Creating a Matrix with zeros as entries only"
+                          "providing Ex and Eg is is depreciated. Use "
+                          "ZerosMatrix instead.", DeprecationWarning)
+            values = ZerosMatrix(Ex=Ex, Eg=Eg).values
 
         self.values = np.asarray(values, dtype=float).copy()
 
@@ -766,6 +771,7 @@ class Matrix(AbstractArray):
             count: (Optional) number to add to the bin.
         Returns: None
         """
+        print(Eg, Eg, self.values)
         self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
 
     def fill_negative(self, window_size: int):
@@ -929,7 +935,6 @@ class ZerosMatrix(Matrix):
                                      "*both* Eg and Ex are given.")
 
         values = np.zeros(shape, dtype=float)
-
         if std:
             self.std = np.zeros(shape, dtype=float)
         else:

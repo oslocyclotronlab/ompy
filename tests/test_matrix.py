@@ -186,7 +186,7 @@ def test_fill_matrix():
     Ex = np.array([1., 2., 3.])
     Eg = np.array([1., 2., 3., 4., 5., 6.])
     values = np.zeros((len(Ex), len(Eg)))
-    mat = om.Matrix(Ex=Ex, Eg=Eg)
+    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
 
     mat.fill(1.9, 2.4)
     values[1][1] += 1
