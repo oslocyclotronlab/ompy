@@ -62,8 +62,11 @@ class Model:
                                      f"or `None` in variable `{name}`.")
 
     def asdict(self) -> Dict[str, Any]:
-        """ wrapper for dataclasses.asdict() """
-        return asdict(self)
+        """ return fields and properties as dict """
+        dic = {prop: getattr(self, prop) for prop in dir(self)
+               if not (prop.startswith('__')
+                  or callable(getattr(Model, prop, None)))} # noqa
+        return dic
 
     def save(self, path: Union[str, Path]) -> None:
         """Save the model parameters to `path`
@@ -110,12 +113,21 @@ class Model:
     def __str__(self) -> str:
         string = f'Model {self.name}\n\n'
         for fld in fields(self):
-            if fld.name.startswith('_') or fld.name == 'name':
+            if fld.name == 'name':
                 continue
             if fld.metadata:
                 string += str(fld.metadata) + "\n"
-            string += f"{fld.name}: {gettype(fld.type)} = "
-            string += f"{getattr(self, fld.name)}\n\n"
+            # replace field name if equivalent property exists
+            # keep fld.type, as methods with property decorator are not typed
+            try:
+                assert fld.name[0] == '_'
+                fieldname = fld.name[1:]
+                val = getattr(self, fieldname)
+            except (AssertionError, AttributeError, IndexError):
+                fieldname = fld.name
+                val = getattr(self, fld.name)
+            string += f"{fieldname}: {gettype(fld.type)} = "
+            string += f"{val}\n\n"
         return string[:-2]
 
 
@@ -427,7 +439,8 @@ class NormalizationParameters(Model):
             metadata='parameters necessary for the spin cut model')  # noqa
 
     def E_grid(self,
-               retstep: bool = True) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+               retstep: bool = True
+               ) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
         """Wrapps np.linspace creates linearly spaced array from Emin to Emax
 
         Args:
