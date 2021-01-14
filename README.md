@@ -118,6 +118,9 @@ python setup.py build_ext --inplace
 ```
 
 ### Troubleshooting
+#### Try to reinstall
+If you changed / if after a `git pull` there have been any changes to one of the `cython` modules, you will have to reinstall/recompile anyways: `pip install -e .`.
+
 #### Docker container
 If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine. The dockerfile is in the [.binder](.binder) folder.
 
