@@ -402,6 +402,12 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
 @dataclass
 class NormalizationParameters(Model):
     """Storage for normalization parameters + some convenience functions
+
+    Note:
+        Due to a issue with automodapi #115, members using `default_factory`
+        have to be documented explicitly here
+
+        - .. autoattribute:: exclude_check_change
     """
 
     #: Element number of the nucleus
@@ -438,6 +444,23 @@ class NormalizationParameters(Model):
     _spincutPars: Dict[str, Any] = field(default=None,
             metadata='parameters necessary for the spin cut model')  # noqa
 
+    #: Optional Parameters (do not check in `is_changed`).
+    #: Defaults to ["A", "Z", "exclude_check_change"]
+    exclude_check_change: List[str] = \
+        field(default_factory=lambda: ["A", "Z", "exclude_check_change"],
+              metadata='Optional parameters.')
+
+    def is_changed(self, include: List[str] = [],
+                   exclude: Optional[List[str]] = None) -> None:
+        """Wrapper of :meth:`Model.is_changed()`
+
+        Note: List optional/convenience parameterts in
+            `self.exclude_check_change`.
+        """
+        if exclude is None:
+            exclude = self.exclude_check_change
+        super().is_changed(include=include, exclude=exclude)
+
     def E_grid(self,
                retstep: bool = True
                ) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
@@ -454,7 +477,8 @@ class NormalizationParameters(Model):
                            retstep=retstep)
 
     @property
-    def spinMass(self) -> Union[int, None]:
+    def spinMass(self):
+        """ Wrapper to get "mass" in self.spincutPars """
         try:
             mass = self._spincutPars['mass']
             return mass
@@ -463,6 +487,7 @@ class NormalizationParameters(Model):
 
     @property
     def spincutPars(self) -> Dict[str, Any]:
+        """ Parameters necessary for the spin cut model """
         return self._spincutPars
 
     @spincutPars.setter
@@ -478,6 +503,7 @@ class NormalizationParameters(Model):
 
     @property
     def A(self) -> Union[int, None]:
+        """ Mass number of the nucleus """
         if self._A is None:
             return self.spinMass
         return self._A
@@ -508,14 +534,17 @@ class NormalizationParameters(Model):
 class ResultsNormalized(Model):
     """Class to store the results of the Oslo Method
 
-    Attributes:
-        nld: see below
-        gsf: see below
-        pars: see below
-        samples: see below
-        nld_model: see below
-        gsf_model_low: see below
-        gsf_model_high: see below
+    Note:
+        Due to a issue with automodapi #115, members using `default_factory`
+        have to be documented explicitly here
+
+        .. autoattribute:: nld
+        .. autoattribute:: gsf
+        .. autoattribute:: pars
+        .. autoattribute:: samples
+        .. autoattribute:: nld_model
+        .. autoattribute:: gsf_model_low
+        .. autoattribute:: gsf_model_high
     """
     #: (Vector or List[Vector]): normalized or initial, depending on method
     nld: Union[Vector, List[Vector]] = field(default_factory=list,
