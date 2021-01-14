@@ -65,7 +65,7 @@ class Model:
         """ return fields and properties as dict """
         dic = {prop: getattr(self, prop) for prop in dir(self)
                if not (prop.startswith('__')
-                  or callable(getattr(Model, prop, None)))} # noqa
+                       or callable(getattr(Model, prop, None)))}
         return dic
 
     def save(self, path: Union[str, Path]) -> None:
