@@ -277,7 +277,6 @@ class Matrix(AbstractArray):
              scale: Optional[str] = None,
              vmin: Optional[float] = None,
              vmax: Optional[float] = None,
-             cmap: Optional[Any] = None,
              midbin_ticks: bool = False,
              add_cbar: bool = True,
              **kwargs) -> Any:
@@ -325,13 +324,13 @@ class Matrix(AbstractArray):
         self.to_mid_bin()
 
         # Set entries of 0 to white
-        current_cmap = copy.copy(cmap if cmap is not None else cm.get_cmap())
+        current_cmap = copy.copy(cm.get_cmap())
         current_cmap.set_bad(color='white')
+        kwargs.setdefault('cmap', current_cmap)
         mask = np.isnan(self.values) | (self.values == 0)
         masked = np.ma.array(self.values, mask=mask)
 
-        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, cmap=current_cmap,
-                              **kwargs)
+        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
         if midbin_ticks:
             ax.xaxis.set_major_locator(MeshLocator(self.Eg))
             ax.tick_params(axis='x', rotation=40)
