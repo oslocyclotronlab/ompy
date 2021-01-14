@@ -394,12 +394,13 @@ def self_if_none(instance: Any, variable: Any, nonable: bool = False) -> Any:
         instance: instance
         variable: The variable to check
         nonable: Does not raise ValueError if
-            variable is None.
+            variable and self.<variable_name> is None
+            (where <variable_name> is replace by the variable's name).
     Returns:
         The value of variable or instance.variable
     Raises:
-        ValueError if both variable and
-        self.variable are None.
+        ValueError: Nonable is True and if both variable and
+            self.variable are None
     """
     name = _retrieve_name(variable)
     if variable is None:
