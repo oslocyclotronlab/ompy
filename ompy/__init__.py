@@ -30,7 +30,7 @@ else:
     from .library import div0, fill_negative_gauss, fill_negative_max
     from .spinfunctions import SpinFunctions
     from .abstractarray import AbstractArray
-    from .matrix import Matrix
+    from .matrix import Matrix, ZerosMatrix
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .vector import Vector
     from .unfolder import Unfolder
