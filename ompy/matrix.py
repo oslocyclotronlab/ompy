@@ -766,12 +766,10 @@ class Matrix(AbstractArray):
     def fill(self, Eg: float, Ex: float, count: Optional[float] = 1) -> None:
         """ Add counts to the bin containing Eg and Ex.
         Args:
-            Eg: (float) x-axis value
-            Ex: (float) y-axis values
-            count: (Optional) number to add to the bin.
-        Returns: None
+            Eg (float): Eg energy value (x-axis value)
+            Ex (float): Ex energy value (y-axis value)
+            count (float, otional): Number to add to the bin. Defaults to 1.
         """
-        print(Eg, Eg, self.values)
         self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
 
     def fill_negative(self, window_size: int):
