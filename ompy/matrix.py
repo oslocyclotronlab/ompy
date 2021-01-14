@@ -291,7 +291,7 @@ class Matrix(AbstractArray):
             vmin: Minimum value for coloring in scaling
             vmax Maximum value for coloring in scaling
             add_cbar: Whether to add a colorbar. Defaults to True.
-            kwargs: Additional kwargs to plot command.
+            **kwargs: Additional kwargs to plot command.
 
         Returns:
             The ax used for plotting
@@ -388,7 +388,7 @@ class Matrix(AbstractArray):
             normalize: If True, normalize the counts to 1. Defaults to False.
             scale (optional, str): y-scale, i.e `log` or `linear`. Defaults to
                 "linear".
-            kwargs: Additional kwargs to plot command.
+            **kwargs: Additional kwargs to plot command.
 
         Raises:
             ValueError: If axis is not in [0, 1]
@@ -871,7 +871,7 @@ class Matrix(AbstractArray):
         """ Check whether `other` has equal binning as `self` within precision.
         Args:
             other (Matrix): Matrix to compare to.
-            kwargs: Additional kwargs to `np.allclose`.
+            **kwargs: Additional kwargs to `np.allclose`.
 
         Returns:
             bool (bool): Returns `True` if both arrays are equal  .
