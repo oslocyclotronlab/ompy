@@ -588,7 +588,12 @@ def fnld(E: ndarray, nld: Vector,
 
     It will take the extrapolation where no exp. data is available.
     """
-    fexp = log_interp1d(nld.E, nld.values)
+    fexp = None
+    if nld.E[0] > 0:
+        fexp = log_interp1d(np.concatenate(([0], nld.E)),
+                            np.concatenate(([0], nld.values)))
+    else:
+        fexp = log_interp1d(nld.E, nld.values)
 
     conds = [E <= nld.E[-1], E > nld.E[-1]]
     return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
