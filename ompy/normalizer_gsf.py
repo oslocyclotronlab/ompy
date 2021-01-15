@@ -133,7 +133,8 @@ class NormalizerGSF(AbstractNormalizer):
 
         Args:
             normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
-                to retrieve parameters. If `nld` and/or `nld_model` are not set, they are taken from `normalizer_nld.res` in `normalize`.
+                to retrieve parameters. If `nld` and/or `nld_model` are not
+                set, they are taken from `normalizer_nld.res` in `normalize`.
             nld (Optional[Vector], optional): NLD. If not set it is taken from
                 `normalizer_nld.res` in `normalize`.
             nld_model (Optional[Callable[..., Any]], optional): Model for nld
@@ -222,7 +223,8 @@ class NormalizerGSF(AbstractNormalizer):
 
     def extrapolate(self,
                     gsf: Optional[Vector] = None,
-                    E: Optional[np.ndarray] = [None, None]) -> Tuple[Vector, Vector]:
+                    E: Optional[np.ndarray] = [None, None]
+                    ) -> Tuple[Vector, Vector]:
         """ Extrapolate gsf using given models
 
         Args:
@@ -263,7 +265,6 @@ class NormalizerGSF(AbstractNormalizer):
             # placeholder if normalizations with
             NotImplementedError(f"Chosen normalization {self.method_Gg}"
                                 "method is not known.")
-
 
     def Gg_standard(self) -> float:
         """ Compute normalization from <Γγ> (Gg) integral, the "standard" way
@@ -588,7 +589,11 @@ def fnld(E: ndarray, nld: Vector,
 
     It will take the extrapolation where no exp. data is available.
     """
-    fexp = log_interp1d(nld.E, nld.values)
+    try:
+        fexp = log_interp1d(nld.E, nld.values)
+    except ValueError as e:
+        print(e)
+        raise ValueError("Probably your nld does not extend to 0 MeV. Please see https://github.com/oslocyclotronlab/ompy/issues/170 for more info.")  # noqa
 
     conds = [E <= nld.E[-1], E > nld.E[-1]]
     return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
