@@ -1,8 +1,9 @@
 # Oslo Method Python - OMpy
-[![Build Status](https://img.shields.io/travis/oslocyclotronlab/ompy/master?label=build%20%28master%29)](https://travis-ci.org/oslocyclotronlab/ompy)
+[![Build Status](https://img.shields.io/travis/oslocyclotronlab/ompy/master?label=build%20%28master%29)](https://travis-ci.com/oslocyclotronlab/ompy)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb)
 ![Code Climate maintainability](https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square)
 [![DOI](https://zenodo.org/badge/141709973.svg)](https://zenodo.org/badge/latestdoi/141709973)
+[![DOI](https://img.shields.io/badge/DOI-10.1016/j.cpc.2020.107795-yellowgreen)](https://doi.org/10.1016/j.cpc.2020.107795)
 <div style="text-align:center"><img height="300px" align="center" src="resources/demo.png?raw=true"></div>
 
 <p align="center">
@@ -34,12 +35,20 @@ If you want to try the package before installation, you may simply [click here](
 **NB! This repo is currently under development. Use it at your own risk.**
 
 ## Citing
-If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary. The DOI is to last *published* version; the *master* branch may be ahead of the *published* version.
+Please cite the following (more info below):
+- The code, by using the DOI documenting this github
+- The article describing the implementation
+- If the unfolding / first-generation methods are used, cite the corresponding articles
+- If you are unfolding, make sure to document also the response, e.g. through the citation guide on [OCL_response_functions](https://github.com/oslocyclotronlab/OCL_response_functions/)
+- For the decomposition / normalization, you *may* cite the previous implementation by Schiller (2000).
+
+**The code**: If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary. The DOI is to last *published* version; the *master* branch may be ahead of the *published* version.
 
 The full version (including the git commit) can also be obtained from `ompy.__full_version__` after installation.
 
-An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with rigorous statistical uncertainty propagation](https://arxiv.org/abs/1904.13248).
+**The article**: The *article* describing the implementation is now published in Comp. Phys. Comm. (2021): *A new software implementation of the Oslo method with rigorous statistical uncertainty propagation* [DOI: 10.1016/j.cpc.2020.107795](https://doi.org/10.1016/j.cpc.2020.107795).
 
+**Other methods**: We have reimplemented the unfolding [[Guttormsen (1996)]](https://doi.org/10.1016/0168-9002(96)00197-0) and first generation method [[Guttormsen (1987)]](https://doi.org/10.1016/0168-9002(87)91221-6), see also documentation in the corresponding classes. The decomposition/normalization is subject to the same degeneracy as shown in [[Schiller (2000)]](http://dx.doi.org/10.1016/s0168-9002(99)01187-0), but the minimizer and the normalization procedure are different, which is explained in detail in the OMpy article. 
 
 ## Installation
 Start off by downloading ompy:
@@ -109,6 +118,9 @@ python setup.py build_ext --inplace
 ```
 
 ### Troubleshooting
+#### Try to reinstall
+If you changed / if after a `git pull` there have been any changes to one of the `cython` modules, you will have to reinstall/recompile anyways: `pip install -e .`.
+
 #### Docker container
 If you don't succeed with the above, we also provide a [Docker](https://www.docker.com/get-started) container via dockerhub, see https://hub.docker.com/r/oslocyclotronlab/ompy. However, for everyday usage, we think it's easier to install the package *normally* on your machine. The dockerfile is in the [.binder](.binder) folder.
 

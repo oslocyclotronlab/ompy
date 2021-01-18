@@ -2,7 +2,11 @@ Welcome to OMpy's documentation!
 ================================
 
 
-|Travis| |Binder| |Code Climate maintainability| |DOI|
+|Travis| |Binder| |Code Climate maintainability| |DOI| |DOI-article|
+
+.. image:: ../../resources/demo.png
+   :height: 150px
+   :alt: ompy image
 
 This is ``ompy``, the Oslo method in python. It contains all the
 functionality needed to go from a raw coincidence matrix, via unfolding
@@ -13,15 +17,6 @@ simply `click here`_ to launch it on Binder.
 
 .. _click here: https://mybinder.org/v2/gh/oslocyclotronlab/ompy/master?filepath=ompy%2Fnotebooks%2Fgetting_started.ipynb
 
-Citing
-******
-If you cite OMpy, please use the version-specific DOI found by clicking the Zenodo badge above; create a new version if necessary. The DOI is to last *published* version; the *master* branch may be ahead of the *published* version.
-
-The full version (including the git commit) can also be obtained from `ompy.__full_version__` after installation.
-
-An article describing the implementation more detailled will follow shortly. A draft can be read on arXiv: [A new software implementation of the Oslo method with rigorous statistical uncertainty propagation](https://arxiv.org/abs/1904.13248).
-
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -30,6 +25,7 @@ An article describing the implementation more detailled will follow shortly. A d
    getting_started
    concepts
    API/index
+   cite
    LICENSE
 
 
@@ -37,7 +33,6 @@ Indices and tables
 ==================
 
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
 .. Include this to generate the api files to be included under API/index
 .. include:: api
@@ -49,3 +44,5 @@ Indices and tables
 .. |Code Climate maintainability| image:: https://img.shields.io/codeclimate/maintainability/oslocyclotronlab/ompy?style=flat-square
 .. |DOI| image:: https://zenodo.org/badge/141709973.svg
    :target: https://zenodo.org/badge/latestdoi/141709973
+.. |DOI-article| image:: https://img.shields.io/badge/DOI-10.1016/j.cpc.2020.107795-yellowgreen
+   :target: https://doi.org/10.1016/j.cpc.2020.107795

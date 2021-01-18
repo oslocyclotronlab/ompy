@@ -1,10 +1,18 @@
 # Release notes for OMpy
 
 ## [Unreleased]
-Changes:
+Added:
+- `ZerosMatrix` as a derived class to create a matrix fill with zeros.
+- `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg). 
+
+Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
 - Added `evidence` attribute to the `ResultsNormalized` class such that the global evidence of the Bayesian fit
   are stored with the results.
+- Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
+
+Deprecated:
+- `shape` argument of Matrix for creation of a matrix filled with zeros. Use `ZerosMatrix` instead.
 
 ## v.1.1.0
 Most important changes:
@@ -29,7 +37,7 @@ Several changes, most important:
 
 
 ## v0.9.1
-Changes:
+Changed:
 
 - corrected version number
 (v 0.9.0 has still v.0.8.0 as the version number)

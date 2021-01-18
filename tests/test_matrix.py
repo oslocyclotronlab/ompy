@@ -23,9 +23,11 @@ def ones(shape: Tuple[int, int]) -> om.Matrix:
     mat = np.tril(mat)
     return om.Matrix(values=mat)
 
+
 @pytest.fixture()
 def Si28():
     return om.example_raw('Si28')
+
 
 @pytest.mark.parametrize(
         "axis,Emin,Emax,shape",
@@ -78,7 +80,7 @@ def test_index(E, index):
     assert mat.index_Ex(E) == index
 
 
-@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')
+@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')  # noqa
 def test_numericals():
     E = np.array([0, 1, 2])
     values1 = np.array([[0, 1, 2.], [-2, 1, 2.],  [2, 3, -10.]])
@@ -97,6 +99,7 @@ def test_numericals():
 
     assert_equal((matrix2@matrix1).values, values2@values1)
     assert_equal((matrix1@matrix2).values, values1@values2)
+
 
 @pytest.mark.parametrize(
         "Ex,Eg",
@@ -119,6 +122,80 @@ def test_bin_shift(Ex, Eg):
     mat.to_lower_bin()
     assert_almost_equal(Ex, mat.Ex)
     assert_almost_equal(Eg, mat.Eg)
+
+
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_save_warning(Ex, Eg):
+    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    mat = om.Matrix(values=values, Ex=Ex, Eg=Eg, std=0.5*values)
+    with pytest.warns(UserWarning):
+        mat.save("/tmp/mat.npy")
+
+
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_save_std_exception(Ex, Eg):
+    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    mat = om.Matrix(values=values, Ex=Ex, Eg=Eg)
+    with pytest.raises(RuntimeError):
+        mat.save("/tmp/mat.npy", which='std')
+
+
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_save_which_error(Ex, Eg):
+    values = np.ones((len(Ex), len(Eg)), dtype="float")
+    mat = om.Matrix(values=values, Ex=Ex, Eg=Eg, std=0.5*values)
+    with pytest.raises(NotImplementedError):
+        mat.save("/tmp/mat.npy", which='Im not real')
+
+
+@pytest.mark.parametrize(
+        "Ex,Eg",
+        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
+         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
+         ])
+def test_shape_ZerosMatrix(Ex, Eg):
+    values = np.zeros((len(Ex), len(Eg)), dtype="float")
+    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
+    assert_equal(mat.values, values)
+
+
+def test_ZerosMatrix_fail_without_enough_info():
+    energies = np.array([1, 2, 3])
+    with pytest.raises(AssertionError):
+        om.ZerosMatrix(Ex=energies)
+    with pytest.raises(AssertionError):
+        om.ZerosMatrix(Eg=energies)
+
+
+def test_fill_matrix():
+    """ TODO: add more cases such as making sure we are close to the correct
+    number, etc.
+    """
+    Ex = np.array([1., 2., 3.])
+    Eg = np.array([1., 2., 3., 4., 5., 6.])
+    values = np.zeros((len(Ex), len(Eg)))
+    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
+
+    mat.fill(1.9, 2.4)
+    values[1][1] += 1
+    assert_equal(mat.values, values)
+
+    mat.fill(0., 6.)
+    values[-1][0] += 1
+    assert_equal(mat.values, values)
+
 
 # This does not work as of now...
 # def test_mutable():

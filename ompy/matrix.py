@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import warnings
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ from pathlib import Path
 from matplotlib.colors import LogNorm, Normalize
 from typing import (Dict, Iterable, Any, Union, Tuple,
                     Sequence, Optional, Iterator)
+import warnings
 from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
 from .filehandling import (mama_read, mama_write,
@@ -65,6 +67,7 @@ class Matrix(AbstractArray):
         std: Array of standard deviations
         path: Load a Matrix from a given path
         state: An enum to keep track of what has been done to the matrix
+        shape: Tuple (len(Ex), len(Eg)), the shape of `values`
 
 
     TODO:
@@ -98,24 +101,29 @@ class Matrix(AbstractArray):
             Ex: The excitation energies using midbinning.
             std: The standard deviations at each bin of `values`
             path: Load a Matrix from a given path
-            shape: Tuple (len(Ex), len(Ex)) to create a matrix with 0 counts.
             state: An enum to keep track of what has been done to the matrix.
                 Can also be a str. like in ["raw", "unfolded", ...]
+            shape: Depreciated. Use `ZerosMatrix` instead.
 
         """
-
-        if shape is not None and values is not None:
-            raise ValueError("'shape' and 'values' are exclusive")
-
         if shape is not None:
-            self.values = np.zeros(shape, dtype=float)
-        else:
-            self.values = np.asarray(values, dtype=float).copy()
+            warnings.warn("Creating a Matrix with zeros as entries by the "
+                          "shape argument is depreciated. Use ZerosMatrix "
+                          "instead.", DeprecationWarning)
+            values = ZerosMatrix(shape=shape, Ex=Ex, Eg=Eg).values
 
-        if (values is not None or shape is not None) and Ex is None:
+        if values is None and Ex is not None and Eg is not None:
+            warnings.warn("Creating a Matrix with zeros as entries only"
+                          "providing Ex and Eg is is depreciated. Use "
+                          "ZerosMatrix instead.", DeprecationWarning)
+            values = ZerosMatrix(Ex=Ex, Eg=Eg).values
+
+        self.values = np.asarray(values, dtype=float).copy()
+
+        if (values is not None) and Ex is None:
             Ex = range(self.values.shape[0])
             Ex = np.asarray(Ex) + 0.5
-        if (values is not None or shape is not None) and Eg is None:
+        if (values is not None) and Eg is None:
             Eg = range(self.values.shape[1])
             Eg = np.asarray(Eg) + 0.5
 
@@ -201,30 +209,50 @@ class Matrix(AbstractArray):
         self.verify_integrity()
 
     def save(self, path: Union[str, Path], filetype: Optional[str] = None,
-             **kwargs):
+             which: Optional[str] = 'values', **kwargs):
         """Save matrix to file
 
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
                 auto-recognition. Options: ["numpy", "tar", "mama", "txt"]
+            which (str, optional): Which attribute to save. Default is
+                'values'. Options: ["values", "std"]
             **kwargs: additional keyword arguments
-
         Raises:
             ValueError: If filetype is unknown
+            RuntimeError: If `std` attribute not set.
+            NotImplementedError: If which is unknown
         """
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
+        values = None
+        if which.lower() == 'values':
+            values = self.values
+            if self.std is not None:
+                warnings.warn(UserWarning("The std attribute of Matrix class has to be saved to file 'manually'. Call with which='std'."))  # noqa
+        elif which.lower() == 'std':
+            if self.std is None:
+                raise RuntimeError(f"Attribute `std` not set.")
+            values = self.std
+        else:
+            raise NotImplementedError(
+                f"{which} is unsupported: Use 'values' or 'std'")
+
         if filetype == 'numpy':
-            save_numpy_2D(self.values, self.Eg, self.Ex, path)
+            save_numpy_2D(values, self.Eg, self.Ex, path)
         elif filetype == 'txt':
-            save_txt_2D(self.values, self.Eg, self.Ex, path, **kwargs)
+            save_txt_2D(values, self.Eg, self.Ex, path, **kwargs)
         elif filetype == 'tar':
-            save_tar([self.values, self.Eg, self.Ex], path)
+            save_tar([values, self.Eg, self.Ex], path)
         elif filetype == 'mama':
+            if which.lower() == 'std':
+                warnings.warn(UserWarning(
+                    "Cannot write std attrbute to MaMa format."))
+
             mama_write(self, path, comment="Made by OMpy",
                        **kwargs)
         else:
@@ -263,7 +291,7 @@ class Matrix(AbstractArray):
             vmin: Minimum value for coloring in scaling
             vmax Maximum value for coloring in scaling
             add_cbar: Whether to add a colorbar. Defaults to True.
-            kwargs: Additional kwargs to plot command.
+            **kwargs: Additional kwargs to plot command.
 
         Returns:
             The ax used for plotting
@@ -296,8 +324,9 @@ class Matrix(AbstractArray):
         self.to_mid_bin()
 
         # Set entries of 0 to white
-        current_cmap = cm.get_cmap()
+        current_cmap = copy.copy(cm.get_cmap())
         current_cmap.set_bad(color='white')
+        kwargs.setdefault('cmap', current_cmap)
         mask = np.isnan(self.values) | (self.values == 0)
         masked = np.ma.array(self.values, mask=mask)
 
@@ -307,7 +336,7 @@ class Matrix(AbstractArray):
             ax.tick_params(axis='x', rotation=40)
             ax.yaxis.set_major_locator(MeshLocator(self.Ex))
         # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        #fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
+        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
         ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
@@ -359,7 +388,7 @@ class Matrix(AbstractArray):
             normalize: If True, normalize the counts to 1. Defaults to False.
             scale (optional, str): y-scale, i.e `log` or `linear`. Defaults to
                 "linear".
-            kwargs: Additional kwargs to plot command.
+            **kwargs: Additional kwargs to plot command.
 
         Raises:
             ValueError: If axis is not in [0, 1]
@@ -612,7 +641,8 @@ class Matrix(AbstractArray):
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: Optional[float] = None,
                   inplace: bool = True) -> Optional[Matrix]:
-        """Create a trapezoidal cut or mask delimited by the diagonal of the matrix
+        """Create a trapezoidal cut or mask delimited by the diagonal of the
+            matrix
 
         Args:
             Ex_min: The bottom edge of the trapezoid
@@ -729,10 +759,19 @@ class Matrix(AbstractArray):
             entries with `Eg > Ex + dE`.
         Args:
             mat: The matrix to iterate over
-            Iterator[Tuple[int, int]]: Indicies (i, j) over the last non-zero (=diagonal)
-            elements.
+            Iterator[Tuple[int, int]]: Indicies (i, j) over the last
+                non-zero(=diagonal) elements.
         """
         return diagonal_elements(self.values)
+
+    def fill(self, Eg: float, Ex: float, count: Optional[float] = 1) -> None:
+        """ Add counts to the bin containing Eg and Ex.
+        Args:
+            Eg (float): Eg energy value (x-axis value)
+            Ex (float): Ex energy value (y-axis value)
+            count (float, otional): Number to add to the bin. Defaults to 1.
+        """
+        self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
 
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
@@ -785,6 +824,10 @@ class Matrix(AbstractArray):
         return np.arange(0, len(self.Ex), dtype=int)
 
     @property
+    def shape(self) -> Tuple[int, int]:
+        return self.values.shape
+
+    @property
     def counts(self) -> float:
         return self.values.sum()
 
@@ -828,7 +871,7 @@ class Matrix(AbstractArray):
         """ Check whether `other` has equal binning as `self` within precision.
         Args:
             other (Matrix): Matrix to compare to.
-            kwargs: Additional kwargs to `np.allclose`.
+            **kwargs: Additional kwargs to `np.allclose`.
 
         Returns:
             bool (bool): Returns `True` if both arrays are equal  .
@@ -862,6 +905,42 @@ class Matrix(AbstractArray):
 
         result.values = result.values@other.values
         return result
+
+
+class ZerosMatrix(Matrix):
+    """ Return new Matrix of given shape, filled with zeros.
+
+    Args:
+        shape: Shape of the new Matrix as [len(Ex), len(Eg)].
+            If Ex and Eg are provided, the shape is inferred.
+        Eg: The gamma ray energies using midbinning. Defaults to an array
+            with the length inferred from shape, if not provided.
+        Ex: The excitation energies using midbinning. Defaults to an array
+            with the length inferred from shape, if not provided.
+        std: Whether to create an array for the `std`, too
+    """
+    def __init__(self, shape: Optional[Tuple[int, int]] = None,
+                 Ex: Optional[np.ndarray] = None,
+                 Eg: Optional[np.ndarray] = None,
+                 std: bool = False,
+                 state: Union[str, MatrixState] = None):
+
+        # Case if Eg and Ex are given but no shape
+        if shape is None:
+            if (Eg is not None) and (Ex is not None):
+                shape = (len(Ex), len(Eg))
+            else:
+                raise AssertionError("Shape can only be inferred if"
+                                     "*both* Eg and Ex are given.")
+
+        values = np.zeros(shape, dtype=float)
+        if std:
+            self.std = np.zeros(shape, dtype=float)
+        else:
+            std = None
+
+        super().__init__(values=values, Ex=Ex, Eg=Eg, std=std, state=state)
+
 
 class MeshLocator(ticker.Locator):
     def __init__(self, locs, nbins=10):

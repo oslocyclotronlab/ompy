@@ -1,6 +1,7 @@
 import numpy as np
 import re
 import pickle
+import warnings
 from pathlib import Path
 from dataclasses import dataclass, field, fields, asdict
 from typing import Optional, Union, Tuple, Any, Dict, Callable, List
@@ -61,8 +62,11 @@ class Model:
                                      f"or `None` in variable `{name}`.")
 
     def asdict(self) -> Dict[str, Any]:
-        """ wrapper for dataclasses.asdict() """
-        return asdict(self)
+        """ return fields and properties as dict """
+        dic = {prop: getattr(self, prop) for prop in dir(self)
+               if not (prop.startswith('__')
+                       or callable(getattr(Model, prop, None)))}
+        return dic
 
     def save(self, path: Union[str, Path]) -> None:
         """Save the model parameters to `path`
@@ -109,12 +113,21 @@ class Model:
     def __str__(self) -> str:
         string = f'Model {self.name}\n\n'
         for fld in fields(self):
-            if fld.name.startswith('_') or fld.name == 'name':
+            if fld.name == 'name':
                 continue
             if fld.metadata:
                 string += str(fld.metadata) + "\n"
-            string += f"{fld.name}: {gettype(fld.type)} = "
-            string += f"{getattr(self, fld.name)}\n\n"
+            # replace field name if equivalent property exists
+            # keep fld.type, as methods with property decorator are not typed
+            try:
+                assert fld.name[0] == '_'
+                fieldname = fld.name[1:]
+                val = getattr(self, fieldname)
+            except (AssertionError, AttributeError, IndexError):
+                fieldname = fld.name
+                val = getattr(self, fld.name)
+            string += f"{fieldname}: {gettype(fld.type)} = "
+            string += f"{val}\n\n"
         return string[:-2]
 
 
@@ -389,8 +402,20 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
 @dataclass
 class NormalizationParameters(Model):
     """Storage for normalization parameters + some convenience functions
+
+    Note:
+        Due to a issue with automodapi #115, members using `default_factory`
+        have to be documented explicitly here
+
+        - .. autoattribute:: exclude_check_change
     """
 
+    #: Element number of the nucleus
+    Z: Optional[int] = field(default=None,
+            metadata="Element number of the nucleus")  # noqa
+    #: Mass number of the nucleus
+    _A: Optional[int] = field(default=None,
+            metadata="Mass number of the nucleus")  # noqa
     #: Average s-wave resonance spacing D0 [eV]
     D0: Optional[Tuple[float, float]] = field(default=None,
             metadata='Average s-wave resonance spacing D0 [eV]')  # noqa
@@ -416,11 +441,29 @@ class NormalizationParameters(Model):
     spincutModel: str = field(default=None,
             metadata='Spincut model')  # noqa
     #: Parameters necessary for the spin cut model
-    spincutPars: Dict[str, Any] = field(default=None,
+    _spincutPars: Dict[str, Any] = field(default=None,
             metadata='parameters necessary for the spin cut model')  # noqa
 
+    #: Optional Parameters (do not check in `is_changed`).
+    #: Defaults to ["A", "Z", "exclude_check_change"]
+    exclude_check_change: List[str] = \
+        field(default_factory=lambda: ["A", "Z", "exclude_check_change"],
+              metadata='Optional parameters.')
+
+    def is_changed(self, include: List[str] = [],
+                   exclude: Optional[List[str]] = None) -> None:
+        """Wrapper of :meth:`Model.is_changed()`
+
+        Note: List optional/convenience parameterts in
+            `self.exclude_check_change`.
+        """
+        if exclude is None:
+            exclude = self.exclude_check_change
+        super().is_changed(include=include, exclude=exclude)
+
     def E_grid(self,
-               retstep: bool = True) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+               retstep: bool = True
+               ) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
         """Wrapps np.linspace creates linearly spaced array from Emin to Emax
 
         Args:
@@ -432,6 +475,46 @@ class NormalizationParameters(Model):
         """
         return np.linspace(self.Emin, self.Sn[0], num=self.steps,
                            retstep=retstep)
+
+    @property
+    def spinMass(self):
+        """ Wrapper to get "mass" in self.spincutPars """
+        try:
+            mass = self._spincutPars['mass']
+            return mass
+        except:  # noqa
+            return None
+
+    @property
+    def spincutPars(self) -> Dict[str, Any]:
+        """ Parameters necessary for the spin cut model """
+        return self._spincutPars
+
+    @spincutPars.setter
+    def spincutPars(self, value: Dict[str, Any]):
+        try:
+            mass = value['mass']
+            if self._A is not None:
+                if mass != self._A:
+                    warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
+        except KeyError:
+            pass
+        self._spincutPars = value
+
+    @property
+    def A(self) -> Union[int, None]:
+        """ Mass number of the nucleus """
+        if self._A is None:
+            return self.spinMass
+        return self._A
+
+    @A.setter
+    def A(self, value: int) -> None:
+        self._A = value
+        if self.spinMass is not None:
+            if self.spinMass != value:
+                warnings.warn(UserWarning("mass number set in `spincutPars` does not match `A`."))  # noqa
+        self._A = value
 
     @property
     def Emax(self) -> float:
@@ -451,15 +534,17 @@ class NormalizationParameters(Model):
 class ResultsNormalized(Model):
     """Class to store the results of the Oslo Method
 
-    Attributes:
-        nld: see below
-        gsf: see below
-        pars: see below
-        samples: see below
-        evidence: see below
-        nld_model: see below
-        gsf_model_low: see below
-        gsf_model_high: see below
+    Note:
+        Due to a issue with automodapi #115, members using `default_factory`
+        have to be documented explicitly here
+
+        .. autoattribute:: nld
+        .. autoattribute:: gsf
+        .. autoattribute:: pars
+        .. autoattribute:: samples
+        .. autoattribute:: nld_model
+        .. autoattribute:: gsf_model_low
+        .. autoattribute:: gsf_model_high
     """
     #: (Vector or List[Vector]): normalized or initial, depending on method
     nld: Union[Vector, List[Vector]] = field(default_factory=list,
