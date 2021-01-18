@@ -589,14 +589,14 @@ def fnld(E: ndarray, nld: Vector,
 
     It will take the extrapolation where no exp. data is available.
     """
+    fexp = log_interp1d(nld.E, nld.values)
+
+    conds = [E <= nld.E[-1], E > nld.E[-1]]
     try:
-        fexp = log_interp1d(nld.E, nld.values)
+        return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
     except ValueError as e:
         print(e)
         raise ValueError("Probably your nld does not extend to 0 MeV. Please see https://github.com/oslocyclotronlab/ompy/issues/170 for more info.")  # noqa
-
-    conds = [E <= nld.E[-1], E > nld.E[-1]]
-    return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
 
 
 def fgsf(E: ndarray, gsf: Vector,
