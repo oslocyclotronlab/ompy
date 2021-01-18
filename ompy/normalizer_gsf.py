@@ -133,7 +133,8 @@ class NormalizerGSF(AbstractNormalizer):
 
         Args:
             normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
-                to retrieve parameters. If `nld` and/or `nld_model` are not set, they are taken from `normalizer_nld.res` in `normalize`.
+                to retrieve parameters. If `nld` and/or `nld_model` are not
+                set, they are taken from `normalizer_nld.res` in `normalize`.
             nld (Optional[Vector], optional): NLD. If not set it is taken from
                 `normalizer_nld.res` in `normalize`.
             nld_model (Optional[Callable[..., Any]], optional): Model for nld
@@ -222,7 +223,8 @@ class NormalizerGSF(AbstractNormalizer):
 
     def extrapolate(self,
                     gsf: Optional[Vector] = None,
-                    E: Optional[np.ndarray] = [None, None]) -> Tuple[Vector, Vector]:
+                    E: Optional[np.ndarray] = [None, None]
+                    ) -> Tuple[Vector, Vector]:
         """ Extrapolate gsf using given models
 
         Args:
@@ -263,7 +265,6 @@ class NormalizerGSF(AbstractNormalizer):
             # placeholder if normalizations with
             NotImplementedError(f"Chosen normalization {self.method_Gg}"
                                 "method is not known.")
-
 
     def Gg_standard(self) -> float:
         """ Compute normalization from <Γγ> (Gg) integral, the "standard" way
@@ -324,10 +325,10 @@ class NormalizerGSF(AbstractNormalizer):
         """
 
         def wnld(E) -> ndarray:
-            return fnld(E, self.nld, self.nld_model)
+            return self.fnld(E, self.nld, self.nld_model)
 
         def wgsf(E) -> ndarray:
-            return fgsf(E, self._gsf, self._gsf_low, self._gsf_high)
+            return self.fgsf(E, self._gsf, self._gsf_low, self._gsf_high)
 
         def integrate() -> ndarray:
             Eg, stepsize = self.norm_pars.E_grid()
@@ -581,28 +582,59 @@ class NormalizerGSF(AbstractNormalizer):
         """ wrapper for lib.self_if_none """
         return self_if_none(self, *args, **kwargs)
 
+    @staticmethod
+    def fnld(E: ndarray, nld: Vector,
+             nld_model: Callable) -> ndarray:
+        """Function composed of nld and model, providing `y = nld(E)`
 
-def fnld(E: ndarray, nld: Vector,
-         nld_model: Callable) -> ndarray:
-    """ Function composed of nld and model, providing y = nld(E)
+        Args:
+            E (ndarray): Energies to evaluate
+            nld (Vector): NLD Vector for composition
+            nld_model (Callable): NLD model for composition
 
-    It will take the extrapolation where no exp. data is available.
-    """
-    fexp = log_interp1d(nld.E, nld.values)
+        Returns:
+            ndarray: Composite NLD
 
-    conds = [E <= nld.E[-1], E > nld.E[-1]]
-    return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
+        Raises:
+            ValueError: For low energies, the nld is not extrapolated. This
+                may cause an error, in the calculation of Gg, when
+                `nld` does not extend to 0. Please see
+                https://github.com/oslocyclotronlab/ompy/issues/170 for more
+                info.
+        """
+        fexp = log_interp1d(nld.E, nld.values)
 
+        conds = [E <= nld.E[-1], E > nld.E[-1]]
+        try:
+            return np.piecewise(E, conds, [fexp, nld_model(E[conds[-1]])])
+        except ValueError as e:
+            print(e)
+            raise ValueError("Probably your nld does not extend to 0 MeV. Please see https://github.com/oslocyclotronlab/ompy/issues/170 for more info.")  # noqa
 
-def fgsf(E: ndarray, gsf: Vector,
-         gsf_low: Vector, gsf_high: Vector) -> ndarray:
-    """ Function composed of gsf and model, providing y = gsf(E)
+    @staticmethod
+    def fgsf(E: ndarray, gsf: Vector,
+             gsf_low: Vector, gsf_high: Vector) -> ndarray:
+        """Function composed of gsf and model, providing `y = gsf(E)`
 
-    It will take the extrapolation where no exp. data is available.
-    """
-    exp = log_interp1d(gsf.E, gsf.values)
-    ext_low = log_interp1d(gsf_low.E, gsf_low.values)
-    ext_high = log_interp1d(gsf_high.E, gsf_high.values)
+        Note:
+            It will take the extrapolation where no exp. data is available.
 
-    conds = [E < gsf.E[0], (E >= gsf.E[0]) & (E <= gsf.E[-1]), E > gsf.E[-1]]
-    return np.piecewise(E, conds, [ext_low, exp, ext_high])
+        Args:
+            E (ndarray): Energies to evaluate
+            gsf (Vector): GSF Vector for composition (mid part)
+            gsf_low (Vector): GSF Vector for composition (lower part),
+                usually an extrapolation
+            gsf_high (Vector): GSF Vector for composition (higher part),
+                usually an extrapolation
+
+        Returns:
+            ndarray: Description
+        """
+        exp = log_interp1d(gsf.E, gsf.values)
+        ext_low = log_interp1d(gsf_low.E, gsf_low.values)
+        ext_high = log_interp1d(gsf_high.E, gsf_high.values)
+
+        conds = [E < gsf.E[0],
+                 (E >= gsf.E[0]) & (E <= gsf.E[-1]),
+                 E > gsf.E[-1]]
+        return np.piecewise(E, conds, [ext_low, exp, ext_high])
