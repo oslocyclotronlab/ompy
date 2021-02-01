@@ -153,6 +153,8 @@ class Extractor:
         self.nld = nlds
         self.gsf = gsfs
 
+        self.check_unconstrained_results()
+
     def step(self, num: int) -> Tuple[Vector, Vector]:
         """ Wrapper around _extract in order to be consistent with other classes
 
@@ -289,7 +291,7 @@ class Extractor:
         T = res.x[:matrix.Eg.size]
         nld = res.x[matrix.Eg.size:]
 
-        # Set elements that couldn't be constrained (no entries) to np.na
+        # Set elements that couldn't be constrained (no entries) to np.nan
         nld_counts0, T_counts0 = self.constraining_counts(matrix, resolution)
         T[T_counts0 == 0] = np.nan
         nld[nld_counts0 == 0] = np.nan
@@ -523,6 +525,31 @@ class Extractor:
             ax[1].set_yscale("log")
 
         return fig, ax
+
+    def check_unconstrained_results(self) -> bool:
+        """ Checks results for unconstrained elements (np.nan)
+
+        Returns:
+            bool: True if results contain unconstrained elements, else False
+        """
+        contains_nan = False
+        for i, vec in enumerate(self.nld):
+            if np.isnan(vec.values).any():
+                contains_nan = True
+                LOG.warning(f"nld #{i} contains nan's.\n"
+                            "Consider removing them e.g. with:\n"
+                            "# for nld in extractor.nld:\n"
+                            "#     nld.cut_nan()\n")
+
+        for i, vec in enumerate(self.nld):
+            if np.isnan(vec.values).any():
+                contains_nan = True
+                LOG.warning(f"gsf #{i} contains nan's.\n"
+                            "Consider removing them e.g. with:\n"
+                            "# for gsf in extractor.gsf:\n"
+                            "#     gsf.cut_nan()\n")
+
+        return contains_nan
 
     def nld_mean(self) -> np.ndarray:
         return np.nanmean([nld.values for nld in self.nld], axis=0)
