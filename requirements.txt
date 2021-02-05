@@ -9,3 +9,5 @@
  tqdm
  pathos
  pybind11>=2.6.0
+ ipython
+ watermark
