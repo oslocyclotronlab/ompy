@@ -1,9 +1,6 @@
 language: python
 
-python:
-  - "3.7"
-  - "3.8"
-  - "3.9"
+python: 3.7
 
 matrix:
 
@@ -54,8 +51,8 @@ before_install:
     export LD_LIBRARY_PATH=${DEPS_DIR}/MultiNest/lib:${LD_LIBRARY_PATH}
 
 install:
-  - pip install cython scipy numpy matplotlib future pytest ipython
-  - pip install -e .
+  - pip3 install cython scipy numpy matplotlib future pytest ipython
+  - pip3 install -e .
 
 script:
     - ipython check_env.py
