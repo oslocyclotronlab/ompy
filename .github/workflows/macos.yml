@@ -33,8 +33,8 @@ jobs:
           cd ${DEPS_DIR}/MultiNest/build && cmake .. && make && cd ${GITHUB_WORKSPACE}
           export LD_LIBRARY_PATH=${DEPS_DIR}/MultiNest/lib:${LD_LIBRARY_PATH}
         env:
-          DEPS_DIR: "${GITHUB_WORKSPACE}/deps"
-          LD_LIBRARY_PATH: "${GITHUB_WORKSPACE}/MultiNest/lib:${LD_LIBRARY_PATH}"
+          DEPS_DIR: ${GITHUB_WORKSPACE}/deps
+          LD_LIBRARY_PATH: ${GITHUB_WORKSPACE}/MultiNest/lib:${LD_LIBRARY_PATH}
 
       - name: Install dependencies
         run: |
