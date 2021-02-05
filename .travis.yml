@@ -51,7 +51,7 @@ before_install:
     export LD_LIBRARY_PATH=${DEPS_DIR}/MultiNest/lib:${LD_LIBRARY_PATH}
 
 install:
-  - pip3 install cython scipy numpy matplotlib future pytest
+  - pip3 install cython scipy numpy matplotlib future pytest ipython
   - pip3 install -e .
 
 script:
