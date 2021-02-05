@@ -8,12 +8,24 @@ import uncertainties
 import tqdm
 import pathos
 import pybind11
-
-from IPython import get_ipython
-ipython = get_ipython()
-
 import watermark
 
-
-ipython.magic("load_ext watermark")
-ipython.magic("watermark -m -u -d -v -iv -w")
+try:
+    from IPython import get_ipython
+    ipython = get_ipython()
+    ipython.magic("load_ext watermark")
+    ipython.magic("watermark -m -u -d -v -iv -w")
+except:
+    try:
+        import IPython.core.ipapi  
+        ipython = IPython.core.ipapi.get()
+        ipython.magic("load_ext watermark")
+        ipython.magic("watermark -m -u -d -v -iv -w")
+    except:
+        try:
+            import IPython.ipapi  
+            ipython = IPython.ipapi.get()
+            ipython.magic("load_ext watermark")
+            ipython.magic("watermark -m -u -d -v -iv -w")
+        except:
+            print("Unable to show versions")
