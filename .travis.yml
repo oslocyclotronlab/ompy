@@ -55,5 +55,5 @@ install:
   - pip3 install -e .
 
 script:
-    - python check_env.py
+    - ipython check_env.py
     - pytest ./tests/
