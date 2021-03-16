@@ -161,17 +161,17 @@ ext_modules_pybind11 = [
 ]
 
 install_requires = [
- "cython,"
- "numpy>=1.17,"
- "numpy>=1.20; sys_platform == 'darwin'"
- "pandas,"
- "matplotlib,"
- "termtables,"
- "pymultinest,"  # needed only for multinest-runs
- "scipy,"
- "uncertainties>=3.0.3"
- "tqdm,"
- "pathos,"
+ "cython",
+ "numpy>=1.17",
+ "numpy>=1.20; sys_platform == 'darwin'",
+ "pandas",
+ "matplotlib",
+ "termtables",
+ "pymultinest",  # needed only for multinest-runs
+ "scipy",
+ "uncertainties>=3.0.3",
+ "tqdm",
+ "pathos",
  "pybind11>=2.6.0"
 ]
 
