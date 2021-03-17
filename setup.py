@@ -162,8 +162,7 @@ ext_modules_pybind11 = [
 
 install_requires = [
  "cython",
- "numpy>=1.17; sys_platform != 'darwin'",
- "numpy>=1.20; sys_platform == 'darwin'",
+ "numpy>=1.20.0",
  "pandas",
  "matplotlib",
  "termtables",
