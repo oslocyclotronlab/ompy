@@ -160,7 +160,20 @@ ext_modules_pybind11 = [
                                               "-march=native"])
 ]
 
-install_requires = numpy.loadtxt("requirements.txt", dtype="str").tolist()
+install_requires = [
+ "cython",
+ "numpy>=1.20.0",
+ "pandas",
+ "matplotlib",
+ "termtables",
+ "pymultinest",  # needed only for multinest-runs
+ "scipy",
+ "uncertainties>=3.0.3",
+ "tqdm",
+ "pathos",
+ "pybind11>=2.6.0"
+]
+
 setup(name='OMpy',
       version=get_version_info()[0],
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
