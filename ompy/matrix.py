@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import warnings
 import copy
@@ -136,6 +137,8 @@ class Matrix(AbstractArray):
         self.verify_integrity()
 
         self.state = state
+        self.loc = ValueLocator(self)
+        self.iloc = IndexLocator(self)
 
     def verify_integrity(self, check_equidistant: bool = False):
         """ Runs checks to verify internal structure
@@ -764,14 +767,17 @@ class Matrix(AbstractArray):
         """
         return diagonal_elements(self.values)
 
-    def fill(self, Eg: float, Ex: float, count: Optional[float] = 1) -> None:
+    def fill(self, Eg: float, Ex: float, count: float = 1.0) -> None:
         """ Add counts to the bin containing Eg and Ex.
         Args:
             Eg (float): Eg energy value (x-axis value)
             Ex (float): Ex energy value (y-axis value)
-            count (float, otional): Number to add to the bin. Defaults to 1.
+            count (float, optional): Number to add to the bin. Defaults to 1.
         """
-        self.values[index(self.Ex, Ex)][index(self.Eg, Eg)] += count
+        warnings.warn("Creating a Matrix with zeros as entries by the "
+                      "shape argument is depreciated. Use "
+                      "Matrix", DeprecationWarning)
+        raise 
 
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
@@ -906,40 +912,62 @@ class Matrix(AbstractArray):
         result.values = result.values@other.values
         return result
 
+    def __str__(self) -> str:
+        return str(self.values) + "\n" + str(self.Ex) + '\n' + str(self.Eg)
 
-class ZerosMatrix(Matrix):
-    """ Return new Matrix of given shape, filled with zeros.
 
-    Args:
-        shape: Shape of the new Matrix as [len(Ex), len(Eg)].
-            If Ex and Eg are provided, the shape is inferred.
-        Eg: The gamma ray energies using midbinning. Defaults to an array
-            with the length inferred from shape, if not provided.
-        Ex: The excitation energies using midbinning. Defaults to an array
-            with the length inferred from shape, if not provided.
-        std: Whether to create an array for the `std`, too
-    """
-    def __init__(self, shape: Optional[Tuple[int, int]] = None,
-                 Ex: Optional[np.ndarray] = None,
-                 Eg: Optional[np.ndarray] = None,
-                 std: bool = False,
-                 state: Union[str, MatrixState] = None):
+class IndexLocator:
+    def __init__(self, matrix: Matrix):
+        self.mat = matrix
 
-        # Case if Eg and Ex are given but no shape
-        if shape is None:
-            if (Eg is not None) and (Ex is not None):
-                shape = (len(Ex), len(Eg))
-            else:
-                raise AssertionError("Shape can only be inferred if"
-                                     "*both* Eg and Ex are given.")
-
-        values = np.zeros(shape, dtype=float)
-        if std:
-            self.std = np.zeros(shape, dtype=float)
+    def __getitem__(self, key):
+        if len(key) == 2:
+            eg, ex = key
+            Eg = self.mat.Eg.__getitem__(eg)
+            Ex = self.mat.Ex.__getitem__(ex)
+            values = self.mat.values.__getitem__(key)
+            return Matrix(Eg=Eg, Ex=Ex, values=values)
         else:
-            std = None
+            raise ValueError("Give two indices [x, y]")
 
-        super().__init__(values=values, Ex=Ex, Eg=Eg, std=std, state=state)
+
+class ValueLocator:
+    def __init__(self, matrix: Matrix):
+        self.mat = matrix
+
+    def __getitem__(self, key):
+        if len(key) == 2:
+            eg, ex = key
+            if isinstance(eg, (int, float)):
+                ieg = self.mat.index_Eg(eg)
+            else:
+                start = None if eg.start is None else self.mat.index_Eg(eg.start)
+                stop = None if eg.stop is None else self.mat.index_Eg(eg.stop)
+                if eg.step is not None:
+                    dx = self.mat.Eg[1] - self.mat.Eg[0]
+                    step = np.ceil(eg.step / dx)
+                else:
+                    step = None
+                ieg = slice(start, stop, step)
+
+            if isinstance(ex, (int, float)):
+                iex = self.mat.index_Ex(ex)
+            else:
+                start = None if ex.start is None else self.mat.index_Ex(ex.start)
+                stop = None if ex.stop is None else self.mat.index_Ex(ex.stop)
+                if ex.step is not None:
+                    dx = self.mat.Ex[1] - self.mat.Ex[0]
+                    step = np.ceil(ex.step / dx)
+                else:
+                    step = None
+                iex = slice(start, stop, step)
+
+            Eg = self.mat.Eg.__getitem__(ieg)
+            Ex = self.mat.Ex.__getitem__(iex)
+            values = self.mat.values.__getitem__((iex, ieg))
+            return Matrix(Eg=Eg, Ex=Ex, values=values)
+        else:
+            raise ValueError("Give two indices [x, y]")
 
 
 class MeshLocator(ticker.Locator):

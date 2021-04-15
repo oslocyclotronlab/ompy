@@ -24,6 +24,21 @@ def ones(shape: Tuple[int, int]) -> om.Matrix:
     return om.Matrix(values=mat)
 
 
+class TestInit:
+    def test_values(self):
+        Eg = np.linspace(0, 1, 100)
+        Ex = np.linspace(-1, 1, 50)
+        values = np.linspace(0, 100, 100*50)
+        mat = om.Matrix(values=values, Eg=Eg, Ex=Ex)
+
+
+        with pytest.raises(ValueError):
+            om.Vector(vals, [1, 2, 3, 4, 5])
+
+    def test_path(self):
+        pass
+
+
 @pytest.fixture()
 def Si28():
     return om.example_raw('Si28')
@@ -158,43 +173,6 @@ def test_save_which_error(Ex, Eg):
     mat = om.Matrix(values=values, Ex=Ex, Eg=Eg, std=0.5*values)
     with pytest.raises(NotImplementedError):
         mat.save("/tmp/mat.npy", which='Im not real')
-
-
-@pytest.mark.parametrize(
-        "Ex,Eg",
-        [(np.linspace(0, 10., num=10), np.linspace(10, 20., num=15)),
-         ([0, 1, 2, 3, 7, 10.], [0, 1, 2, 3, 80, 90.])
-         ])
-def test_shape_ZerosMatrix(Ex, Eg):
-    values = np.zeros((len(Ex), len(Eg)), dtype="float")
-    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
-    assert_equal(mat.values, values)
-
-
-def test_ZerosMatrix_fail_without_enough_info():
-    energies = np.array([1, 2, 3])
-    with pytest.raises(AssertionError):
-        om.ZerosMatrix(Ex=energies)
-    with pytest.raises(AssertionError):
-        om.ZerosMatrix(Eg=energies)
-
-
-def test_fill_matrix():
-    """ TODO: add more cases such as making sure we are close to the correct
-    number, etc.
-    """
-    Ex = np.array([1., 2., 3.])
-    Eg = np.array([1., 2., 3., 4., 5., 6.])
-    values = np.zeros((len(Ex), len(Eg)))
-    mat = om.ZerosMatrix(Ex=Ex, Eg=Eg)
-
-    mat.fill(1.9, 2.4)
-    values[1][1] += 1
-    assert_equal(mat.values, values)
-
-    mat.fill(0., 6.)
-    values[-1][0] += 1
-    assert_equal(mat.values, values)
 
 
 # This does not work as of now...

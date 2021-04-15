@@ -1,4 +1,4 @@
-from typing import Union, Iterable, List, Tuple
+from typing import Union, Iterable, List, Tuple, Optional
 from pathlib import Path
 import tarfile
 import time
@@ -286,7 +286,7 @@ def load_txt_2D(path: Union[str, Path]
 
 
 def load_numpy_1D(path: Union[str, Path]
-                  ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+                  ) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]

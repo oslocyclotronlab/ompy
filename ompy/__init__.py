@@ -25,6 +25,11 @@ else:
     from .version import VERSION as __version__
     from .version import FULLVERSION as __full_version__
 
+    from pint import UnitRegistry
+    ureg = UnitRegistry()
+    ureg.setup_matplotlib()
+    u = ureg
+
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .library import div0, fill_negative_gauss, fill_negative_max
@@ -33,6 +38,7 @@ else:
     from .matrix import Matrix, ZerosMatrix
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .vector import Vector
+    from .ufunc import zeros_like #zeros
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble

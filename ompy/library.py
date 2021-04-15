@@ -7,6 +7,7 @@ from typing import Optional, Tuple, Iterator, Any, Union
 import inspect
 import re
 
+
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
     # Check whether a or b (or both) are numpy arrays. If not, we don't

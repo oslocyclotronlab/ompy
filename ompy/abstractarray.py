@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Union, Tuple
+from typing import Union, Tuple, Sequence
 import numpy as np
 
 
@@ -17,9 +17,19 @@ class AbstractArray:
         """ Raise error as it is implemented in subclass only """
         raise NotImplementedError()
 
-    def copy(self) -> AbstractArray:
-        """ Return a deepcopy of the class """
-        return copy.deepcopy(self)
+    def same_shape(self, other: Sequence[float], error: bool = False) -> bool:
+        return self.has_equal_binning()
+
+    def copy(self, **kwargs) -> AbstractArray:
+        """ Return a deepcopy of the class
+
+        Args:
+            kwargs: Overwrite attributes of the copied object
+        """
+        new = copy.deepcopy(self)
+        for attr, val in kwargs.items():
+            setattr(new, attr, val)
+        return new
 
     def verify_equdistant(self, axis: Union[int, str]):
         """ Runs checks to verify if energy arrays are equidistant
@@ -67,8 +77,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values -= other
         else:
-            self.has_equal_binning(other)
-            result.values -= other.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values -= other
+            elif self.has_equal_binning(other):
+                result.values -= other.values
         return result
 
     def __rsub__(self, other) -> AbstractArray:
@@ -76,8 +89,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values = other - result.values
         else:
-            self.has_equal_binning(other)
-            result.values = other.values - result.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values = other - result.values
+            elif self.has_equal_binning(other):
+                result.values = other.values - result.values
         return result
 
     def __add__(self, other) -> AbstractArray:
@@ -85,8 +101,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values += other
         else:
-            self.has_equal_binning(other)
-            result.values += other.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values += other
+            elif self.has_equal_binning(other):
+                result.values += other.values
         return result
 
     def __radd__(self, other) -> AbstractArray:
@@ -97,8 +116,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values *= other
         else:
-            self.has_equal_binning(other)
-            result.values *= other.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values *= other
+            elif self.has_equal_binning(other):
+                result.values *= other.values
         return result
 
     def __rmul__(self, other) -> AbstractArray:
@@ -109,8 +131,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values /= other
         else:
-            self.has_equal_binning(other)
-            result.values /= other.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values /= other
+            elif self.has_equal_binning(other):
+                result.values /= other.values
         return result
 
     def __rtruediv__(self, other) -> AbstractArray:
@@ -118,8 +143,11 @@ class AbstractArray:
         if isinstance(other, (int, float)):
             result.values = other / result.values
         else:
-            self.has_equal_binning(other)
-            result.values = other.values / result.values
+            if isinstance(other, np.ndarray):
+                self.same_shape(other, error=True)
+                result.values = other / result.values
+            elif self.has_equal_binning(other):
+                result.values = other.values / result.values
         return result
 
     def __matmul__(self, other) -> AbstractArray:

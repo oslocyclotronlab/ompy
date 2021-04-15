@@ -187,15 +187,21 @@ class Ensemble:
         self.size = number
         self.regenerate = regenerate
 
-        LOG.info(f"Start normalization with {self.nprocesses} cpus")
-        pool = ProcessPool(nodes=self.nprocesses)
+        # LOG.info(f"Start normalization with {self.nprocesses} cpus")
+        # pool = ProcessPool(nodes=self.nprocesses)
         ss = np.random.SeedSequence(self.seed)
-        iterator = pool.imap(self.step, range(number), ss.spawn(number),
-                             repeat(method))
-        ensembles = np.array(list(tqdm(iterator, total=number)))
-        pool.close()
-        pool.join()
-        pool.clear()
+        #iterator = pool.imap(self.step, range(number), ss.spawn(number),
+        #                     repeat(method))
+        #ensembles = np.array(list(tqdm(iterator, total=number)))
+        #pool.close()
+        #pool.join()
+        #pool.clear()
+
+        ensembles = []
+        sses = ss.spawn(number)
+        for i in tqdm(range(number)):
+            ensembles.append(self.step(i, sses[i], method))
+        ensembles = np.asarray(ensembles)
 
         raw_ensemble = ensembles[:, 0, :, :]
         unfolded_ensemble = ensembles[:, 1, :, :]
