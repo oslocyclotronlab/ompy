@@ -310,18 +310,20 @@ def save_numpy_1D(values: np.ndarray, E: np.ndarray,
 
 def save_csv_1D(values: np.ndarray, E: np.ndarray,
                 std: Union[np.ndarray, None],
-                path: Union[str, Path]) -> None:
+                path: Union[str, Path], **kwargs) -> None:
     df = {'E': E, 'values': values}
     if std is not None:
         df['std'] = std
     df = pd.DataFrame(df)
-    df.to_csv(path, index=False)
+    kwargs.setdefault('index', False)
+    df.to_csv(path, **kwargs)
 
 
-def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
-                                                 np.ndarray,
-                                                 Union[np.ndarray, None]]:
-    df = pd.read_csv(path)
+def load_csv_1D(path: Union[str, Path],
+                **kwargs) -> Tuple[np.ndarray, 
+                                   np.ndarray,
+                                   Union[np.ndarray, None]]:
+    df = pd.read_csv(path, **kwargs)
     E = df['E'].to_numpy(copy=True)
     values = df['values'].to_numpy(copy=True)
     std = None
