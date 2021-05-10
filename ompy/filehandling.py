@@ -320,7 +320,7 @@ def save_csv_1D(values: np.ndarray, E: np.ndarray,
 
 
 def load_csv_1D(path: Union[str, Path],
-                **kwargs) -> Tuple[np.ndarray, 
+                **kwargs) -> Tuple[np.ndarray,
                                    np.ndarray,
                                    Union[np.ndarray, None]]:
     df = pd.read_csv(path, **kwargs)
