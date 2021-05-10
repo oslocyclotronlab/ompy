@@ -3,7 +3,8 @@
 ## [Unreleased]
 Added:
 - `ZerosMatrix` as a derived class to create a matrix fill with zeros.
-- `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg). 
+- `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg).
+- When saving and loading `Vector` from `csv` files one can now pass keyword arguments to the pandas `read_csv()` and `to_csv()` functions.
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.

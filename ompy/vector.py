@@ -37,7 +37,8 @@ class Vector(AbstractArray):
                  E: Optional[Iterable[float]] = None,
                  path: Optional[Union[str, Path]] = None,
                  std: Optional[Iterable[float]] = None,
-                 units: Optional[str] = "keV"):
+                 units: Optional[str] = "keV",
+                 **kwargs):
         """
         There are several ways to initialize
 
@@ -53,7 +54,7 @@ class Vector(AbstractArray):
             path: see above
             std: see above
             unit: see above
-
+            kwargs: arguments to the filereader (see pandas.read_csv)
         Raises:
            ValueError if the given arrays are of differing lenghts.
 
@@ -77,7 +78,7 @@ class Vector(AbstractArray):
         self.units = units
 
         if path is not None:
-            self.load(path)
+            self.load(path, **kwargs)
         self.verify_integrity()
 
     def __len__(self):
@@ -194,12 +195,13 @@ class Vector(AbstractArray):
                 warnings.warn("MaMa cannot store std. "
                               "Consider using another format")
         elif filetype == 'csv':
-            save_csv_1D(vector.values, vector.E, vector.std, path)
+            save_csv_1D(vector.values, vector.E, vector.std, path, **kwargs)
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
     def load(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
+             filetype: Optional[str] = None,
+             **kwargs) -> None:
         """Load to a file of specified format
 
         Args:
@@ -231,7 +233,7 @@ class Vector(AbstractArray):
         elif filetype == 'mama':
             self.values, self.E = mama_read(path)
         elif filetype == 'csv':
-            self.values, self.E, self.std = load_csv_1D(path)
+            self.values, self.E, self.std = load_csv_1D(path, **kwargs)
         else:
             try:
                 self.values, self.E = mama_read(path)

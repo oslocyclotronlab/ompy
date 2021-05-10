@@ -46,6 +46,19 @@ def test_save_load_no_std():
         assert_allclose(vec_from_file.values, vals)
 
 
+def test_save_load_csv_with_kwargs():
+    E = np.linspace(0, 1, 100)
+    vals = np.linspace(2, 3.4, 100)
+    std = np.random.randn(100)*0.1
+
+    vec = om.Vector(values=vals, E=E, std=std)
+    vec.save('/tmp/test_csv.csv', sep="\t")
+    vec_from_file = om.Vector(path='/tmp/test_csv.csv', sep='\t')
+    assert_allclose(vec_from_file.E, vec.E)
+    assert_allclose(vec_from_file.values, vec.values)
+    assert_allclose(vec_from_file.std, vec.std)
+
+
 def test_save_load():
     E = np.linspace(0, 1, 100)
     vals = np.linspace(2, 3.4, 100)
