@@ -680,7 +680,7 @@ def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:
         A vector describing the levels
     """
     histogram, _ = load_discrete(path, energy, 0.1)
-    return Vector(values=histogram, E=energy)
+    return Vector(values=histogram, E=energy, units='MeV')
 
 
 def load_levels_smooth(path: Union[str, Path], energy: ndarray,
@@ -697,4 +697,5 @@ def load_levels_smooth(path: Union[str, Path], energy: ndarray,
         A vector describing the smoothed levels
     """
     histogram, smoothed = load_discrete(path, energy, resolution)
-    return Vector(values=smoothed if resolution > 0 else histogram, E=energy)
+    return Vector(values=smoothed if resolution > 0 else histogram, E=energy,
+                  units='MeV')
