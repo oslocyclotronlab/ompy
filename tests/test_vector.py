@@ -32,6 +32,21 @@ def test_len():
     assert_equal(len(vec), N)
 
 
+def test_save_units():
+    E = np.arange(0, 5010, 10)
+    vals = np.random.random(len(E))
+
+    vec = om.Vector(values=vals, E=E)
+    vec.save("/tmp/units.txt", units='MeV')
+
+    vec_from_file = om.Vector(path="/tmp/units.txt", units='MeV')
+    assert_allclose(vec_from_file.E, E/1000.)
+    assert_allclose(vec_from_file.values, vals)
+
+    vec_from_file.to_keV()
+    assert_allclose(vec_from_file.E, vec.E)
+
+
 def test_save_load_no_std():
     E = np.linspace(0, 1, 100)
     vals = np.linspace(2, 3.4, 100)
