@@ -160,6 +160,7 @@ class Vector(AbstractArray):
 
     def save(self, path: Union[str, Path],
              filetype: Optional[str] = None,
+             units: Optional[str] = "keV",
              **kwargs) -> None:
         """Save to a file of specified format
 
@@ -174,7 +175,12 @@ class Vector(AbstractArray):
             ValueError: Filetype is not supported
         """
         vector = self.copy()
-        vector.to_keV()
+        if units == 'keV':
+            vector.to_keV()
+        elif units == 'MeV':
+            vector.to_MeV()
+        else:
+            raise NotImplementedError(f"Could not understand units={units}")
         path = Path(path) if isinstance(path, str) else path
         if filetype is None:
             filetype = filetype_from_suffix(path)
