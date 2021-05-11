@@ -169,16 +169,22 @@ class Vector(AbstractArray):
             filetype (str, optional): Filetype. Default uses
                 auto-recognition from suffix.
                 Options: ["numpy", "txt", "tar", "mama", "csv"]
+            units (str, optional): Units for the x-axis. Default
+                uses keV. Options: ["keV", "MeV", "same"]. "same"
+                option will use the current selected units of the vector.
             **kwargs: additional keyword arguments
 
         Raises:
-            ValueError: Filetype is not supported
+            ValueError: Filetype is not supported.
+            NotImplementedError: Unsupported units.
         """
         vector = self.copy()
         if units == 'keV':
             vector.to_keV()
         elif units == 'MeV':
             vector.to_MeV()
+        elif units == 'same':  # We don't change the units
+            pass
         else:
             raise NotImplementedError(f"Could not understand units={units}")
         path = Path(path) if isinstance(path, str) else path
