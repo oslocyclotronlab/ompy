@@ -3,6 +3,7 @@ import ompy as om
 import numpy as np
 from numpy.testing import assert_allclose
 
+
 @pytest.mark.parametrize(
                 "spinpars",
                  [{"NLDa": 25.160, "Eshift": 0.120},
@@ -35,6 +36,10 @@ testdata = [("EB05", [4.2, 6.534],
             ("Disc_and_EB05", [1.5, 4.2, 6.534],   # combination of the above
              {"mass": 240, "NLDa": 25.506, "Eshift": 0.162, "Sn": 6.534,
               "sigma2_disc": [1.5, 3.6]},
+             [np.sqrt(3.6),
+              np.sqrt(y_interpol(4.2, 1.5, 6.534, 3.6, 8.387**2)), 8.387]),
+            ("gDisc_and_sigmaSn", [1.5, 4.2, 6.534],
+             {"sigma2_disc": [1.5, 3.6], 'sigma2_Sn': [6.534, 8.387**2]},
              [np.sqrt(3.6),
               np.sqrt(y_interpol(4.2, 1.5, 6.534, 3.6, 8.387**2)), 8.387])
             ]

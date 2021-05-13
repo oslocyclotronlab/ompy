@@ -186,7 +186,7 @@ class SpinFunctions:
 
     def gDisc_and_sigmaSn(self, sigma2_disc: Tuple[float, float],
                           sigma2_Sn: Tuple[float, float],
-                          Ex: Optional[float, Sequence] = None) -> Union[float, Sequence]:  # noqa
+                          Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence]:  # noqa
         """
         Linear interpolation of the spin-cut between
         a spin cut "from the discrete levels" and a set
@@ -211,5 +211,5 @@ class SpinFunctions:
         y = [sigma2_disc[1], sigma2_Sn[1]]
         sigma2 = interp1d(x, y,
                           bounds_error=False,
-                          fill_value=(sigma2_disc[1], sigma2_Sn))
-        return sigma2
+                          fill_value=(sigma2_disc[1], sigma2_Sn[1]))
+        return sigma2(Ex)
