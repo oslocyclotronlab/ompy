@@ -42,6 +42,9 @@ class SpinFunctions:
         elif model == "Disc_and_EB05":
             pars_req = {"mass", "NLDa", "Eshift", "Sn", "sigma2_disc"}
             return call_model(self.gDisc_and_EB05, pars, pars_req)
+        elif model == "gDisc_and_sigmaSn":
+            pars_req = {"sigma2_disc", "sigma2_Sn"}
+            return call_model(self.gDisc_and_sigmaSn, pars, pars_req)
         else:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
@@ -173,10 +176,40 @@ class SpinFunctions:
         Ex = self.Ex if Ex is None else Ex
         Ex = np.atleast_1d(Ex)
         sigma2_Sn = self.gEB05(mass, NLDa, Eshift, Ex=Sn)
-        sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex)
+        sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex)  # noqa
         x = [sigma2_disc[0], Sn]
         y = [sigma2_disc[1], sigma2_EB05(Sn)]
         sigma2 = interp1d(x, y,
                           bounds_error=False,
                           fill_value=(sigma2_disc[1], sigma2_Sn))
         return np.where(Ex < Sn, sigma2(Ex), sigma2_EB05(Ex))
+
+    def gDisc_and_sigmaSn(self, sigma2_disc: Tuple[float, float],
+                          sigma2_Sn: Tuple[float, float],
+                          Ex: Optional[float, Sequence] = None) -> Union[float, Sequence]:  # noqa
+        """
+        Linear interpolation of the spin-cut between
+        a spin cut "from the discrete levels" and a set
+        value at the nutron separation energy. Essentially
+        the same as `gDisc_and_EB05` but with spin-cut
+        at Sn explicitly set.
+
+        Args:
+            sigma2_disc (Tuple[float, float]): [float, float]
+                [Energy, sigma2] for the discretes
+            sigma2_Sn(Tuple[float, float]): [float, float]
+                [Energy, sigma2] at Sn.
+
+        Returns:
+            Union[float, Sequence]: Squared spincut
+        """
+
+        Ex = self.Ex if Ex is None else Ex
+        Ex = np.atleast_1d(Ex)
+
+        x = [sigma2_disc[0], sigma2_Sn[0]]
+        y = [sigma2_disc[1], sigma2_Sn[1]]
+        sigma2 = interp1d(x, y,
+                          bounds_error=False,
+                          fill_value=(sigma2_disc[1], sigma2_Sn))
+        return sigma2
