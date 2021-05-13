@@ -42,7 +42,7 @@ class SpinFunctions:
         elif model == "Disc_and_EB05":
             pars_req = {"mass", "NLDa", "Eshift", "Sn", "sigma2_disc"}
             return call_model(self.gDisc_and_EB05, pars, pars_req)
-        elif model == "gDisc_and_sigmaSn":
+        elif model == "Disc_and_sigmaSn":
             pars_req = {"sigma2_disc", "sigma2_Sn"}
             return call_model(self.gDisc_and_sigmaSn, pars, pars_req)
         else:
