@@ -172,6 +172,7 @@ class Vector(AbstractArray):
             units (str, optional): Units for the x-axis. Default
                 uses keV. Options: ["keV", "MeV", "same"]. "same"
                 option will use the current selected units of the vector.
+                Note: This keyword is ignored when saving to "mama" type.
             **kwargs: additional keyword arguments
 
         Raises:
@@ -202,10 +203,15 @@ class Vector(AbstractArray):
             else:
                 save_tar([vector.values, vector.E], path)
         elif filetype == 'mama':
-            mama_write(self, path, comment="Made by OMpy", **kwargs)
             if self.std is not None:
                 warnings.warn("MaMa cannot store std. "
                               "Consider using another format")
+            if vector.units != 'keV':
+                warnings.warn("The MaMa format does not support storing "
+                              "spectra with other units than keV. "
+                              "`units` keyword will be ignored.")
+                vector.to_keV()
+            mama_write(self, path, comment="Made by OMpy", **kwargs)
         elif filetype == 'csv':
             save_csv_1D(vector.values, vector.E, vector.std, path, **kwargs)
         else:
