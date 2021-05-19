@@ -153,7 +153,9 @@ class SpinFunctions:
         """
         Linear interpolation of the spin-cut between
         a spin cut "from the discrete levels" and EB05
-        RReference: Guttormsen et al., 2017, PRC 96, 024313
+        References:
+            Guttormsen et al., PRC 96, 024313 (2017)
+            R. Capote et al., Nucl. Data Sheets 110, 3107-3214 (2009)
 
         Note:
             We set sigma2(E<E_discrete) = sigma2(E_discrete).
@@ -193,6 +195,9 @@ class SpinFunctions:
         value at the nutron separation energy. Essentially
         the same as `gDisc_and_EB05` but with spin-cut
         at Sn explicitly set.
+        Reference:
+            Guttormsen et al., PRC 96, 024313 (2017)
+            R. Capote et al., Nucl. Data Sheets 110, 3107-3214 (2009)
 
         Args:
             sigma2_disc (Tuple[float, float]): [float, float]
