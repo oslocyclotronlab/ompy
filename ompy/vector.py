@@ -155,7 +155,7 @@ class Vector(AbstractArray):
             kwargs.setdefault("fmt", "o")
             ax.errorbar(self.E, self.values, yerr=self.std, **kwargs)
         ax.set_yscale(scale)
-        ax.set_xlabel("Energy")
+        ax.set_xlabel(f"Energy [{self.units}]")
         return fig, ax
 
     def save(self, path: Union[str, Path],
