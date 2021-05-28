@@ -5,10 +5,12 @@ Added:
 - `ZerosMatrix` as a derived class to create a matrix fill with zeros.
 - `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg).
 - When saving and loading `Vector` from `csv` files one can now pass keyword arguments to the pandas `read_csv()` and `to_csv()` functions.
+- Added a keyword (`units`) to select the energy units when saving a `Vector` to file.
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
 - Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
+- Fixed a potential bug where `units` attribute is set erroniously when reading the discrete level density from file (`load_levels_discrete` and `load_levels_discrete_smooth`).
 
 Deprecated:
 - `shape` argument of Matrix for creation of a matrix filled with zeros. Use `ZerosMatrix` instead.

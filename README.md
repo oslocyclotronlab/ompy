@@ -139,6 +139,9 @@ If you don't have OpenMP / have problems installing it (see above), you can inst
 We cleaned the repository from old comits clogging the repo (big data files that should never have been there). Unfortunetely, this has the sideeffect that the history had to be rewritten: Previous commits now have a different SHA1 (git version keys). If you need anything from the previous repo, see [ompy_Archive_Sept2019](https://github.com/oslocyclotronlab/ompy_Archive_Sept2019). This will unfortunately also destroy references in issues.
 The simplest way to get the new repo is to rerun the installation instructions below.
 
+#### Saving `Vector`´s in `MaMa` format
+The `MaMa` format has some limitation. Mainly the format will not be able to save the `std` attribute, meaning that error-bars will not be stored. The `MaMa` format is always in keV units, meaning that the `units` keyword in the `Vector.save` method is ignored.
+
 ## General usage
 All the functions and classes in the package are available in the main module. You get everything by importing the package
 
