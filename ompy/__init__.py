@@ -46,6 +46,6 @@ else:
                                  load_levels_smooth)
     from .normalizer_gsf import NormalizerGSF
     from .normalizer_simultan import NormalizerSimultan
-    from .ensembleNormalizer import EnsembleNormalizer
+    from .ensemble_normalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
