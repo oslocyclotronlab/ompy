@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import pymc3 as pm
-from pathlib import Path
+import termtables as tt
 
 from numpy import ndarray
 from typing import Optional, Union, Any, Tuple, List, Dict
@@ -365,7 +365,7 @@ class ErrorFinder:
                 sigma = trace[idx][:, m].std()
                 i = max(0, int(-np.floor(np.log10(sigma))) + 1)
                 fmt = '%%.%df' % i
-                vals += ['%s[%d]' % idx, m, fmt % mean, fmt % sigma]
+                vals += ['%s[%d]' % (idx, m), fmt % mean, fmt % sigma]
             return vals
         values = []
         try:

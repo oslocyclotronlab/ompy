@@ -47,25 +47,21 @@ class FermiDirac(PositiveContinuous):
         self.mu = tt.as_tensor_variable(floatX(mu))
         assert_negative_support(lam, "lam", "FermiDirac")
 
-
         self.median = self._ppf(0.5, self.lam, self.mu)
 
-        
-    
-    def _ppf(self, value, lam, mu):
+    def _ppf(self, q, lam, mu):
         """
         Calculate the CDF for the Fermi-Dirac distribution.
         """
-
-        N = (lam*mu + tt.log(1 + tt.exp(-lam*mu)))        
-        return lam*mu - tt.log(tt.exp(N*(1 - value)) - 1)
+        N = np.log(1 + np.exp(lam*mu))
+        return mu - np.log(np.exp(N*(1-q)) - 1)/lam
 
     def _random(self, lam, mu, size=None):
         """
         Draw a random number from the Fermi-Dirac distribution.
         """
         v = np.random.uniform(size=size)
-        return self._ppf(value, lam, mu)
+        return self._ppf(v, lam, mu)
 
     def random(self, point=None, size=None):
         """
@@ -122,9 +118,5 @@ class FermiDirac(PositiveContinuous):
         lam = self.lam
         mu = self.mu
 
-        N = lam/tt.log(1 + tt.exp(lam*mu))
-        V = (tt.exp(lam*(value - mu)) + 1)/(tt.exp(lam*mu) + 1)
-        logcdf = tt.log(N) + tt.log(lam*value - tt.log(V))
-        return bound(logcdf, value >=0, lam > 0)
-
-
+        logcdf = tt.log(1 - tt.log(1 + tt.exp(-lam*(value - mu)))/tt.log(1 + tt.exp(lam*mu)))
+        return bound(logcdf, value >= 0, lam > 0)

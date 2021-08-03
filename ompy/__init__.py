@@ -49,3 +49,5 @@ else:
     from .ensemble_normalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
+    from .dist import FermiDirac
+    from .error_finder import ErrorFinder
