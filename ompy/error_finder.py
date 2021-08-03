@@ -34,12 +34,14 @@ class ErrorFinder:
 
     Attributes:
         algorithm (string): Indicate what algorithm to use, either 'log' or
-            'lin'. Default is 'lin'
+            'lin'. Default is 'log'
         seed (int): Seed used in the pyMC3 sampling.
         options (dict): The pymc3.sample options to use.
         testvals (dict): A dictionary with testvalues to feed to pymc3 when
             declaring the prior distributions. This can probably be left to
             the default, but could be changed if needed.
+    TODO:
+        - The linear model is currently not very well optimized. Usually fails.
     """
 
     LOG = logging.getLogger(__name__)  # overwrite parent variable
@@ -160,10 +162,10 @@ class ErrorFinder:
         self.display_results(trace)
 
         mid = np.median if median else np.mean
-        nld_rel_err = om.Vector(E=E_nld, values=mid(trace['σ_ρ'], axis=0),
-                                std=np.std(trace['σ_ρ'], axis=0), units='MeV')
-        gsf_rel_err = om.Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
-                                std=np.std(trace['σ_f'], axis=0), units='MeV')
+        nld_rel_err = Vector(E=E_nld, values=mid(trace['σ_ρ'], axis=0),
+                             std=np.std(trace['σ_ρ'], axis=0), units='MeV')
+        gsf_rel_err = Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
+                             std=np.std(trace['σ_f'], axis=0), units='MeV')
         if trace:
             return nld_rel_err, gsf_rel_err, trace
         else:
@@ -193,11 +195,8 @@ class ErrorFinder:
                 be returned. Useful for debugging.
         """
 
-        N, M_nld = nld_obs.shape
-        _, M_gsf = gsf_obs.shape
-
-        nld_obs = np.log(nld_obs)
-        gsf_obs = np.log(gsf_obs)
+        N, _, M_nld = nld_obs.shape
+        _, _, M_gsf = gsf_obs.shape
 
         self.LOG.info("Starting pyMC3 - linear model")
 
@@ -207,33 +206,35 @@ class ErrorFinder:
             σ_B = pm.HalfFlat("σ_B", testval=self.testvals['σ_B'])
             σ_α = pm.HalfFlat("σ_α", testval=self.testvals['σ_α'])
 
-            A = pm.TruncatedNormal("A", mu=0., sigma=σ_A, shape=[N, N-1],
+            A = pm.TruncatedNormal("A", mu=1., sigma=σ_A,
+                                   shape=[N, N-1], lower=0.,
                                    testval=self.testvals['A'])[:, coef_nld]
-            B = pm.TruncatedNormal("B", mu=0., sigma=σ_B, shape=[N, N-1],
+            B = pm.TruncatedNormal("B", mu=1., sigma=σ_B,
+                                   shape=[N, N-1], lower=0.,
                                    testval=self.testvals['B'])[:, coef_gsf]
-            α = pm.Normal("α", mu=0., sigma=σ_α, shape=[N+1, N])
+            α = pm.Normal("α", mu=0., sigma=σ_α, shape=[N, N-1])
 
-            σ_ρ = FermiDirac("σ_ρ", lam=10., mu=1., shape=M_nld)[vals_nld]
-            σ_f = FermiDirac("σ_f", lam=10., mu=1., shape=M_gsf)[vals_gsf]
+            σ_ρ = FermiDirac("σ_ρ", lam=10., mu=1., shape=M_nld)
+            σ_f = FermiDirac("σ_f", lam=10., mu=1., shape=M_gsf)
 
             μ_ρ = A * pm.math.exp(α[:, coef_nld] * E_nld[vals_nld])
             μ_f = B * pm.math.exp(α[:, coef_gsf] * E_gsf[vals_gsf])
 
-            ρ_obs = pm.Normal("ρ_obs", mu=μ_ρ, sigma=σ_ρ*μ_ρ,
+            ρ_obs = pm.Normal("ρ_obs", mu=μ_ρ, sigma=μ_ρ*σ_ρ[vals_nld],
                               observed=nld_obs)
-            f_obs = pm.Normal("f_obs", mu=μ_f, sigma=σ_f*μ_f,
+            f_obs = pm.Normal("f_obs", mu=μ_f, sigma=μ_f*σ_f[vals_gsf],
                               observed=gsf_obs)
 
             # Perform the sampling
-            trace = pm.Sample(random_seed=self.seed, **self.options)
+            trace = pm.sample(random_seed=self.seed, **self.options)
 
         self.display_results(trace)
 
         mid = np.median if median else np.mean
-        nld_rel_err = om.Vector(E=E_nld, values=mid(trace['σ_ρ'], axis=0),
-                                std=np.std(trace['σ_ρ'], axis=0), units='MeV')
-        gsf_rel_err = om.Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
-                                std=np.std(trace['σ_f'], axis=0), units='MeV')
+        nld_rel_err = Vector(E=E_nld, values=mid(trace['σ_ρ'], axis=0),
+                             std=np.std(trace['σ_ρ'], axis=0), units='MeV')
+        gsf_rel_err = Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
+                             std=np.std(trace['σ_f'], axis=0), units='MeV')
 
         if trace:
             return nld_rel_err, gsf_rel_err, trace
@@ -355,28 +356,38 @@ class ErrorFinder:
             sigma = trace[idx].std()
             i = max(0, int(-np.floor(np.log10(sigma))) + 1)
             fmt = '%%.%df' % i
-            return [idx, fmt % mean, fmt % sigma]
-
-        def lines(idx) -> list:
-            _, M = trace[idx].shape
-            vals = []
-            for m in range(M):
-                mean = trace[idx][:, m].mean()
-                sigma = trace[idx][:, m].std()
-                i = max(0, int(-np.floor(np.log10(sigma))) + 1)
-                fmt = '%%.%df' % i
-                vals += ['%s[%d]' % (idx, m), fmt % mean, fmt % sigma]
-            return vals
+            fmts = '\t'.join([fmt + " ± " + fmt])
+            return fmts % (mean, sigma)
+        header = []
         values = []
         try:
             for idx in ['A', 'B', 'α', 'σ_A', 'σ_B', 'σ_α']:
-                values += line(idx)
+                values.append(line(idx))
+            header = ['A', 'B', 'α', 'σ_A', 'σ_B', 'σ_α']
         except KeyError:
             for idx in ['D', 'F', 'α', 'σ_D', 'σ_F', 'σ_α']:
-                values += line(idx)
+                values.append(line(idx))
+            header = ['D', 'F', 'α', 'σ_D', 'σ_F', 'σ_α']
 
-        values += lines('σ_ρ')
-        values += lines('σ_f')
+        errs = []
+        _, M_nld = trace['σ_ρ'].shape
+        _, M_gsf = trace['σ_f'].shape
+        errs = [[f'{m}', '', ''] for m in range(max([M_nld, M_gsf]))]
+        for m in range(M_nld):
+            mean = trace['σ_ρ'][:, m].mean() * 100.
+            sigma = trace['σ_ρ'][:, m].std() * 100.
+            i = max(0, int(-np.floor(np.log10(sigma))) + 1)
+            fmt = '%%.%df' % i
+            fmts = '\t'.join([fmt + " ± " + fmt])
+            errs[m][1] = fmts % (mean, sigma)
+        for m in range(M_gsf):
+            mean = trace['σ_f'][:, m].mean() * 100.
+            sigma = trace['σ_f'][:, m].std() * 100.
+            i = max(0, int(-np.floor(np.log10(sigma))) + 1)
+            fmt = '%%.%df' % i
+            fmts = '\t'.join([fmt + " ± " + fmt])
+            errs[m][2] = fmts % (mean, sigma)
 
-        self.LOG.info("Inference results:\n%s",
-                      tt.to_string(values, header=['', 'mean', 'std']))
+        self.LOG.info("Inference results:\n%s\n%s",
+                      tt.to_string([values], header=header),
+                      tt.to_string(errs, header=['', 'σ_ρ [%]', 'σ_f [%]']))
