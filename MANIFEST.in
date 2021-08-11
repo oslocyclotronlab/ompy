@@ -1,0 +1,3 @@
+recursive-include example-data *
+recursive-include OCL_response_functions *
+include *.md *.rst
