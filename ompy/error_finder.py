@@ -71,7 +71,7 @@ class ErrorFinder:
     def evaluate(self, nlds: List[Vector],
                  gsfs: List[Vector],
                  median: Optional[bool] = False,
-                 trace: Optional[bool] = False
+                 full: Optional[bool] = False
                  ) -> Union[Tuple[Vector, Vector], Any]:
         """ Evaluate the model and find the relative errors
         of the NLDs and γSFs passed to the function.
@@ -81,7 +81,7 @@ class ErrorFinder:
             gsfs (List[Vector]): List of the γSFs in an ensemble
             median (bool, optional): If the mean of the relative error should
                 be used rather than the mean. Default is False.
-            trace (bool, optional): If the sample trace should
+            full (bool, optional): If the sample trace should
                 be returned or not.
         Returns:
             The relative error of the nuclear level density and
@@ -95,22 +95,20 @@ class ErrorFinder:
         algo = None
         if self.algorithm == 'lin':
             algo = self.linear
-            return self.linear(*self.condition_data(nlds, gsfs), trace)
         elif self.algorithm == 'log':
             algo = self.logarithm
-            return self.logarithm(*self.condition_data(nlds, gsfs), trace)
         else:
             raise NotImplementedError(
                 f"Algorithm '{algorithm}' not implemented")
 
         return algo(*self.condition_data(nlds, gsfs),
-                    median=median, trace=trace)
+                    median=median, full=full)
 
     def logarithm(self, E_nld: ndarray, E_gsf: ndarray,
                   nld_obs: ndarray, gsf_obs: ndarray,
                   coef_nld: ndarray, coef_gsf: ndarray,
                   vals_nld: ndarray, vals_gsf: ndarray,
-                  median: Optional[bool] = False, trace: Optional[bool] = False
+                  median: Optional[bool] = False, full: Optional[bool] = False
                   ) -> Union[Tuple[Vector, Vector], Any]:
         """ Calculate the relative errors of the NLD and γSF points using a
         logarithmic model.
@@ -126,14 +124,14 @@ class ErrorFinder:
             vals_gsf (ndarray): Indices needed for broadcasting
             median (bool, optional): If the resulting relative errors should be
                 the mean or the median.
-            trace (bool, optional): If the trace from the pyMC3 sampling should
+            full (bool, optional): If the trace from the pyMC3 sampling should
                 be returned. Useful for debugging.
         """
 
         N, _, M_nld = nld_obs.shape
         _, _, M_gsf = gsf_obs.shape
 
-        self.LOG.info("Starting pyMC3 - logarithmic model")
+        self.LOG.info("Starting pyMC3 inference - logarithmic model")
 
         with pm.Model() as model:
 
@@ -166,7 +164,7 @@ class ErrorFinder:
                              std=np.std(trace['σ_ρ'], axis=0), units='MeV')
         gsf_rel_err = Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
                              std=np.std(trace['σ_f'], axis=0), units='MeV')
-        if trace:
+        if full:
             return nld_rel_err, gsf_rel_err, trace
         else:
             return nld_rel_err, gsf_rel_err
@@ -175,7 +173,7 @@ class ErrorFinder:
                nld_obs: ndarray, gsf_obs: ndarray,
                coef_nld: ndarray, coef_gsf: ndarray,
                vals_nld: ndarray, vals_gsf: ndarray,
-               median: Optional[bool] = False, trace: Optional[bool] = False
+               median: Optional[bool] = False, full: Optional[bool] = False
                ) -> Union[Tuple[Vector, Vector], Any]:
         """ Calculate the relative errors of the NLD and γSF points using a
         linear model.
@@ -191,14 +189,14 @@ class ErrorFinder:
             vals_gsf (ndarray): Indices needed for broadcasting
             median (bool, optional): If the resulting relative errors should be
                 the mean or the median.
-            trace (bool, optional): If the trace from the pyMC3 sampling should
+            full (bool, optional): If the trace from the pyMC3 sampling should
                 be returned. Useful for debugging.
         """
 
         N, _, M_nld = nld_obs.shape
         _, _, M_gsf = gsf_obs.shape
 
-        self.LOG.info("Starting pyMC3 - linear model")
+        self.LOG.info("Starting pyMC3 inference - linear model")
 
         with pm.Model() as model:
 
@@ -236,10 +234,45 @@ class ErrorFinder:
         gsf_rel_err = Vector(E=E_gsf, values=mid(trace['σ_f'], axis=0),
                              std=np.std(trace['σ_f'], axis=0), units='MeV')
 
-        if trace:
+        if full:
             return nld_rel_err, gsf_rel_err, trace
         else:
             return nld_rel_err, gsf_rel_err
+
+    def keep_only(self, vecs: List[Vector]) -> List[Vector]:
+        """ Takes a list of vectors and returns a list of vectors
+        where only the points shared between all vectors are returned.
+        """
+
+        E = [vec.E.copy() for vec in vecs]
+        energies = {}
+        for vec in vecs:
+            for E in vec.E:
+                if E not in energies:
+                    energies[E] = [False] * len(vecs)
+
+        # Next we will add if the point is present or not
+        for n, vec in enumerate(vecs):
+            for E in vec.E:
+                energies[E][n] = True
+
+        keep_energy = []
+        for key in energies:
+            if np.all(energies[key]):
+                keep_energy.append(key)
+
+        vec_all_common = [vec.copy() for vec in vecs]
+        for vec in vec_all_common:
+            E = []
+            values = []
+            for e, value in zip(vec.E, vec.values):
+                if e in keep_energy:
+                    E.append(e)
+                    values.append(value)
+            vec.E = np.array(E)
+            vec.values = np.array(values)
+
+        return vec_all_common
 
     def condition_data(self, _nlds: List[Vector], _gsfs: List[Vector],
                        ) -> Tuple[ndarray, ndarray, ndarray, ndarray]:
@@ -297,14 +330,17 @@ class ErrorFinder:
             self.LOG.warning(f"NLDs and/or γSFs contains nan's."
                              " They will be removed")
 
+        # Next we will ensure that all members have all energies
+        if (not all_equal([len(nld) for nld in nlds]) or
+           not all_equal([len(gsf) for gsf in gsfs])):
+            self.LOG.warning("Some members of the ensemble have different "
+                             "lengths. "
+                             "Consider re-binning or changing limits.")
+            nlds = self.keep_only(nlds)
+            gsfs = self.keep_only(gsfs)
+
         self.LOG.debug("After removing nan: %d NLD values and %d GSF values",
                        len(nlds[0]), len(gsfs[0]))
-
-        if not (all_equal([len(nld) for nld in nlds]) or
-                all_equal([len(gsf) for gsf in gsfs])):
-            raise IndexError("NLDs and/or γSFs have different "
-                             "length. Consider setting reduce to True "
-                             "Note this will result in a partial result")
 
         # Next we can extract the important bits
         E_nld = nlds[0].E.copy()
@@ -316,8 +352,8 @@ class ErrorFinder:
         nld_obs = []
         gsf_obs = []
 
-        idx_nld = np.tile(np.arange(M_nld), (N-1, 1))
-        idx_gsf = np.tile(np.arange(M_gsf), (N-1, 1))
+        idx_nld = np.tile(np.arange(M_nld, dtype=int), (N-1, 1))
+        idx_gsf = np.tile(np.arange(M_gsf, dtype=int), (N-1, 1))
 
         for n, (nld, gsf) in enumerate(zip(nlds, gsfs)):
 
