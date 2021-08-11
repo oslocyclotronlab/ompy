@@ -25,6 +25,28 @@ MINOR = 1
 MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
+DISTNAME = 'OMpy'
+DESCRIPTION = 'Modern Oslo method analysis in python'
+AUTHOR = "Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima"
+AUTHOR_EMAIL = ("jorgenem@gmail.com, "
+                "fabio.zeiser@fys.uio.no, "
+                "erlenlim@fys.uio.no")
+URL = "https://github.com/oslocyclotronlab/ompy"
+LICENSE = "GNU General Public License, Version 3.0"
+
+classifiers = [
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Physics',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',  # noqa
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Operating System :: OS Independent'
+      ]
+
 
 # Return the git revision as a string
 # See also ompy/version.py
@@ -171,16 +193,16 @@ install_requires = [
  "uncertainties>=3.0.3",
  "tqdm",
  "pathos",
- "pybind11>=2.6.0"
+ "pybind11>=2.6.0",
 ]
 
-setup(name='OMpy',
+setup(name=DISTNAME,
       version=get_version_info()[0],
-      author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
-      author_email=("jorgenem@gmail.com, "
-                    "fabio.zeiser@fys.uio.no, "
-                    "erlenlim@fys.uio.no"),
-      url="https://github.com/oslocyclotronlab/ompy",
+      author=AUTHOR,
+      author_email=AUTHOR_EMAIL,
+      license=LICENSE
+      url=URL,
+      description=DESCRIPTION,
       packages=find_packages(),
       ext_modules=cythonize(ext_modules,
                             compiler_directives={'language_level': "3",
@@ -188,6 +210,7 @@ setup(name='OMpy',
                             compile_time_env={"OPENMP": openmp}
                             )+ext_modules_pybind11,
       zip_safe=False,
-      install_requires=install_requires
+      install_requires=install_requires,
+      include_package_data=True,  # See MANIFEST.in
+      classifiers=classifiers
       )
-
