@@ -171,7 +171,8 @@ install_requires = [
  "uncertainties>=3.0.3",
  "tqdm",
  "pathos",
- "pybind11>=2.6.0"
+ "pybind11>=2.6.0",
+ "pymc3>=3.11.2,<4.0"
 ]
 
 setup(name='OMpy',
