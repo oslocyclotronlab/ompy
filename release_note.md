@@ -6,6 +6,9 @@ Added:
 - `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg).
 - When saving and loading `Vector` from `csv` files one can now pass keyword arguments to the pandas `read_csv()` and `to_csv()` functions.
 - Added a keyword (`units`) to select the energy units when saving a `Vector` to file.
+- Added class `ErrorFinder`. This class uses pyMC3 to estimate the relative uncertanties of the NLD and gSF in an ensemble of NLDs and gSFs.
+- Added attribute `error_finder` to the `Extractor` class. If set the `Extractor` class will use the `error_finder` object to estimate the relative uncertanties of the extracted NLDs and gSFs. Points that the `ErrorFinder` are unable to estimate will be set to the largest value of those that was successfully estimated.
+- Added dependency `pyMC3>=3.11.2,<4.0`.
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
