@@ -174,18 +174,20 @@ class Extractor:
         self.nld = nlds
         self.gsf = gsfs
 
-        if self.error_estimator is not None:
+        if self.error_estimator is not None and regenerate:
             LOG.debug("Estimating relative errors")
             nld_rel_err, gsf_rel_err = self.error_estimator(nlds, gsfs)
             nld_rel_err.to_keV()
             gsf_rel_err.to_keV()
-            for nld, gsf in zip(self.nld, self.gsf):
+            for i, nld, gsf in enumerate(zip(self.nld, self.gsf)):
                 nld.std = self.rel_err_missing * nld.values
                 gsf.std = self.rel_err_missing * gsf.values
                 idx_nld = nld.indices(nld_rel_err.E)
                 idx_gsf = gsf.indices(gsf_rel_err.E)
                 nld.std[idx_nld] = nld_rel_err.values * nld.values[idx_nld]
                 gsf.std[idx_gsf] = gsf_rel_err.values * gsf.values[idx_gsf]
+                nld.save(self.path / f'nld_{i}.npy')  # Overwrite with errors!
+                gsf.save(self.path / f'gsf_{i}.npy')  # Overwrite with errors!
 
         self.check_unconstrained_results()
 
