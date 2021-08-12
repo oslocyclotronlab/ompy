@@ -68,6 +68,10 @@ class ErrorFinder:
         self.testvals = {'σ_D': 0.25, 'σ_F': 0.25, 'σ_α': 0.05,
                          'σ_A': 0.25, 'σ_B': 0.25, 'A': 1.0, 'B': 1.0}
 
+    def __call__(self, *args) -> Union[Tuple[Vector, Vector], Any]:
+        """ Wrapper for evaluate """
+        return self.evaluate(*args)
+
     def evaluate(self, nlds: List[Vector],
                  gsfs: List[Vector],
                  median: Optional[bool] = False,
