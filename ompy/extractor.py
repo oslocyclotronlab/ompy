@@ -179,7 +179,7 @@ class Extractor:
             nld_rel_err, gsf_rel_err = self.error_estimator(nlds, gsfs)
             nld_rel_err.to_keV()
             gsf_rel_err.to_keV()
-            for i, nld, gsf in enumerate(zip(self.nld, self.gsf)):
+            for i, (nld, gsf) in enumerate(zip(self.nld, self.gsf)):
                 nld.std = self.rel_err_missing * nld.values
                 gsf.std = self.rel_err_missing * gsf.values
                 idx_nld = nld.indices(nld_rel_err.E)
