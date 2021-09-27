@@ -52,7 +52,7 @@ class FermiDirac(PositiveContinuous):
 
     .. math::
 
-        f(x \mid \lambda \mu) = 
+        f(x \mid \lambda \mu) =
             \frac{\lambda}{\lambda\mu - \ln(1 + e^{-\lambda\mu})}
             \frac{1}{e^{\lambda(x - \mu)} + 1}
 
@@ -61,8 +61,8 @@ class FermiDirac(PositiveContinuous):
 
     ========  ============================
     Support   :math:`x \in [0, \infty)`
-    Mean      
-    Variance  
+    Mean
+    Variance
     ========  ============================
 
 
@@ -86,13 +86,15 @@ class FermiDirac(PositiveContinuous):
 
     def logp(value, lam, mu):
         """
-        Calculate log-probability of Fermi-Dirac distribution at spesified value.
+        Calculate log-probability of Fermi-Dirac distribution at spesified
+        value.
 
         Parameters
         ----------
         value: numeric
-            Value(s) for which log-probability is calculated. If the log probabilities for multiple
-            values are desired the values must be provided in a numpy array or Aesara tensor
+            Value(s) for which log-probability is calculated. If the log
+            probabilities for multiple values are desired the values must be
+            provided in a numpy array or Aesara tensor
 
         Returns
         -------
@@ -105,8 +107,8 @@ class FermiDirac(PositiveContinuous):
 
     def logcdf(value, lam, mu):
         """
-        Compute the log of cumulative distribution function for the Fermi-Dirac distribution
-        at the specified value.
+        Compute the log of cumulative distribution function for the Fermi-Dirac
+        distribution at the specified value.
         Parameters
         ----------
         value: numeric or np.ndarray or aesara.tensor
@@ -122,4 +124,3 @@ class FermiDirac(PositiveContinuous):
         V = (at.exp(lam*(value - mu)) + 1)/(at.exp(lam*mu) + 1)
         logcdf = at.log(N) + at.log(lam*value - at.log(V))
         return bound(logcdf, value >= 0, lam > 0)
-

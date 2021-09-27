@@ -2,13 +2,13 @@ import numpy as np
 
 import theano.tensor as tt
 from pymc3.distributions.continuous import (
-    PositiveContinuous, 
+    PositiveContinuous,
     assert_negative_support,
     draw_values,
     generate_samples)
 from pymc3.distributions.dist_math import bound
 from pymc3.theanof import floatX
-#from mpmath import polylog
+
 
 class FermiDirac(PositiveContinuous):
     """
@@ -18,7 +18,7 @@ class FermiDirac(PositiveContinuous):
 
     .. math::
 
-        f(x \mid \lambda \mu) = 
+        f(x \mid \lambda \mu) =
             \frac{\lambda}{\lambda\mu + \ln(1 + e^{-\lambda\mu})}
             \frac{1}{e^{\lambda(x - \mu)} + 1}
 
@@ -27,8 +27,8 @@ class FermiDirac(PositiveContinuous):
 
     ========  ============================
     Support   :math:`x \in [0, \infty)`
-    Mean      
-    Variance  
+    Mean
+    Variance
     ========  ============================
 
 
@@ -79,16 +79,19 @@ class FermiDirac(PositiveContinuous):
         array
         """
         lam, mu = draw_values([self.lam, self.mu], point=point, size=size)
-        return generate_samples(self._random, lam, mu, dist_shape=self.shape, size=size)
+        return generate_samples(self._random, lam, mu, dist_shape=self.shape,
+                                size=size)
 
     def logp(self, value):
         """
-        Calculate log-probability of Fermi-Dirac distribution at specified value.
+        Calculate log-probability of Fermi-Dirac distribution at specified
+        value.
         Parameters
         ----------
         value: numeric
-            Value(s) for which log-probability is calculated. If the log probabilities for multiple
-            values are desired the values must be provided in a numpy array or theano tensor
+            Value(s) for which log-probability is calculated. If the log
+            probabilities for multiple values are desired the values must be
+            provided in a numpy array or theano tensor
         Returns
         -------
         TensorVariable
@@ -103,13 +106,14 @@ class FermiDirac(PositiveContinuous):
 
     def logcdf(self, value):
         """
-        Compute the log of cumulative distribution function for the Fermi-Dirac distribution
-        at the specified value.
+        Compute the log of cumulative distribution function for the Fermi-Dirac
+        distribution at the specified value.
         Parameters
         ----------
         value: numeric or np.ndarray or theano.tensor
-            Value(s) for which log CDF is calculated. If the log CDF for multiple
-            values are desired the values must be provided in a numpy array or theano tensor.
+            Value(s) for which log CDF is calculated. If the log CDF for
+            multiple values are desired the values must be provided in a numpy
+            array or theano tensor.
         Returns
         -------
         TensorVariable
@@ -118,5 +122,6 @@ class FermiDirac(PositiveContinuous):
         lam = self.lam
         mu = self.mu
 
-        logcdf = tt.log(1 - tt.log(1 + tt.exp(-lam*(value - mu)))/tt.log(1 + tt.exp(lam*mu)))
+        logcdf = tt.log(1 - tt.log(1 + tt.exp(-lam*(value - mu))) /
+                        tt.log(1 + tt.exp(lam*mu)))
         return bound(logcdf, value >= 0, lam > 0)
