@@ -11,6 +11,7 @@ Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
 - Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
 - Fixed a potential bug where `units` attribute is set erroniously when reading the discrete level density from file (`load_levels_discrete` and `load_levels_discrete_smooth`).
+- Refactored the setup/build process to make sure pip installs all the nessecary files.
 
 Deprecated:
 - `shape` argument of Matrix for creation of a matrix filled with zeros. Use `ZerosMatrix` instead.
