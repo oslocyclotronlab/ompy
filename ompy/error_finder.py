@@ -12,18 +12,6 @@ from .matrix import Matrix
 from .dist import FermiDirac
 
 
-def all_equal(iterator):
-    """ Check if all elements in an iterator are equal.
-    """
-
-    iterator = iter(iterator)
-    try:
-        first = next(iterator)
-    except StopIteration:
-        return True
-    return all(first == x for x in iterator)
-
-
 class ErrorFinder:
     """ Find the relative errors from an ensemble of NLDs and γSFs.
 
@@ -431,3 +419,15 @@ class ErrorFinder:
         self.LOG.info("Inference results:\n%s\n%s",
                       tt.to_string([values], header=header),
                       tt.to_string(errs, header=['', 'σ_ρ [%]', 'σ_f [%]']))
+
+
+def all_equal(iterator):
+    """ Check if all elements in an iterator are equal.
+    """
+
+    iterator = iter(iterator)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == x for x in iterator)
