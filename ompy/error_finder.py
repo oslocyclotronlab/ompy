@@ -297,7 +297,7 @@ class ErrorFinder:
 
         # Ensure that the same number of NLDs and GSFs are provided
         assert len(_nlds) == len(_gsfs), \
-            "Length of nlds and gsfs doesn't match"
+            "Number of nlds and gsfs is different" 
 
         N = len(_nlds)
 
