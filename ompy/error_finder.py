@@ -334,7 +334,7 @@ class ErrorFinder:
         self.LOG.debug("After removing nan: %d NLD values and %d GSF values",
                        len(nlds[0]), len(gsfs[0]))
 
-        # Next we can extract the important bits
+        # Next we can extract the important parts
         E_nld = nlds[0].E.copy()
         E_gsf = gsfs[0].E.copy()
 
