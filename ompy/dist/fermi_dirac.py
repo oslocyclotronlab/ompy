@@ -66,6 +66,7 @@ class FermiDirac(PositiveContinuous):
     def random(self, point=None, size=None):
         """
         Draw random values from Fermi-Dirac distribution.
+
         Parameters
         ----------
         point: dict, optional
@@ -74,6 +75,7 @@ class FermiDirac(PositiveContinuous):
         size: int, optional
             Desired size of random sample (returns one sample if not
             specified).
+
         Returns
         -------
         array
@@ -86,12 +88,14 @@ class FermiDirac(PositiveContinuous):
         """
         Calculate log-probability of Fermi-Dirac distribution at specified
         value.
+
         Parameters
         ----------
         value: numeric
             Value(s) for which log-probability is calculated. If the log
             probabilities for multiple values are desired the values must be
             provided in a numpy array or theano tensor
+
         Returns
         -------
         TensorVariable
@@ -108,12 +112,14 @@ class FermiDirac(PositiveContinuous):
         """
         Compute the log of cumulative distribution function for the Fermi-Dirac
         distribution at the specified value.
+
         Parameters
         ----------
         value: numeric or np.ndarray or theano.tensor
             Value(s) for which log CDF is calculated. If the log CDF for
             multiple values are desired the values must be provided in a numpy
             array or theano tensor.
+
         Returns
         -------
         TensorVariable

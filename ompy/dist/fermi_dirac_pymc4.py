@@ -109,12 +109,14 @@ class FermiDirac(PositiveContinuous):
         """
         Compute the log of cumulative distribution function for the Fermi-Dirac
         distribution at the specified value.
+
         Parameters
         ----------
         value: numeric or np.ndarray or aesara.tensor
             Value(s) for which log CDF is calculated. If the log CDF for
             multiple values are desired the values must be provided in a numpy
             array or Aesara tensor.
+
         Returns
         -------
         TensorVariable
