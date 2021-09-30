@@ -10,6 +10,7 @@ Added:
 - Added attribute `error_finder` to the `Extractor` class. If set the `Extractor` class will use the `error_finder` object to estimate the relative uncertanties of the extracted NLDs and gSFs. Points that the `ErrorFinder` are unable to estimate will be set to the largest value of those that was successfully estimated.
 - Added dependency `pyMC3>=3.11.2,<4.0`.
 - Added `indices()` to the `Vector` class get the index of several x-values. Similar to `Matrix.indices_Eg()` and `Matrix.indices_Ex()`
+- Added a notebook `uncertanty_by_counts` exploring the new algorithm used to estimate uncertanties before normalization.
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
