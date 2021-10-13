@@ -34,6 +34,7 @@ class ErrorFinder:
         - The linear model is currently not very well optimized. Usually fails.
         - Trace should always be saved. Calculations can take hours!
         - Refactor the linear model (maybe remove?)
+        - Refactor how data are conditioned
     """
 
     LOG = logging.getLogger(__name__)  # overwrite parent variable
