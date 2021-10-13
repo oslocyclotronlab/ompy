@@ -28,8 +28,12 @@ class ErrorFinder:
         testvals (dict): A dictionary with testvalues to feed to pymc3 when
             declaring the prior distributions. This can probably be left to
             the default, but could be changed if needed.
+        trace: The trace of the inference data. None if the class hasn't
+            ran.
     TODO:
         - The linear model is currently not very well optimized. Usually fails.
+        - Trace should always be saved. Calculations can take hours!
+        - Refactor the linear model (maybe remove?)
     """
 
     LOG = logging.getLogger(__name__)  # overwrite parent variable
@@ -55,6 +59,9 @@ class ErrorFinder:
         self.seed = seed
         self.testvals = {'σ_D': 0.25, 'σ_F': 0.25, 'σ_α': 0.05,
                          'σ_A': 0.25, 'σ_B': 0.25, 'A': 1.0, 'B': 1.0}
+        self.prior_parameters = {'σ_ρ': {'lam': 10., 'mu': 1.},
+                                 'σ_f': {'lam': 10., 'mu': 1.}}
+        self.trace = None
 
     def __call__(self, *args) -> Union[Tuple[Vector, Vector], Any]:
         """ Wrapper for evaluate """
@@ -135,20 +142,25 @@ class ErrorFinder:
             F = pm.Normal("F", mu=0., sigma=σ_F, shape=[N, N-1])[:, coef_gsf]
             α = pm.Normal("α", mu=0., sigma=σ_α, shape=[N, N-1])
 
-            σ_ρ = FermiDirac("σ_ρ", lam=10., mu=1., shape=M_nld)[vals_nld]
-            σ_f = FermiDirac("σ_f", lam=10., mu=1., shape=M_gsf)[vals_gsf]
+            σ_ρ = FermiDirac("σ_ρ", lam=self.prior_parameters['σ_ρ']['lam'],
+                             mu=self.prior_parameters['σ_ρ']['mu'],
+                             shape=M_nld)[vals_nld]
+
+            σ_f = FermiDirac("σ_f", lam=self.prior_parameters['σ_f']['lam'],
+                             mu=self.prior_parameters['σ_f']['mu'],
+                             shape=M_gsf)[vals_gsf]
 
             μ_ρ = D + α[:, coef_nld] * E_nld[vals_nld]
             μ_f = F + α[:, coef_gsf] * E_gsf[vals_gsf]
 
-            ρ_obs = pm.Normal("ρ_obs", mu=μ_ρ, sigma=σ_ρ,
+            ρ_obs = pm.Normal("ρ_obs", mu=μ_ρ, sigma=np.sqrt(2)*σ_ρ,
                               observed=np.log(nld_obs))
-            f_obs = pm.Normal("f_obs", mu=μ_f, sigma=σ_f,
+            f_obs = pm.Normal("f_obs", mu=μ_f, sigma=np.sqrt(2)*σ_f,
                               observed=np.log(gsf_obs))
 
             # Perform the sampling
             trace = pm.sample(random_seed=self.seed, **self.options)
-
+        self.trace = trace
         self.display_results(trace)
 
         mid = np.median if median else np.mean
