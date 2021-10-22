@@ -30,7 +30,7 @@ def check_if_clang_compiler():
     """Check if the compiler is clang or gcc"""
     std_err = subprocess.run("gcc", capture_output=True, text=True).stderr
     if "clang" in std_err:
-        return true
+        return True
 
 
 # Return the git revision as a string
