@@ -63,6 +63,9 @@ class Extractor:
             Ex axis (particle detector resolution). Defaults to 150 keV
         rel_err_missing (float): Relative error used for points that cannot be
             estimated by error_estimator object.
+        suppress_warning (bool): Suppress warnings. The warnings are usually
+            expected. Set this attribute to `True` in order to avoid enourmous
+            amounts of warnings in your notebooks.
 
 
     TODO:
@@ -105,6 +108,7 @@ class Extractor:
         self.resolution_Ex = 150  # keV
 
         self.rel_err_missing = 0.3
+        self.suppress_warning = False
 
     def __call__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None):
@@ -572,18 +576,20 @@ class Extractor:
         for i, vec in enumerate(self.nld):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"nld #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for nld in extractor.nld:\n"
-                            "#     nld.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"nld #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for nld in extractor.nld:\n"
+                                "#     nld.cut_nan()\n")
 
         for i, vec in enumerate(self.nld):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"gsf #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for gsf in extractor.gsf:\n"
-                            "#     gsf.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"gsf #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for gsf in extractor.gsf:\n"
+                                "#     gsf.cut_nan()\n")
 
         return contains_nan
 
