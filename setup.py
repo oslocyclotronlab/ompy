@@ -131,20 +131,27 @@ fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
 
-extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
+# Check CPU architecture. If x86 apply x86 optimization
+extra_compile_args_cython = ["-O3", "-ffast-math", "-march=native"]
+extra_compile_args_cpp = ["-std=c++11", "-O3",
+                          "-funroll-loops", "-march=native"]
+if platform == "i386":
+    extra_compile_args_cpp = ["-mfpmath=sse"]
+
+
 extra_link_args = []
 if openmp and platform.system() == 'Darwin':
-    extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
+    extra_compile_args_cython.insert(-1, "-Xpreprocessor -fopenmp")
     extra_link_args.insert(-1, "-lomp")
 elif openmp:
-    extra_compile_args.insert(-1, "-fopenmp")
+    extra_compile_args_cython.insert(-1, "-fopenmp")
     extra_link_args.insert(-1, "-fopenmp")
 
 ext_modules = [
         Extension("ompy.decomposition",
                   ["ompy/decomposition.pyx"],
                   # on MacOS the clang compiler pretends not to support OpenMP, but in fact it does so
-                  extra_compile_args=extra_compile_args,
+                  extra_compile_args=extra_compile_args_cython,
                   extra_link_args=extra_link_args,
                   include_dirs=[numpy.get_include()]
                   ),
@@ -155,9 +162,7 @@ ext_modules = [
 ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
                           ["src/stats.cpp"],
-                          extra_compile_args=["-std=c++11", "-mfpmath=sse",
-                                              "-O3", "-funroll-loops",
-                                              "-march=native"])
+                          extra_compile_args=extra_compile_args_cpp)
 ]
 
 install_requires = [
