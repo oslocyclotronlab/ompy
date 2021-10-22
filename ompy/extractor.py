@@ -244,7 +244,7 @@ class Extractor:
         # decomposition to make sense.
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
-        assert dEx == dEg, \
+        assert np.isclose(dEx, dEg), \
             "Ex and Eg must have the same bin width. Currently they have"\
             f"dEx: {dEx:.1f} and dEg: {dEg:.1f}. You have to rebin.\n"\
             "The `ensemble` class has a `rebin` method."
