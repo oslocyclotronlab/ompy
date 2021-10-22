@@ -26,6 +26,13 @@ MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 
+def check_if_clang_compiler():
+    """Check if the compiler is clang or gcc"""
+    std_err = subprocess.run("gcc", capture_output=True, text=True).stderr
+    if "clang" in std_err:
+        return true
+
+
 # Return the git revision as a string
 # See also ompy/version.py
 def git_version():
@@ -140,7 +147,7 @@ if platform == "i386":
 
 
 extra_link_args = []
-if openmp and platform.system() == 'Darwin':
+if openmp and platform.system() == 'Darwin' and check_if_clang_compiler():
     extra_compile_args_cython.insert(-1, "-Xpreprocessor -fopenmp")
     extra_link_args.insert(-1, "-lomp")
 elif openmp:
