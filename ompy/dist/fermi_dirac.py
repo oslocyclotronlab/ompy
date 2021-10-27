@@ -24,11 +24,27 @@ class FermiDirac(PositiveContinuous):
 
     .. plot::
 
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        x = np.linspace(0, 5., 1000)
+        lam = [1.0, 10., 25.]
+        mu = [0.5, 1.0, 2.0]
+
+        def pdf(x, lam, mu):
+            return (lam/np.log(1 + np.exp(lam*mu))*(1/(np.exp(lam*(x-mu)) + 1))
+
+        for l in lam:
+            for m in mu:
+                pdf = pdf(x, l, m)
+                plt.plot(x, pdf, label=f"$\lambda = {l}$, $\mu = {m}$")
+        plt.xlabel("x", fontsize=12)
+        plt.ylabel("f(x)", fontsize=12)
+        plt.legend(loc=1)
+        plt.show()
 
     ========  ============================
     Support   :math:`x \in [0, \infty)`
-    Mean
-    Variance
     ========  ============================
 
 
@@ -38,6 +54,14 @@ class FermiDirac(PositiveContinuous):
         Rate of decay at mu (lam > 0)
     mu: float
         Decay position
+
+    Examples
+    --------
+    .. code-block:: python
+
+        with pm.Model():
+            x = ompy.FermiDirac('x', lam=10.0, mu=1.2)
+
     """
 
     def __init__(self, lam, mu, *args, **kwargs):
