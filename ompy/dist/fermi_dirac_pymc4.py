@@ -37,8 +37,7 @@ class FermiDiracRV(RandomVariable):
                mu: np.ndarray, size: Tuple[int, ...]
                ) -> np.ndarray:
         q = rng.uniform(size=size)
-        N = lam/np.log(1 + np.exp(lam*mu))
-        return mu - np.log(1 - np.exp(lam*(1 - q)/lam))/lam
+        return mu - np.log((1 + np.exp(lam*mu))**(1-q) - 1)/lam
 
 
 fermidirac = FermiDiracRV()
@@ -122,7 +121,6 @@ class FermiDirac(PositiveContinuous):
         TensorVariable
         """
 
-        N = lam/at.log(1 + at.exp(lam*mu))
-        V = (at.exp(lam*(value - mu)) + 1)/(at.exp(lam*mu) + 1)
-        logcdf = at.log(N) + at.log(lam*value - at.log(V))
+        logcdf = at.log(1 - at.log(1 + at.exp(-lam*(value - mu))) /
+                        at.log(1 + at.exp(lam*mu)))
         return bound(logcdf, value >= 0, lam > 0)

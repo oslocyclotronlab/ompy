@@ -53,8 +53,7 @@ class FermiDirac(PositiveContinuous):
         """
         Calculate the CDF for the Fermi-Dirac distribution.
         """
-        N = np.log(1 + np.exp(lam*mu))
-        return mu - np.log(np.exp(N*(1-q)) - 1)/lam
+        return mu - np.log((1 + np.exp(lam*mu))**(1-q) - 1)/lam
 
     def _random(self, lam, mu, size=None):
         """
@@ -101,6 +100,10 @@ class FermiDirac(PositiveContinuous):
         TensorVariable
         """
 
+        # The formula is
+        # p(x) = lam/ln(1 + exp(lam*mu)) * 1/(exp(lam*(x-mu)) + 1)
+        # ln(p(x)) = ln(lam/ln(1 + exp(lam*mu))) - ln(exp(lam*(x-mu)) + 1)
+
         lam = self.lam
         mu = self.mu
 
@@ -124,6 +127,10 @@ class FermiDirac(PositiveContinuous):
         -------
         TensorVariable
         """
+
+        # The formula is CDF
+        # P(x) = 1 - ln(1 + exp(-lam*(x-mu)))/ln(1 + exp(lam*mu))
+        # ln(P(x)) = ln(1 - ln(1 + exp(-lam*(x-mu)))/ln(1 + exp(lam*mu)))
 
         lam = self.lam
         mu = self.mu

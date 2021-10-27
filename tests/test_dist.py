@@ -6,6 +6,7 @@ from numpy.testing import assert_equal, assert_allclose
 
 import matplotlib.pyplot as plt
 
+
 @pytest.mark.parametrize(
     "lam,mu",
     [(10., 1.),
@@ -28,6 +29,7 @@ def test_fermi_dirac(lam, mu):
 
     # We use a fairly large tolerance since error should be stocastic
     assert_allclose(hist, y, atol=0.1)
+
 
 @pytest.mark.parametrize(
     "lam,mu",
