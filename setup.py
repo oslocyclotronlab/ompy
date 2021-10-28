@@ -28,14 +28,13 @@ VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 def check_if_clang_compiler():
     """Check if the compiler is clang or gcc"""
-    std_err = subprocess.run("gcc", capture_output=True, text=True).stderr
+
+    # Find the CC variable
+    cc = os.getenv("CC")
+    cc = 'gcc' if cc is None else cc  # Will be gcc if none.
+    std_err = subprocess.run(cc, capture_output=True, text=True).stderr
     if "clang" in std_err:
         return True
-
-if check_if_clang_compiler():
-    print("I found clang")
-else:
-    print("I found GCC")
 
 # Return the git revision as a string
 # See also ompy/version.py
@@ -176,6 +175,19 @@ ext_modules_pybind11 = [
                           extra_compile_args=extra_compile_args_cpp)
 ]
 
+# Superhacky solution to get pybind11 to play nicely with GCC...
+if platform.system() == 'Darwin' and not check_if_clang_compiler():
+    try:
+        idx = ext_modules_pybind11[0].extra_compile_args.index('-stdlib=libc++')
+        del ext_modules_pybind11[0].extra_compile_args[idx]
+    except ValueError:
+        pass
+    try:
+        idx = ext_modules_pybind11[0].extra_link_args.index('-stdlib=libc++')
+        del ext_modules_pybind11[0].extra_link_args[idx]
+    except ValueError:
+        pass
+
 install_requires = [
  "cython",
  "numpy>=1.20.0",
@@ -206,4 +218,3 @@ setup(name='OMpy',
       zip_safe=False,
       install_requires=install_requires
       )
-
