@@ -32,6 +32,10 @@ def check_if_clang_compiler():
     if "clang" in std_err:
         return True
 
+if check_if_clang_compiler():
+    print("I found clang")
+else:
+    print("I found GCC")
 
 # Return the git revision as a string
 # See also ompy/version.py
