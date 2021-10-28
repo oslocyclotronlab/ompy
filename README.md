@@ -142,6 +142,9 @@ The simplest way to get the new repo is to rerun the installation instructions b
 #### Saving `Vector`´s in `MaMa` format
 The `MaMa` format has some limitation. Mainly the format will not be able to save the `std` attribute, meaning that error-bars will not be stored. The `MaMa` format is always in keV units, meaning that the `units` keyword in the `Vector.save` method is ignored.
 
+#### Compiling with `gcc` on macOS
+Short answer: Don't. Long answer: If you want to compile using `gcc` you are on your own. This is not a standard setup and will require careful configuration of the system. There is a recent update (PR #191) that will ensure that compilation will complete without any issues, however there may be linking issues at runtime. If you have issues, please consider using the standard `clang` compiler or use the docker image.
+
 ## General usage
 All the functions and classes in the package are available in the main module. You get everything by importing the package
 
