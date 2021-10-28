@@ -142,13 +142,8 @@ fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
 
-# Check CPU architecture. If x86 apply x86 optimization
-extra_compile_args_cython = ["-O3", "-ffast-math", "-march=native"]
-extra_compile_args_cpp = ["-std=c++11", "-O3",
-                          "-funroll-loops", "-march=native"]
-if platform == "i386":
-    extra_compile_args_cpp = ["-mfpmath=sse"]
-
+extra_compile_args_cython = ["-O3", "-ffast-math"]
+extra_compile_args_cpp = ["-std=c++11", "-O3"]
 
 extra_link_args = []
 if openmp and platform.system() == 'Darwin' and check_if_clang_compiler():
