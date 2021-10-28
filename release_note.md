@@ -11,6 +11,8 @@ Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
 - Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
 - Fixed a potential bug where `units` attribute is set erroniously when reading the discrete level density from file (`load_levels_discrete` and `load_levels_discrete_smooth`).
+- Fixed a bug that prevented compilation on ARM platforms.
+- Added a workaround for cases where `gcc` is used rather than `clang` on macOS. This setup will probably still fail on runtime unless the system is correctly configured. That is not our problem, solve it yourself. 
 
 Deprecated:
 - `shape` argument of Matrix for creation of a matrix filled with zeros. Use `ZerosMatrix` instead.
