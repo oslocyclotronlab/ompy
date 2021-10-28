@@ -26,17 +26,6 @@ MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 
-def check_if_clang_compiler():
-    """Check if the compiler is clang or gcc"""
-
-    # Find the CC variable
-    cc = os.getenv("CC")
-    cc = 'gcc' if cc is None else cc  # Will be gcc if none.
-    std_err = subprocess.run(cc, capture_output=True, text=True).stderr
-    if "clang" in std_err:
-        return True
-
-
 # Return the git revision as a string
 # See also ompy/version.py
 def git_version():
@@ -146,7 +135,7 @@ extra_compile_args_cython = ["-O3", "-ffast-math"]
 extra_compile_args_cpp = ["-std=c++11", "-O3"]
 
 extra_link_args = []
-if openmp and platform.system() == 'Darwin' and check_if_clang_compiler():
+if openmp and platform.system() == 'Darwin':
     extra_compile_args_cython.insert(-1, "-Xpreprocessor -fopenmp")
     extra_link_args.insert(-1, "-lomp")
 elif openmp:
@@ -170,20 +159,6 @@ ext_modules_pybind11 = [
                           ["src/stats.cpp"],
                           extra_compile_args=extra_compile_args_cpp)
 ]
-
-# Superhacky solution to get pybind11 to play nicely with GCC...
-if platform.system() == 'Darwin' and not check_if_clang_compiler():
-    try:
-        idx = ext_modules_pybind11[0].extra_compile_args.index(
-            '-stdlib=libc++')
-        del ext_modules_pybind11[0].extra_compile_args[idx]
-    except ValueError:
-        pass
-    try:
-        idx = ext_modules_pybind11[0].extra_link_args.index('-stdlib=libc++')
-        del ext_modules_pybind11[0].extra_link_args[idx]
-    except ValueError:
-        pass
 
 install_requires = [
  "cython",
