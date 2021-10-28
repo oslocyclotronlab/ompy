@@ -36,6 +36,7 @@ def check_if_clang_compiler():
     if "clang" in std_err:
         return True
 
+
 # Return the git revision as a string
 # See also ompy/version.py
 def git_version():
@@ -178,7 +179,8 @@ ext_modules_pybind11 = [
 # Superhacky solution to get pybind11 to play nicely with GCC...
 if platform.system() == 'Darwin' and not check_if_clang_compiler():
     try:
-        idx = ext_modules_pybind11[0].extra_compile_args.index('-stdlib=libc++')
+        idx = ext_modules_pybind11[0].extra_compile_args.index(
+            '-stdlib=libc++')
         del ext_modules_pybind11[0].extra_compile_args[idx]
     except ValueError:
         pass
