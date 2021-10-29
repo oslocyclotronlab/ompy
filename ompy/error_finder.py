@@ -21,8 +21,8 @@ class ErrorFinder:
     stable and should be used if the linear doesn't converge.
 
     Attributes:
-        algorithm (string): Indicate what algorithm to use, either 'log' or
-            'lin'. Default is 'log'
+        algorithm (string): Indicate what algorithm to use Currently only 'log'
+            is implemented. Default is 'log'
         seed (int): Seed used in the pyMC3 sampling.
         options (dict): The pymc3.sample options to use.
         testvals (dict): A dictionary with testvalues to feed to pymc3 when
@@ -31,7 +31,6 @@ class ErrorFinder:
         trace: The trace of the inference data. None if the class hasn't
             ran.
     TODO:
-        - The linear model is currently not very well optimized. Usually fails.
         - Trace should always be saved. Calculations can take hours!
         - Refactor the linear model (maybe remove?)
         - Refactor how data are conditioned
@@ -50,7 +49,7 @@ class ErrorFinder:
 
         """
 
-        if not (algorithm.lower() == 'lin' or algorithm.lower() == 'log'):
+        if not (algorithm.lower() == 'log'):
             raise NotImplementedError(
                 f"Algorithm '{algorithm}' not implemented")
 
@@ -62,7 +61,6 @@ class ErrorFinder:
                          'σ_A': 0.25, 'σ_B': 0.25, 'A': 1.0, 'B': 1.0}
         self.prior_parameters = {'σ_ρ': {'lam': 10., 'mu': 1.},
                                  'σ_f': {'lam': 10., 'mu': 1.}}
-        self.trace = None
 
     def __call__(self, *args) -> Union[Tuple[Vector, Vector], Any]:
         """ Wrapper for evaluate """
@@ -93,45 +91,43 @@ class ErrorFinder:
             pyMC3 may raise errors. Please report if such errors occurs.
         """
         algo = None
-        if self.algorithm == 'lin':
-            algo = self.linear
-        elif self.algorithm == 'log':
+        if self.algorithm == 'log':
             algo = self.logarithm
         else:
             raise NotImplementedError(
                 f"Algorithm '{algorithm}' not implemented")
 
-        return algo(*self.condition_data(nlds, gsfs),
-                    median=median, full=full)
+        return algo(nlds, gsfs, median=median, full=full)
 
-    def logarithm(self, E_nld: ndarray, E_gsf: ndarray,
-                  nld_obs: ndarray, gsf_obs: ndarray,
-                  coef_nld: ndarray, coef_gsf: ndarray,
-                  vals_nld: ndarray, vals_gsf: ndarray,
+    def logarithm(self, nlds: List[Vector], gsfs: List[Vector],
                   median: Optional[bool] = False, full: Optional[bool] = False
                   ) -> Union[Tuple[Vector, Vector], Any]:
-        """ Calculate the relative errors of the NLD and γSF points using a
-        logarithmic model.
+        """Use Bayesian inference to estimate the relative errors of the NLD
+        and GSF from an ensemble. See Ingeberg et al., NIM (TBA)
 
         Args:
-            E_nld (ndarray): Energy points of the NLD
-            E_gsf (ndarray): Energy points of the γSF
-            nld_obs (ndarray): The observation tensor of the NLD
-            gsf_obs (ndarray): The observation tensor of the γSF
-            coef_nld (ndarray): Indices needed for broadcasting
-            coef_gsf (ndarray): Indices needed for broadcasting
-            vals_nld (ndarray): Indices needed for broadcasting
-            vals_gsf (ndarray): Indices needed for broadcasting
+            nlds (List[Vector]): Ensemble of NLDs
+            gsfs (List[Vector]): Ensemble of GSFs
             median (bool, optional): If the resulting relative errors should be
                 the mean or the median.
             full (bool, optional): If the trace from the pyMC3 sampling should
                 be returned. Useful for debugging.
         """
 
-        N, _, M_nld = nld_obs.shape
-        _, _, M_gsf = gsf_obs.shape
+        assert len(nlds) == len(gsfs), \
+            "Number of ensemble members of the NLD and GSF doesn't match."
+        N = len(nlds)
+
+        E_nld, q_nld = format_data(nlds)
+        E_gsf, q_gsf = format_data(gsfs)
+
+        M_nld, M_gsf = len(E_nld), len(E_gsf)
+        coef_mask_nld, values_mask_nld = format_mask(N, M_nld)
+        coef_mask_gsf, values_mask_gsf = format_mask(N, M_gsf)
 
         self.LOG.info("Starting pyMC3 inference - logarithmic model")
+        self.LOG.debug(f"Inference with an ensemble with N={N} members with "
+                       f"{M_nld} NLD bins and {M_gsf} GSF bins.")
 
         with pm.Model() as model:
 
@@ -139,25 +135,25 @@ class ErrorFinder:
             σ_F = pm.HalfFlat("σ_F", testval=self.testvals['σ_F'])
             σ_α = pm.HalfFlat("σ_α", testval=self.testvals['σ_α'])
 
-            D = pm.Normal("D", mu=0., sigma=σ_D, shape=[N, N-1])[:, coef_nld]
-            F = pm.Normal("F", mu=0., sigma=σ_F, shape=[N, N-1])[:, coef_gsf]
-            α = pm.Normal("α", mu=0., sigma=σ_α, shape=[N, N-1])
+            D = pm.Normal("D", mu=0, sigma=σ_D, shape=[N, N-1])[:, coef_mask_nld]  # noqa
+            F = pm.Normal("F", mu=0, sigma=σ_F, shape=[N, N-1])[:, coef_mask_gsf]  # noqa
+            α = pm.Normal("α", mu=0, sigma=σ_α, shape=[N, N-1])
 
             σ_ρ = FermiDirac("σ_ρ", lam=self.prior_parameters['σ_ρ']['lam'],
                              mu=self.prior_parameters['σ_ρ']['mu'],
-                             shape=M_nld)[vals_nld]
+                             shape=M_nld)[values_mask_nld]
 
             σ_f = FermiDirac("σ_f", lam=self.prior_parameters['σ_f']['lam'],
                              mu=self.prior_parameters['σ_f']['mu'],
-                             shape=M_gsf)[vals_gsf]
+                             shape=M_gsf)[values_mask_gsf]
 
-            μ_ρ = D + α[:, coef_nld] * E_nld[vals_nld]
-            μ_f = F + α[:, coef_gsf] * E_gsf[vals_gsf]
+            μ_ρ = D + α[:, coef_mask_nld] * E_nld[values_mask_nld]
+            μ_f = F + α[:, coef_mask_gsf] * E_gsf[values_mask_gsf]
 
-            ρ_obs = pm.Normal("ρ_obs", mu=μ_ρ, sigma=np.sqrt(2)*σ_ρ,
-                              observed=np.log(nld_obs))
-            f_obs = pm.Normal("f_obs", mu=μ_f, sigma=np.sqrt(2)*σ_f,
-                              observed=np.log(gsf_obs))
+            q_ρ = pm.Normal("q_ρ", mu=μ_ρ, sigma=np.sqrt(2)*σ_ρ,
+                            observed=np.log(q_nld))
+            q_f = pm.Normal("q_f", mu=μ_f, sigma=np.sqrt(2)*σ_f,
+                            observed=np.log(q_gsf))
 
             # Perform the sampling
             trace = pm.sample(random_seed=self.seed, **self.options)
@@ -173,150 +169,6 @@ class ErrorFinder:
             return nld_rel_err, gsf_rel_err, trace
         else:
             return nld_rel_err, gsf_rel_err
-
-    def keep_only(self, vecs: List[Vector]) -> List[Vector]:
-        """ Takes a list of vectors and returns a list of vectors
-        where only the points shared between all vectors are returned.
-        """
-
-        E = [vec.E.copy() for vec in vecs]
-        energies = {}
-        for vec in vecs:
-            for E in vec.E:
-                if E not in energies:
-                    energies[E] = [False] * len(vecs)
-
-        # Next we will add if the point is present or not
-        for n, vec in enumerate(vecs):
-            for E in vec.E:
-                energies[E][n] = True
-
-        keep_energy = []
-        for key in energies:
-            if np.all(energies[key]):
-                keep_energy.append(key)
-
-        vec_all_common = [vec.copy() for vec in vecs]
-        for vec in vec_all_common:
-            E = []
-            values = []
-            for e, value in zip(vec.E, vec.values):
-                if e in keep_energy:
-                    E.append(e)
-                    values.append(value)
-            vec.E = np.array(E)
-            vec.values = np.array(values)
-
-        return vec_all_common
-
-    def condition_data(self, _nlds: List[Vector], _gsfs: List[Vector],
-                       ) -> Tuple[ndarray, ndarray, ndarray, ndarray]:
-        """ Ensures that data are copied and that all values are in correct
-        units. It also checks that all lengths are correct.
-
-        Args:
-            nlds (List[Vector]): List of the NLDs in an ensemble
-            gsfs (List[Vector]): List of the γSFs in an ensemble
-
-        Returns:
-            Tuple of nld energy points, gsf energy points and the observed
-            matrix for the NLD and γSF.
-
-        Raises:
-            IndexError: If the length of members of the ensemble have an
-                equal number of points in the NLD and γSF.
-
-        Warnings:
-            Will raise a warning if there are members in the ensemble that
-            contains one or more nan's. This is mostly to inform the user
-            and shouldn't be an issue later on.
-
-        TODO:
-            - Mitigation when cut_nan() results in different length vectors
-              of different members of the ensemble. (e.g. len(nld[0]) = 10,
-              len(nld[1]) = 9).
-
-        """
-
-        # Ensure that the same number of NLDs and GSFs are provided
-        assert len(_nlds) == len(_gsfs), \
-            "Number of nlds and gsfs is different" 
-
-        N = len(_nlds)
-
-        self.LOG.debug("Processing an ensemble with %d members", N)
-
-        # Make copy to ensure that we don't overwrite anything
-        nlds = [nld.copy() for nld in _nlds]
-        gsfs = [gsf.copy() for gsf in _gsfs]
-
-        self.LOG.debug("Before removing nan: %d NLD values and %d GSF values",
-                       len(nlds[0]), len(gsfs[0]))
-
-        # Ensure that we have in MeV and that there isn't any nan's.
-        is_nan = False
-        for nld, gsf in zip(nlds, gsfs):
-            nld.to_MeV()
-            gsf.to_MeV()
-            is_nan = np.isnan(nld.values).any() or np.isnan(gsf.values).any()
-            nld.cut_nan()
-            gsf.cut_nan()
-        if is_nan:
-            self.LOG.warning(f"NLDs and/or γSFs contains nan's."
-                             " They will be removed")
-
-        # Next we will ensure that all members have all energies
-        if (not all_equal([len(nld) for nld in nlds]) or
-           not all_equal([len(gsf) for gsf in gsfs])):
-            self.LOG.warning("Some members of the ensemble have different "
-                             "lengths. "
-                             "Consider re-binning or changing limits.")
-            nlds = self.keep_only(nlds)
-            gsfs = self.keep_only(gsfs)
-
-        self.LOG.debug("After removing nan: %d NLD values and %d GSF values",
-                       len(nlds[0]), len(gsfs[0]))
-
-        # Next we can extract the important parts
-        E_nld = nlds[0].E.copy()
-        E_gsf = gsfs[0].E.copy()
-
-        M_nld = len(E_nld)
-        M_gsf = len(E_gsf)
-
-        nld_obs = []
-        gsf_obs = []
-
-        idx_nld = np.tile(np.arange(M_nld, dtype=int), (N-1, 1))
-        idx_gsf = np.tile(np.arange(M_gsf, dtype=int), (N-1, 1))
-
-        for n, (nld, gsf) in enumerate(zip(nlds, gsfs)):
-
-            # Make a copy of the values arrays
-            nld_array = [nld.values.copy() for nld in nlds]
-            gsf_array = [gsf.values.copy() for gsf in gsfs]
-
-            del nld_array[n]
-            del gsf_array[n]
-
-            nld_array = np.array(nld_array)
-            gsf_array = np.array(gsf_array)
-
-            # Set the observed data
-            nld_obs.append(nld.values[idx_nld]/nld_array)
-            gsf_obs.append(gsf.values[idx_gsf]/gsf_array)
-
-        nld_obs = np.array(nld_obs)
-        gsf_obs = np.array(gsf_obs)
-
-        idx_coef_nld = np.repeat(np.arange(N-1), M_nld).reshape(N-1, M_nld)
-        idx_coef_gsf = np.repeat(np.arange(N-1), M_gsf).reshape(N-1, M_gsf)
-
-        idx_vals_nld = np.array([idx_nld] * N)
-        idx_vals_gsf = np.array([idx_gsf] * N)
-
-        return E_nld, E_gsf, nld_obs, gsf_obs, \
-            idx_coef_nld, idx_coef_gsf, idx_vals_nld, idx_vals_gsf
 
     def display_results(self, trace: Any) -> None:
         """ Print the results from the pyMC3 inference to the log.
@@ -374,3 +226,113 @@ def all_equal(iterator):
     except StopIteration:
         return True
     return all(first == x for x in iterator)
+
+
+def remove_nans(vecs: List[Vector]) -> List[Vector]:
+    """ Remove all points that are nan's for each member of the ensemble"""
+
+    vecs_no_nan = [vec.copy() for vec in vecs]
+    for vec in vecs_no_nan:
+        vec.cut_nan(inplace=True)
+
+    return vecs_no_nan
+
+
+def keep_only(vecs: List[Vector]) -> List[Vector]:
+    """ Deletes all the points that are not shared by all vectors in the list
+    and returns the list with only the points shared among all vectors.
+
+    Args:
+        vecs (List): List of similar vectors
+    Returns: List of vectors with only the points that share x-value among all
+        of the input vectors.
+    """
+    vecs = remove_nans(vecs)
+    E = [vec.E.copy() for vec in vecs]
+    energies = {}
+    for vec in vecs:
+        for E in vec.E:
+            if E not in energies:
+                energies[E] = [False] * len(vecs)
+
+    # Next we will add if the point is present or not
+    for n, vec in enumerate(vecs):
+        for E in vec.E:
+            energies[E][n] = True
+
+    keep_energy = []
+    for key in energies:
+        if np.all(energies[key]):
+            keep_energy.append(key)
+
+    vec_all_common = [vec.copy() for vec in vecs]
+    for vec in vec_all_common:
+        E = []
+        values = []
+        for e, value in zip(vec.E, vec.values):
+            if e in keep_energy:
+                E.append(e)
+                values.append(value)
+        vec.E = np.array(E)
+        vec.values = np.array(values)
+
+    return vec_all_common
+
+
+def format_data(vecs: List[Vector]) -> Tuple[ndarray, ndarray]:
+    """Find and build required variables for pymc3 model.
+    This function takes an ensemble (NLDs or GSFs) and finds the energy
+    bins that are not nan and are shared among all members. It then
+    builds a tensor:
+
+        q_{r,i,j} = \ln(\frac{v_{r,j}}{v_{i,j}})
+
+    where i and r ≠ i are the ensemble member index and j is the
+    bin index.
+
+    Args:
+        vecs (List[Vector]): List of vectors. Typically an ensemble
+            of NLDs or GSFs.
+    Returns:
+        E (array): energy bins shared among all of the input vector
+        q (array): Observation tensor
+    """
+    # Remove all bins that contains nan's
+    N = len(vecs)
+    vecs = keep_only(vecs)
+
+    E = vecs[0].E.copy()
+    if vecs[0].units == 'keV':
+        E /= 1.0e3
+    M = len(E)
+
+    # Masking to get proper broadcasting of shapes
+    mask = np.tile(np.arange(M, dtype=int), (N-1, 1))
+
+    # Next we will create the observation tensor
+    q = []
+    for r in range(N):
+        not_r = []
+        for i in range(N):
+            if i == r:
+                continue
+            not_r.append(vecs[i].values.copy())
+        q.append(vecs[r].values[mask]/not_r)
+    q = np.array(q)
+    return E, q
+
+
+def format_mask(N: int, M: int) -> Tuple[ndarray, ndarray]:
+    """Setup masking arrays for correct broadcasting.
+
+    Args:
+        N (int): Number of ensemble members
+        M (int): Number of bins
+    Returns:
+        coef_mask (array): Masking broadcasting the coefficients.
+        values_mask (array): Masking broadcasting the values.
+    """
+
+    coef_mask = np.repeat(np.arange(N-1), M).reshape(N-1, M)
+    values_mask = np.array([np.tile(np.arange(M, dtype=int), (N-1, 1))] * N)
+    return coef_mask, values_mask
