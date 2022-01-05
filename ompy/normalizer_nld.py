@@ -198,6 +198,8 @@ class NormalizerNLD(AbstractNormalizer):
         nld = nld.copy()
         self.LOG.debug("Setting NLD, convert to MeV")
         nld.to_MeV()
+        self.LOG.debug("Setting NLD, removing nan")
+        nld.cut_nan()
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an

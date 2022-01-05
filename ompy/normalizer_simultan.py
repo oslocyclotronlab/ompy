@@ -129,12 +129,15 @@ class NormalizerSimultan(AbstractNormalizer):
             norm._save_instance = False
             norm.regenerate = True
 
+        self.LOG.debug("Setting NLD and GSF, convert to MeV and removing nan")
         gsf = self.self_if_none(gsf)
         nld = self.self_if_none(nld)
         nld = nld.copy()
         gsf = gsf.copy()
         nld.to_MeV()
         gsf.to_MeV()
+        nld.cut_nan()
+        gsf.cut_nan()
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an
