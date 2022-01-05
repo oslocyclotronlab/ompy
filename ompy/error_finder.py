@@ -62,9 +62,9 @@ class ErrorFinder:
         self.prior_parameters = {'σ_ρ': {'lam': 10., 'mu': 1.},
                                  'σ_f': {'lam': 10., 'mu': 1.}}
 
-    def __call__(self, *args) -> Union[Tuple[Vector, Vector], Any]:
+    def __call__(self, *args, **kwargs) -> Union[Tuple[Vector, Vector], Any]:
         """ Wrapper for evaluate """
-        return self.evaluate(*args)
+        return self.evaluate(*args, **kwargs)
 
     def evaluate(self, nlds: List[Vector],
                  gsfs: List[Vector],
