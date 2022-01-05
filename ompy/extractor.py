@@ -117,7 +117,8 @@ class Extractor:
     def extract_from(self, ensemble: Optional[Ensemble] = None,
                      trapezoid: Optional[Action] = None,
                      error_estimator: Optional[ErrorFinder] = None,
-                     regenerate: Optional[bool] = None):
+                     regenerate: Optional[bool] = None,
+                     return_trace: Optional[bool] = False) -> Union[None, Any]:
         """Decompose each first generation matrix in an Ensemble
 
         If `regenerate` is `True` it saves the extracted nld and gsf to file,
@@ -140,7 +141,13 @@ class Extractor:
                 estimating the relative errors of the extracted nld and gsf.
             regenerate (bool, optional): Whether to regenerate all nld and gsf
                 even if they are found on disk.
-
+            return_trace (bool, optional): If the trace from the ErrorFinder
+                algorithm should be returned or not. If `error_estimator`
+                argument and `error_estimator` attribute are both None this
+                will have no affect.
+        Returns: Trace from inference sampling of the relative errors if
+            `return_trace` argument is true and either the `error_estimator`
+            argument or attribute are set.
         Raises:
             ValueError: If no Ensemble instance is provided here or earlier.
         """
@@ -178,9 +185,15 @@ class Extractor:
         self.nld = nlds
         self.gsf = gsfs
 
+        trace = None
+
         if self.error_estimator is not None and regenerate:
             LOG.debug("Estimating relative errors")
-            nld_rel_err, gsf_rel_err = self.error_estimator(nlds, gsfs)
+
+            # We allways get the trace. If the user doesn't want it, we do
+            # not give it. Doesn't matter really!
+            nld_rel_err, gsf_rel_err, trace = self.error_estimator(nlds, gsfs,
+                                                                   full=True)
             nld_rel_err.to_keV()
             gsf_rel_err.to_keV()
             for i, (nld, gsf) in enumerate(zip(self.nld, self.gsf)):
@@ -194,6 +207,8 @@ class Extractor:
                 gsf.save(self.path / f'gsf_{i}.npy')  # Overwrite with errors!
 
         self.check_unconstrained_results()
+        if return_trace:
+            return trace  # If error_estimator is not set, then allways None.
 
     def step(self, num: int) -> Tuple[Vector, Vector]:
         """ Wrapper around _extract in order to be consistent with other classes
