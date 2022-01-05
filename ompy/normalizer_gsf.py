@@ -167,6 +167,10 @@ class NormalizerGSF(AbstractNormalizer):
         else:
             self.nld = self.self_if_none(nld)
 
+        self.LOG.debug("Setting NLD, convert to MeV and removing nan")
+        self.nld.to_MeV()
+        self.nld.cut_nan()
+
         alpha = self.self_if_none(alpha, nonable=True)
         if alpha is None:
             self.LOG.debug("Setting alpha from from normalizer_nld")
@@ -190,15 +194,17 @@ class NormalizerGSF(AbstractNormalizer):
         else:
             self.res = ResultsNormalized(name="Results NLD and GSF, stepwise")
 
-        self.LOG.info(f"Normalizing #{num}")
-        self._gsf = gsf.copy()  # make a copy as it will be transformed
-        gsf.to_MeV()
-        gsf = gsf.transform(alpha=alpha, inplace=False)
-        self._gsf = gsf
+        self.LOG.debug("Setting GSF, convert to MeV and removing nan")
+        self._gsf = gsf.copy()
+        self._gsf.to_MeV()
+        self._gsf.cut_nan()
+        self._gsf.transform(alpha=alpha, inplace=True)
 
-        self.model_low.autorange(gsf)
-        self.model_high.autorange(gsf)
-        self._gsf_low, self._gsf_high = self.extrapolate(gsf)
+        self.LOG.info(f"Normalizing #{num}")
+
+        self.model_low.autorange(self._gsf)
+        self.model_high.autorange(self._gsf)
+        self._gsf_low, self._gsf_high = self.extrapolate(self._gsf)
 
         # experimental Gg and calc. both in meV
         B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
