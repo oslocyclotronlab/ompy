@@ -69,7 +69,7 @@ class Unfolder:
     minimum_iterations = Bounded(5, min=1, type=int)
     use_compton_subtraction = Toggle(True)
 
-    def __init__(self, num_iter: int = 200, response: Optional[Matrix] = None):
+    def __init__(self, num_iter: int = 200, response: Matrix | None = None):
         """Unfolds the gamma-detector response of a spectrum
 
         Args:
@@ -79,14 +79,14 @@ class Unfolder:
         self.num_iter = num_iter
         self.weight_fluctuation: float = 1e-3
 
-        self._R: Optional[Matrix] = response
-        self.raw: Optional[Matrix] = None
-        self.r: Optional[np.ndarray] = None
+        self._R: Matrix | None = response
+        self.raw: Matrix | None = None
+        self.r: np.ndarray | None = None
 
-        self.response_tab: Optional[pandas.DataFrame] = None
-        self.FWHM_tweak_multiplier: Optional[dict[str, float]] = None
+        self.response_tab: pandas.DataFrame | None = None
+        self.FWHM_tweak_multiplier: dict[str, float] | None = None
 
-        self.iscores: Optional[np.ndarray] = None
+        self.iscores: np.ndarray | None = None
 
     def __call__(self, matrix: Matrix) -> Matrix:
         """ Wrapper for `self.apply()` """
@@ -121,7 +121,7 @@ class Unfolder:
         self.r = self.raw.values
 
     def apply(self, raw: Matrix,
-              response: Optional[Matrix] = None) -> Matrix:
+              response: Matrix | None = None) -> Matrix:
         """ Run unfolding.
 
         Selected iteration for each `Ex` row can be obtained via
@@ -188,7 +188,7 @@ class Unfolder:
         return unfolded
 
     def step(self, unfolded: np.ndarray, folded: np.ndarray,
-             step: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+             step: np.ndarray) -> (np.ndarray, np.ndarray):
         """Perform a single step of Guttormsen unfolding
 
         .. parsed-literal::

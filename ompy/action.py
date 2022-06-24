@@ -42,7 +42,7 @@ class Action:
         for call in self.calls:
             call[2].update(kwargs)
 
-    def get_args(self, method: str) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+    def get_args(self, method: str) -> ((Any, ...], Dict[str, Any)):
         for (name, args, kwargs) in self.calls:
             if name == method:
                 return args, kwargs

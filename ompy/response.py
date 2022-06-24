@@ -20,7 +20,7 @@ from .decomposition import index
 from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
 from .vector import Vector
-from .header import Pathlike
+from .stubs import Pathlike
 from . import Toggle, Unitful
 
 LOG = logging.getLogger(__name__)
@@ -157,16 +157,16 @@ class Response():
 
     def LoadDir(self,
                 path: Union[str, Path],
-                resp_name: Optional[str] = 'resp.dat',
-                spec_prefix: Optional[str] = 'cmp'):
+                resp_name: str | None = 'resp.dat',
+                spec_prefix: str | None = 'cmp'):
         """
         Method for loading response file and compton spectra from a folder.
 
         Args:
             path (Union[str, Path]): path to folder
-            resp_name (Optional[str], optional): name of file with
+            resp_name (str | None, optional): name of file with
                 `response table`
-            spec_prefix (Optional[str], optional): Prefix for all spectra
+            spec_prefix (str | None, optional): Prefix for all spectra
 
         Returns:
             (tuple) containing
@@ -292,7 +292,7 @@ class Response():
         Eout: np.ndarray = None,
         fwhm_abs: float = None,
         return_table: bool = False,
-    ) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
+    ) -> Union[Matrix, (Matrix, pd.DataFrame]):
         """ Interpolated the response matrix
 
         Perform the interpolation for the energy range specified in Eout with
@@ -319,7 +319,7 @@ class Response():
             return_table (optional): Returns "all" output, see below
 
         Returns:
-            Matrix or Tuple[Matrix, pd.DataFrame]:
+            Matrix or (Matrix, pd.DataFrame):
               - response (Matrix): Response matrix with incident energy on the
                 "Ex" axis and the spectral response on the "Eg" axis
               - response_table (DataFrame, optional): Table with efficiencies,
@@ -510,7 +510,7 @@ class Response():
         return f_cmp(E)
 
     def linear_backscatter(self, E: float,
-                           compton: dict) -> Tuple[np.ndarray, int]:
+                           compton: dict) -> (np.ndarray, int):
         """Interpolate one-to-one up to the backscatter peak
 
         Args:
@@ -519,7 +519,7 @@ class Response():
                to interpolate between
 
         Returns:
-            Tuple[np.ndarray, int]: `R` is Response for `E`, and
+            (np.ndarray, int): `R` is Response for `E`, and
                 `i_bc` is index of backscatter peak
 
         """
@@ -621,7 +621,7 @@ class Response():
         return R
 
     def fan_method_compton(self, E: float, compton: dict, i_start: int,
-                           i_stop: int) -> Tuple[np.ndarray, int]:
+                           i_stop: int) -> (np.ndarray, int):
         """Fan method
 
         Args:
@@ -634,7 +634,7 @@ class Response():
                 `i_last`
 
         Returns:
-            Tuple[np.ndarray, int]: `R` is Response for `E`, and `i_last` last
+            (np.ndarray, int): `R` is Response for `E`, and `i_last` last
                 index of fan-method
         """
         R = np.zeros(self.N_out)

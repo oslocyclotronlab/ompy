@@ -64,10 +64,10 @@ class EnsembleNormalizer(AbstractNormalizer):
     logging.captureWarnings(True)
 
     def __init__(self, *, extractor: Extractor,
-                 normalizer_nld: Optional[NormalizerNLD] = None,
-                 normalizer_gsf: Optional[NormalizerGSF] = None,
-                 normalizer_simultan: Optional[NormalizerSimultan] = None,
-                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
+                 normalizer_nld: NormalizerNLD | None = None,
+                 normalizer_gsf: NormalizerGSF | None = None,
+                 normalizer_simultan: NormalizerSimultan | None = None,
+                 path: Union[str, Path] | None = 'saved_run/normalizers',
                  regenerate: bool = False):
         """
         Args:
@@ -87,7 +87,7 @@ class EnsembleNormalizer(AbstractNormalizer):
 
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
-        self.res: Optional[List[ResultsNormalized]] = None
+        self.res: List[ResultsNormalized] | None = None
 
         if path is None:
             self.path = None
@@ -194,18 +194,18 @@ class EnsembleNormalizer(AbstractNormalizer):
                                                              size=N)
         return self.normalizer_gsf.res
 
-    def plot(self, ax: Tuple[Any, Any] = None,
+    def plot(self, ax: (Any, Any) = None,
              add_figlegend: bool = True,
              n_plot: bool = 5,
              plot_model_stats: bool = False,
-             random_state: Optional[np.random.RandomState] = None,
+             random_state: np.random.RandomState | None = None,
              return_stats: bool = False,
-             **kwargs) -> Union[Tuple[Any, Any],
-                                Tuple[Any, Any, Tuple[Any, Any]]]:
+             **kwargs) -> Union[(Any, Any),
+                                (Any, Any, (Any, Any])):
         """Plots randomly drawn samples
 
         Args:
-            ax (Tuple[Any, Any], optional): The matplotlib axis to plot onto.
+            ax ((Any, Any), optional): The matplotlib axis to plot onto.
                 Creates axis is not provided.
             add_figlegend (bool, optional): Defaults to `True`.
             n_plot (bool, optional): Number of (nld, gsf) samples to plot
@@ -297,7 +297,7 @@ class EnsembleNormalizer(AbstractNormalizer):
             return fig, ax
 
     def samples_from_res(self,
-                         random_state: Optional[np.random.RandomState] = None) -> pd.DataFrame:
+                         random_state: np.random.RandomState | None = None) -> pd.DataFrame:
         """Draw random samples from results with transformed nld & gsf
 
         Args:
@@ -323,16 +323,16 @@ class EnsembleNormalizer(AbstractNormalizer):
                 samples = samples.append(df)
         return samples
 
-    def plot_selection(self, *, ax: Tuple[Any, Any],
+    def plot_selection(self, *, ax: (Any, Any),
                        samples: pd.DataFrame,
-                       normalizer_nld: Optional[NormalizerNLD],
-                       normalizer_gsf: Optional[NormalizerGSF],
-                       n_plot: Optional[bool] = 5,
-                       random_state: Optional[np.random.RandomState] = None) -> None:
+                       normalizer_nld: NormalizerNLD | None,
+                       normalizer_gsf: NormalizerGSF | None,
+                       n_plot: bool | None = 5,
+                       random_state: np.random.RandomState | None = None) -> None:
         """ Plot some nld and gsf samples
 
         Args:
-            ax (Tuple[Any, Any]): The matplotlib axis to plot onto.
+            ax ((Any, Any)): The matplotlib axis to plot onto.
                 Creates axis is not provided.
             samples (pd.DataFrame): Random samples from results with
                 transformed nld & gsf
@@ -433,9 +433,9 @@ class EnsembleNormalizer(AbstractNormalizer):
         np.array([vec_extend_values(xi, Eunion) for xi in array])
 
     @staticmethod
-    def plot_vector_stats(ax: Tuple[Any, Any],
+    def plot_vector_stats(ax: (Any, Any),
                           samples: pd.DataFrame,
-                          percentiles: Tuple[float, float],
+                          percentiles: (float, float),
                           color: Any) -> Tuple[Any,
                                                pd.DataFrame, pd.DataFrame]:
         """ Helper for plotting of stats from a vector
@@ -503,8 +503,8 @@ class EnsembleNormalizer(AbstractNormalizer):
     @staticmethod
     def stats_from_df(df: pd.DataFrame,
                       fmap: Callable[[Vector, np.array], None],
-                      shape_out: Tuple[int, int],
-                      percentiles: Tuple[float, float]) -> pd.DataFrame:
+                      shape_out: (int, int),
+                      percentiles: (float, float)) -> pd.DataFrame:
         """Helper to get median, 68% or similar from a collection of Vectors
 
         Args:
@@ -533,7 +533,7 @@ class EnsembleNormalizer(AbstractNormalizer):
     def plot_nld_ext_stats(ax: Any, *, x: np.ndarray,
                            samples: pd.DataFrame,
                            normalizer_nld: NormalizerNLD,
-                           percentiles: Tuple[float, float],
+                           percentiles: (float, float),
                            **kwargs) -> pd.DataFrame:
         """Helper for plotting statistics of the nld extrapolation
 
@@ -568,8 +568,8 @@ class EnsembleNormalizer(AbstractNormalizer):
     def plot_gsf_ext_stats(ax: Any, *, xlow: np.ndarray, xhigh: np.ndarray,
                            samples: pd.DataFrame,
                            normalizer_gsf: NormalizerGSF,
-                           percentiles: Tuple[float, float],
-                           color: Any) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                           percentiles: (float, float),
+                           color: Any) -> (pd.DataFrame, pd.DataFrame):
         """Helper for plotting statistics of the gsf extrapolations
 
         Args:
@@ -616,7 +616,7 @@ class EnsembleNormalizer(AbstractNormalizer):
             stats.append(stat)
         return stats
 
-    def save_results_txt(self, path: Optional[Union[str, Path]] = None,
+    def save_results_txt(self, path: Union[str, Path] | None = None,
                          suffix: str = None):
         """ Save results as txt
 
@@ -722,7 +722,7 @@ def tranform_nld_gsf(samples: dict, nld=None, gsf=None,
     return selected
 
 
-def vec_extend(vector: Vector) -> Tuple[float, float]:
+def vec_extend(vector: Vector) -> (float, float):
     """ Get the lowest and highest energy of the vector
 
     Assumes that the energy array is sorted.

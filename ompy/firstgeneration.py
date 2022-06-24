@@ -70,7 +70,7 @@ class FirstGeneration:
                                      str.lower)
 
     def __init__(self):
-        self.valley_correction: Optional[Vector] = None
+        self.valley_correction: Vector | None = None
         self.use_slide: bool = False
         self.action = Action('matrix')
 
@@ -112,7 +112,7 @@ class FirstGeneration:
         self.remove_negative(final)
         return final
 
-    def setup(self, matrix: Matrix) -> Tuple[Matrix, Matrix, Matrix]:
+    def setup(self, matrix: Matrix) -> (Matrix, Matrix, Matrix):
         """ Set up initial first generation matrix with normalized Ex rows """
         H: np.ndarray = self.row_normalized(matrix)
         # Initial weights should also be row normalized
@@ -126,8 +126,8 @@ class FirstGeneration:
     def step(iteration: int, H_old: np.ndarray,
              W_old: np.ndarray, N: np.ndarray,
              matrix: Matrix,
-             valley_correction: Optional[np.ndarray] = None)\
-            -> Tuple[np.ndarray, np.ndarray]:
+             valley_correction: np.ndarray | None = None)\
+            -> (np.ndarray, np.ndarray):
         """ An iteration step in the first generation method
 
         The most interesting part of the first generation method.
@@ -281,7 +281,7 @@ class FirstGeneration:
             H[i, :j] = 1/max(1, j)
         return H
 
-    def cut_valley_correction(self, matrix: Matrix) -> Optional[np.ndarray]:
+    def cut_valley_correction(self, matrix: Matrix) -> np.ndarray | None:
         """ Cut valley correction Ex axis if necessary.
 
         Ensures valley correction has the same Ex axis as the matrix
@@ -314,7 +314,7 @@ class FirstGeneration:
 
     @staticmethod
     def allgen_from_primary(fg: Matrix,
-                            xs: Optional[np.ndarray] = None) -> Matrix:
+                            xs: np.ndarray | None = None) -> Matrix:
         """Create all generation matrix from first generations matrix
 
         .. code::

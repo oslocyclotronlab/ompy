@@ -8,8 +8,8 @@ from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 
 
-def mama_read(filename: str) -> Union[Tuple[ndarray, ndarray],
-                                      Tuple[ndarray, ndarray, ndarray]]:
+def mama_read(filename: str) -> Union[(ndarray, ndarray),
+                                      (ndarray, ndarray, ndarray]):
     """Read 1d and 2d mama spectra/matrices
 
     Args:
@@ -254,7 +254,7 @@ def save_numpy_2D(matrix: np.ndarray, Eg: np.ndarray,
 
 
 def load_numpy_2D(path: Union[str, Path]
-                  ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                  ) -> (np.ndarray, np.ndarray, np.ndarray):
     mat = np.load(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
@@ -280,13 +280,13 @@ def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
 
 
 def load_txt_2D(path: Union[str, Path]
-                ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                ) -> (np.ndarray, np.ndarray, np.ndarray):
     mat = np.loadtxt(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
 def load_numpy_1D(path: Union[str, Path]
-                  ) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
+                  ) -> (np.ndarray, np.ndarray, np.ndarray) | None:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -331,7 +331,7 @@ def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
 
 
 def load_txt_1D(path: Union[str, Path]
-                ) -> Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]:
+                ) -> (np.ndarray, np.ndarray, Union[np.ndarray, None]):
     vec = np.loadtxt(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -371,7 +371,7 @@ def filetype_from_suffix(path: Path) -> str:
 
 
 def load_discrete(path: Union[str, Path], energy: ndarray,
-                  resolution: float = 0.1) -> Tuple[ndarray, ndarray]:
+                  resolution: float = 0.1) -> (ndarray, ndarray):
     """Load discrete levels and apply smoothing
 
     Assumes linear equdistant binning
@@ -383,7 +383,7 @@ def load_discrete(path: Union[str, Path], energy: ndarray,
             gaussian smoothing. Defaults to 0.1.
 
     Returns:
-        Tuple[ndarray, ndarray]
+        (ndarray, ndarray)
     """
     energies = np.loadtxt(path)
     energies /= 1e3  # convert to MeV

@@ -1,7 +1,7 @@
 from . import ureg, DimensionalityError, Q_
 import re
 from typing import Tuple
-from .header import Unit
+from .stubs import Unit
 
 
 class Validator:
@@ -120,7 +120,7 @@ class UnitfulError(Validator):
             raise ValueError("UnitfulError can not be dimensionless.")
 
     @staticmethod
-    def parse(string: str) -> Tuple[Unit, Unit]:
+    def parse(string: str) -> (Unit, Unit):
         # Matches 5+-6 keV, 5-+0.1 eV and 4±7 eV
         match = re.match(r"(.+)(?:\+\-|\-\+|±)(.+)", string)
         if match is not None:
@@ -147,7 +147,7 @@ class UnitfulError(Validator):
                 raise ValueError(f"Could not parse {string}.")
         return val, err
 
-    def validate(self, value) -> Tuple[Unit, Unit]:
+    def validate(self, value) -> (Unit, Unit):
         if isinstance(value, str):
             value, error = self.parse(value)
         else:

@@ -17,7 +17,7 @@ from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D)
 from .library import div0, handle_rebin_arguments, only_one_not_none
 from .rebin import rebin_1D
-from .header import Unitlike, arraylike, Axes
+from .stubs import Unitlike, arraylike, Axes
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -35,13 +35,13 @@ class Vector(AbstractArray):
             Defaults to "keV".
     """
 
-    def __init__(self, values: Optional[Iterable[float]] = None,
-                 E: Optional[Iterable[float]] = None,
+    def __init__(self, values: Iterable[float] | None = None,
+                 E: Iterable[float] | None = None,
                  *,
-                 path: Optional[Union[str, Path]] = None,
-                 std: Optional[Iterable[float]] = None,
+                 path: Union[str, Path] | None = None,
+                 std: Iterable[float] | None = None,
                  copy: bool = True,
-                 units: Optional[str] = "keV",
+                 units: str | None = "keV",
                  E_label: str = 'Energy'):
         """
         There are two ways to initialize:
@@ -78,7 +78,7 @@ class Vector(AbstractArray):
             def fetch(x):
                 return np.atleast_1d(np.asarray(x, dtype=float))
 
-        self.std: Optional[ndarray] = None
+        self.std: ndarray | None = None
 
         if path is not None:
             if values is not None or E is not None:
@@ -92,9 +92,9 @@ class Vector(AbstractArray):
             else:
                 self.values = fetch(values)
                 try:
-                    self._E = fetch(E.magnitude)*unit
+                    self._E = fetch(E.magnitude) * unit
                 except AttributeError:
-                    self._E = fetch(E)*unit
+                    self._E = fetch(E) * unit
 
         if std is not None:
             self.std = fetch(std)
@@ -133,7 +133,7 @@ class Vector(AbstractArray):
 
         diff = (self.E - np.roll(self.E, 1))[1:]
         de = diff[0]
-        return np.all(np.isclose(diff, de*np.ones(diff.shape)))
+        return np.all(np.isclose(diff, de * np.ones(diff.shape)))
 
     def calibration(self) -> Dict[str, float]:
         """Calculate and return the calibration coefficients of the energy axes
@@ -142,7 +142,7 @@ class Vector(AbstractArray):
         """
 
         calibration = {"a0": self._E[0].to('keV').magnitude,
-                       "a1": (self._E[1]-self._E[0]).to('keV').magnitude}
+                       "a1": (self._E[1] - self._E[0]).to('keV').magnitude}
         return calibration
 
     def plot(self, ax: Axes | None = None,
@@ -196,7 +196,7 @@ class Vector(AbstractArray):
         return ax
 
     def save(self, path: Union[str, Path],
-             filetype: Optional[str] = None,
+             filetype: str | None = None,
              **kwargs) -> None:
         """Save to a file of specified format
 
@@ -237,7 +237,7 @@ class Vector(AbstractArray):
             raise ValueError(f"Unknown filetype {filetype}")
 
     def load(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
+             filetype: str | None = None) -> None:
         """Load to a file of specified format
 
         Units assumed to be keV.
@@ -284,7 +284,7 @@ class Vector(AbstractArray):
         self.verify_integrity()
 
     def transform(self, const: float = 1,
-                  alpha: float = 0, inplace: bool = True) -> Optional[Vector]:
+                  alpha: float = 0, inplace: bool = True) -> Vector | None:
         """Apply a normalization transformation::
 
             vector -> const * vector * exp(alpha*energy)
@@ -300,11 +300,11 @@ class Vector(AbstractArray):
                 inplace. If False, returns the transformed vector.
 
         Returns:
-            Optional[Vector]
+            Vector | None
         """
         if self.std is not None:
             relative_uncertainty = self.std / self.values
-        transformed = const*self.values*np.exp(alpha*self.E)
+        transformed = const * self.values * np.exp(alpha * self.E)
 
         if self.std is not None:
             std = relative_uncertainty * transformed
@@ -317,14 +317,14 @@ class Vector(AbstractArray):
             if self.std is not None:
                 self.std = std
 
-    def error(self, other: Union[Vector, ndarray],
-              std: Optional[ndarray] = None) -> float:
+    def error(self, other: Vector | ndarray,
+              std: ndarray | None = None) -> float:
         """Computes the (weighted) χ²
 
         Args:
             other (Vector or ndarray]): The reference to compare itself to. If
                 an array, assumes it has the same energy binning as itself.
-            std (Optional[ndarray], optional): Standard deviations to use as
+            std (ndarray | None, optional): Standard deviations to use as
                 inverse of the weights.
 
         Returns:
@@ -338,24 +338,24 @@ class Vector(AbstractArray):
             other = other.values
         except TypeError:  # already an array
             pass
-        squared_error = (self.values - other)**2
+        squared_error = (self.values - other) ** 2
         if self.std is not None:
             if std is not None:
-                sigmasq = self.std**2 + std**2
+                sigmasq = self.std ** 2 + std ** 2
             else:
-                sigmasq = self.std**2
+                sigmasq = self.std ** 2
         else:
             if std is not None:
-                sigmasq = std**2
+                sigmasq = std ** 2
             else:
                 sigmasq = 1
 
         error = div0(squared_error, sigmasq)
         return error.sum()
 
-    def cut(self, Emin: Optional[float] = None,
-            Emax: Optional[float] = None,
-            inplace: bool = False) -> Optional[Vector]:
+    def cut(self, Emin: float | None = None,
+            Emax: float | None = None,
+            inplace: bool = False) -> Vector | None:
         """ Cut the vector at the energy limits
 
         Args:
@@ -366,6 +366,7 @@ class Vector(AbstractArray):
         Returns:
             The cut vector if `inplace` is True.
         """
+        warnings.warn("cut is being deprecation in favor of vec.iloc[j:k]", DeprecationWarning)
         Emin = Emin if Emin is not None else self.E.min()
         Emax = Emax if Emax is not None else self.E.max()
         imin = self.index(Emin)
@@ -409,20 +410,22 @@ class Vector(AbstractArray):
 
     @overload
     def rebin(self, bins: arraylike | None = None,
-              factor: float | None= None,
+              factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
-              inplace: Literal[False] = ...) -> Vector: ...
+              inplace: Literal[False] = ...) -> Vector:
+        ...
 
     @overload
     def rebin(self, bins: arraylike | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
-              inplace: Literal[True] = ...) -> None: ...
+              inplace: Literal[True] = ...) -> None:
+        ...
 
     def rebin(self, bins: arraylike | None = None,
-              factor: float | None= None,
+              factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
               inplace: bool = False) -> Vector | None:
@@ -461,9 +464,13 @@ class Vector(AbstractArray):
             return self.clone(E=newbins, values=rebinned)
 
     @overload
-    def rebin_like(self, other: Vector, inplace: Literal[False] = ...) -> Vector: ...
+    def rebin_like(self, other: Vector, inplace: Literal[False] = ...) -> Vector:
+        ...
+
     @overload
-    def rebin_like(self, other: Vector, inplace: Literal[True] = ...) -> None: ...
+    def rebin_like(self, other: Vector, inplace: Literal[True] = ...) -> None:
+        ...
+
     def rebin_like(self, other: Vector, inplace: bool = False) -> Vector | None:
         """ Rebin to match the binning of `other`.
 
@@ -475,7 +482,7 @@ class Vector(AbstractArray):
         bins = self.to_same(other._E)
         return self.rebin(bins=bins, inplace=inplace)
 
-    # def extend_like(self, other: Vector, inplace: bool = False) -> Optional[Vector]:
+    # def extend_like(self, other: Vector, inplace: bool = False) -> Vector | None:
     #     """ Resize to match the energy span of `other`.
 
     #     Args:
@@ -498,8 +505,8 @@ class Vector(AbstractArray):
     #     else:
     #         return self.clone(E=E, values=values)
 
-    def closest(self, E: ndarray, side: Optional[str] = 'right',
-                inplace=False) -> Optional[Vector]:
+    def closest(self, E: ndarray, side: str | None = 'right',
+                inplace=False) -> Vector | None:
         """ Re-bin the vector without merging bins.
 
             The resulting vector will have E as the x-axis while
@@ -555,7 +562,7 @@ class Vector(AbstractArray):
             return self.clone(values=values, E=E, std=std)
 
     def cumulative(self, factor: Union[float, str] = 1.0,
-                   inplace: bool = False) -> Optional[Vector]:
+                   inplace: bool = False) -> Vector | None:
         """ Cumulative sum of the vector.
 
             Args:
@@ -579,10 +586,10 @@ class Vector(AbstractArray):
                 raise RuntimeError("Vector x-axis isn't equidistant.")
             factor = self.de
 
-        cumsum = factor*self.values.cumsum()
+        cumsum = factor * self.values.cumsum()
         cumerr = None
         if self.std is not None:
-            cumerr = np.sqrt(np.cumsum(self.std**2))*factor
+            cumerr = np.sqrt(np.cumsum(self.std ** 2)) * factor
 
         if inplace:
             self.values = cumsum
@@ -690,7 +697,7 @@ class Vector(AbstractArray):
         else:
             NotImplementedError("Type not implemented")
 
-        result.values = result.values@other.values
+        result.values = result.values @ other.values
         return result
 
     def __str__(self) -> str:
@@ -703,9 +710,9 @@ class Vector(AbstractArray):
             s += f"{len(self.E)} bins with dE: {de}\n"
             s += f"Total counts: {self.sum()}\n"
             if self.std is not None:
-                return s+str(self.values)+'\n'+str(self.std)
+                return s + str(self.values) + '\n' + str(self.std)
             else:
-                return s+str(self.values)
+                return s + str(self.values)
         else:
             if self.std is not None:
                 return (f"{self.values}\n{self.std}\n{self.E} "
@@ -713,7 +720,6 @@ class Vector(AbstractArray):
             else:
                 return (f"{self.values}\n{self.E} "
                         f"[{self.units:~}]")
-
 
     def clone(self, **kwargs) -> Vector:
         """ Copies the object.
@@ -775,7 +781,7 @@ class IndexLocator:
         self.vector = vector
 
     def __getitem__(self, key):
-        if True:#len(key) == 1:
+        if True:  # len(key) == 1:
             E = self.vector.E.__getitem__(key)
             values = self.vector.values.__getitem__(key)
             return Vector(E=E, values=values)

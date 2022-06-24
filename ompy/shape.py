@@ -14,9 +14,9 @@ from .extractor import Extractor
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
-Point2D = Tuple[float, float]
-Points2D = Tuple[Point2D, Point2D]
-Interval = Tuple[float, float]
+Point2D = (float, float)
+Points2D = (Point2D, Point2D)
+Interval = (float, float)
 array = np.ndarray
 
 
@@ -28,7 +28,7 @@ class Diagonal:
         self.spin = spin
         self.parity = parity
 
-    def compute_gsf(self, spinmodel) -> Tuple[Vector]:
+    def compute_gsf(self, spinmodel) -> (Vector):
         values = np.nan_to_num(self.values)
         # Sum along Eg
         summed = values.sum(axis=0)
@@ -87,9 +87,9 @@ class Shape:
         self.matrix: Matrix = matrix
         self.spinmodel = None
         self.gsf: Vector = Vector([0], [0])
-        self.gsfs: Tuple[Vector, Vector] = Vector([0], [0]), Vector([0], [0])
-        self.reg: Optional[Any] = None
-        self.fit_region: Optional[array] = None
+        self.gsfs: (Vector, Vector] = Vector([0], [0]), Vector([0], [0))
+        self.reg: Any | None = None
+        self.fit_region: array | None = None
 
     def add_diagonal(self, intercept=0, slope=1, *,
                      spin: float, parity: float,
@@ -106,19 +106,19 @@ class Shape:
         self.diagonals.append(Diagonal(diagonal, spin, parity))
 
     def compute_gsf(self, kind='log') -> Vector:
-        unsewed: List[Tuple[Vector, Vector]] = self.compute_gsf_unsewed()
+        unsewed: List[(Vector, Vector]) = self.compute_gsf_unsewed()
         self.gsf, *self.gsfs = self.sew(unsewed, kind=kind)
         return self.gsf
 
-    def compute_gsf_unsewed(self) -> List[Tuple[Vector, Vector]]:
-        gsfs: List[Tuple[Vector, Vector]] = []
+    def compute_gsf_unsewed(self) -> List[(Vector, Vector]):
+        gsfs: List[(Vector, Vector]] = [)
         for diagonal in self.diagonals:
             gsf = diagonal.compute_gsf(self.spinmodel)
             gsfs.append(gsf)
 
         return gsfs
 
-    def sew(self, gsfs: List[Tuple[Vector, Vector]], kind='log') -> Tuple[Vector, Vector, Vector]:
+    def sew(self, gsfs: List[(Vector, Vector]], kind='log') -> Tuple[Vector, Vector, Vector):
         # TODO Prettify
         (diagonal_1, Egs_1), (diagonal_2, Egs_2) = gsfs
         # Assumes all have same Ex, diagonal_1.E == diagonal_2.E
@@ -284,7 +284,7 @@ def diagonal_stripe(matrix: Matrix, p1: Point2D, p2: Point2D,
 
 
 def parallel_line(mat: Matrix, p1: Point2D, p2: Point2D,
-                  delta: float) -> Tuple[array, array]:
+                  delta: float) -> (array, array):
     (Eg0, Ex0), (Eg1, Ex1) = p1, p2
     X0, X1 = mat.indices_Eg([Eg0, Eg1])
     Y0, Y1 = mat.indices_Ex([Ex0, Ex1])
@@ -340,7 +340,7 @@ def good_pair(start: int, N: int, Eg_1, Eg_2, diagonal_1, diagonal_2):
 
 
 def normalize_to_shape(extractor: Extractor, shape: Union[float, Shape],
-                       region: Optional[Interval] = None):
+                       region: Interval | None = None):
     if isinstance(shape, (int, float)):
         slope = shape
         if region is None:

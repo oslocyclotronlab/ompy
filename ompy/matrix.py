@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import copy
-from ctypes import ArgumentError
 import logging
 import warnings
+from ctypes import ArgumentError
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator, Optional, Sequence, Tuple,
-                    Union, Callable, overload, Literal)
+from typing import (Any, Dict, Iterable, Iterator, Sequence, Union, Callable, overload, Literal)
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -14,20 +13,20 @@ import numpy as np
 from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize
 
+from . import ureg
 from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
 from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
                            save_tar, save_txt_2D)
+from .geometry import Line
 from .library import (diagonal_elements, div0, fill_negative_gauss,
-                      only_one_not_none, handle_rebin_arguments)
+                      handle_rebin_arguments)
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
+from .stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
+                    Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike)
 from .vector import Vector
-from . import ureg, Q_, DimensionalityError
-from .header import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
-                     Colorbar, QuadMesh, ArrayInt, PointUnit)
-from .geometry import Line
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -85,12 +84,12 @@ class Matrix(AbstractArray):
           the integrity of the matrix can be ensured.
     """
     def __init__(self,
-                 values: Optional[np.ndarray] = None,
-                 Eg: Optional[np.ndarray] = None,
-                 Ex: Optional[np.ndarray] = None,
-                 std: Optional[np.ndarray] = None,
-                 path: Optional[Pathlike] = None,
-                 state: Optional[Union[str, MatrixState]] = None,
+                 values: np.ndarray | None = None,
+                 Eg: arraylike | None = None,
+                 Ex: arraylike | None = None,
+                 std: np.ndarray | None = None,
+                 path: Pathlike | None = None,
+                 state: Union[str, MatrixState] | None = None,
                  Ex_units: Unitlike = 'keV',
                  Eg_units: Unitlike = 'keV',
                  copy: bool = True,
@@ -124,7 +123,7 @@ class Matrix(AbstractArray):
             def fetch(x):
                 return np.asarray(x, dtype=float)
 
-        self.std: Optional[np.ndarray] = None
+        self.std: np.ndarray | None = None
         if path is not None:
             if (values is not None or
                 Eg is not None or
@@ -218,7 +217,7 @@ class Matrix(AbstractArray):
                 np.all(np.isclose(diff_Eg, dEg*np.ones_like(diff_Eg))))
 
     def load(self, path: Union[str, Path],
-             filetype: Optional[str] = None) -> None:
+             filetype: str | None = None) -> None:
         """ Load matrix from specified format
 
         Args:
@@ -251,8 +250,8 @@ class Matrix(AbstractArray):
         self._Ex *= ureg('keV')
         self.verify_integrity()
 
-    def save(self, path: Union[str, Path], filetype: Optional[str] = None,
-             which: Optional[str] = 'values', **kwargs):
+    def save(self, path: Union[str, Path], filetype: str | None = None,
+             which: str | None = 'values', **kwargs):
         """Save matrix to file
 
         Args:
@@ -317,7 +316,7 @@ class Matrix(AbstractArray):
         }
         return calibration
 
-    def same_shape(self, other: ndarray, error: bool = False) -> bool:
+    def same_shape(self, other: array, error: bool = False) -> bool:
         """ Check whether `other` has same shape `self.values`.
 
         Args:
@@ -514,11 +513,11 @@ class Matrix(AbstractArray):
         return Vector(values=projection, E=energy, E_label=label)
 
     def cut(self, axis: Union[int, str],
-            Emin: Optional[float] = None,
-            Emax: Optional[float] = None,
+            Emin: float | None = None,
+            Emax: float | None = None,
             inplace: bool = False,
             Emin_inclusive: bool = True,
-            Emax_inclusive: bool = True) -> Optional[Matrix]:
+            Emax_inclusive: bool = True) -> Matrix | None:
         """Cuts the matrix to the sub-interval limits along given axis.
 
         Args:
@@ -589,7 +588,7 @@ class Matrix(AbstractArray):
             return self.clone(values=values_cut, Eg=Eg, Ex=Ex)
 
     def cut_like(self, other: Matrix,
-                 inplace: bool = False) -> Optional[Matrix]:
+                 inplace: bool = False) -> Matrix | None:
         """ Cut a matrix like another matrix (according to energy arrays)
 
         Args:
@@ -598,7 +597,7 @@ class Matrix(AbstractArray):
                 return a new matrix. Defaults to False.
 
         Returns:
-            Optional[Matrix]: If inplace is False, returns the cut matrix
+            Matrix | None: If inplace is False, returns the cut matrix
         """
         if inplace:
             self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=inplace)
@@ -638,8 +637,8 @@ class Matrix(AbstractArray):
             return matrix
 
     def trapezoid(self, Ex_min: float, Ex_max: float,
-                  Eg_min: float, Eg_max: Optional[float] = None,
-                  inplace: bool = False) -> Optional[Matrix]:
+                  Eg_min: float, Eg_max: float | None = None,
+                  inplace: bool = False) -> Matrix | None:
         """Create a trapezoidal cut or mask delimited by the diagonal of the
             matrix
 
@@ -776,14 +775,14 @@ class Matrix(AbstractArray):
             else:
                 return self.clone(Ex=newbins*unit, values=rebinned)
 
-    def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
+    def diagonal_elements(self) -> Iterator[(int, int)]:
         """ Iterates over the last non-zero elements
         Note:
             Assumes that the matrix is diagonal, i.e. that there are no
             entries with `Eg > Ex + dE`.
         Args:
             mat: The matrix to iterate over
-            Iterator[Tuple[int, int]]: Indicies (i, j) over the last
+            Iterator[(int, int]): Indicies (i, j) over the last
                 non-zero(=diagonal) elements.
         """
         return diagonal_elements(self.values)
@@ -798,7 +797,7 @@ class Matrix(AbstractArray):
         self.values = np.where(self.values > 0, self.values, 0)
 
     def fill_and_remove_negative(self,
-                                 window_size: Tuple[int, np.ndarray] = 20):
+                                 window_size: (int, np.ndarray) = 20):
         """ Combination of :meth:`ompy.Matrix.fill_negative` and
         :meth:`ompy.Matrix.remove_negative`
 
@@ -842,7 +841,7 @@ class Matrix(AbstractArray):
         return np.arange(0, len(self.Ex), dtype=int)
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> (int, int):
         return self.values.shape
 
     @property
@@ -930,7 +929,7 @@ class Matrix(AbstractArray):
         self._Eg = self._Eg.copy(order=order)
         return self
 
-    def iter(self) -> Iterator[Tuple[int, int]]:
+    def iter(self) -> Iterator[(int, int)]:
         for row in range(self.shape[0]):
             for col in range(self.shape[1]):
                 yield row, col
@@ -1148,11 +1147,11 @@ class ValueLocator:
 
 
 @overload
-def preparse(s: None) -> tuple[Literal[False], None]: ...
+def preparse(s: None) -> (Literal[False], None): ...
 @overload
-def preparse(s: Unitlike) -> tuple[bool, Unitlike]: ...
+def preparse(s: Unitlike) -> (bool, Unitlike): ...
 
-def preparse(s: Unitlike | None) -> tuple[bool, Unitlike | None]:
+def preparse(s: Unitlike | None) -> (bool, Unitlike | None):
     inclusive = False
     if isinstance(s, str):
         s = s.strip()

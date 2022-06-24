@@ -13,7 +13,7 @@ from numpy import ndarray
 from .matrix import Matrix
 from .rebin import rebin_2D
 from .action import Action
-from .header import Unitlike
+from .stubs import Unitlike
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -75,10 +75,10 @@ class Ensemble:
         - (Re)generation with book keeping is a recurring pattern.
           Try to abstract it away.
     """
-    def __init__(self, raw: Optional[Matrix] = None,
-                 bg: Optional[Matrix] = None,
+    def __init__(self, raw: Matrix | None = None,
+                 bg: Matrix | None = None,
                  bg_ratio: float = 1,
-                 path: Optional[Union[str, Path]] = 'saved_run/ensemble'):
+                 path: Union[str, Path] | None = 'saved_run/ensemble'):
         """ Sets up attributes and loads a saved ensemble if provided.
 
         Args:
@@ -93,15 +93,15 @@ class Ensemble:
                 fail *silently* if it is unable to. It is recommended to call
                 load([path]) explicitly.
         """
-        self.raw: Optional[Matrix] = raw
-        self.bg: Optional[Matrix] = bg
-        self.bg_ratio: Optional[float] = bg_ratio
-        self.prompt_w_bg: Optional[Matrix] = raw
-        self.firstgen: Optional[Matrix] = None
+        self.raw: Matrix | None = raw
+        self.bg: Matrix | None = bg
+        self.bg_ratio: float | None = bg_ratio
+        self.prompt_w_bg: Matrix | None = raw
+        self.firstgen: Matrix | None = None
 
-        self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
+        self.unfolder: Callable[[Matrix], Matrix] | None = None
         self.first_generation_method: \
-            Optional[Callable[[Matrix], Matrix]] = None
+            Callable[[Matrix], Matrix] | None = None
         self.size = 0
         self.regenerate = False
         self.action_prompt_w_bg = Action('matrix')
@@ -110,13 +110,13 @@ class Ensemble:
         self.action_unfolded = Action('matrix')
         self.action_firstgen = Action('matrix')
 
-        self.std_raw: Optional[Matrix] = None
-        self.std_unfolded: Optional[Matrix] = None
-        self.std_firstgen: Optional[Matrix] = None
+        self.std_raw: Matrix | None = None
+        self.std_unfolded: Matrix | None = None
+        self.std_firstgen: Matrix | None = None
 
-        self.raw_ensemble: Optional[Matrix] = None
-        self.unfolded_ensemble: Optional[Matrix] = None
-        self.firstgen_ensemble: Optional[Matrix] = None
+        self.raw_ensemble: Matrix | None = None
+        self.unfolded_ensemble: Matrix | None = None
+        self.firstgen_ensemble: Matrix | None = None
 
         self.seed: int = 987654
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
@@ -130,7 +130,7 @@ class Ensemble:
         if self.raw is not None:
             self.raw.state = "raw"
 
-    def load(self, path: Optional[Union[str, Path]] = None) -> Ensemble:
+    def load(self, path: Union[str, Path] | None = None) -> Ensemble:
         """ Loads a saved ensemble. Alternative to `regenerate`.
 
         Currently only supports '.npy' format.
@@ -434,7 +434,7 @@ class Ensemble:
         self.std_firstgen = firstgen_std
 
     def generate_gaussian(self, state: str,
-                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray: # noqa
+                          rstate: np.random.Generator | None = np.random.default_rng) -> np.ndarray: # noqa
         """Generates an array with Gaussian perturbations of a matrix.
         Note that entries are truncated at 0 (only positive).
 
@@ -452,7 +452,7 @@ class Ensemble:
         return perturbed
 
     def generate_poisson(self, state: str,
-                         rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:  # noqa
+                         rstate: np.random.Generator | None = np.random.default_rng) -> np.ndarray:  # noqa
         """Generates an array with Poisson perturbations of a matrix
 
         Args:
@@ -590,12 +590,12 @@ class Ensemble:
         return matrix
 
     def plot(self, *, ax: Any = None,
-             vmin: Optional[float] = None,
-             vmax: Optional[float] = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
              add_cbar: bool = True,
              scale_by: str = 'all',
              units: str = 'keV',
-             **kwargs) -> Tuple[Any, ndarray]:
+             **kwargs) -> (Any, ndarray):
         """ Plot the computed standard deviations
 
         Args:

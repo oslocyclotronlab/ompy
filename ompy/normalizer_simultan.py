@@ -28,12 +28,12 @@ class NormalizerSimultan(AbstractNormalizer):
 
     Attributes:
         extractor (Extractor): Extractor instance
-        gsf (Optional[Vector], optional): gsf to normalize
+        gsf (Vector | None, optional): gsf to normalize
         multinest_path (Path, optional): Default path where multinest
             saves files
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
             `{"seed": 65498, "resume": False}`
-        nld (Optional[Vector], optional): nld to normalize
+        nld (Vector | None, optional): nld to normalize
         normalizer_nld (NormalizerNLD): `NormalizerNLD` instance to get the normalization paramters
         normalizer_gsf (NormalizerGSF): `NormalizerGSF` instance to get the normalization paramters
         res (ResultsNormalized): Results
@@ -51,11 +51,11 @@ class NormalizerSimultan(AbstractNormalizer):
     logging.captureWarnings(True)
 
     def __init__(self, *,
-                 gsf: Optional[Vector] = None,
-                 nld: Optional[Vector] = None,
-                 normalizer_nld: Optional[NormalizerNLD] = None,
-                 normalizer_gsf: Optional[NormalizerGSF] = None,
-                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
+                 gsf: Vector | None = None,
+                 nld: Vector | None = None,
+                 normalizer_nld: NormalizerNLD | None = None,
+                 normalizer_gsf: NormalizerGSF | None = None,
+                 path: Union[str, Path] | None = 'saved_run/normalizers',
                  regenerate: bool = False):
         """
         TODO:
@@ -83,12 +83,12 @@ class NormalizerSimultan(AbstractNormalizer):
         self.gsf = None if gsf is None else gsf.clone()
         self.nld = None if nld is None else nld.clone()
 
-        self.std_fake_nld: Optional[bool] = None  # See `normalize`
-        self.std_fake_gsf: Optional[bool] = None  # See `normalize`
+        self.std_fake_nld: bool | None = None  # See `normalize`
+        self.std_fake_gsf: bool | None = None  # See `normalize`
 
-        self.res: Optional[ResultsNormalized] = None
+        self.res: ResultsNormalized | None = None
 
-        self.multinest_path: Optional[Path] = Path('multinest')
+        self.multinest_path: Path | None = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
         if path is None:
@@ -98,19 +98,19 @@ class NormalizerSimultan(AbstractNormalizer):
             self.path.mkdir(exist_ok=True, parents=True)
 
     def normalize(self, *, num: int = 0,
-                  gsf: Optional[Vector] = None,
-                  nld: Optional[Vector] = None,
-                  normalizer_nld: Optional[NormalizerNLD] = None,
-                  normalizer_gsf: Optional[NormalizerGSF] = None) -> None:
+                  gsf: Vector | None = None,
+                  nld: Vector | None = None,
+                  normalizer_nld: NormalizerNLD | None = None,
+                  normalizer_gsf: NormalizerGSF | None = None) -> None:
         """Perform normalization and saves results to `self.res`
 
         Args:
             num (int, optional): Loop number
-            gsf (Optional[Vector], optional): gsf before normalization
-            nld (Optional[Vector], optional): nld before normalization
-            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+            gsf (Vector | None, optional): gsf before normalization
+            nld (Vector | None, optional): nld before normalization
+            normalizer_nld (NormalizerNLD | None, optional): NormalizerNLD
                 instance
-            normalizer_gsf (Optional[NormalizerGSF], optional): NormalizerGSF
+            normalizer_gsf (NormalizerGSF | None, optional): NormalizerGSF
                 instance
         """
         if not self.regenerate:
@@ -215,7 +215,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
     def optimize(self, num: int,
                  args_nld: Iterable,
-                 guess: Dict[str, float]) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[float]]]:  # noqa
+                 guess: Dict[str, float]) -> (Dict[str, (float, float]], Dict[str, List[float])):  # noqa
         """Find parameters given model constraints and an initial guess
 
         Employs Multinest.
@@ -227,7 +227,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
         Returns:
             Tuple:
-            - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
+            - popt (Dict[str, (float, float])): Median and 1sigma of the
                 parameters
             - samples (Dict[str, List[float]]): Multinest samplesø.
                 Note: They are still importance weighted, not random draws
@@ -344,7 +344,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
         return popt, samples
 
-    def lnlike(self, x: Tuple[float, float, float, float, float],
+    def lnlike(self, x: (float, float, float, float, float),
                args_nld: Iterable) -> float:
         """Compute log likelihood  of the normalization fitting
 
@@ -352,7 +352,7 @@ class NormalizerSimultan(AbstractNormalizer):
         maximization
 
         Args:
-            x (Tuple[float, float, float, float, float]): The arguments
+            x ((float, float, float, float, float)): The arguments
                 ordered as A, alpha, T and Eshift, B
             args_nld (TYPE): Additional arguments for the nld lnlike
 
@@ -382,9 +382,9 @@ class NormalizerSimultan(AbstractNormalizer):
         err_gsf = normalizer_gsf.lnlike()
         return err_nld + err_gsf
 
-    def plot(self, ax: Optional[Any] = None, add_label: bool = True,
+    def plot(self, ax: Any | None = None, add_label: bool = True,
              add_figlegend: bool = True,
-             **kwargs) -> Tuple[Any, Any]:
+             **kwargs) -> (Any, Any):
         """Plots nld and gsf
 
         Args:
@@ -392,7 +392,7 @@ class NormalizerSimultan(AbstractNormalizer):
                 is not provided
             add_label (bool, optional):Defaults to `True`.
             add_figlegend (bool, optional): Defaults to `True`.
-            results Optional[ResultsNormalized]: If provided, gsf and model
+            results ResultsNormalized | None: If provided, gsf and model
                 are taken from here instead.
             **kwargs: kwargs for plot
 

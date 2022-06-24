@@ -28,8 +28,8 @@ def empty_like(array: AbstractArray,
 
 
 def zeros(array: Union[np.ndarray,
-                       Tuple[int],
-                       Tuple[int, int],
+                       (int),
+                       (int, int),
                        int],
           **kwargs) -> AbstractArray:
     raise NotImplementedError()
@@ -52,7 +52,7 @@ def zeros(array: Union[np.ndarray,
 
 
 def sum(array: Union[Matrix, Vector, np.ndarray],
-        axis: Optional[Union[int, str]] = None,
+        axis: Union[int, str] | None = None,
         **kwargs) -> Union[Vector, np.ndarray]:
     raise NotImplementedError()
     if isinstance(array, Vector):

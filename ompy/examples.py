@@ -33,7 +33,7 @@ def example_response(name: str) -> Matrix:
     return Matrix(path=path)
 
 
-def disjoint_rows(shape: Tuple[int, int]) -> Matrix:
+def disjoint_rows(shape: (int, int)) -> Matrix:
     """ Creates a mock matrix with disjoin rows
 
     A 5×6 looks like this:

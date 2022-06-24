@@ -17,7 +17,7 @@ from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
 from .library import contains_zeroes_patches
-from .header import Pathlike
+from .stubs import Pathlike
 
 
 if 'JPY_PARENT_PID' in os.environ:
@@ -70,9 +70,9 @@ class Extractor:
           it is not created. This is a very common pattern. Consider
           superclassing the disk book-keeping.
     """
-    def __init__(self, ensemble: Optional[Ensemble] = None,
-                 trapezoid: Optional[Action] = None,
-                 path: Optional[Union[str, Path]] =
+    def __init__(self, ensemble: Ensemble | None = None,
+                 trapezoid: Action | None = None,
+                 path: Union[str, Path] | None =
                  'saved_run/extractor'):
         """
         ensemble (Ensemble, optional): see above
@@ -101,7 +101,7 @@ class Extractor:
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
 
-    def load(self, path: Optional[Pathlike] = None) -> Extractor:
+    def load(self, path: Pathlike | None = None) -> Extractor:
         path = Path(path) if path is not None else self.path
         if path is None:
             raise RuntimeError("Path or self.path must not be None.")
@@ -116,13 +116,13 @@ class Extractor:
         self.gsf = [Vector(path=gsf) for gsf in gsfs]
         return self
 
-    def __call__(self, ensemble: Optional[Ensemble] = None,
-                 trapezoid: Optional[Action] = None):
+    def __call__(self, ensemble: Ensemble | None = None,
+                 trapezoid: Action | None = None):
         return self.extract_from(ensemble, trapezoid)
 
-    def extract_from(self, ensemble: Optional[Ensemble] = None,
-                     trapezoid: Optional[Action] = None,
-                     regenerate: Optional[bool] = None):
+    def extract_from(self, ensemble: Ensemble | None = None,
+                     trapezoid: Action | None = None,
+                     regenerate: bool | None = None):
         """Decompose each first generation matrix in an Ensemble
 
         If `regenerate` is `True` it saves the extracted nld and gsf to file,
@@ -177,7 +177,7 @@ class Extractor:
 
         self.check_unconstrained_results()
 
-    def step(self, num: int) -> Tuple[Vector, Vector]:
+    def step(self, num: int) -> (Vector, Vector):
         """ Wrapper around _extract in order to be consistent with other classes
 
         Args:
@@ -186,7 +186,7 @@ class Extractor:
         nld, gsf = self._extract(num)
         return nld, gsf
 
-    def _extract(self, num: int) -> Tuple[Vector, Vector]:
+    def _extract(self, num: int) -> (Vector, Vector):
         """ Extract nld and gsf from matrix number i from Ensemble
 
         Args:
@@ -213,9 +213,9 @@ class Extractor:
         return nld, gsf
 
     def decompose(self, matrix: Matrix,
-                  std: Optional[Matrix] = None,
-                  x0: Optional[np.ndarray] = None,
-                  product: bool = False) -> Tuple[Vector, Vector]:
+                  std: Matrix | None = None,
+                  x0: np.ndarray | None = None,
+                  product: bool = False) -> (Vector, Vector):
         """ Decomposes a matrix into nld and γSF
 
         Algorithm:
@@ -335,7 +335,7 @@ class Extractor:
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg)
 
     def guess_initial_values(self, E_nld: np.ndarray, matrix: Matrix,
-                             method: Optional[str] = None) -> np.ndarray:
+                             method: str | None = None) -> np.ndarray:
         """Guess initial values `x0` for minimization rountine
 
         Note:
@@ -455,7 +455,7 @@ class Extractor:
             resolution (np.ndarray): Resolution at `Ex=Ex`
 
         Returns:
-            Tuple[nld_counts, T_counts]: Number of counts constraining each
+            (nld_counts, T_counts): Number of counts constraining each
                 nld and gsf bin
         """
         matrix = matrix.clone(order='C')
@@ -513,7 +513,7 @@ class Extractor:
         fwhm_pars = np.array([73.2087, 0.50824, 9.62481e-05])
         return fFWHM(matrix.Ex, fwhm_pars)
 
-    def plot(self, ax: Optional[Any] = None, scale: str = 'log',
+    def plot(self, ax: Any | None = None, scale: str = 'log',
              plot_mean: bool = False,
              color='k', **kwargs) -> None:
         """ Basic visualization of nld and gsf
@@ -608,7 +608,7 @@ class Extractor:
             pass
         return state
 
-    def get_product(self, member: int, Ex: Optional[np.ndarray] = None):
+    def get_product(self, member: int, Ex: np.ndarray | None = None):
         nld = self.nld[member]
         gsf = self.gsf[member]
         nld.set_order('C')
@@ -624,7 +624,7 @@ class Extractor:
                                nld.E, gsf.E, Ex)
         return Matrix(Eg=gsf.E, Ex=Ex, values=values)
 
-    def get_product_std(self, Ex: Optional[np.ndarray] = None) -> Matrix:
+    def get_product_std(self, Ex: np.ndarray | None = None) -> Matrix:
         products = np.asarray([self.get_product(i, Ex=Ex).values
                                for i in range(len(self.nld))])
         std = np.std(products, axis=0)
@@ -634,7 +634,7 @@ class Extractor:
 
 
 def normalize(mat: Matrix,
-              std: Optional[Matrix]) -> Tuple[np.ndarray, np.ndarray]:
+              std: Matrix]) -> Tuple[np.ndarray, np.ndarray | None:
     """Matrix normalization per row taking into account the std. dev
 
     Error propagation assuming gaussian error propagation.

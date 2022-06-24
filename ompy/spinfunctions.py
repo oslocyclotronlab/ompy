@@ -47,13 +47,13 @@ class SpinFunctions:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
 
-    def distribution(self) -> Tuple[float, np.ndarray]:
+    def distribution(self) -> (float, np.ndarray):
         """Get spin distribution
 
         Note: Assuming equal parity
 
         Returns:
-            spinDist (Tuple[float, np.ndarray]): Spin distribution. Shape
+            spinDist ((float, np.ndarray)): Spin distribution. Shape
                 depends on input Ex and J and is squeezed if only one of them
                 is an array. If both are arrays: `spinDist[Ex,J]`
         """
@@ -67,7 +67,7 @@ class SpinFunctions:
     # different spin cut models
 
     def gconst(self, sigma: float,
-              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+              Ex: Union[float, Sequence]] = None) -> Union[float, Sequence | None : # noqa
         """
         Constant spin-cutoff parameter
 
@@ -81,7 +81,7 @@ class SpinFunctions:
         return np.full_like(Ex, sigma**2)
 
     def gEB05(self, mass: int, NLDa: float, Eshift: float,
-              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+              Ex: Union[float, Sequence]] = None) -> Union[float, Sequence | None : # noqa
         """
         Von Egidy & B PRC72,044311(2005), Eq. (4)
         The rigid moment of inertia formula (RMI)
@@ -107,7 +107,7 @@ class SpinFunctions:
         return sigma2
 
     def gEB09_CT(self, mass: int,
-                 Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence]:
+                 Ex: Union[float, Sequence]] = None) -> Union[float, Sequence | None:
         """
         The constant temperature (CT) formula
         - Von Egidy & B PRC80,054310, see sec. IV, p7 refering to ref. below
@@ -124,7 +124,7 @@ class SpinFunctions:
         return sigma2
 
     def gEB09_emp(self, mass: int, Pa_prime: float,
-                  Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+                  Ex: Union[float, Sequence]] = None) -> Union[float, Sequence | None : # noqa
         """
         Von Egidy & B PRC80,054310, Eq.(16)
         FG+CT
@@ -146,8 +146,8 @@ class SpinFunctions:
         return sigma2
 
     def gDisc_and_EB05(self, mass: int, NLDa: float, Eshift: float, Sn: float,
-                       sigma2_disc: Tuple[float, float],
-                       Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+                       sigma2_disc: (float, float),
+                       Ex: Union[float, Sequence]] = None) -> Union[float, Sequence | None : # noqa
         """
         Linear interpolation of the spin-cut between
         a spin cut "from the discrete levels" and EB05
@@ -163,7 +163,7 @@ class SpinFunctions:
             NLDa (float): Level density parameter
             Eshift (float): Energy shift
             Sn (float): Neutron separation energy
-            sigma2_disc (Tuple[float, float]): [float, float]
+            sigma2_disc ((float, float]): [float, float)
                 [Energy, sigma2] from the discretes
             Ex (float or Sequence, optional):
                 Excitation energy. Defaults to self.Ex

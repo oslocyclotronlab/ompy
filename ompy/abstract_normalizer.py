@@ -13,7 +13,7 @@ class AbstractNormalizer():
         Do not initialize itself.
 
     Attributes:
-        path (Optional[Union[str, Path]]): Path to save/load
+        path (Union[str, Path] | None): Path to save/load
         regenerate (bool): If `True`, calculates again instead of
             loading from `path`.
         _save_instance (bool): Can oversteer saving
@@ -24,7 +24,7 @@ class AbstractNormalizer():
         self.regenerate = regenerate
         self._save_instance: bool = True
 
-    def save(self, path: Optional[Union[str, Path]] = None,
+    def save(self, path: Union[str, Path] | None = None,
              overwrite: bool = True):
         """ Save (pickels) the instance
 
@@ -44,7 +44,7 @@ class AbstractNormalizer():
         with open(fname, mode) as fobj:
             dill.dump(self, fobj)
 
-    def load(self, path: Optional[Union[str, Path]] = None):
+    def load(self, path: Union[str, Path] | None = None):
         """ Loads (pickeled) instance.
 
         Such that it can be loaded if `regenerate = False`.
@@ -67,7 +67,7 @@ class AbstractNormalizer():
         self.__dict__.update(saved.__dict__)
         self.LOG.info(f"Loaded")
 
-    def save_results_txt(self, path: Optional[Union[str, Path]] = None,
+    def save_results_txt(self, path: Union[str, Path] | None = None,
                          nld: Vector = None,
                          gsf: Vector = None,
                          samples: dict = None,

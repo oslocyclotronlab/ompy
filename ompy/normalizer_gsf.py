@@ -44,14 +44,14 @@ class NormalizerGSF(AbstractNormalizer):
     LOG = logging.getLogger(__name__)  # overwrite parent variable
     logging.captureWarnings(True)
 
-    def __init__(self, *, normalizer_nld: Optional[NormalizerNLD] = None,
-                 nld: Optional[Vector] = None,
-                 nld_model: Optional[Callable[..., Any]] = None,
-                 alpha: Optional[float] = None,
-                 gsf: Optional[Vector] = None,
-                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
+    def __init__(self, *, normalizer_nld: NormalizerNLD | None = None,
+                 nld: Vector | None = None,
+                 nld_model: Callable[..., Any] | None = None,
+                 alpha: float | None = None,
+                 gsf: Vector | None = None,
+                 path: Union[str, Path] | None = 'saved_run/normalizers',
                  regenerate: bool = False,
-                 norm_pars: Optional[NormalizationParameters] = None,
+                 norm_pars: NormalizationParameters | None = None,
                  ) -> None:
         """
         Note:
@@ -70,17 +70,17 @@ class NormalizerGSF(AbstractNormalizer):
             mutable to ensure it is not changed.
 
         Args:
-            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+            normalizer_nld (NormalizerNLD | None, optional): NormalizerNLD
                 to retrieve parameters. If `nld` and/or `nld_model` are not
                 set, they are taken from `normalizer_nld.res` in `normalize`.
-            nld (Optional[Vector], optional): NLD. If not set it is taken from
+            nld (Vector | None, optional): NLD. If not set it is taken from
                 `normalizer_nld.res` in `normalize`.
-            nld_model (Optional[Callable[..., Any]], optional): Model for nld
+            nld_model (Callable[..., Any] | None, optional): Model for nld
                 above data of the from `y = nld_model(E)`. If not set it is
                 taken from `normalizer_nld.res` in `normalize`.
-            alpha (Optional[float], optional): tranformation parameter α
-            gsf (Optional[Vector], optional): gsf to normalize.
-            norm_pars (Optional[NormalizationParameters], optional):
+            alpha (float | None, optional): tranformation parameter α
+            gsf (Vector | None, optional): gsf to normalize.
+            norm_pars (NormalizationParameters | None, optional):
                 Normalization parameters like experimental <Γγ>
 
         """
@@ -103,13 +103,13 @@ class NormalizerGSF(AbstractNormalizer):
         else:
             self.norm_pars = norm_pars
 
-        self._gsf: Optional[Vector] = None
-        self._gsf_low: Optional[Vector] = None
-        self._gsf_high: Optional[Vector] = None
+        self._gsf: Vector | None = None
+        self._gsf_low: Vector | None = None
+        self._gsf_high: Vector | None = None
 
         self.method_Gg = "standard"
 
-        self.res: Optional[ResultsNormalized] = None
+        self.res: ResultsNormalized | None = None
 
         self._saved_SpinSum = None
         self._saved_spincutModel = None
@@ -122,29 +122,29 @@ class NormalizerGSF(AbstractNormalizer):
             self.path = Path(path)
             self.path.mkdir(exist_ok=True, parents=True)
 
-    def normalize(self, *, gsf: Optional[Vector] = None,
-                  normalizer_nld: Optional[NormalizerNLD] = None,
-                  alpha: Optional[float] = None,
-                  nld: Optional[Vector] = None,
-                  nld_model: Optional[Callable[..., Any]] = None,
-                  norm_pars: Optional[NormalizationParameters] = None,
+    def normalize(self, *, gsf: Vector | None = None,
+                  normalizer_nld: NormalizerNLD | None = None,
+                  alpha: float | None = None,
+                  nld: Vector | None = None,
+                  nld_model: Callable[..., Any] | None = None,
+                  norm_pars: NormalizationParameters | None = None,
                   num: int = 0) -> None:
         """Normalize gsf to a given <Γγ> (Gg). Saves results to `self.res`.
 
         Args:
-            normalizer_nld (Optional[NormalizerNLD], optional): NormalizerNLD
+            normalizer_nld (NormalizerNLD | None, optional): NormalizerNLD
                 to retrieve parameters. If `nld` and/or `nld_model` are not
                 set, they are taken from `normalizer_nld.res` in `normalize`.
-            nld (Optional[Vector], optional): NLD. If not set it is taken from
+            nld (Vector | None, optional): NLD. If not set it is taken from
                 `normalizer_nld.res` in `normalize`.
-            nld_model (Optional[Callable[..., Any]], optional): Model for nld
+            nld_model (Callable[..., Any] | None, optional): Model for nld
                 above data of the from `y = nld_model(E)`. If not set it is
                 taken from `normalizer_nld.res` in `normalize`.
-            alpha (Optional[float], optional): tranformation parameter α
-            gsf (Optional[Vector], optional): gsf to normalize.
-            norm_pars (Optional[NormalizationParameters], optional):
+            alpha (float | None, optional): tranformation parameter α
+            gsf (Vector | None, optional): gsf to normalize.
+            norm_pars (NormalizationParameters | None, optional):
                 Normalization parameters like experimental <Γγ>
-            num (Optional[int], optional): Loop number, defaults to 0.
+            num (int | None, optional): Loop number, defaults to 0.
         """
         if not self.regenerate:
             try:
@@ -222,13 +222,13 @@ class NormalizerGSF(AbstractNormalizer):
         #self.save()  # saves instance
 
     def extrapolate(self,
-                    gsf: Optional[Vector] = None,
-                    E: Optional[np.ndarray] = [None, None]
-                    ) -> Tuple[Vector, Vector]:
+                    gsf: Vector | None = None,
+                    E: np.ndarray] = [None, None | None
+                    ) -> (Vector, Vector):
         """ Extrapolate gsf using given models
 
         Args:
-            gsf (Optional[Vector]): If extrapolation is fit, it will be fit to
+            gsf (Vector | None): If extrapolation is fit, it will be fit to
                 this vector. Default is `self._gsf`.
             E (optional): extrapolation energies [Elow, Ehigh]
         Returns:
@@ -443,15 +443,15 @@ class NormalizerGSF(AbstractNormalizer):
                              model=self.norm_pars.spincutModel,
                              pars=self.norm_pars.spincutPars).distribution()
 
-    def plot(self, ax: Optional[Any] = None, *,
+    def plot(self, ax: Any | None = None, *,
              add_label: bool = True,
              add_figlegend: bool = True,
              plot_fitregion: bool = True,
              plot_model: bool = True,
-             extrap_high: Optional[float] = None,
-             results: Optional[ResultsNormalized] = None,
+             extrap_high: float | None = None,
+             results: ResultsNormalized | None = None,
              reset_color_cycle: bool = True,
-             **kwargs) -> Tuple[Any, Any]:
+             **kwargs) -> (Any, Any):
         """Plot the gsf and extrapolation normalization
 
         Args:
@@ -459,10 +459,10 @@ class NormalizerGSF(AbstractNormalizer):
                 is not provided
             add_label (bool, optional): Defaults to `True`.
             add_figlegend (bool, optional):Defaults to `True`.
-            plot_fitregion (Optional[bool], optional): Defaults to `True`.
+            plot_fitregion (bool | None, optional): Defaults to `True`.
             results (ResultsNormalized, optional): If provided, gsf and model
                 are taken from here instead.
-            reset_color_cycle (Optional[bool], optional): Defaults to `True`
+            reset_color_cycle (bool | None, optional): Defaults to `True`
             **kwargs: Additional keyword arguments
 
         Returns:

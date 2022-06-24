@@ -160,7 +160,7 @@ class AbstractExtrapolationModel(Model):
             either ["fit", "fix"]
         model (Callable[..., Any]): If `method` is `"fit"`, the model to fit
             to the data has to be provided
-        Efit (Tuple[float, float]): Fit range (lower, higher).
+        Efit ((float, float)): Fit range (lower, higher).
 
         TODO:
             - allow for more flexible (more general) models.
@@ -174,9 +174,9 @@ class AbstractExtrapolationModel(Model):
     _shift_after: float = field(default=None,
             metadata='Exponential shift Exp[scale*Eg + shift]'
                      'after normalization')  # noqa
-    Emin: Optional[float] = field(default=None,
+    Emin: float | None = field(default=None,
             metadata='Minimal gamma energy to extrapolate from in MeV')  # noqa
-    Emax: Optional[float] = field(default=None,
+    Emax: float | None = field(default=None,
             metadata='Maximal gamma energy to extrapolate from in MeV')  # noqa
     steps: int = field(default=1001,
             metadata='Number of gamma energies to use in extrapolation')  # noqa
@@ -186,7 +186,7 @@ class AbstractExtrapolationModel(Model):
     # if method is "fit"
     model: Callable[..., Any] = field(default=None,
             metadata='extrapolation model')  # noqa
-    Efit: Optional[Tuple[float, float]] = \
+    Efit: (float, float) | None = \
               field(default_factory=NonTuple2,
                     metadata='Fit range')  # noqa
 
@@ -221,9 +221,9 @@ class AbstractExtrapolationModel(Model):
     def norm_to_shift_after(self, norm: float) -> None:
         self.shift_after = self.shift + np.log(norm)
 
-    def fit(self, gsf: Vector, model: Optional[float] = None,
-            Emin: Optional[float] = None,
-            Emax: Optional[float] = None) -> None:
+    def fit(self, gsf: Vector, model: float | None = None,
+            Emin: float | None = None,
+            Emax: float | None = None) -> None:
         """Fits parameters of `model` to the given gsf
 
         Optional parameters are detemined from the instance attributes if
@@ -263,8 +263,8 @@ class AbstractExtrapolationModel(Model):
         self.scale = popt[0]
         self.shift = popt[1]
 
-    def extrapolate(self, E: Optional[np.ndarray] = None,
-                    scaled: Optional[bool] = True) -> Vector:
+    def extrapolate(self, E: np.ndarray | None = None,
+                    scaled: bool | None = True) -> Vector:
         """ Wrapper to extrapolate a model
 
         Args:
@@ -316,9 +316,9 @@ class ExtrapolationModelLow(AbstractExtrapolationModel):
                 raise NotImplementedError("Set Efit manually")
             self.Efit[1] = gsf.E[fraction+2]
 
-    def __model(self, Eg: Optional[float] = None,
-                scale: Optional[float] = None,
-                shift: Optional[float] = None) -> np.ndarray:
+    def __model(self, Eg: float | None = None,
+                scale: float | None = None,
+                shift: float | None = None) -> np.ndarray:
         """ gsf extrapolation at low energies
 
         Computes Exp[scale·Eg + shift]
@@ -369,9 +369,9 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
                 raise NotImplementedError("Set Efit manually")
             self.Efit[1] = gsf.E[-2]
 
-    def __model(self, Eg: Optional[float] = None,
-                scale: Optional[float] = None,
-                shift: Optional[float] = None) -> np.ndarray:
+    def __model(self, Eg: float | None = None,
+                scale: float | None = None,
+                shift: float | None = None) -> np.ndarray:
         """ gsf extrapolation at high energies
 
         Computes Exp[scale·Eg + shift] / Eg³
@@ -407,22 +407,22 @@ class NormalizationParameters(Model):
     """
 
     #: Element number of the nucleus
-    Z: Optional[int] = field(default=None,
+    Z: int | None = field(default=None,
             metadata="Element number of the nucleus")  # noqa
     #: Mass number of the nucleus
-    _A: Optional[int] = field(default=None,
+    _A: int | None = field(default=None,
             metadata="Mass number of the nucleus")  # noqa
     #: Average s-wave resonance spacing D0 [eV]
-    D0: Optional[Tuple[float, float]] = field(default=None,
+    D0: (float, float) | None = field(default=None,
             metadata='Average s-wave resonance spacing D0 [eV]')  # noqa
     #: Total average radiative width  [meV]
-    Gg: Optional[Tuple[float, float]] = field(default=None,
+    Gg: (float, float) | None = field(default=None,
             metadata='Total average radiative width  [meV]')  # noqa
     #: Neutron separation energy [MeV]
-    Sn: Optional[Tuple[float, float]] = field(default=None,
+    Sn: (float, float) | None = field(default=None,
             metadata='Neutron separation energy [MeV]')  # noqa
     #: "Target" (A-1 nucleus) ground state spin
-    Jtarget: Optional[float] = field(default=None,
+    Jtarget: float | None = field(default=None,
             metadata='"Target" (A-1 nucleus) ground state spin')  # noqa
     #: Min energy to integrate <Γγ> from
     Emin: float = field(default=0.0,
@@ -447,7 +447,7 @@ class NormalizationParameters(Model):
               metadata='Optional parameters.')
 
     def is_changed(self, include: List[str] = [],
-                   exclude: Optional[List[str]] = None) -> None:
+                   exclude: List[str] | None = None) -> None:
         """Wrapper of :meth:`Model.is_changed()`
 
         Note: List optional/convenience parameterts in
@@ -459,7 +459,7 @@ class NormalizationParameters(Model):
 
     def E_grid(self,
                retstep: bool = True
-               ) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+               ) -> np.ndarray | (np.ndarray, float):
         """Wrapps np.linspace creates linearly spaced array from Emin to Emax
 
         Args:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, overload, Literal
-from .header import Axes, Point, PointUnit, Points, Unitlike, ArrayBool, PointI
+from .stubs import Axes, Point, PointUnit, Points, Unitlike, ArrayBool, PointI
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
@@ -59,7 +59,7 @@ class Line(Geometry):
         self.p2 = p2
         self.slope = slope
 
-    def resolve_self(self, matrix: Matrix) -> tuple[PointI, PointI]:
+    def resolve_self(self, matrix: Matrix) -> (PointI, PointI):
         p1 = Geometry.maybe_resolve(self.p1, matrix)
         p2 = Geometry.maybe_resolve(self.p2, matrix)
         p1, p2 = refine_points(p1, p2, self.slope)

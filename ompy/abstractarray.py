@@ -170,7 +170,7 @@ class AbstractArray:
         raise NotImplementedError()
 
     @property
-    def shape(self) -> Union[Tuple[int], Tuple[int, int]]:
+    def shape(self) -> Union[(int], (int, int)):
         return self.values.shape
 
     def __getitem__(self, key):

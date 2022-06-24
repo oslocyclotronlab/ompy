@@ -1,15 +1,17 @@
-import numpy as np
-from scipy.interpolate import interp1d, RectBivariateSpline
-from scipy.stats import truncnorm
-import matplotlib
-from itertools import product
-from typing import Optional, Tuple, Iterator, Any, Union
 import inspect
 import re
-from matplotlib import patches
+from itertools import product
+from typing import Iterator, Any, Union
+
+import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy.ndimage as nd
-from .header import ArrayFloat, arraylike, Unitlike, ArrayKeV
+from matplotlib import patches
+from scipy.interpolate import interp1d, RectBivariateSpline
+from scipy.stats import truncnorm
+
+from .stubs import ArrayFloat, arraylike, Unitlike, ArrayKeV
 
 
 def div0(a, b):
@@ -19,7 +21,7 @@ def div0(a, b):
     if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
             c = np.true_divide(a, b)
-            c[~ np.isfinite(c )] = 0  # -inf inf NaN
+            c[~ np.isfinite(c)] = 0  # -inf inf NaN
     else:
         if b == 0:
             c = 0
@@ -30,16 +32,16 @@ def div0(a, b):
 
 def i_from_E(E, E_array):
     # Returns index of the E_array value closest to given E
-    assert(E_array.ndim == 1), "E_array has more then one dimension"
+    assert (E_array.ndim == 1), "E_array has more then one dimension"
     return np.argmin(np.abs(E_array - E))
 
 
 def line(x, points):
     """ Returns a line through coordinates [x1,y1,x2,y2]=points
     """
-    a = (points[3]-points[1])/float(points[2]-points[0])
-    b = points[1] - a*points[0]
-    return a*x + b
+    a = (points[3] - points[1]) / float(points[2] - points[0])
+    b = points[1] - a * points[0]
+    return a * x + b
 
 
 def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
@@ -47,15 +49,15 @@ def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     # Define cut   x1    y1    x2    y2
     cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array),
                   i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
-    i_array = np.linspace(0,len(Ex_array)-1,len(Ex_array)).astype(int) # Ex axis
-    j_array = np.linspace(0,len(Eg_array)-1,len(Eg_array)).astype(int) # Eg axis
+    i_array = np.linspace(0, len(Ex_array) - 1, len(Ex_array)).astype(int)  # Ex axis
+    j_array = np.linspace(0, len(Eg_array) - 1, len(Eg_array)).astype(int)  # Eg axis
     i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
 
 
 def E_array_from_calibration(a0: float, a1: float, *,
-                             N: Optional[int] = None,
-                             E_max: Optional[float] = None) -> np.ndarray:
+                             N: int | None = None,
+                             E_max: float | None = None) -> np.ndarray:
     """
     Return an array of mid-bin energy values corresponding to the
     specified calibration.
@@ -75,10 +77,10 @@ def E_array_from_calibration(a0: float, a1: float, *,
         raise ValueError("Cannot give both N and E_max -- must choose one")
 
     if N is not None:
-        return np.linspace(a0, a0+a1*(N-1), N)
+        return np.linspace(a0, a0 + a1 * (N - 1), N)
     elif E_max is not None:
-        N = int(np.round((E_max - a0)/a1)) + 1
-        return np.linspace(a0, a0+a1*(N-1), N)
+        N = int(np.round((E_max - a0) / a1)) + 1
+        return np.linspace(a0, a0 + a1 * (N - 1), N)
     else:
         raise ValueError("Either N or E_max must be given")
 
@@ -166,13 +168,13 @@ def fill_negative_gauss(array: np.ndarray, Eg: np.ndarray,
     """
     if isinstance(window_size, (int, float)):
         window_size = np.full(array.shape[1], window_size)
-        sigma = window_size/2.355  # convert FWHM to sigma
+        sigma = window_size / 2.355  # convert FWHM to sigma
     else:
         assert len(window_size) == array.shape[1], "Array length incompatible"
-        sigma = window_size/2.355  # convert FWHM to sigma
+        sigma = window_size / 2.355  # convert FWHM to sigma
 
     # generate truncated gauss for each Eg bin, format [Eg-bin, gauss-values]
-    lower, upper = Eg - n_trunc*sigma, Eg + n_trunc*sigma
+    lower, upper = Eg - n_trunc * sigma, Eg + n_trunc * sigma
     a = (lower - Eg) / sigma
     b = (upper - Eg) / sigma
     gauss = [truncnorm(a=a, b=b, loc=p, scale=sig).pdf(Eg)
@@ -221,7 +223,7 @@ def shuffle_counts(row: np.ndarray, i_from: int, i_to: int):
 
 
 def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
-        """
+    """
         Cut away counts to the right of a diagonal line defined by indices
 
         Args:
@@ -233,11 +235,11 @@ def cut_diagonal(matrix, Ex_array, Eg_array, E1, E2):
         Returns:
             The matrix with counts above diagonal removed
         """
-        Ex1, Eg1 = E1
-        Ex2, Eg2 = E2
-        mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
-        matrix_out = np.where(mask, matrix, 0)
-        return matrix_out
+    Ex1, Eg1 = E1
+    Ex2, Eg2 = E2
+    mask = make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2)
+    matrix_out = np.where(mask, matrix, 0)
+    return matrix_out
 
 
 def interpolate_matrix_1D(matrix_in, E_array_in, E_array_out, axis=1):
@@ -304,7 +306,7 @@ def log_interp1d(xx, yy, **kwargs):
     return log_interp
 
 
-def call_model(fun,pars,pars_req):
+def call_model(fun, pars, pars_req):
     """ Call `fun` and check if all required parameters are provided """
 
     # Check if required parameters are a subset of all pars given
@@ -376,7 +378,7 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     if threshold is not None:
         threshold = im.norm(threshold)
     else:
-        threshold = im.norm(matrix.values.max())/2.
+        threshold = im.norm(matrix.values.max()) / 2.
 
     # Set default alignment to center, but allow it to be
     # overwritten by textkw.
@@ -401,7 +403,7 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     return texts
 
 
-def diagonal_elements(matrix: np.ndarray) -> Iterator[Tuple[int, int]]:
+def diagonal_elements(matrix: np.ndarray) -> Iterator[(int, int)]:
     """ Iterates over the last non-zero elements
 
     Args:
@@ -414,7 +416,7 @@ def diagonal_elements(matrix: np.ndarray) -> Iterator[Tuple[int, int]]:
     for i, row in enumerate(matrix):
         for j, col in enumerate(reversed(row)):
             if col != 0.0:
-                yield i, Ny-j
+                yield i, Ny - j
                 break
 
 
@@ -494,9 +496,9 @@ def plot_trapezoid(cut: 'Action', matrix: 'Matrix',
 
     dEg = Eg_max - Ex_max
     if dEg > 0:
-        binwidth = mat.Eg[1]-mat.Eg[0]
-        dEg = np.ceil(dEg/binwidth) * binwidth
-    x = [Eg_min, Ex_min+dEg, Ex_max+dEg, Eg_min]
+        binwidth = mat.Eg[1] - mat.Eg[0]
+        dEg = np.ceil(dEg / binwidth) * binwidth
+    x = [Eg_min, Ex_min + dEg, Ex_max + dEg, Eg_min]
     y = [Ex_min, Ex_min, Ex_max, Ex_max]
     if plot_matrix:
         matrix.plot(ax=ax)
@@ -512,7 +514,7 @@ def ascii_plot(matrix: 'Matrix', shape=(5, 5)):
     """
     values = np.unique(np.sort(matrix.values.flatten()))
     values = values[values > 0]
-    N = len(values)/4
+    N = len(values) / 4
 
     def block(count):
         i = np.argmin(np.abs(count - values))
@@ -533,9 +535,9 @@ def ascii_plot(matrix: 'Matrix', shape=(5, 5)):
         print('──', end='')
     print('')
 
+
 def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
-                            kernel_size: Union[str, int,
-                                               Tuple[int, int]] = 'auto'):
+                            kernel_size: str | int | (int, int) = 'auto'):
     """ Check if matrix contains too many clustered zeroes
 
     Only bins above the diagonal are checked. Note that the diagonal
@@ -561,16 +563,16 @@ def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
     if isinstance(kernel_size, str):
         if kernel_size != 'auto':
             raise ValueError("Kernel size must be 'auto' or int.")
-        width = max(int(0.2*mat.shape[0]), 2)
-        height = max(int(0.2*mat.shape[1]), 2)
+        width = max(int(0.2 * mat.shape[0]), 2)
+        height = max(int(0.2 * mat.shape[1]), 2)
     elif isinstance(kernel_size, int):
         width = height = kernel_size
     else:
         width, height = kernel_size
-    #print(width, height)
+    # print(width, height)
     kernel = np.array(np.ones((width, height)))
     v = mat.values
-    vv = v/v
+    vv = v / v
     vv[np.isnan(vv)] = 0
     # Size we convolve in 2D, each pixel in the convolution
     # will contain information about a subarray of the matrix.
@@ -583,11 +585,11 @@ def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
         vv[i, j:] = np.NaN
     conv = nd.convolve(vv, kernel)
     m2 = mat.clone(values=conv)
-    #m2.plot()
-    mask = conv < (1 - threshold)*width*height
+    # m2.plot()
+    mask = conv < (1 - threshold) * width * height
     mask = np.array(mask, dtype=float)
     mask[np.isnan(conv)] = np.nan
-    #fig, ax = plt.subplots()
+    # fig, ax = plt.subplots()
 
     found = False
     for i, row in enumerate(mask):
@@ -595,39 +597,40 @@ def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
             if np.isnan(elem):
                 break
             if elem:
-                #print(elem)
-                #print(i, j)
+                # print(elem)
+                # print(i, j)
                 mask[i, j] = -5
                 found = True
                 break
         if found:
             break
-    #ax.pcolormesh(mask)
+    # ax.pcolormesh(mask)
     return found
+
 
 def plot_projection_rectangle(ax: 'Axes', matrix: 'Matrix', axis: int | str,
                               Emin: float | None = None,
                               Emax: float | None = None,
                               **kwargs):
-        axis = to_plot_axis(axis)
-        if axis not in (0, 1):
-            raise ValueError(f"Axis must be 0 or 1, got: {axis}")
+    axis = to_plot_axis(axis)
+    if axis not in (0, 1):
+        raise ValueError(f"Axis must be 0 or 1, got: {axis}")
 
-        isEx = axis == 1
-        index = matrix.index_Ex if isEx else matrix.index_Eg
-        E = matrix.Ex if isEx else matrix.Eg
-        E2 = matrix.Eg if isEx else matrix.Ex
-        emin = E[index(Emin)] if Emin is not None else E[0]
-        emax = E[index(Emax)] if Emax is not None else E[-1]
-        start = (emin, 0) if isEx else (0, emin)
-        w = emax - emin if isEx else E[-1]
-        h = emax - emin if not isEx else E2[-1]
-        kwargs |= {'fill': False}
-        kwargs |= {'lw': 1}
-        kwargs |= {'edgecolor': 'r'}
-        rectangle = patches.Rectangle(start, width=w, height=h, **kwargs)
-        ax.add_patch(rectangle)
-        return ax
+    isEx = axis == 1
+    index = matrix.index_Ex if isEx else matrix.index_Eg
+    E = matrix.Ex if isEx else matrix.Eg
+    E2 = matrix.Eg if isEx else matrix.Ex
+    emin = E[index(Emin)] if Emin is not None else E[0]
+    emax = E[index(Emax)] if Emax is not None else E[-1]
+    start = (emin, 0) if isEx else (0, emin)
+    w = emax - emin if isEx else E[-1]
+    h = emax - emin if not isEx else E2[-1]
+    kwargs = {'fill': False} | kwargs
+    kwargs = {'lw': 1} | kwargs
+    kwargs = {'edgecolor': 'r'} | kwargs
+    rectangle = patches.Rectangle(start, width=w, height=h, **kwargs)
+    ax.add_patch(rectangle)
+    return ax
 
 
 def to_plot_axis(axis: int | str) -> int:
@@ -665,7 +668,7 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
                            numbins: int | None = None) -> ArrayFloat:
     if not only_one_not_none(newbins, factor, binwidth, numbins):
         raise ValueError("Either 'bins', 'factor', `numbins` or 'binwidth' must be"
-                            " specified, but not more than one.")
+                         " specified, but not more than one.")
 
     binwidth_ = transform(binwidth) if binwidth is not None else None
     newbins_ = transform(newbins) if newbins is not None else None
@@ -673,15 +676,15 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
     if factor is not None:
         if factor <= 0:
             raise ValueError("`factor` must be positive")
-        numbins = int(len(bins)/factor)
+        numbins = int(len(bins) / factor)
 
     if numbins is not None:
         newbins_, step = np.linspace(bins[0], bins[-1],
-                                 num=numbins, retstep=True)
+                                     num=numbins, retstep=True)
         LOG.debug("Rebinning with factor %g, giving %g mids",
-                    factor, len(newbins_))
+                  factor, len(newbins_))
         LOG.debug("Old step size: %g\nNew step size: %g",
-                    bins[1] - bins[0], step)
+                  bins[1] - bins[0], step)
 
     if binwidth_ is not None:
         newbins_ = np.arange(bins[0], bins[-1], binwidth_, dtype=float)
@@ -694,4 +697,3 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
         raise ValueError("Can not rebin to more bins")
 
     return newbins_
-

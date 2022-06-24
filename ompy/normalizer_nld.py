@@ -20,7 +20,7 @@ from .filehandling import load_discrete
 from .models import ResultsNormalized, NormalizationParameters
 from .abstract_normalizer import AbstractNormalizer
 
-TupleDict = Dict[str, Tuple[float, float]]
+TupleDict = Dict[str, (float, float])
 
 
 class NormalizerNLD(AbstractNormalizer):
@@ -49,7 +49,7 @@ class NormalizerNLD(AbstractNormalizer):
         nld (Vector): The NLD to normalize. Gets converted to [MeV] from [keV].
         norm_pars (NormalizationParameters): Normalization parameters like
             experimental D₀, and spin(-cut) model
-        bounds (Dict[str, Tuple[float, float]): The bounds on each of
+        bounds (Dict[str, (float, float)): The bounds on each of
             the parameters. Its keys are 'A', 'alpha', 'T', and 'D0'. The
             values are on the form (min, max).
         model (Callable[..., ndarray]): The model to use at high energies
@@ -68,11 +68,11 @@ class NormalizerNLD(AbstractNormalizer):
     logging.captureWarnings(True)
 
     def __init__(self, *,
-                 nld: Optional[Vector] = None,
-                 discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = None,
+                 nld: Vector | None = None,
+                 discrete: Union[str, Vector] | None = None,
+                 path: Union[str, Path] | None = None,
                  regenerate: bool = False,
-                 norm_pars: Optional[NormalizationParameters] = None) -> None:
+                 norm_pars: NormalizationParameters | None = None) -> None:
         """ Normalizes nld ang gSF.
 
         Note:
@@ -112,7 +112,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.norm_pars = norm_pars
         self.bounds = {'A': [1e-1, 20], 'alpha': [1e-1, 2], 'T': [0.1, 5],
                        'Eshift': [-5, 5]}  # D0 bounds set later
-        self.model: Optional[Callable[..., ndarray]] = self.const_temperature
+        self.model: Callable[..., ndarray] | None = self.const_temperature
         # self.curried_model = lambda *arg: None
         self.multinest_path = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
@@ -136,12 +136,12 @@ class NormalizerNLD(AbstractNormalizer):
         """ Wrapper around normalize """
         self.normalize(*args, **kwargs)
 
-    def normalize(self, *, limit_low: Optional[Tuple[float, float]] = None,
-                  limit_high: Optional[Tuple[float, float]] = None,
-                  nld: Optional[Vector] = None,
-                  discrete: Optional[Vector] = None,
-                  bounds: Optional[TupleDict] = None,
-                  norm_pars: Optional[NormalizationParameters] = None,
+    def normalize(self, *, limit_low: (float, float) | None = None,
+                  limit_high: (float, float) | None = None,
+                  nld: Vector | None = None,
+                  discrete: Vector | None = None,
+                  bounds: TupleDict | None = None,
+                  norm_pars: NormalizationParameters | None = None,
                   num: int = 0) -> None:
         """ Normalize NLD to a low and high energy region
 
@@ -222,9 +222,9 @@ class NormalizerNLD(AbstractNormalizer):
 
         #self.save()  # save instance
 
-    def initial_guess(self, limit_low: Optional[Tuple[float, float]] = None,
-                      limit_high: Optional[Tuple[float, float]] = None
-                      ) -> Tuple[Tuple[float, float, float, float],
+    def initial_guess(self, limit_low: (float, float) | None = None,
+                      limit_high: (float, float) | None = None
+                      ) -> (Tuple[float, float, float, float),
                                  Dict[str, float]]:
         """ Find an inital guess for the constant, α, T and D₀
 
@@ -283,7 +283,7 @@ class NormalizerNLD(AbstractNormalizer):
         return args, p0
 
     def optimize(self, num: int, args,
-                 guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
+                 guess: Dict[str, float]) -> (Dict[str, float], Dict[str, float]):
         """Find parameters given model constraints and an initial guess
 
         Starts Multinest
@@ -295,7 +295,7 @@ class NormalizerNLD(AbstractNormalizer):
 
         Returns:
             Tuple:
-            - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
+            - popt (Dict[str, (float, float])): Median and 1sigma of the
                 parameters
             - samples (Dict[str, List[float]]): Multinest samplesø.
                 Note: They are still importance weighted, not random draws
@@ -393,11 +393,11 @@ class NormalizerNLD(AbstractNormalizer):
 
     def plot(self, *, ax: Any = None,
              add_label: bool = True,
-             results: Optional[ResultsNormalized] = None,
+             results: ResultsNormalized | None = None,
              add_figlegend: bool = True,
              plot_fitregion: bool = True,
              reset_color_cycle: bool = True,
-             **kwargs) -> Tuple[Any, Any]:
+             **kwargs) -> (Any, Any):
         """Plot the NLD, discrete levels and result of normalization
 
         Args:
@@ -407,8 +407,8 @@ class NormalizerNLD(AbstractNormalizer):
             add_figlegend (bool, optional):Defaults to `True`.
             results (ResultsNormalized, optional): If provided, nld and model
                 are taken from here instead.
-            plot_fitregion (Optional[bool], optional): Defaults to `True`.
-            reset_color_cycle (Optional[bool], optional): Defaults to `True`
+            plot_fitregion (bool | None, optional): Defaults to `True`.
+            reset_color_cycle (bool | None, optional): Defaults to `True`
             **kwargs: Description
 
         Returns:
@@ -475,7 +475,7 @@ class NormalizerNLD(AbstractNormalizer):
         return fig, ax
 
     @staticmethod
-    def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
+    def lnlike(x: (float, float, float, float), nld_low: Vector,
                nld_high: Vector, discrete: Vector,
                model: Callable[..., ndarray],
                Sn, nldSn) -> float:
@@ -524,10 +524,10 @@ class NormalizerNLD(AbstractNormalizer):
         return ct
 
     @staticmethod
-    def nldSn_from_D0(D0: Union[float, Tuple[float, float]],
-                      Sn: Union[float, Tuple[float, float]], Jtarget: float,
+    def nldSn_from_D0(D0: Union[float, (float, float]),
+                      Sn: Union[float, (float, float]), Jtarget: float,
                       spincutModel: str, spincutPars: Dict[str, Any],
-                      **kwargs) -> Tuple[float, float]:
+                      **kwargs) -> (float, float):
         """Calculate nld(Sn) from D0
 
 
@@ -577,9 +577,9 @@ class NormalizerNLD(AbstractNormalizer):
 
     @staticmethod
     def D0_from_nldSn(nld_model: Callable[..., Any],
-                      Sn: Union[float, Tuple[float, float]], Jtarget: float,
+                      Sn: Union[float, (float, float]), Jtarget: float,
                       spincutModel: str, spincutPars: Dict[str, Any],
-                      **kwargs) -> Tuple[float, float]:
+                      **kwargs) -> (float, float):
         """Calculate D0 from nld(Sn), assuming equiparity.
 
         This is the inverse of `nldSn_from_D0`
@@ -620,11 +620,11 @@ class NormalizerNLD(AbstractNormalizer):
         return D0
 
     @property
-    def discrete(self) -> Optional[Vector]:
+    def discrete(self) -> Vector | None:
         return self._discrete
 
     @discrete.setter
-    def discrete(self, value: Optional[Union[Path, str, Vector]]) -> None:
+    def discrete(self, value: Union[Path, str, Vector] | None) -> None:
         if value is None:
             self._discretes = None
             self.LOG.debug("Set `discrete` to None")
@@ -651,7 +651,7 @@ class NormalizerNLD(AbstractNormalizer):
                              " for discrete levels")
 
     @property
-    def smooth_levels_fwhm(self) -> Optional[float]:
+    def smooth_levels_fwhm(self) -> float | None:
         return self._smooth_levels_fwhm
 
     @smooth_levels_fwhm.setter

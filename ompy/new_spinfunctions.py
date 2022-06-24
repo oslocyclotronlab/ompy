@@ -278,7 +278,7 @@ class DiscAndEB05(SpinFunction):
         NLDa (float): Level density parameter
         Eshift (float): Energy shift
         Sn (float): Neutron separation energy
-        sigma2_disc (Tuple[float, float]): [float, float]
+        sigma2_disc ((float, float]): [float, float)
             [Energy, sigma2] from the discretes
         Ex (float or Sequence, optional):
             Excitation energy. Defaults to self.Ex
