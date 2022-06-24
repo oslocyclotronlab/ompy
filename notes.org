@@ -1,0 +1,161 @@
+* vector
+  - Either (`values` and `E`) or `path` is mandatory for initialization.
+    Allowing for partial initialization has only been a source for complex 
+    initialization logic and a cause for bugs. No other code in ompy relies on
+    partial initialization, so this feature is removed.
+  - Remove `shape` as an argument for initialization. 
+  - Fix bug with how `std` can overwrite the loaded std to `None`.
+  - Rename the argument `E_new` of `Vector.closest()` to `E`. 
+    Make the argument names in line with the rest of the code.
+    The suffix `new` is redundant as there are no other `E` vectors to be confused with.
+  - Change name of `cumulative()` to `cumsum()` to be in line with `numpy.cumsum()`
+  - Change the default value of `factor` to `1.0` in `cumsum()` and remove superfluous `None`.
+  - Add `set_order()`, a wrapper around numpy `set_order`. This is to make it
+    easier to set the bit alignment when calling cython.
+  - Change `verify_equidistant() -> None` to new `is_equidistant() -> bool`.
+    Makes it more usable to check if a vector is equidistant instead of 
+    raising an exception.
+  - Add `sum()` as a wrapper around `np.sum(vector.values)`.
+  - Rename `cut_nan()` to `drop_nan()`. This is in line
+    with the usual meaning of `drop`, as `cut` implies the
+    ends are being trimmed, not that elements in the middle are
+    removed.
+    
+* matrix
+  - Either (`values`, `Ex` and `Eg`) or `path` is mandatory for initialization.
+    See ^vector.
+  - Make several methods return self for easier chaining.
+  - Add `to(unit)` for changing the units and returning a copy.
+  - Add `to_same_Ex(E)` and `to_same_Eg(E)` methods to set 
+    the `E` to be compatible in units with Ex and Eg.
+    Allows for easier comparisons of the magnitudes.
+  - Remove `ZerosMatrix`. 
+    Adding a type for only initialization is cumbersome, as a type should
+    capture different behavior, not content.
+  - Add units to `Eg` and `Ex`.
+  - Deprecate `fill`. Use `Matrix[i, j] += c`, `Matrix(Eg, Ex) += c`,
+  - Change default value of `inplace` to `False` for `cut()`, `cut_like()` and
+    `cut_diagonal()`.
+  - Fix a bug in `cut` where the boundaries could be set incorrectly.
+  - Add two new methods for creating a sub-matrix:
+    - IndexLocator
+    - ValueLocator
+  - `projection` is simplified by relying on `ValueLocator` and returns a `Vector`.
+    The upper bound `Emax` is no longer inclusive by default.
+  - The `plot_projection` is useless and is removed.
+    One can instead use `mat.projection(args and kwargs).plot()`.
+  - There seems to be a bug (or perhaps feature?) with matplotlib where
+    the cmap range favors lower values, and the range has a maximum range. The result
+    is that even though a matrix contains large bins, the bins are not represented in the
+    cmap, leading to confusion. Possible solution: If we detect bins with negligible counts
+    and a too narrow cmap range, set vmin to something sensible. This is implemented and seems to
+    work well.
+      
+* Extractor
+  - Fix issue 181
+  - Add a simple load method. Not enough to reconstruct an Extractor.
+    
+* General Changes
+  - This patch contains a whole load of breaking changes.
+    The rationale is that the earlier code had several design 
+    decisions I thought were clever and flexible, but that have
+    proven to be unnecessary and only make it easier to introduce bugs.
+  - Rename `Union[T, None]` to `Optional[T]`.
+  - Make `inplace` arguments default to `False`.
+    The reasoning is that most Pythonic functions with an option
+    for inplace mutation opts for immutable by default. 
+    In addition, almost all usages in OMpy use `inplace=False`.
+  - Add `binwidth` argument to `rebin()`. 
+    
+* Units
+  - The units of energy for both vectors and matrices defaults to `keV`. 
+  - The units are stripped if the energy is involved in any computation.
+    
+* Rebinning
+  - The rebinning fails if rebinning to smaller bins,
+    and in some edge cases due to float rounding error.
+  - The rebinning does not preserve Poisson statistics.
+
+* Unresolved problems
+  - Setting default values in plotting functions will override
+    the default values the user has earlier set implicitly.
+  - How to handle `om.Vector(values=values)` without any energies?
+    I see no reason to not provide the energy. If the user only wants to use
+    the vector with values, then a numpy array should have sufficed. They main
+    reason one would omit the energy is by mistake, in which case it should
+    be reported as an error. This is default behavior for now.
+  - Should Vector/Matrix copy their arguments by default?
+    If true, then one will exclude a source of sloppy error, but
+    at the expense of bloated memory usage.
+    If false, then the user error might go up, but the behavior will
+    be more consistent with Pythonic usage of references instead of copies.
+    To err on the side of caution, it arguments are copied.
+  - Vector&Matrix arithmetic is not implemented. 
+    I don't know whether it makes sense to ever perform Vector*Matrix.
+  - `Matrix.cut()` is unpythonic, with `Matrix = Matrix[start:stop, start:stop]`
+    being more natural. For slicing with energy one can use 'Matrix.loc[]'. However,
+    one of the reason we implemented `.cut()` in the first place is because of the
+    trickiness of inclusive or exclusive values. Having already thought through it and 
+    defaulted to inclusive energies, we can save future headache by using `.cut` instead
+    of square brackets.
+  - Have `turbo` as default colormap?
+  - The argument `factor` in `vector.cumsum` (formerly `vector.cumulative`)
+    seems arbitrary. What is the reasoning for its inclusion?
+  - In general, rebinning does not preserve total count.
+    For nice numbers, numbers we usually use while testing, the
+    counts are preserved. The problem is when the number of bins increases,
+    upscaling the data se
+    - Rebinning does not take into account std or variable bin size.
+  - It might be ergonomic to introduce a generalized way to
+    manipulate the vectors/matrices while preserving their
+    integrity, similar to pandas `df.apply` or `df.query`.
+  - I suggest we avoid the copy module as much as possible.
+    Despite its name, it does not actually copy an object, it only
+    copies a particular type of "variable" (formally only elements
+    of __slots__). Using it leads to loads of nasty edge cases where
+    attributes go missing or have wrong values. The new
+    `clone()` method is functionally equivalent to a clean copy,
+    by creating a new object with the same values.
+  - 'response.py' is a Cthulhuian mess. Should be refactored.
+      
+* Pet Peeve Proposals
+  None of these changes are implemented, but are thorns that 
+  annoy me.
+  - Change the return value of `.plot()` functions to
+    `ax` instead of `(fig, ax)`. I usually ignore the `fig` value,
+    forcing me to use type `_, ax = mat.plot()`. If I would like
+    to use `fig`, it can be recovered from `ax` with `ax.figure`.
+  - Remove `path` arguments from `__init__()`. The `__init__()`s 
+    of the different classes are terribly complicated. Would remove
+    the surface for bugs and mental complexity by forcing some of the arguments
+    to become obligatory instead of optional. The logic performed by
+    `path` can be move to a `classmethod` instead. This is more inline with
+    how other packages like `numpy` and `pandas` work. For example:
+    
+    ```python
+    # Before
+    mat = om.Matrix(Eg=Eg, Ex=Ex, values=values)
+    mat2 = om.Matrix(path="path/file.npy")
+    # this raises our custom ValueError
+    mat = om.Matrix(Eg=Eg, values=values)
+
+    # After
+    mat = om.Matrix(Eg=Eg, Ex=Ex, values=values)
+    mat2 = om.Matrix.load(path="path/file.npy")
+    mat3 = om.load(path="path/file.npy")
+    # this raises inbuilt TypeError
+    mat = om.Matrix(Eg=Eg, values=values)
+    ```
+      
+ - Todo make the rhosig point more certain
+ - Discrete levels certain even though they are not.
+ - Counts in unfolding
+ - legge til kunstig store usikkerhet på være nivåtettheter for å
+   tvinge en bedre interpolering
+ - Integralet av vår nivåtetthet burde være lik diskrete nivåer.
+ - Kummulativ nivåtetthet? 
+ - La brukeren velge en usikkerhet i det området man tilpasser
+ - La brukeren konfirmere initial guess
+ - Finstruktur i nivåtteheten bør følge finsturkturen i de diskrete nivåene.
+ - Inkomplette nivåer? En annen forskjell i populert spinn.
+ - Beholde adgang, skjema.

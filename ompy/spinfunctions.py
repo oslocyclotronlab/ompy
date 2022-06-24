@@ -2,6 +2,7 @@ import numpy as np
 from .library import call_model
 from scipy.interpolate import interp1d
 from typing import Optional, Sequence, Tuple, Any, Union, Dict
+import matplotlib.pyplot as plt
 
 
 class SpinFunctions:
@@ -180,3 +181,10 @@ class SpinFunctions:
                           bounds_error=False,
                           fill_value=(sigma2_disc[1], sigma2_Sn))
         return np.where(Ex < Sn, sigma2(Ex), sigma2_EB05(Ex))
+
+    def plot(self, ax=None, **kwargs):
+        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
+
+        dist = self.distribution()
+        ax.plot(self.J, dist.T)
+        return fig, ax

@@ -20,6 +20,8 @@ from .decomposition import index
 from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
 from .vector import Vector
+from .header import Pathlike
+from . import Toggle, Unitful
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -48,9 +50,13 @@ class Response():
             Defaults to 6.
 
     """
+    # if compton was not smoothed before
+    smooth_compton = Toggle(False)
+    # Whether to smooth the full energy peak
+    smooth_fe = Toggle(True)
+    fwhm_abs = Unitful('0 keV')
 
-    def __init__(self,
-                 path: Union[str, Path]):
+    def __init__(self, path: Pathlike):
         """
         The resonse object is initialized with the path to the source
         files required to perform the interpolation. The path varaiable
@@ -65,8 +71,9 @@ class Response():
             - adapt rutines for the possibility that not all cmp spectra have
               the same binning
         """
-        path = Path(path) if isinstance(path, str) else path
+        path = Path(path)
         path = path.expanduser()  # if "~" was used for the homedir
+        path = path.resolve()  # if relative path was used
 
         if path.is_dir():
             LOG.debug(f"Loading response from directory: {path}")
@@ -79,26 +86,23 @@ class Response():
         elif not path.exists():
             raise ValueError(f"Path {path} does not exist")
 
-        # if compton was not smoothed before
-        self.smooth_compton: bool = False
-
         # after how many sigma to truncate gaussian smoothing
         self.truncate: float = 6
 
     def LoadZip(self,
-                path: Union[str, Path],
-                resp_name: Optional[str] = 'resp.csv',
-                spec_prefix: Optional[str] = 'cmp'):
+                path: Pathlike,
+                resp_name: str = 'resp.csv',
+                spec_prefix: str = 'cmp'):
         """ Method for loading response file and compton spectra from zipfile.
 
         Is assumes that path is a zip file that constains at least XX files.
         At least one has to be a special summary table to be named `resp_name`.
 
         Args:
-            path (Union[str, Path]): path to folder
-            resp_name (Optional[str], optional): name of file with
+            path (Pathlike): path to folder
+            resp_name (str, optional): name of file with
                 `response table`
-            spec_prefix (Optional[str], optional): Prefix for all spectra
+            spec_prefix (str, optional): Prefix for all spectra
 
         Returns:
             (tuple) containing
@@ -118,13 +122,17 @@ class Response():
         resp = pd.read_csv(zfile.open(resp_name, 'r'))
 
         # Verify that resp has all the required columns
-        if not set(['Eg', 'FWHM_rel_norm', 'Eff_tot', 'FE', 'SE', 'DE', 'c511']).issubset(resp.columns):
-            raise ValueError(f'{resp_name} missing one or more required columns')
+        if not set([
+                'Eg', 'FWHM_rel_norm', 'Eff_tot', 'FE', 'SE', 'DE', 'c511'
+        ]).issubset(resp.columns):
+            raise ValueError(
+                f'{resp_name} missing one or more required columns')
 
         # Verify that zip file contains a spectra for each energy
         files = [spec_prefix + str(int(Eg)) for Eg in sorted(resp['Eg'])]
         if not all(file in zfile.namelist() for file in files):
-            raise ValueError(f'One or more compton spectra is missing in {path}')
+            raise ValueError(
+                f'One or more compton spectra is missing in {path}')
 
         # Now we will read in all the Compton spectra
         N_cmp = -1
@@ -208,7 +216,7 @@ class Response():
         N_Eg = len(Eg_sim_array)
         fnames = []
         for i in range(0, N_Eg):
-            fnames.append(f"{spec_prefix}{Eg_sim_array[i]:.0f}")
+            fnames.append(f"{spec_prefix}{Eg_sim_array[i]:.0f}.m")
 
         last = Vector(path=os.path.join(path, fnames[-1]))
         N_cmp = last.shape[0]
@@ -222,14 +230,16 @@ class Response():
                                           "have to be the same")
             compton_matrix[i, 0:len(cmp_current.values)] = cmp_current.values
 
-        resp = pd.DataFrame(data={
-            'Eg': Eg_sim_array,
-            'FWHM_rel_norm': fwhm_rel,
-            'Eff_tot': Eff_tot,
-            'FE': FE,
-            'SE': SE,
-            'DE': DE,
-            'c511': c511})
+        resp = pd.DataFrame(
+            data={
+                'Eg': Eg_sim_array,
+                'FWHM_rel_norm': fwhm_rel,
+                'Eff_tot': Eff_tot,
+                'FE': FE,
+                'SE': SE,
+                'DE': DE,
+                'c511': c511
+            })
         return resp, compton_matrix, last.E
 
     def get_probabilities(self):
@@ -239,7 +249,6 @@ class Response():
             + self.resp['FE'] + self.resp['SE'] + self.resp['DE'] \
             + self.resp['c511']
         self.sum_spec = np.array(self.sum_spec)
-
         # normalize "compton" spectra
         self.cmp_matrix = div0(self.compton_matrix,
                                self.sum_spec.reshape((len(self.sum_spec), 1)))
@@ -254,8 +263,10 @@ class Response():
 
         # Interpolate the peak structures except Compton (handled separately)
         def interpolate(y, fill_value="extrapolate"):
-            return interp1d(self.resp['Eg'], y,
-                            kind="linear", bounds_error=False,
+            return interp1d(self.resp['Eg'],
+                            y,
+                            kind="linear",
+                            bounds_error=False,
                             fill_value=fill_value)
 
         self.f_pcmp = interpolate(self.pcmp)
@@ -267,19 +278,21 @@ class Response():
         # TODO: Should this be extrapolated, too?
         self.f_Eff_tot = interpolate(self.resp['Eff_tot'])
 
-        fwhm_rel_1330 = (self.fwhm_abs / 1330 * 100)
-        self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm']
-                                              * fwhm_rel_1330)
+        fwhm_rel_1330 = (self.fwhm_abs.magnitude / 1330 * 100)
+        self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm'] *
+                                              fwhm_rel_1330)
+
         def f_fwhm_abs(E):  # noqa
-            return E * self.f_fwhm_rel_perCent(E)/100
+            return E * self.f_fwhm_rel_perCent(E) / 100
 
         self.f_fwhm_abs = f_fwhm_abs
 
-    def interpolate(self,
-                    Eout: np.ndarray = None,
-                    fwhm_abs: float = None,
-                    return_table: bool = False
-                    ) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
+    def interpolate(
+        self,
+        Eout: np.ndarray = None,
+        fwhm_abs: float = None,
+        return_table: bool = False,
+    ) -> Union[Matrix, Tuple[Matrix, pd.DataFrame]]:
         """ Interpolated the response matrix
 
         Perform the interpolation for the energy range specified in Eout with
@@ -328,7 +341,7 @@ class Response():
         for j, E in enumerate(Eout):
             oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma
-            i_Egmax = min(index(Eout, Egmax), N_out-1)
+            i_Egmax = min(index(Eout, Egmax), N_out - 1)
             LOG.debug(f"Response for E {E:.0f} calc up to {Eout[i_Egmax]:.0f}")
 
             compton = self.get_closest_compton(E)
@@ -337,13 +350,17 @@ class Response():
             R_fan, i_last = \
                 self.fan_method_compton(E, compton,
                                         i_start=i_bsc+1, i_stop=i_Egmax)
-            if i_last <= i_bsc+2:  # fan method didn't do anything
-                R_high = self.linear_to_end(E, compton,
-                                            i_start=i_bsc+1, i_stop=i_Egmax)
+            if i_last <= i_bsc + 2:  # fan method didn't do anything
+                R_high = self.linear_to_end(E,
+                                            compton,
+                                            i_start=i_bsc + 1,
+                                            i_stop=i_Egmax)
                 R[j, :] += R_low + R_high
             else:
-                R_high = self.fan_to_end(E, compton,
-                                         i_start=i_last+1, i_stop=i_Egmax,
+                R_high = self.fan_to_end(E,
+                                         compton,
+                                         i_start=i_last + 1,
+                                         i_stop=i_Egmax,
                                          fwhm_abs_array=fwhm_abs_array)
                 R[j, :] += R_low + R_fan + R_high
 
@@ -357,7 +374,8 @@ class Response():
             # smooth if compton background was not smoothed before (?)
             # if performed here, no need to smooth twice, see discrete_peaks
             if self.smooth_compton:
-                R[j, :] = gauss_smoothing(R[j, :], self.Eout,
+                R[j, :] = gauss_smoothing(R[j, :],
+                                          self.Eout,
                                           fwhm_abs_array,
                                           truncate=self.truncate)
 
@@ -369,21 +387,27 @@ class Response():
             LOG.debug(f"{len(R[R < 0])} entries in R were set to 0")
             R[R < 0] = 0
 
-        response = Matrix(values=R, Eg=Eout, Ex=Eout)
+        response = Matrix(values=R,
+                          Eg=Eout,
+                          Ex=Eout,
+                          xlabel=r'Measured $\gamma$-energy',
+                          ylabel=r'True $\gamma$-energy')
 
         if return_table:
             # Return the response matrix, as well as the other structures,
             # FWHM and efficiency, interpolated to the Eout_array
-            response_table = {'E': Eout,
-                              'fwhm_abs': fwhm_abs_array,
-                              'fwhm_rel_%': self.f_fwhm_rel_perCent(Eout),
-                              'fwhm_rel': self.f_fwhm_rel_perCent(Eout)/100,
-                              'eff_tot': self.f_Eff_tot(Eout),
-                              'pcmp': self.f_pcmp(Eout),
-                              'pFE': self.f_pFE(Eout),
-                              'pSE': self.f_pSE(Eout),
-                              'pDE': self.f_pDE(Eout),
-                              'p511': self.f_p511(Eout)}
+            response_table = {
+                'E': Eout,
+                'fwhm_abs': fwhm_abs_array,
+                'fwhm_rel_%': self.f_fwhm_rel_perCent(Eout),
+                'fwhm_rel': self.f_fwhm_rel_perCent(Eout) / 100,
+                'eff_tot': self.f_Eff_tot(Eout),
+                'pcmp': self.f_pcmp(Eout),
+                'pFE': self.f_pFE(Eout),
+                'pSE': self.f_pSE(Eout),
+                'pDE': self.f_pDE(Eout),
+                'p511': self.f_p511(Eout)
+            }
             response_table = pd.DataFrame(data=response_table)
             return response, response_table
         else:
@@ -391,9 +415,9 @@ class Response():
 
     def iterpolate_checks(self):
         """ Check on the inputs to `interpolate` """
-        assert(1e-1 <= self.fwhm_abs <= 1000), \
+        assert(1e-1 <= self.fwhm_abs.magnitude <= 1000), \
             "Check the fwhm_abs, probably it's wrong."\
-            "\nNormal Oscar≃30 keV, Now: {} keV".format(self.fwhm_abs)
+            "\nNormal Oscar≃30 keV, Now: {} keV".format(self.fwhm_abs.magnitude)
 
         Eout = self.Eout
         if len(Eout) <= 1:
@@ -407,7 +431,7 @@ class Response():
             f"Now it is: {self.f_fwhm_rel_perCent_norm(1330)} at 1.33 MeV."
 
         LOG.info(f"Note: Spectra outside of {self.resp['Eg'].min()} and "
-                 f"{self.resp['Eg'].max()} are extrapolation only.")
+                 f"{self.resp['Eg'].max()} keV are extrapolation only.")
 
     def get_closest_compton(self, E: float) -> Dict[str, Any]:
         """Find and rebin closest energies from available response functions
@@ -425,10 +449,13 @@ class Response():
         """
         N = len(self.resp['Eg'])
         # ilow = 0
+        # Find the compton spectra corresponding to the closest
+        # energy below and above E. Rebin these to the requested energies,
+        # but with the final compton energy.
         ihigh = np.searchsorted(self.resp['Eg'], E, side="right")
         if ihigh == N:  # E > self.resp['Eg'].max()
             ihigh -= 1
-        ilow = ihigh-1
+        ilow = ihigh - 1
 
         # Select the Compton spectra, called Fs1 and Fs2 in MAMA.
         Ehigh = self.resp['Eg'][ihigh]
@@ -445,18 +472,22 @@ class Response():
         cmp_low = rebin_1D(cmp_low, self.Ecmp_array, Enew)
         cmp_high = rebin_1D(cmp_high, self.Ecmp_array, Enew)
 
-        compton = {"ilow": ilow,
-                   "ihigh": ihigh,
-                   "Elow": Elow,
-                   "Ehigh": Ehigh,
-                   "counts_low": cmp_low,
-                   "counts_high": cmp_high}
+        compton = {
+            "ilow": ilow,
+            "ihigh": ihigh,
+            "Elow": Elow,
+            "Ehigh": Ehigh,
+            "counts_low": cmp_low,
+            "counts_high": cmp_high
+        }
 
         return compton
 
-    def linear_cmp_interpolation(self, E: float, compton: dict,
-                                 fill_value: str = "extrapolate"
-                                 ) -> np.ndarray:
+    def linear_cmp_interpolation(
+            self,
+            E: float,
+            compton: dict,
+            fill_value: str = "extrapolate") -> np.ndarray:
         """Linear interpolation between the compton spectra
 
         Args:
@@ -470,7 +501,10 @@ class Response():
         """
         x = np.array([compton["Elow"], compton["Ehigh"]])
         y = np.vstack([compton["counts_low"], compton["counts_high"]])
-        f_cmp = interp1d(x, y, kind="linear", bounds_error=False,
+        f_cmp = interp1d(x,
+                         y,
+                         kind="linear",
+                         bounds_error=False,
                          fill_value=fill_value,
                          axis=0)
         return f_cmp(E)
@@ -495,12 +529,12 @@ class Response():
         R = np.zeros(self.N_out)
 
         fcmp = self.linear_cmp_interpolation(E, compton)
-        R[:i_bsc+1] = fcmp[:i_bsc+1]
+        R[:i_bsc + 1] = fcmp[:i_bsc + 1]
         R[R < 0] = 0
         return R, i_bsc
 
-    def linear_to_end(self, E: float, compton: dict,
-                      i_start: int, i_stop: int) -> np.ndarray:
+    def linear_to_end(self, E: float, compton: dict, i_start: int,
+                      i_stop: int) -> np.ndarray:
         """Interpolate one-to-one from the last fan energy to the Emax
 
         Args:
@@ -515,12 +549,11 @@ class Response():
         """
         R = np.zeros(self.N_out)
         fcmp = self.linear_cmp_interpolation(E, compton)
-        R[i_start:i_stop+1] = fcmp[i_start:i_stop+1]
+        R[i_start:i_stop + 1] = fcmp[i_start:i_stop + 1]
         R[R < 0] = 0
         return R
 
-    def fan_to_end(self, E: float, compton: dict,
-                   i_start: int, i_stop: int,
+    def fan_to_end(self, E: float, compton: dict, i_start: int, i_stop: int,
                    fwhm_abs_array: np.ndarray) -> np.ndarray:
         """Linear(!) fan interpolation from Compton edge to Emax
 
@@ -562,18 +595,18 @@ class Response():
         scale2 = (Egmax2 - Ecmp2) / (self.Eout[i_stop] - self.Eout[i_start])
 
         def lin_interpolation(x, x0, y0, x1, y1):
-            return y0 + (y1-y0)*(x-x0)/(x1-x0)
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
 
-        i_edge = i_start-1
+        i_edge = i_start - 1
         # for i in range(i_edge+1, i_stop):
-        for i in range(i_edge+1, self.N_out):
+        for i in range(i_edge + 1, self.N_out):
             i1 = int(i_low_edge + scale1 * (i - i_edge))
             i2 = int(i_high_edge + scale2 * (i - i_edge))
 
             if i1 >= len(compton["counts_low"]):
-                i1 = len(compton["counts_low"])-1
+                i1 = len(compton["counts_low"]) - 1
             if i2 >= len(compton["counts_high"]):
-                i2 = len(compton["counts_high"])-1
+                i2 = len(compton["counts_high"]) - 1
 
             c1 = compton["counts_low"][i1]
             c2 = compton["counts_high"][i2]
@@ -587,8 +620,7 @@ class Response():
 
         return R
 
-    def fan_method_compton(self, E: float, compton: dict,
-                           i_start: int,
+    def fan_method_compton(self, E: float, compton: dict, i_start: int,
                            i_stop: int) -> Tuple[np.ndarray, int]:
         """Fan method
 
@@ -615,7 +647,7 @@ class Response():
         Esim_high = compton["Ehigh"]
 
         def lin_interpolation(x, x0, y0, x1, y1):
-            return y0 + (y1-y0)*(x-x0)/(x1-x0)
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
 
         i_last = i_start  # Keep track of how far up the fan method goes
         for i in range(i_start, i_ce_max):
@@ -668,17 +700,12 @@ class Response():
         Eout = self.Eout
         E_fe = Eout[i_response]
 
-        # Add full-energy peak, which should be at energy corresponding to
-        # index i_response:
-        discrete_peaks[i_response] = self.f_pFE(E_fe)
-
         # Add single-escape peak
         E_se = E_fe - 511
         if E_se >= 0 and E_se >= Eout[0]:
             i_floor, i_ceil, floor_distance\
                 = self.two_channel_split(E_se, Eout)
-            discrete_peaks[
-                i_floor] += (1 - floor_distance) * self.f_pSE(E_fe)
+            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_pSE(E_fe)
             discrete_peaks[i_ceil] += floor_distance * self.f_pSE(E_fe)
 
         # Repeat for double-escape peak
@@ -686,8 +713,7 @@ class Response():
         if E_de >= 0 and E_de >= Eout[0]:
             i_floor, i_ceil, floor_distance\
                 = self.two_channel_split(E_de, Eout)
-            discrete_peaks[
-                i_floor] += (1 - floor_distance) * self.f_pDE(E_fe)
+            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_pDE(E_fe)
             discrete_peaks[i_ceil] += floor_distance * self.f_pDE(E_fe)
 
         # Add 511 annihilation peak
@@ -695,15 +721,17 @@ class Response():
             E_511 = 511
             i_floor, i_ceil, floor_distance\
                 = self.two_channel_split(E_511, Eout)
-            discrete_peaks[
-                i_floor] += (1 - floor_distance) * self.f_p511(E_fe)
+            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_p511(E_fe)
             discrete_peaks[i_ceil] += floor_distance * self.f_p511(E_fe)
 
-        if not self.smooth_compton:
+            #if not self.smooth_compton:
             # Do common smoothing of the discrete_peaks array:
-            discrete_peaks = gauss_smoothing(discrete_peaks, Eout,
+            discrete_peaks = gauss_smoothing(discrete_peaks,
+                                             Eout,
                                              fwhm_abs_array,
                                              truncate=self.truncate)
+        discrete_peaks[i_response] = self.f_pFE(E_fe)
+
         return discrete_peaks
 
     @staticmethod

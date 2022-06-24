@@ -1,4 +1,6 @@
+from __future__ import annotations
 import numpy as np
+from numpy.testing import assert_allclose
 import matplotlib.pyplot as plt
 import warnings
 import logging
@@ -14,6 +16,9 @@ from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
+from .library import contains_zeroes_patches
+from .header import Pathlike
+
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -96,6 +101,21 @@ class Extractor:
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
 
+    def load(self, path: Optional[Pathlike] = None) -> Extractor:
+        path = Path(path) if path is not None else self.path
+        if path is None:
+            raise RuntimeError("Path or self.path must not be None.")
+
+        nlds = list(sorted(path.glob("nld_[0-9]*.*")))
+        gsfs = list(sorted(path.glob("gsf_[0-9]*.*")))
+        if len(nlds) < 1:
+            raise RuntimeError(f'Found to files at {path}')
+
+        assert len(nlds) == len(gsfs), "Corrupt data"
+        self.nld = [Vector(path=nld) for nld in nlds]
+        self.gsf = [Vector(path=gsf) for gsf in gsfs]
+        return self
+
     def __call__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None):
         return self.extract_from(ensemble, trapezoid)
@@ -132,6 +152,8 @@ class Extractor:
         if regenerate is None:
             regenerate = self.regenerate
         self.path = Path(self.path)
+        if self.path is None:
+            raise RuntimeError("self.path must no be `None`.")
 
         nlds = []
         gsfs = []
@@ -175,8 +197,8 @@ class Extractor:
         """
         assert self.ensemble is not None
         assert self.trapezoid is not None
-        matrix = self.ensemble.get_firstgen(num).copy()
-        std = self.ensemble.std_firstgen.copy()
+        matrix = self.ensemble.get_firstgen(num).clone(order='C')
+        std = self.ensemble.std_firstgen.clone(order='C')
         # following lines might be superfluous now:
         # ensure same cuts for all ensemble members if Eg_max is not given
         # (thus auto-determined) in the trapezoid.
@@ -227,16 +249,16 @@ class Extractor:
         """
         if np.any(matrix.values < 0):
             raise ValueError("input matrix has to have positive entries only.")
+        if contains_zeroes_patches(matrix):
+            warnings.warn("The matrix contains too many clusters of zeroes."
+                          " Consider rebinning.")
         if std is not None:
-            std = std.copy()
+            std = std.clone()
             if np.any(std.values < 0):
                 raise ValueError("std has to have positive entries only.")
             assert matrix.shape == std.shape, \
                 f"matrix.shape: {matrix.shape} != std.shape : {std.shape}"
-            std.values = std.values.copy(order='C')
             matrix.values, std.values = normalize(matrix, std)
-            matrix.Ex = matrix.Ex.copy(order='C')
-            matrix.Eg = matrix.Eg.copy(order='C')
         else:
             matrix.values, _ = normalize(matrix)
 
@@ -244,10 +266,11 @@ class Extractor:
         # decomposition to make sense.
         dEx = matrix.Ex[1] - matrix.Ex[0]
         dEg = matrix.Eg[1] - matrix.Eg[0]
-        assert dEx == dEg, \
-            "Ex and Eg must have the same bin width. Currently they have"\
-            f"dEx: {dEx:.1f} and dEg: {dEg:.1f}. You have to rebin.\n"\
-            "The `ensemble` class has a `rebin` method."
+        assert matrix.is_equidistant()
+        assert_allclose(dEx, dEg, err_msg=(
+            "Ex and Eg must have the same bin width. Currently they have"
+            f"dEx: {dEx:.1f} and dEg: {dEg:.1f}. You have to rebin.\n"
+            "The `ensemble` class has a `rebin` method."))
         bin_width = dEx
 
         # create nld energy array
@@ -305,7 +328,7 @@ class Extractor:
             T_0 = np.where(np.isnan(T), np.zeros_like(T), T)
             values = nld_T_product(nld_0, T_0, resolution,
                                    E_nld, matrix.Eg, matrix.Ex)
-            mat = Matrix(values=values, Ex=matrix.Ex, Eg=matrix.Eg)
+            mat = matrix.clone(values=values) #Matrix(values=values, Ex=matrix.Ex, Eg=matrix.Eg)
             return Vector(nld, E_nld), Vector(gsf, matrix.Eg), mat
 
         else:
@@ -348,8 +371,7 @@ class Extractor:
             raise NotImplementedError(f"Method {method} not in "
                                       "['BSFG-like','CT-like'.")
 
-        T0, _ = matrix.projection('Eg')
-        assert T0.size == matrix.Eg.size
+        T0 = matrix.projection('Eg').values
         x0 = np.append(T0, nld0)
         assert np.isfinite(x0).all
         return x0
@@ -436,7 +458,7 @@ class Extractor:
             Tuple[nld_counts, T_counts]: Number of counts constraining each
                 nld and gsf bin
         """
-        matrix = matrix.copy()
+        matrix = matrix.clone(order='C')
 
         # Mask elements beyond Ex + resolution* to 0 (not used in chi2)
         # * + halfbin to get closest bin (when calib uses midbins)
@@ -452,7 +474,7 @@ class Extractor:
                               for d in range(start, stop)])
         nld_counts = nld_counts[::-1]
 
-        T_counts, _ = matrix.projection('Eg')
+        T_counts = matrix.projection('Eg').values
 
         return nld_counts, T_counts.data
 
@@ -517,6 +539,8 @@ class Extractor:
                            alpha=1/len(self.nld), **kwargs)
                 ax[1].plot(gsf.E, gsf.values, color=color,
                            alpha=1/len(self.gsf), **kwargs)
+        ax[0].set_xlabel("Energy " + f"[${self.nld[0].units:~L}$]")
+        ax[1].set_xlabel("Energy " + f"[${self.gsf[0].units:~L}$]")
 
         ax[0].set_title("Level density")
         ax[1].set_title(r"$\gamma$SF")
@@ -583,6 +607,30 @@ class Extractor:
         except KeyError:
             pass
         return state
+
+    def get_product(self, member: int, Ex: Optional[np.ndarray] = None):
+        nld = self.nld[member]
+        gsf = self.gsf[member]
+        nld.set_order('C')
+        gsf.set_order('C')
+
+        if Ex is None:
+            Ex = self.ensemble.get_firstgen(member).copy().Ex
+        Ex = Ex.copy(order='C')
+        T = (2*np.pi*gsf.E**3)*np.nan_to_num(gsf.values)
+        resolution = np.zeros_like(gsf.E)
+
+        values = nld_T_product(np.nan_to_num(nld.values), T, resolution,
+                               nld.E, gsf.E, Ex)
+        return Matrix(Eg=gsf.E, Ex=Ex, values=values)
+
+    def get_product_std(self, Ex: Optional[np.ndarray] = None) -> Matrix:
+        products = np.asarray([self.get_product(i, Ex=Ex).values
+                               for i in range(len(self.nld))])
+        std = np.std(products, axis=0)
+        mat = self.get_product(0, Ex=Ex)
+        mat.values = std
+        return mat
 
 
 def normalize(mat: Matrix,

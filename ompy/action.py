@@ -1,4 +1,4 @@
-from typing import Union, List, Iterable, Any, Callable
+from typing import Union, List, Iterable, Any, Callable, Tuple, Dict
 from .matrix import Matrix
 from .vector import Vector
 
@@ -6,6 +6,7 @@ from .vector import Vector
 class Action:
     """ Allows for delayed method calls """
     def __init__(self, base='Matrix'):
+        self.base = base
         self.calls = []
         if base.lower() == 'matrix':
             self.patch(Matrix)
@@ -23,10 +24,10 @@ class Action:
             if callable(obj):
                 setattr(self, name, wrap(self, name))
 
-    def act_on(self, target: Union[Matrix, Vector]) -> List[Any]:
+    def act_on(self, target: Union[Matrix, Vector], **kwargs) -> List[Any]:
         ret_vals: List[Any] = []
-        for func, args, kwargs in self.calls:
-            ret = getattr(target, func)(*args, **kwargs)
+        for func, args, _kwargs in self.calls:
+            ret = getattr(target, func)(*args, **(_kwargs | kwargs))
             ret_vals.append(ret)
         return ret_vals
 
@@ -40,6 +41,12 @@ class Action:
     def curry(self, **kwargs):
         for call in self.calls:
             call[2].update(kwargs)
+
+    def get_args(self, method: str) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+        for (name, args, kwargs) in self.calls:
+            if name == method:
+                return args, kwargs
+        raise ValueError(f"{self.base} has not method {method}.")
 
 
 def wrap(self, name: str) -> Callable:

@@ -2,12 +2,14 @@ import copy
 import logging
 import termtables as tt
 import numpy as np
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Optional
 from .matrix import Matrix
 from .vector import Vector
 from .library import div0
 from .rebin import rebin_2D
 from .action import Action
+#from . import ureg, Q_, DimensionalityError
+from . import Unitful, Bounded, Choice
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -20,7 +22,7 @@ class FirstGeneration:
         Attributes need to be set only if the respective method
         (statistical / total) multiplicity estimation is used.
 
-    Attributes:
+    Attributes:  #noqua
         num_iterations (int): Number of iterations the first
             generations method is applied. Defaults to 10.
         multiplicity_estimation (str): Selects which method should be used
@@ -51,23 +53,25 @@ class FirstGeneration:
     TODO:
         - Clean up where attributes are set for the respective methods.
     """
+    # MAMA ThresSta
+    statistical_upper = Unitful('430 keV')
+    # MAMA ThresTot
+    statistical_lower = Unitful('200 keV')
+    # MAMA ThresRatio
+    statistical_ratio = Unitful(0.3)
+    Ex_entry_shift = Unitful('200.0 keV')
+    # MAMA ExEntry0s
+    Ex_entry_statistical = Unitful('300.0 keV')
+    # MAMA ExEntry0t
+    Ex_entry_total = Unitful('0.0 keV')
+    num_iterations = Bounded(10, min=1, type=int)
+    multiplicity_estimation = Choice('statistical',
+                                     {'statistical', 'total'},
+                                     str.lower)
 
     def __init__(self):
-        self.num_iterations: int = 10
-        self.multiplicity_estimation: str = 'statistical'
-
-        self.statistical_upper: float = 430.0  # MAMA ThresSta
-        self.statistical_lower: float = 200.0  # MAMA ThresTot
-        self.statistical_ratio: float = 0.3    # MAMA ThresRatio
-
-        self.Ex_entry_shift: float = 200.0
-        self.Ex_entry_statistical: float = 300.0  # MAMA ExEntry0s
-
-        self.Ex_entry_total: float = 0.0          # MAMA ExEntry0t
-
         self.valley_correction: Optional[Vector] = None
         self.use_slide: bool = False
-
         self.action = Action('matrix')
 
     def __call__(self, matrix: Matrix) -> Matrix:
@@ -83,7 +87,7 @@ class FirstGeneration:
         Returns:
             The first generation matrix
         """
-        matrix = unfolded.copy()
+        matrix = unfolded.clone().to('keV')
         self.action.act_on(matrix)
         if np.any(matrix.Ex < 0):
             raise ValueError("input matrix has to have positive Ex entries"
@@ -103,7 +107,7 @@ class FirstGeneration:
             LOG.info("iter %i/%i: ε = %g", iteration+1,
                      self.num_iterations, diff)
 
-        final = Matrix(values=H, Eg=matrix.Eg, Ex=matrix.Ex)
+        final = unfolded.clone(values=H, std=None)
         final.state = "firstgen"
         self.remove_negative(final)
         return final
@@ -118,7 +122,8 @@ class FirstGeneration:
 
         return H, W, normalization
 
-    def step(self, iteration: int, H_old: np.ndarray,
+    @staticmethod
+    def step(iteration: int, H_old: np.ndarray,
              W_old: np.ndarray, N: np.ndarray,
              matrix: Matrix,
              valley_correction: Optional[np.ndarray] = None)\
@@ -176,7 +181,7 @@ class FirstGeneration:
             header=('Ex', 'Multiplicities')
             ))
         assert (multiplicities >= 0).all(), "Bug. Contact developers"
-        sum_counts, _ = matrix.projection('Ex')
+        sum_counts = matrix.projection('Ex').values
 
         normalization = div0(np.outer(sum_counts, multiplicities),
                              np.outer(multiplicities, sum_counts))
@@ -224,6 +229,7 @@ class FirstGeneration:
                                self.statistical_upper)
         else:
             slide = self.statistical_upper
+        slide = slide.to('keV').magnitude
         values[slide > Eg] = 0.0
 
         # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
@@ -235,8 +241,8 @@ class FirstGeneration:
         # Entry energy where the statistical γ-cascade ends in the
         # yrast line.
         entry = np.maximum(
-            np.minimum(matrix.Ex - self.Ex_entry_shift,
-                       self.Ex_entry_statistical),
+            np.minimum(matrix.Ex - self.Ex_entry_shift.to('keV').magnitude,
+                       self.Ex_entry_statistical.to('keV').magnitude),
             0.0)
 
         multiplicity = div0(matrix.Ex - entry, Eg_mean)
@@ -276,7 +282,7 @@ class FirstGeneration:
         return H
 
     def cut_valley_correction(self, matrix: Matrix) -> Optional[np.ndarray]:
-        """ Cut valley correction Ex axis if neccessary.
+        """ Cut valley correction Ex axis if necessary.
 
         Ensures valley correction has the same Ex axis as the matrix
         it will be used with.
@@ -297,26 +303,14 @@ class FirstGeneration:
 
         if not isinstance(valley_correction, Vector):
             raise TypeError("`valley_correction` must be a vector.")
-        valley_correction.copy()
-        valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max())
+        valley_correction.clone()
+        valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max(),
+                              inplace=True)
         assert np.allclose(valley_correction.E, matrix.Ex)
         if np.any(valley_correction.values < 0):
             raise ValueError("valley correction has to have positive entries only.")
 
         return valley_correction.values
-
-    @property
-    def multiplicity_estimation(self) -> str:
-        return self._multiplicity_estimation
-
-    @multiplicity_estimation.setter
-    def multiplicity_estimation(self, method: str) -> None:
-        if method.lower() in ['statistical', 'total']:
-            self._multiplicity_estimation = method.lower()
-        else:
-            raise ValueError("Expected multiplicity estimation to"
-                             " be either 'statistical' or 'total'")
-
 
     @staticmethod
     def allgen_from_primary(fg: Matrix,
@@ -341,10 +335,10 @@ class FirstGeneration:
         if xs is None:
             xs = fg.values.sum(axis=1)
 
-        fg = fg.copy()
-        w = fg.copy()
+        fg = fg.clone()
+        w = fg.clone()
         w[:] = 0
-        ag = fg.copy()
+        ag = fg.clone()
         ag[:] = 0
 
         # Note: cannot do this here, as FG matrix "flipped" around Eg_center
@@ -371,7 +365,7 @@ class FirstGeneration:
         """ Wrapper for Matrix.remove_negative()
 
         Put in as an extra method to facilitate replacing this by eg.
-        `fill_and_remove_negatve`
+        `fill_and_remove_negative`
 
         Args:
             matrix: Input matrix

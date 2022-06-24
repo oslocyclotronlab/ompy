@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ from numpy import ndarray
 from .matrix import Matrix
 from .rebin import rebin_2D
 from .action import Action
+from .header import Unitlike
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -95,6 +97,7 @@ class Ensemble:
         self.bg: Optional[Matrix] = bg
         self.bg_ratio: Optional[float] = bg_ratio
         self.prompt_w_bg: Optional[Matrix] = raw
+        self.firstgen: Optional[Matrix] = None
 
         self.unfolder: Optional[Callable[[Matrix], Matrix]] = None
         self.first_generation_method: \
@@ -124,10 +127,11 @@ class Ensemble:
             self.path = Path(path)
             self.path.mkdir(exist_ok=True, parents=True)
 
-        self.raw.state = "raw"
+        if self.raw is not None:
+            self.raw.state = "raw"
 
-    def load(self, path: Optional[Union[str, Path]] = None):
-        """ Loads a saved ensamble. Alternative to `regenerate`.
+    def load(self, path: Optional[Union[str, Path]] = None) -> Ensemble:
+        """ Loads a saved ensemble. Alternative to `regenerate`.
 
         Currently only supports '.npy' format.
 
@@ -163,6 +167,8 @@ class Ensemble:
         self.std_raw = Matrix(path=path / 'raw_std.npy')
         self.std_unfolded = Matrix(path=path / 'unfolded_std.npy')
         self.std_firstgen = Matrix(path=path / 'firstgen_std.npy')
+
+        return self
 
     def generate(self, number: int, method: str = 'poisson',
                  regenerate: bool = False) -> None:
@@ -370,7 +376,7 @@ class Ensemble:
         self.action_firstgen.act_on(firstgen)
         return firstgen
 
-    def rebin(self, out_array: np.ndarray, member: str) -> None:
+    def rebin(self, out_array: np.ndarray, member: str = 'firstgen') -> None:
         """ Rebins the first generations matrixes and recals std
 
         Args:
@@ -385,6 +391,11 @@ class Ensemble:
 
         ensemble = self.firstgen_ensemble
         matrix = self.firstgen
+
+        if isinstance(out_array, int):
+            out_array = np.linspace(min(matrix.Ex), max(matrix.Ex), out_array)
+        elif isinstance(out_array, float):
+            out_array = np.arange(min(matrix.Ex), max(matrix.Ex), out_array)
 
         do_Ex = not np.array_equal(out_array, matrix.Ex)
         do_Eg = not np.array_equal(out_array, matrix.Eg)
@@ -526,15 +537,15 @@ class Ensemble:
         try:
             matrices = []
             for i in index:
-                matrices.append(Matrix(self.firstgen_ensemble[i],
-                                       self.firstgen.Eg,
-                                       self.firstgen.Ex))
+                matrices.append(Matrix(values=self.firstgen_ensemble[i],
+                                       Eg=self.firstgen.Eg,
+                                       Ex=self.firstgen.Ex))
             return matrices
         except TypeError:
             pass
-        return Matrix(self.firstgen_ensemble[index],
-                      self.firstgen.Eg,
-                      self.firstgen.Ex, state='firstgen')
+        return Matrix(values=self.firstgen_ensemble[index],
+                      Eg=self.firstgen.Eg,
+                      Ex=self.firstgen.Ex, state='firstgen')
 
     def action_from_state(self, state: str) -> Action:
         """ Return the action corresponding to a given state
@@ -583,6 +594,7 @@ class Ensemble:
              vmax: Optional[float] = None,
              add_cbar: bool = True,
              scale_by: str = 'all',
+             units: str = 'keV',
              **kwargs) -> Tuple[Any, ndarray]:
         """ Plot the computed standard deviations
 
@@ -626,13 +638,16 @@ class Ensemble:
             vmax = choices[scale_by][1]
 
         # Actual plotting
-        self.std_raw.plot(ax=ax[0], title='Raw', add_cbar=False,
-                          vmin=vmin, vmax=vmax, **kwargs)
-        self.std_unfolded.plot(ax=ax[1], title='Unfolded', add_cbar=False,
-                               vmin=vmin, vmax=vmax, **kwargs)
-        im, _, _ = self.std_firstgen.plot(ax=ax[2], title='First Generation',
-                                          vmin=vmin, vmax=vmax,
-                                          add_cbar=False, **kwargs)
+        self.std_raw.to(units).plot(ax=ax[0], title='Raw', add_cbar=False,
+                                    vmin=vmin, vmax=vmax, **kwargs)
+        self.std_unfolded.to(units).plot(ax=ax[1], title='Unfolded',
+                                         add_cbar=False,
+                                         vmin=vmin, vmax=vmax, **kwargs)
+        (im, _), _, _ = self.std_firstgen.to(units).plot(ax=ax[2],
+                                                         title='First Generation',
+                                                         vmin=vmin, vmax=vmax,
+                                                         add_cbar=False,
+                                                         **kwargs)
 
         # Y labels only clutter
         ax[1].set_ylabel(None)

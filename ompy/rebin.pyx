@@ -57,17 +57,17 @@ def rebin_1D(np.ndarray counts, np.ndarray mids_in, np.ndarray mids_out):
 
     cdef int Nin, Nout
     cdef int jmin, jmax  # To select subset in inner loop below
-    cdef double a0_in, a1_in, a0_out, a1_out
+    cdef double Emin_in, dE_in, Emin_out, dE_out
 
     # Get calibration coefficients and number of elements from array:
     Nin = mids_in.shape[0]
-    a0_in, a1_in = mids_in[0], mids_in[1]-mids_in[0]
+    Emin_in, dE_in = mids_in[0], mids_in[1]-mids_in[0]
     Nout = mids_out.shape[0]
-    a0_out, a1_out = mids_out[0], mids_out[1]-mids_out[0]
+    Emin_out, dE_out = mids_out[0], mids_out[1]-mids_out[0]
 
     # convert to lower-bin edges
-    a0_in -= a1_in/2
-    a0_out -= a1_out/2
+    Emin_in -= dE_in/2
+    Emin_out -= dE_out/2
 
     # Allocate rebinned array to fill:
     counts_out = np.zeros(Nout, dtype=DTYPE)
@@ -78,16 +78,16 @@ def rebin_1D(np.ndarray counts, np.ndarray mids_in, np.ndarray mids_out):
     for i in range(Nout):
         # Only loop over the relevant subset of j indices where there may be
         # overlap:
-        jmin = max(0, int((a0_out + a1_out*(i-1) - a0_in)/a1_in))
-        jmax = min(Nin-1, int((a0_out + a1_out*(i+1) - a0_in)/a1_in))
+        jmin = max(0, int((Emin_out + dE_out*(i-1) - Emin_in)/dE_in))
+        jmax = min(Nin-1, int((Emin_out + dE_out*(i+1) - Emin_in)/dE_in))
         # Calculate the bin edge energies manually for speed:
-        Eout_i = a0_out + a1_out*i
+        Eout_i = Emin_out + dE_out*i
         for j in range(jmin, jmax+1):
             # Calculate proportionality factor based on current overlap:
-            Ein_j = a0_in + a1_in*j
-            bins_overlap = overlap(Ein_j, Ein_j+a1_in,
-                                   Eout_i, Eout_i+a1_out)
-            counts_out_view[i] += counts[j] * bins_overlap / a1_in
+            Ein_j = Emin_in + dE_in*j
+            bins_overlap = overlap(Ein_j, Ein_j+dE_in,
+                                   Eout_i, Eout_i+dE_out)
+            counts_out_view[i] += counts[j] * bins_overlap / dE_in
 
     return counts_out
 

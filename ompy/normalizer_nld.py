@@ -12,7 +12,7 @@ from scipy.optimize import differential_evolution
 from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
-from .stats import truncnorm_ppf
+from scipy.stats import truncnorm
 from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
@@ -54,9 +54,6 @@ class NormalizerNLD(AbstractNormalizer):
             values are on the form (min, max).
         model (Callable[..., ndarray]): The model to use at high energies
             to estimate the NLD. Defaults to constant temperature model.
-        de_kwargs(dict): Additional keywords to differential evolution.
-             Defaults to `{"seed": 65424}`. Note that `bounds` has been
-             taken out as a separate attribute, but is a keyword of de.
         multinest_path (Path): Where to save the multinest output.
             defaults to 'multinest'.
         multinest_kwargs (dict): Additional keywords to multinest. Defaults to
@@ -73,7 +70,7 @@ class NormalizerNLD(AbstractNormalizer):
     def __init__(self, *,
                  nld: Optional[Vector] = None,
                  discrete: Optional[Union[str, Vector]] = None,
-                 path: Optional[Union[str, Path]] = 'saved_run/normalizers',
+                 path: Optional[Union[str, Path]] = None,
                  regenerate: bool = False,
                  norm_pars: Optional[NormalizationParameters] = None) -> None:
         """ Normalizes nld ang gSF.
@@ -113,11 +110,10 @@ class NormalizerNLD(AbstractNormalizer):
         self._D0 = None
         self._smooth_levels_fwhm = None
         self.norm_pars = norm_pars
-        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-1, 20], 'T': [0.1, 1],
+        self.bounds = {'A': [1e-1, 20], 'alpha': [1e-1, 2], 'T': [0.1, 5],
                        'Eshift': [-5, 5]}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
-        self.de_kwargs = {"seed": 65424}
         self.multinest_path = Path('multinest')
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
@@ -132,11 +128,9 @@ class NormalizerNLD(AbstractNormalizer):
         self.limit_high = None
         self.std_fake = None  # See `normalize`
 
-        if path is None:
-            self.path = None
-        else:
-            self.path = Path(path)
-            self.path.mkdir(exist_ok=True, parents=True)
+        self.path = (Path(path) if path is not None
+                     else Path('saved_run/normalizers'))
+        self.path.mkdir(exist_ok=True, parents=True)
 
     def __call__(self, *args, **kwargs) -> None:
         """ Wrapper around normalize """
@@ -181,8 +175,7 @@ class NormalizerNLD(AbstractNormalizer):
         limit_low = self.limit_low
         limit_high = self.limit_high
 
-        discrete = self.self_if_none(discrete)
-        discrete.to_MeV()
+        discrete = self.self_if_none(discrete).to('MeV')
         nld = self.self_if_none(nld)
 
         self.norm_pars = self.self_if_none(norm_pars)
@@ -195,9 +188,9 @@ class NormalizerNLD(AbstractNormalizer):
         self.res = ResultsNormalized(name="Results NLD")
 
         self.LOG.info(f"\n\n---------\nNormalizing nld #{num}")
-        nld = nld.copy()
+        nld = nld.clone().to('MeV')
         self.LOG.debug("Setting NLD, convert to MeV")
-        nld.to_MeV()
+        #nld.to_MeV()
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an
@@ -223,11 +216,11 @@ class NormalizerNLD(AbstractNormalizer):
         self.res.nld = transformed
         self.res.pars = popt
         self.res.samples = samples
-        ext_model = lambda E: self.model(E, T=popt['T'][0],
+        ext_model = lambda E: self.model(E, T=popt['T'][0],  # noqa
                                          Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
 
-        self.save()  # save instance
+        #self.save()  # save instance
 
     def initial_guess(self, limit_low: Optional[Tuple[float, float]] = None,
                       limit_high: Optional[Tuple[float, float]] = None
@@ -245,7 +238,7 @@ class NormalizerNLD(AbstractNormalizer):
                 energies.
 
         Returns:
-           The arguments used for chi^2 minimization and the
+           The arguments used for χ² minimization and the
            minimizer.
         """
         limit_low = self.self_if_none(limit_low)
@@ -264,25 +257,28 @@ class NormalizerNLD(AbstractNormalizer):
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
         nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
-        rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        self.LOG.debug("NLD Sn from D0: %g", nldSn)
+        rel_uncertainty = 0.3#self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        self.LOG.debug("Relative uncertainty: %g", rel_uncertainty)
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
+        self.LOG.debug("NLD Sn: %g ± %g", nldSn[0], nldSn[1])
 
         def neglnlike(*args, **kwargs):
             return - self.lnlike(*args, **kwargs)
+
         args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
                 nldSn)
-        res = differential_evolution(neglnlike, bounds=bounds, args=args,
-                                     **self.de_kwargs)
+        res = differential_evolution(neglnlike, bounds=bounds, args=args)
 
-        self.LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
+        p0 = res.x.tolist()
+        self.LOG.info("DE results:\n%s", tt.to_string([p0],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
-        p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
-        for key, res in p0.items():
-            if res in self.bounds[key]:
-                self.LOG.warning(f"DE result for {key} is at edge its bound:"
-                                 f"{self.bounds[key]}. This will probably lead"
-                                 f"to wrong estimations in multinest, too.")
+        p0 = dict(zip(["A", "alpha", "T", "Eshift"], p0))
+        #p0['Eshift'] = -1
+        #p0['A'] = 2
+        #p0['alpha'] = 0.9
+        #p0['T'] = 1
 
         return args, p0
 
@@ -290,7 +286,7 @@ class NormalizerNLD(AbstractNormalizer):
                  guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
         """Find parameters given model constraints and an initial guess
 
-        Employs Multinest
+        Starts Multinest
 
         Args:
             num (int): Loop number
@@ -301,26 +297,19 @@ class NormalizerNLD(AbstractNormalizer):
             Tuple:
             - popt (Dict[str, Tuple[float, float]]): Median and 1sigma of the
                 parameters
-            - samples (Dict[str, List[float]]): Multinest samples.
+            - samples (Dict[str, List[float]]): Multinest samplesø.
                 Note: They are still importance weighted, not random draws
                 from the posterior.
 
         Raises:
-            ValueError: Invalid parameters for automatic prior
-
-        Note:
-            You might want to adjust the priors for your specific case! Here
-            we just propose a general solution that might often work out of
-            the box.
+            ValueError: Invalid parameters for automatix prior
         """
         if guess['alpha'] < 0:
-            raise NotImplementedError("Prior selection not implemented for "
-                                      "α < 0")
+            raise ValueError("Prior selection not implemented for α < 0")
         alpha_exponent = np.log10(guess['alpha'])
 
         if guess['T'] < 0:
-            raise ValueError("Prior selection not implemented for T < 0; "
-                             "negative temperature is unphysical")
+            raise ValueError("Prior selection not implemented for T < 0")
         T_exponent = np.log10(guess['T'])
 
         A = guess['A']
@@ -331,7 +320,8 @@ class NormalizerNLD(AbstractNormalizer):
         a_A = (lower_A - mu_A) / sigma_A
         b_A = (upper_A - mu_A) / sigma_A
 
-        lower_Eshift, upper_Eshift = -5., 5
+        print(f"{guess=}")
+        lower_Eshift, upper_Eshift = -2, -1 #-5., 5
         mu_Eshift, sigma_Eshift = 0, 5
         a_Eshift = (lower_Eshift - mu_Eshift) / sigma_Eshift
         b_Eshift = (upper_Eshift - mu_Eshift) / sigma_Eshift
@@ -339,7 +329,8 @@ class NormalizerNLD(AbstractNormalizer):
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm_ppf(cube[0], a_A, b_A)*sigma_A+mu_A
+            cube[0] = truncnorm.ppf(cube[0], a_A, b_A, loc=mu_A,
+                                    scale=sigma_A)
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -347,8 +338,9 @@ class NormalizerNLD(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
-                                    b_Eshift)*sigma_Eshift + mu_Eshift
+            cube[3] = truncnorm.ppf(cube[3], a_Eshift, b_Eshift,
+                                    loc=mu_Eshift,
+                                    scale=sigma_Eshift)
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
@@ -441,14 +433,15 @@ class NormalizerNLD(AbstractNormalizer):
         if add_label:
             labelNld = 'exp.'
             labelNldSn = r'$\rho(S_n)$'
-            labelModel = 'model'
-            labelDiscrete = "known levels"
-        nld.plot(ax=ax, label=labelNld, **kwargs)
+            labelModel = 'modell'
+            labelDiscrete = "kjente nivåer"
+        nld.plot(ax=ax, label=labelNld,  **kwargs)
+        kwargs.pop("markersize", None)
 
         self.discrete.plot(ax=ax, kind='step', c='k', label=labelDiscrete)
 
         nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
-        rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
+        rel_uncertainty = 0.3#self.norm_pars.D0[1]/self.norm_pars.D0[0]
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
         x = np.linspace(self.limit_high[0], self.norm_pars.Sn[0])
@@ -459,8 +452,8 @@ class NormalizerNLD(AbstractNormalizer):
         ax.errorbar(self.norm_pars.Sn[0], nldSn[0], yerr=nldSn[1],
                     label=labelNldSn, fmt="ks", markerfacecolor='none')
         # workaround for enseble Normalizer; always keep these label
-        for i in range(3):
-            ax.lines[-(i+1)]._label = "_nld(Sn)"
+        #for i in range(3):
+        #    ax.lines[-(i+1)]._label = "_nld(Sn)"
 
         ax.plot(model.E, model.values, "--", label=labelModel, markersize=0,
                 c='g', **kwargs)
@@ -511,7 +504,8 @@ class NormalizerNLD(AbstractNormalizer):
         err_low = transformed_low.error(discrete)
         expected = Vector(E=transformed_high.E,
                           values=model(E=transformed_high.E,
-                                       T=T, Eshift=Eshift))
+                                       T=T, Eshift=Eshift),
+                          units='MeV')
         err_high = transformed_high.error(expected)
 
         nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
@@ -519,6 +513,7 @@ class NormalizerNLD(AbstractNormalizer):
 
         ln_stds = (np.log(transformed_low.std).sum()
                    + np.log(transformed_high.std).sum())
+        #err_high=0
 
         return -0.5*(err_low + err_high + err_nldSn + ln_stds)
 
@@ -573,9 +568,11 @@ class NormalizerNLD(AbstractNormalizer):
         if Jtarget == 0:
             summe = 1 / 2 * g(Jtarget + 1 / 2)
         else:
+            print(g(Jtarget))
             summe = 1 / 2 * (g(Jtarget - 1 / 2) + g(Jtarget + 1 / 2))
 
         nld = 1 / (summe * D0 * 1e-6)
+        nld = 1e4
         return [Sn, nld]
 
     @staticmethod
@@ -633,15 +630,15 @@ class NormalizerNLD(AbstractNormalizer):
             self.LOG.debug("Set `discrete` to None")
         elif isinstance(value, (str, Path)):
             if self.nld is None:
-                raise ValueError(f"`nld` must be set before loading levels")
-            nld = self.nld.copy()
-            nld.to_MeV()
+                raise ValueError("`nld` must be set before loading levels")
+            nld = self.nld.clone().to('MeV')
             self.LOG.debug("Set `discrete` levels from file with FWHM %s",
                            self.smooth_levels_fwhm)
             self._discrete = load_levels_smooth(value, nld.E,
                                                 self.smooth_levels_fwhm)
-            self._discrete.units = "MeV"
+            #self._discrete.units = "MeV"
             self._discrete_path = value
+            self._discrete.to('MeV', inplace=True)
 
         elif isinstance(value, Vector):
             if self.nld is not None and np.any(self.nld.E != value.E):
@@ -680,7 +677,7 @@ def load_levels_discrete(path: Union[str, Path], energy: ndarray) -> Vector:
         A vector describing the levels
     """
     histogram, _ = load_discrete(path, energy, 0.1)
-    return Vector(values=histogram, E=energy)
+    return Vector(values=histogram, E=energy, units='MeV')
 
 
 def load_levels_smooth(path: Union[str, Path], energy: ndarray,
@@ -697,4 +694,5 @@ def load_levels_smooth(path: Union[str, Path], energy: ndarray,
         A vector describing the smoothed levels
     """
     histogram, smoothed = load_discrete(path, energy, resolution)
-    return Vector(values=smoothed if resolution > 0 else histogram, E=energy)
+    return Vector(values=smoothed if resolution > 0 else histogram, E=energy,
+                  units='MeV')

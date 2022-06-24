@@ -1,0 +1,156 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, overload, Literal
+from .header import Axes, Point, PointUnit, Points, Unitlike, ArrayBool, PointI
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import colors
+from abc import ABC, abstractmethod
+
+if TYPE_CHECKING:
+    from .matrix import Matrix
+
+
+class Geometry(ABC):
+
+    @abstractmethod
+    @overload
+    def apply(self, matrix: Matrix, inplace: Literal[False] = ...) -> None: ...
+
+    @abstractmethod
+    @overload
+    def apply(self, matrix: Matrix, inplace: Literal[True] = ...) -> Matrix: ...
+
+    @abstractmethod
+    def apply(self, matrix: Matrix, inplace: bool = False) -> Matrix | None:
+        ...
+
+    def plot(self, matrix: Matrix, ax: Axes | None = None, **kwargs) -> Axes:
+        if ax is None:
+            ax: Axes = plt.subplots()[1]
+        return self.draw(matrix, ax, **kwargs)
+
+    @abstractmethod
+    def draw(self, matrix: Matrix, ax: Axes, **kwargs) -> Axes:
+        ...
+
+    @staticmethod
+    def resolve(point: PointUnit, matrix: Matrix) -> PointI:
+        ieg = matrix.index_Eg(point[0])
+        iex = matrix.index_Ex(point[1])
+        return ieg, iex
+
+    @overload
+    @staticmethod
+    def maybe_resolve(point: PointUnit , matrix: Matrix) -> PointI: ...
+    @overload
+    @staticmethod
+    def maybe_resolve(point: None , matrix: Matrix) -> None: ...
+    @staticmethod
+    def maybe_resolve(point: PointUnit | None, matrix: Matrix) -> PointI | None:
+        if point is not None:
+            return Geometry.resolve(point, matrix)
+
+class Line(Geometry):
+    def __init__(self, *, p1: PointUnit | None = None,
+                 p2: PointUnit | None = None,
+                 slope: float | None = None):
+        super().__init__()
+        self.p1 = p1
+        self.p2 = p2
+        self.slope = slope
+
+    def resolve_self(self, matrix: Matrix) -> tuple[PointI, PointI]:
+        p1 = Geometry.maybe_resolve(self.p1, matrix)
+        p2 = Geometry.maybe_resolve(self.p2, matrix)
+        p1, p2 = refine_points(p1, p2, self.slope)
+        return p1, p2
+
+    def above(self, matrix: Matrix) -> ArrayBool:
+        p1, p2 = self.resolve_self(matrix)
+        mask = line_mask(matrix, p1, p2)
+        return mask
+
+    def at(self, matrix: Matrix) -> ArrayBool:
+        p1, p2 = self.resolve_self(matrix)
+        mask = line_mask(matrix, p1, p2, 'at')
+        return mask
+
+    def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
+        mask = self.at(matrix)
+        Eg, Ex = matrix.plot_bins()
+        # Ugly hack to plot mask
+        masked = np.ma.array(mask, mask=~mask)
+        palette = plt.cm.gray.with_extremes(over=color)
+        ax.pcolormesh(Eg, Ex, masked, cmap=palette,
+                      norm=colors.Normalize(vmin=-1.0, vmax=0.5))
+        return ax
+
+
+def line_mask(matrix: Matrix, p1: PointI, p2: PointI,
+              where: str = 'above') -> ArrayBool:
+    """Create a mask for above (True) and below (False) a line
+
+    Args:
+
+    Returns:
+        The boolean array with counts below the line set to False
+
+    NOTE:
+        This method and Jørgen's original method give 2 pixels difference
+        Probably because of how the interpolated line is drawn
+    """
+    Ix = p1[0], p2[0]
+    Iy = p1[1], p2[1]
+
+    # Interpolate between the two points
+    assert(Ix[1] != Ix[0])
+    a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
+    b = Iy[0] - a*Ix[0]
+    line = lambda x: a*x + b  # NOQA E731
+
+    # Mask all indices below this line to 0
+    i_mesh, j_mesh = np.meshgrid(matrix.range_Eg, matrix.range_Ex)
+    match where:
+        case 'above':
+            mask = j_mesh < line(i_mesh)
+        case 'below':
+            mask = j_mesh > line(i_mesh)
+        case 'at':
+            mask = (j_mesh >= line(i_mesh)) & (j_mesh <= line(i_mesh)+1)
+        case _:
+            raise ValueError("'where' must be 'above', 'below' or 'at'")
+    return mask
+
+
+def refine_points(p1: Point | None = None, p2: Point | None = None,
+                    slope: float | None = None) -> Points:
+    if p1 is None and p2 is None:
+        raise ValueError("Must provide at least 1 point")
+    if p1 is not None and p2 is not None:
+        return sort_points(p1, p2)
+    if slope is None:
+        raise ValueError("Provide both 1 point and a slope")
+
+    p = p1 if p2 is None else p2
+    assert p is not None
+
+    return points_from_partial(slope, p)
+
+def sort_points(p1: Point, p2: Point) -> Points:
+    if p1[0] < p2[0]:
+        return p1, p2
+    if p1[0] > p2[0]:
+        return p2, p1
+    if p1[1] < p2[1]:
+        return p1, p2
+    return p2, p1
+
+def points_from_partial(slope: float, point: Point) -> Points:
+    Eg, Ex = point
+    intercept = Ex - slope*Eg
+    return points_from_ab(intercept, slope)
+
+def points_from_ab(intercept: float, slope: float) -> Points:
+    Eg0, Eg1 = 0, 5000
+    Ex0, Ex1 = intercept, slope*Eg1 + intercept
+    return ((Eg0, Ex0), (Eg1, Ex1))

@@ -21,7 +21,7 @@ class NormalizerGSF(AbstractNormalizer):
 
     Normalizes nld/gsf according to the transformation eq (3), Schiller2000::
 
-        gsf' = gsf * B * np.exp(alpha * Eg)
+        gsf' = gsf * B * np.exp(α * Eg)
 
     Attributes:
         gsf_in (Vector): gsf to normalize
@@ -88,9 +88,9 @@ class NormalizerGSF(AbstractNormalizer):
 
         # use self._gsf internally, but separate from self._gsf
         # in order to not trasform self.gsf_in 2x, if normalize() is called 2x
-        self.gsf_in = None if gsf is None else gsf.copy()
+        self.gsf_in = None if gsf is None else gsf.clone()
 
-        self.nld = None if nld is None else nld.copy()
+        self.nld = None if nld is None else nld.clone()
         self.normalizer_nld = normalizer_nld
         self.nld_model = nld_model
         self.alpha = alpha if alpha is None else alpha
@@ -148,7 +148,6 @@ class NormalizerGSF(AbstractNormalizer):
         """
         if not self.regenerate:
             try:
-                print("regenerate is self.regenerate")
                 self.load()
                 return
             except FileNotFoundError:
@@ -191,9 +190,8 @@ class NormalizerGSF(AbstractNormalizer):
             self.res = ResultsNormalized(name="Results NLD and GSF, stepwise")
 
         self.LOG.info(f"Normalizing #{num}")
-        self._gsf = gsf.copy()  # make a copy as it will be transformed
-        gsf.to_MeV()
-        gsf = gsf.transform(alpha=alpha, inplace=False)
+        self._gsf = gsf.clone()  # make a copy as it will be transformed
+        gsf = gsf.to('MeV').transform(alpha=alpha, inplace=False)
         self._gsf = gsf
 
         self.model_low.autorange(gsf)
@@ -201,9 +199,11 @@ class NormalizerGSF(AbstractNormalizer):
         self._gsf_low, self._gsf_high = self.extrapolate(gsf)
 
         # experimental Gg and calc. both in meV
+        self.LOG.debug("Gg before norm: %f", self.Gg_before_norm())
         B_norm = self.norm_pars.Gg[0] / self.Gg_before_norm()
         # propagate uncertainty of D0
         B_norm_unc = B_norm * self.norm_pars.D0[1] / self.norm_pars.D0[0]
+        self.LOG.debug("B: %f", B_norm)
 
         # apply transformation and export results
         self._gsf.transform(B_norm)
@@ -219,7 +219,7 @@ class NormalizerGSF(AbstractNormalizer):
         else:
             self.res.pars = {"B": [B_norm, B_norm_unc]}
 
-        self.save()  # saves instance
+        #self.save()  # saves instance
 
     def extrapolate(self,
                     gsf: Optional[Vector] = None,
@@ -333,17 +333,20 @@ class NormalizerGSF(AbstractNormalizer):
         def integrate() -> ndarray:
             Eg, stepsize = self.norm_pars.E_grid()
             Ex = self.norm_pars.Sn[0] - Eg
+            self.LOG.debug("Ex[1] from Sn: %f", Ex[1])
             integral = (np.power(Eg, 3) * wgsf(Eg) * wnld(Ex)
                         * self.SpinSum(Ex, self.norm_pars.Jtarget))
             integral = np.sum(integral) * stepsize
             return integral
 
         integral = integrate()
+        self.LOG.debug("Integral: %f", integral)
 
         # factor of 2 because of equi-parity `spinsum` instead of `spinsum(π)`,
         # see above
         integral /= 2
         Gg = integral * self.norm_pars.D0[0] * 1e3  # [eV] * 1e3 -> [meV]
+        self.LOG.debug("Gg from integral: %f", Gg)
         return Gg
 
     def SpinSum(self, Ex: Union[float, np.ndarray],
@@ -444,6 +447,8 @@ class NormalizerGSF(AbstractNormalizer):
              add_label: bool = True,
              add_figlegend: bool = True,
              plot_fitregion: bool = True,
+             plot_model: bool = True,
+             extrap_high: Optional[float] = None,
              results: Optional[ResultsNormalized] = None,
              reset_color_cycle: bool = True,
              **kwargs) -> Tuple[Any, Any]:
@@ -472,25 +477,29 @@ class NormalizerGSF(AbstractNormalizer):
         if reset_color_cycle:
             ax.set_prop_cycle(None)
         res = self.res if results is None else results
+
         gsf = res.gsf
         model_low = res.gsf_model_low
         model_high = res.gsf_model_high
 
         label_gsf = "exp." if add_label else "_exp."
-        label_model = "model" if add_label else "_model"
+        label_model = "modell" if add_label else "_model"
         label_limits = "fit limits" if add_label else "_fit limits"
         gsf.plot(ax=ax, label=label_gsf, **kwargs)
 
         # extend the plotting range to the fit range
         xplot = np.linspace(model_low.Emin, model_low.Efit[1])
         gsf_low = model_low.extrapolate(xplot)
-        xplot = np.linspace(model_high.Efit[0], self.norm_pars.Sn[0])
+        if extrap_high is None:
+            extrap_high = self.norm_pars.Sn[0]
+        xplot = np.linspace(model_high.Efit[0], extrap_high)
         gsf_high = model_high.extrapolate(xplot)
 
         defaults = {"markersize": 0, "linestyle": "--"}
         defaults.update(kwargs)
-        gsf_low.plot(ax=ax, c='g', label=label_model, **defaults)
-        gsf_high.plot(ax=ax, c='g', **defaults)
+        if plot_model:
+            gsf_low.plot(ax=ax, c='g', label=label_model, **defaults)
+            gsf_high.plot(ax=ax, c='g', **defaults)
 
         if plot_fitregion:
             ax.axvspan(model_low.Efit[0], model_low.Efit[1],
@@ -499,8 +508,8 @@ class NormalizerGSF(AbstractNormalizer):
                        color='grey', alpha=0.1)
 
         ax.set_yscale('log')
-        ax.set_xlabel(rf"$\gamma$-ray energy $E_\gamma$~[{gsf.units}]")
-        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$)~[{gsf.units}$^{{-3}}$]")
+        ax.set_xlabel(rf"$\gamma$-ray energy $E_\gamma$ [${gsf.units:~L}$]")
+        ax.set_ylabel(rf"$\gamma$-SF f($E_\gamma$) [${gsf.units:~L}^{{-3}}$]")
 
         if fig is not None and add_figlegend:
             fig.legend(loc=9, ncol=3, frameon=False)

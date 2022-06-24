@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 import copy
 from typing import Union, Tuple, Sequence
 import numpy as np
+
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class AbstractArray:
@@ -20,15 +24,24 @@ class AbstractArray:
     def same_shape(self, other: Sequence[float], error: bool = False) -> bool:
         return self.has_equal_binning()
 
+    def clone(self, **kwargs) -> AbstractArray:
+        raise NotImplementedError()
+
     def copy(self, **kwargs) -> AbstractArray:
         """ Return a deepcopy of the class
 
         Args:
             kwargs: Overwrite attributes of the copied object
         """
+        LOG.warning("Using copy() risks returning incomplete objects."
+                    " Use clone() instead.")
         new = copy.deepcopy(self)
         for attr, val in kwargs.items():
-            setattr(new, attr, val)
+            if attr in ('E', 'Ex', 'Eg'):
+                logging.debug("Called copy() with %s. Prefixed with '_'", attr)
+                setattr(new, '_'+attr, val)
+            else:
+                setattr(new, attr, val)
         return new
 
     def verify_equdistant(self, axis: Union[int, str]):
@@ -73,7 +86,7 @@ class AbstractArray:
             return all(truth)
 
     def __sub__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values -= other
         else:
@@ -85,7 +98,7 @@ class AbstractArray:
         return result
 
     def __rsub__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values = other - result.values
         else:
@@ -97,7 +110,7 @@ class AbstractArray:
         return result
 
     def __add__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values += other
         else:
@@ -112,7 +125,7 @@ class AbstractArray:
         return self.__add__(other)
 
     def __mul__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values *= other
         else:
@@ -127,7 +140,7 @@ class AbstractArray:
         return self.__mul__(other)
 
     def __truediv__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values /= other
         else:
@@ -139,7 +152,7 @@ class AbstractArray:
         return result
 
     def __rtruediv__(self, other) -> AbstractArray:
-        result = self.copy()
+        result = self.clone()
         if isinstance(other, (int, float)):
             result.values = other / result.values
         else:
@@ -166,8 +179,22 @@ class AbstractArray:
     def __setitem__(self, key, item):
         return self.values.__setitem__(key, item)
 
+    def __getattr__(self, attr):
+        name = self.__class__.__name__
+        if attr.startswith("_"):
+            raise AttributeError(f"'{name}' object has no attribute {attr}")
+        res = getattr(self.values, attr, None)
+        if res is not None:
+            return res
+        raise AttributeError(f"Neither {name} nor"
+                             f" {name}.values has '{attr}'")
 
-def to_plot_axis(axis: Union[int, str]) -> int:
+    def __len__(self) -> int:
+        return len(self.values)
+
+
+
+def to_plot_axis(axis: int | str) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:

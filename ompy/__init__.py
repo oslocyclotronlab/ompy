@@ -26,19 +26,27 @@ else:
     from .version import FULLVERSION as __full_version__
 
     from pint import UnitRegistry
+    from pint.errors import DimensionalityError
     ureg = UnitRegistry()
     ureg.setup_matplotlib()
     u = ureg
+    Q_ = ureg.Quantity
+
+    import warnings
+    warnings.simplefilter('always', DeprecationWarning)
 
     # Simply import all functions and classes from all files to make them
     # available at the package level
-    from .library import div0, fill_negative_gauss, fill_negative_max
+    from .validator import Unitful, Bounded, Choice, Toggle
+    #from .spinfunctions import (SpinFunction, Const, EB05, EB09CT, EB09Emp,
+    #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
+    from .geometry import Geometry, Line
     from .abstractarray import AbstractArray
-    from .matrix import Matrix, ZerosMatrix
+    from .matrix import Matrix
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .vector import Vector
-    from .ufunc import zeros_like #zeros
+    from .ufunc import zeros_like, empty_like
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble
@@ -54,4 +62,9 @@ else:
     from .normalizer_simultan import NormalizerSimultan
     from .ensembleNormalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
+    #from .modelcontext import Model
+    from .shape import Shape, normalize_to_shape
+    from .library import (div0, fill_negative_gauss, fill_negative_max,
+                          plot_trapezoid, contains_zeroes_patches,
+                          ascii_plot, plot_projection_rectangle)
     from .introspection import logging, hooks

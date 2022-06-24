@@ -73,15 +73,15 @@ class NormalizerSimultan(AbstractNormalizer):
         if normalizer_nld is None:
             self.normalizer_nld = None
         else:
-            self.normalizer_nld = copy.deepcopy(normalizer_nld)
+            self.normalizer_nld = normalizer_nld #copy.deepcopy(normalizer_nld)
 
         if normalizer_gsf is None:
             self.normalizer_gsf = None
         else:
-            self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
+            self.normalizer_gsf = normalizer_gsf #copy.deepcopy(normalizer_gsf)
 
-        self.gsf = None if gsf is None else gsf.copy()
-        self.nld = None if nld is None else nld.copy()
+        self.gsf = None if gsf is None else gsf.clone()
+        self.nld = None if nld is None else nld.clone()
 
         self.std_fake_nld: Optional[bool] = None  # See `normalize`
         self.std_fake_gsf: Optional[bool] = None  # See `normalize`
@@ -123,18 +123,18 @@ class NormalizerSimultan(AbstractNormalizer):
         # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
 
-        self.normalizer_nld = copy.deepcopy(self.self_if_none(normalizer_nld))
-        self.normalizer_gsf = copy.deepcopy(self.self_if_none(normalizer_gsf))
+        self.normalizer_nld = self.self_if_none(normalizer_nld)
+        self.normalizer_gsf = self.self_if_none(normalizer_gsf)
         for norm in [self.normalizer_nld, self.normalizer_gsf]:
             norm._save_instance = False
             norm.regenerate = True
 
         gsf = self.self_if_none(gsf)
         nld = self.self_if_none(nld)
-        nld = nld.copy()
-        gsf = gsf.copy()
-        nld.to_MeV()
-        gsf.to_MeV()
+        nld = nld.clone()
+        gsf = gsf.clone()
+        nld.to('MeV', inplace=True)
+        gsf.to('MeV', inplace=True)
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an

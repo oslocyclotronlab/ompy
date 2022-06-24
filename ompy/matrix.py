@@ -1,27 +1,33 @@
 from __future__ import annotations
 
+import copy
+from ctypes import ArgumentError
 import logging
 import warnings
-import copy
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from matplotlib import ticker
 from pathlib import Path
+from typing import (Any, Dict, Iterable, Iterator, Optional, Sequence, Tuple,
+                    Union, Callable, overload, Literal)
+
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize
-from typing import (Dict, Iterable, Any, Union, Tuple,
-                    Sequence, Optional, Iterator)
-import warnings
+
 from .abstractarray import AbstractArray, to_plot_axis
 from .decomposition import index
-from .filehandling import (mama_read, mama_write,
-                           save_numpy_2D, load_numpy_2D,
-                           save_txt_2D, load_txt_2D, save_tar, load_tar,
-                           filetype_from_suffix)
-from .library import div0, fill_negative_gauss, diagonal_elements
+from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
+                           load_txt_2D, mama_read, mama_write, save_numpy_2D,
+                           save_tar, save_txt_2D)
+from .library import (diagonal_elements, div0, fill_negative_gauss,
+                      only_one_not_none, handle_rebin_arguments)
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
 from .vector import Vector
+from . import ureg, Q_, DimensionalityError
+from .header import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
+                     Colorbar, QuadMesh, ArrayInt, PointUnit)
+from .geometry import Line
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -40,7 +46,7 @@ class Matrix(AbstractArray):
     of the matrix has the same shape as the Ex array (Excitation axis)
 
     Note:
-        Many functions will implicity assume linear binning.
+        Many functions will implicitly assume linear binning.
 
     .. parsed-literal::
                    Diagonal Ex=Eγ
@@ -50,7 +56,7 @@ class Matrix(AbstractArray):
          i a   │█████████████▓▓░░░░░
          s x i │███▓████▓████░░░░░ ░░░░
            i n │███████████░░░░   ░░░░░
-         1 s d │███▓█████░░   ░░░░ ░░░░ <-- "Folded" counts
+         1 s d │███▓█████░░   ░░░░ ░░░░ <-- Counts
              e │███████▓░░░░░░░░░░░░░░░
              x │█████░     ░░░░ ░░  ░░
                │███░░░░░░░░ ░░░░░░  ░░░
@@ -72,7 +78,6 @@ class Matrix(AbstractArray):
 
 
     TODO:
-        - Find a way to handle units
         - Synchronize cuts. When a cut is made along one axis,
           such as values[min:max, :] = 0, make cuts to the
           other relevant variables
@@ -84,9 +89,13 @@ class Matrix(AbstractArray):
                  Eg: Optional[np.ndarray] = None,
                  Ex: Optional[np.ndarray] = None,
                  std: Optional[np.ndarray] = None,
-                 path: Optional[Union[str, Path]] = None,
-                 shape: Optional[Tuple[int, int]] = None,
-                 state: Union[str, MatrixState] = None):
+                 path: Optional[Pathlike] = None,
+                 state: Optional[Union[str, MatrixState]] = None,
+                 Ex_units: Unitlike = 'keV',
+                 Eg_units: Unitlike = 'keV',
+                 copy: bool = True,
+                 xlabel: str = r"$\gamma$-energy $E_{\gamma}$",
+                 ylabel: str = r"Excitation energy $E_{x}$"):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
@@ -94,7 +103,7 @@ class Matrix(AbstractArray):
 
         For initializing one can give values, [Ex, Eg] arrays,
         a filename for loading a saved matrix or a shape
-        for initialzing it with zero entries.
+        for initializing it with empty entries.
 
         Args:
             values: Set the matrix' values.
@@ -104,41 +113,60 @@ class Matrix(AbstractArray):
             path: Load a Matrix from a given path
             state: An enum to keep track of what has been done to the matrix.
                 Can also be a str. like in ["raw", "unfolded", ...]
-            shape: Depreciated. Use `ZerosMatrix` instead.
+            copy: Whether to copy the arguments or take them as reference.
+                Defaults to `True`.
 
         """
-        if shape is not None:
-            warnings.warn("Creating a Matrix with zeros as entries by the "
-                          "shape argument is depreciated. Use ZerosMatrix "
-                          "instead.", DeprecationWarning)
-            values = ZerosMatrix(shape=shape, Ex=Ex, Eg=Eg).values
+        if copy:
+            def fetch(x):
+                return np.asarray(x, dtype=float).copy()
+        else:
+            def fetch(x):
+                return np.asarray(x, dtype=float)
 
-        if values is None and Ex is not None and Eg is not None:
-            warnings.warn("Creating a Matrix with zeros as entries only"
-                          "providing Ex and Eg is is depreciated. Use "
-                          "ZerosMatrix instead.", DeprecationWarning)
-            values = ZerosMatrix(Ex=Ex, Eg=Eg).values
-
-        self.values = np.asarray(values, dtype=float).copy()
-
-        if (values is not None) and Ex is None:
-            Ex = range(self.values.shape[0])
-            Ex = np.asarray(Ex) + 0.5
-        if (values is not None) and Eg is None:
-            Eg = range(self.values.shape[1])
-            Eg = np.asarray(Eg) + 0.5
-
-        self.Eg: np.ndarray = np.asarray(Eg, dtype=float).copy()
-        self.Ex: np.ndarray = np.asarray(Ex, dtype=float).copy()
-        self.std = std
-
+        self.std: Optional[np.ndarray] = None
         if path is not None:
+            if (values is not None or
+                Eg is not None or
+                Ex is not None):
+                LOG.warning(("Loading from path. Other arguments"
+                             "are ignored"))
             self.load(path)
-        self.verify_integrity()
+        else:
+            if (values is None or
+                Eg is None or
+                Ex is None):
+                raise ValueError("Provide either values and energies, or path.")
+            try:
+                Eg_unit = Eg.units
+                self._Eg: ArrayKeV = np.atleast_1d(fetch(Eg.magnitude))*Eg_unit
+            except AttributeError:
+                #Eg_unit = ureg.Quantity(Eg_units)
+                #Eg_unit = ureg(Eg_units)
+                Eg_unit = ureg.Unit(Eg_units)
+                self._Eg: ArrayKeV = np.atleast_1d(fetch(Eg))*Eg_unit
+
+            try:
+                Ex_unit = Ex.units
+                self._Ex: ArrayKeV = np.atleast_1d(fetch(Ex.magnitude))*Ex_unit
+            except AttributeError:
+                #Ex_unit = ureg(Ex_units)
+                #Ex_unit = ureg.Quantity(Ex_units)
+                Ex_unit = ureg.Unit(Ex_units)
+                self._Ex: ArrayKeV = np.atleast_1d(fetch(Ex)) * Ex_unit
+
+            self.values = np.atleast_2d(fetch(values))
+
+        if std is not None:
+            self.std = np.atleast_2d(fetch(std))
 
         self.state = state
+        self.xlabel = xlabel
+        self.ylabel = ylabel
         self.loc = ValueLocator(self)
         self.iloc = IndexLocator(self)
+
+        self.verify_integrity()
 
     def verify_integrity(self, check_equidistant: bool = False):
         """ Runs checks to verify internal structure
@@ -150,34 +178,44 @@ class Matrix(AbstractArray):
         Raises:
             ValueError: If any check fails
         """
-        if self.values is None or self.values.ndim != 2:
-            return
+        if self.values.ndim != 2:
+            raise ValueError(f"Values must be ndim 2, not {self.values.ndim}.")
 
         # Check shapes:
         shape = self.values.shape
-        if self.Ex is not None and self.Ex.ndim == 1:
+        if self.Ex.ndim == 1:
             if shape[0] != len(self.Ex):
                 raise ValueError(("Shape mismatch between matrix and Ex:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Ex)}"))
-        if self.Ex is not None and self.Ex.ndim > 1:
+        else:
             raise ValueError(f"Ex array must be ndim 1, not {self.Ex.ndim}")
 
-        if self.Eg is not None and self.Eg.ndim == 1:
+        if self.Eg.ndim == 1:
             if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
                                   f" (_{shape[0]}_, {shape[1]}) ≠ "
                                   f"{len(self.Eg)}"))
-        if self.Eg is not None and self.Eg.ndim > 1:
+        else:
             raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
 
-        if check_equidistant:
-            self.verify_equdistant("Ex")
-            self.verify_equdistant("Eg")
+        if check_equidistant and not self.is_equidistant():
+            raise ValueError("Is not equidistant.")
 
         if self.std is not None:
             if shape != self.std.shape:
                 raise ValueError("Shape mismatch between self.values and std.")
+
+    def is_equidistant(self) -> bool:
+        if len(self) <= 1:
+            return True
+
+        diff_Ex = (self.Ex - np.roll(self.Ex, 1))[1:]
+        diff_Eg = (self.Eg - np.roll(self.Eg, 1))[1:]
+        dEx = diff_Ex[0]
+        dEg = diff_Eg[0]
+        return (np.all(np.isclose(diff_Ex, dEx*np.ones_like(diff_Ex))) and
+                np.all(np.isclose(diff_Eg, dEg*np.ones_like(diff_Eg))))
 
     def load(self, path: Union[str, Path],
              filetype: Optional[str] = None) -> None:
@@ -197,18 +235,20 @@ class Matrix(AbstractArray):
         filetype = filetype.lower()
 
         if filetype == 'numpy':
-            self.values, self.Eg, self.Ex = load_numpy_2D(path)
+            self.values, self._Eg, self._Ex = load_numpy_2D(path)
         elif filetype == 'txt':
-            self.values, self.Eg, self.Ex = load_txt_2D(path)
+            self.values, self._Eg, self._Ex = load_txt_2D(path)
         elif filetype == 'tar':
-            self.values, self.Eg, self.Ex = load_tar(path)
+            self.values, self._Eg, self._Ex = load_tar(path)
         elif filetype == 'mama':
-            self.values, self.Eg, self.Ex = mama_read(path)
+            self.values, self._Eg, self._Ex = mama_read(path)
         else:
             try:
-                self.values, self.Eg, self.Ex = mama_read(path)
+                self.values, self._Eg, self._Ex = mama_read(path)
             except ValueError:  # from within mama_read
                 raise ValueError(f"Unknown filetype {filetype}")
+        self._Eg *= ureg('keV')
+        self._Ex *= ureg('keV')
         self.verify_integrity()
 
     def save(self, path: Union[str, Path], filetype: Optional[str] = None,
@@ -245,12 +285,14 @@ class Matrix(AbstractArray):
             raise NotImplementedError(
                 f"{which} is unsupported: Use 'values' or 'std'")
 
+        Eg = self._Eg.to('keV').magnitude
+        Ex = self._Ex.to('keV').magnitude
         if filetype == 'numpy':
-            save_numpy_2D(values, self.Eg, self.Ex, path)
+            save_numpy_2D(values, Eg, Ex, path)
         elif filetype == 'txt':
-            save_txt_2D(values, self.Eg, self.Ex, path, **kwargs)
+            save_txt_2D(values, Eg, Ex, path, **kwargs)
         elif filetype == 'tar':
-            save_tar([values, self.Eg, self.Ex], path)
+            save_tar([values, Eg, Ex], path)
         elif filetype == 'mama':
             if which.lower() == 'std':
                 warnings.warn(UserWarning(
@@ -268,21 +310,65 @@ class Matrix(AbstractArray):
             The calibration coefficients in a dictionary.
         """
         calibration = {
-            "a0x": self.Ex[0],
-            "a1x": self.Ex[1]-self.Ex[0],
-            "a0y": self.Eg[0],
-            "a1y": self.Eg[1]-self.Eg[0],
+            "a0x": self._Ex.to('keV').magnitude[0],
+            "a1x": self._Ex.to('keV').magnitude[1]-self._Ex.to('keV').magnitude[0],
+            "a0y": self._Eg.to('keV').magnitude[0],
+            "a1y": self._Eg.to('keV').magnitude[1]-self._Eg.to('keV').magnitude[0],
         }
         return calibration
 
-    def plot(self, *, ax: Any = None,
-             title: Optional[str] = None,
-             scale: Optional[str] = None,
-             vmin: Optional[float] = None,
-             vmax: Optional[float] = None,
+    def same_shape(self, other: ndarray, error: bool = False) -> bool:
+        """ Check whether `other` has same shape `self.values`.
+
+        Args:
+            other (array-like): Object to compare to.
+
+        Returns:
+            Returns `True` if shapes are equal.
+        Raises:
+            ValueError: if shapes aren't equal and `error` is true.
+            TypeError: if `other` lacks `.shape`
+        """
+        try:
+            same = other.shape == self.shape
+        except AttributeError:
+            if error:
+                raise TypeError("Other needs to be array-like.")
+            else:
+                return False
+
+        if error and not same:
+            raise ValueError(f"Expected {self.shape}, got {other.shape}.")
+        return same
+
+
+    @overload
+    def plot(self, *, ax: Axes | None = None,
+             title: str | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
+             midbin_ticks: bool = False,
+             add_cbar: Literal[True] = ...,
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar]]: ...
+    @overload
+    def plot(self, *, ax: Axes | None = None,
+             title: str | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
+             midbin_ticks: bool = False,
+             add_cbar: Literal[False] = ...,
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, None]]: ...
+
+    def plot(self, *, ax: Axes | None = None,
+             title: str | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
              midbin_ticks: bool = False,
              add_cbar: bool = True,
-             **kwargs) -> Any:
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -303,6 +389,9 @@ class Matrix(AbstractArray):
             ValueError: If scale is unsupported
         """
         fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
+        assert ax is not None
+        assert isinstance(fig, Figure)
+
         if len(self.Ex) <= 1 or len(self.Eg) <= 1:
             raise ValueError("Number of bins must be greater than 1")
 
@@ -311,20 +400,18 @@ class Matrix(AbstractArray):
         if scale == 'log':
             if vmin is not None and vmin <= 0:
                 raise ValueError("`vmin` must be positive for log-scale")
+            if vmin is None:
+                _max = np.log10(self.max())
+                _min = np.log10(self.values[self.values > 0].min())
+                if _max - _min > 10:
+                    vmin = 10**(int(_max-6))
             norm = LogNorm(vmin=vmin, vmax=vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
         else:
             raise ValueError("Unsupported zscale ", scale)
-        # Move all bins down to lower bins
-        self.to_lower_bin()
-        # Must extend it the range to make pcolormesh happy
-        dEg = self.Eg[-1] - self.Eg[-2]
-        dEx = self.Ex[-1] - self.Ex[-2]
-        Eg = np.append(self.Eg, self.Eg[-1] + dEg)
-        Ex = np.append(self.Ex, self.Ex[-1] + dEx)
-        # Move the bins back up
-        self.to_mid_bin()
+        norm = kwargs.pop('norm', norm)
+        Eg, Ex = self.plot_bins()
 
         # Set entries of 0 to white
         current_cmap = copy.copy(cm.get_cmap())
@@ -333,7 +420,7 @@ class Matrix(AbstractArray):
         mask = np.isnan(self.values) | (self.values == 0)
         masked = np.ma.array(self.values, mask=mask)
 
-        lines = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
+        mesh = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
         if midbin_ticks:
             ax.xaxis.set_major_locator(MeshLocator(self.Eg))
             ax.tick_params(axis='x', rotation=40)
@@ -342,8 +429,8 @@ class Matrix(AbstractArray):
         # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         ax.set_title(title if title is not None else self.state)
-        ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
-        ax.set_ylabel(r"Excitation energy $E_{x}$")
+        ax.set_xlabel(self.xlabel + f" [${self.Eg_units:~L}$]")
+        ax.set_ylabel(self.ylabel + f" [${self.Ex_units:~L}$]")
 
         # show z-value in status bar
         # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
@@ -361,65 +448,36 @@ class Matrix(AbstractArray):
                 return f'x={x:1.0f}, y={y:1.0f}'
         ax.format_coord = format_coord
 
+        cbar: Colorbar | None = None
         if add_cbar:
             if vmin is not None and vmax is not None:
-                cbar = fig.colorbar(lines, ax=ax, extend='both')
+                cbar = fig.colorbar(mesh, ax=ax, extend='both')
             elif vmin is not None:
-                cbar = fig.colorbar(lines, ax=ax, extend='min')
+                cbar = fig.colorbar(mesh, ax=ax, extend='min')
             elif vmax is not None:
-                cbar = fig.colorbar(lines, ax=ax, extend='max')
+                cbar = fig.colorbar(mesh, ax=ax, extend='max')
             else:
-                cbar = fig.colorbar(lines, ax=ax)
+                cbar = fig.colorbar(mesh, ax=ax)
 
             # cbar.ax.set_ylabel("# counts")
             # plt.show()
-        return lines, ax, fig
+        return ax, (mesh, cbar)
 
-    def plot_projection(self, axis: Union[int, str],
-                        Emin: float = None,
-                        Emax: float = None, *, ax: Any = None,
-                        normalize: bool = False,
-                        scale: str = 'linear', **kwargs) -> Any:
-        """ Plots the projection of the matrix along axis
+    def plot_bins(self):
+        # Move all bins down to lower bins
+        self.to_lower_bin()
+        # Must extend it the range to make pcolormesh happy
+        dEg = self.Eg[-1] - self.Eg[-2]
+        dEx = self.Ex[-1] - self.Ex[-2]
+        Eg = np.append(self.Eg, self.Eg[-1] + dEg)
+        Ex = np.append(self.Ex, self.Ex[-1] + dEx)
+        # Move the bins back up
+        self.to_mid_bin()
+        return Eg, Ex
 
-        Args:
-            axis: The axis to project onto.
-                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
-            Emin: The minimum energy to be summed over.
-            Emax: The maximum energy to be summed over.
-            ax: The axes object to plot onto.
-            normalize: If True, normalize the counts to 1. Defaults to False.
-            scale (optional, str): y-scale, i.e `log` or `linear`. Defaults to
-                "linear".
-            **kwargs: Additional kwargs to plot command.
-
-        Raises:
-            ValueError: If axis is not in [0, 1]
-
-        Returns:
-            The ax used for plotting
-        """
-        if ax is None:
-            fig, ax = plt.subplots()
-
-        axis = to_plot_axis(axis)
-        is_Ex = axis == 1
-        projection, energy = self.projection(axis, Emin, Emax,
-                                             normalize=normalize)
-        Vector(values=projection, E=energy).plot(ax=ax, **kwargs)
-
-        if is_Ex:
-            ax.set_xlabel(r"Excitation energy $E_{x}$")
-        else:
-            ax.set_xlabel(r"$\gamma$-ray energy $E_{\gamma}$")
-
-        ax.set_yscale(scale)
-
-        return ax
-
-    def projection(self, axis: Union[int, str], Emin: float = None,
-                   Emax: float = None,
-                   normalize: bool = False) -> Tuple[np.ndarray, np.ndarray]:
+    def projection(self, axis: Union[int, str], Emin: float | None = None,
+                   Emax: float | None = None,
+                   normalize: bool = False) -> Vector:
         """ Returns the projection along the specified axis
 
         Args:
@@ -434,60 +492,30 @@ class Matrix(AbstractArray):
         Returns:
             The projection and the energies summed onto
         """
+        warnings.warn("projection is being deprecation in favor of mat.iloc[i, j:k]", DeprecationWarning)
         axis = to_plot_axis(axis)
         if axis not in (0, 1):
             raise ValueError(f"Axis must be 0 or 1, got: {axis}")
 
         isEx = axis == 1
 
-        # Determine subset of the other axis to be summed
-        indexE = self.index_Eg if isEx else self.index_Ex
-        rangeE = self.range_Eg if isEx else self.range_Ex
-        imin = indexE(Emin) if Emin is not None else rangeE[0]
-        imax = indexE(Emax) if Emax is not None else rangeE[-1]
-        subset = slice(imin, imax+1)
-        selection = self.values[:, subset] if isEx else self.values[subset, :]
-        energy = self.Ex if isEx else self.Eg
-
+        selection = self.loc[:, Emin:Emax] if isEx else self.loc[Emin:Emax, :]
+        energy = self._Ex if isEx else self._Eg
         projection = selection.sum(axis=axis)
         if normalize:
             projection = div0(projection, selection.sum(axis=axis).sum())
 
-        return projection, energy
+        if isEx:
+            label = r"Excitation energy $E_{x}$ "
+        else:
+            label = r"$\gamma$-ray energy $E_{\gamma}$"
 
-    def ascii_plot(self, shape=(5, 5)):
-        """Plots a rebinned ascii version of the matrix
-
-        Args:
-            shape (tuple, optional): Shape of the rebinned matrix
-        """
-        values = np.unique(np.sort(self.values.flatten()))
-        values = values[values > 0]
-        N = len(values)/4
-
-        def block(count):
-            i = np.argmin(np.abs(count - values))
-            b = int(i // N)
-            return ['░░', '▒▒', '▓▓', '██'][b]
-
-        for row in reversed(range(self.shape[0])):
-            print('│', end='')
-            for col in range(self.shape[1]):
-                elem = self[row, col]
-                if elem == 0:
-                    print('  ', end='')
-                else:
-                    print(block(elem), end='')
-            print('')
-        print('└', end='')
-        for col in range(self.shape[1]):
-            print('──', end='')
-        print('')
+        return Vector(values=projection, E=energy, E_label=label)
 
     def cut(self, axis: Union[int, str],
             Emin: Optional[float] = None,
             Emax: Optional[float] = None,
-            inplace: bool = True,
+            inplace: bool = False,
             Emin_inclusive: bool = True,
             Emax_inclusive: bool = True) -> Optional[Matrix]:
         """Cuts the matrix to the sub-interval limits along given axis.
@@ -496,11 +524,11 @@ class Matrix(AbstractArray):
             axis: Which axis to apply the cut to.
                 Can be 0, "Eg" or 1, "Ex".
             Emin: Lowest energy to be included. Defaults to
-                lowest energy. Inclusive.
+                lowest energy. Inclusive by default.
             Emax: Higest energy to be included. Defaults to
-                highest energy. Inclusive.
+                highest energy. Inclusive by default.
             inplace: If True make the cut in place. Otherwise return a new
-                matrix. Defaults to True
+                matrix. Defaults to False.
             Emin_inclusive: whether the bin containing the lower bin
                 should be included (True) or excluded (False).
                 Defaults to True.
@@ -512,73 +540,78 @@ class Matrix(AbstractArray):
             None if inplace == False
             cut_matrix (Matrix): The cut version of the matrix
         """
+        warnings.warn("To be deprecated in favor of mat[i:j, n:m]", DeprecationWarning)
         axis = to_plot_axis(axis)
         range = self.Eg if axis == 0 else self.Ex
         index = self.index_Eg if axis == 0 else self.index_Ex
-        Emin = Emin if Emin is not None else min(range)
-        Emax = Emax if Emax is not None else max(range)
+        magnitude = self.to_same_Eg if axis == 0 else self.to_same_Ex
+        Emin = magnitude(Emin) if Emin is not None else min(range)
+        Emax = magnitude(Emax) if Emax is not None else max(range)
 
         iEmin = index(Emin)
         if range[iEmin] < Emin:
             iEmin += 1
         if not Emin_inclusive:
             iEmin += 1
+
         iEmax = index(Emax)
         if range[iEmax] > Emax:
             iEmax -= 1
         if not Emax_inclusive:
             iEmax -= 1
+
         # Fix for boundaries
-        if Emin >= len(range):
-            Emin = len(range)-1
-        if Emax <= 0:
-            Emax = 0
+        if iEmin >= len(range):
+            iEmin = len(range)-1
+        if iEmax <= 0:
+            iEmax = 0
         iEmax += 1  # Because of slicing
         Eslice = slice(iEmin, iEmax)
         Ecut = range[Eslice]
 
         if axis == 0:
             values_cut = self.values[:, Eslice]
-            Eg = Ecut
-            Ex = self.Ex
+            Eg = Ecut*self.Eg_units
+            Ex = self._Ex
         elif axis == 1:
             values_cut = self.values[Eslice, :]
-            Ex = Ecut
-            Eg = self.Eg
+            Ex = Ecut*self.Eg_units
+            Eg = self._Eg
         else:
-            raise ValueError("Expected axis 0 or 1")
+            raise ValueError("`axis` must be 0 or 1.")
 
         if inplace:
             self.values = values_cut
-            self.Ex = Ex
-            self.Eg = Eg
+            self._Ex = Ex
+            self._Eg = Eg
         else:
-            return Matrix(values_cut, Eg=Eg, Ex=Ex)
+            return self.clone(values=values_cut, Eg=Eg, Ex=Ex)
 
     def cut_like(self, other: Matrix,
-                 inplace: bool = True) -> Optional[Matrix]:
+                 inplace: bool = False) -> Optional[Matrix]:
         """ Cut a matrix like another matrix (according to energy arrays)
 
         Args:
             other (Matrix): The other matrix
             inplace (bool, optional): If True make the cut in place. Otherwise
-                return a new matrix. Defaults to True
+                return a new matrix. Defaults to False.
 
         Returns:
             Optional[Matrix]: If inplace is False, returns the cut matrix
         """
         if inplace:
-            self.cut('Ex', other.Ex.min(), other.Ex.max())
-            self.cut('Eg', other.Eg.min(), other.Eg.max())
+            self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=inplace)
+            self.cut('Eg', other.Eg.min(), other.Eg.max(), inplace=inplace)
         else:
-            out = self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=False)
-            assert out is not None
-            out.cut('Eg', other.Eg.min(), other.Eg.max())
+            out = self.cut('Ex', other.Ex.min(), other.Ex.max(),
+                           inplace=inplace)
+            if out is not None:
+                out.cut('Eg', other.Eg.min(), other.Eg.max(), inplace=True)
             return out
 
-    def cut_diagonal(self, E1: Optional[Iterable[float]] = None,
-                     E2: Optional[Iterable[float]] = None,
-                     inplace: bool = True) -> Optional[Matrix]:
+    def cut_diagonal(self, p1: PointUnit | None = None, p2: PointUnit | None = None,
+                     slope: float | None = None,
+                     inplace: bool = False) -> Matrix | None:
         """Cut away counts to the right of a diagonal line defined by indices
 
         Args:
@@ -586,64 +619,26 @@ class Matrix(AbstractArray):
             E2: Second point of intercept
             inplace: Whether the operation should be applied to the
                 current matrix, or to a copy which is then returned.
+                Defaults to `False`.
 
         Returns:
             The matrix with counts above diagonal removed (if inplace is
             False).
         """
-        if E1 is None or E2 is None:
-            raise ValueError("If either E1 or E2 is specified, "
-                             "both must be specified and have same type")
-        else:
-            mask = self.line_mask(E1, E2)
+        #TODO Fix by using detector resolution
+        line = Line(p1=p1, p2=p2, slope=slope)
+        mask = line.above(self)
 
         if inplace:
             self.values[mask] = 0.0
         else:
-            matrix = copy.deepcopy(self)
+            matrix = self.clone()
             matrix.values[mask] = 0.0
             return matrix
 
-    def line_mask(self, E1: Iterable[float],
-                  E2: Iterable[float]) -> np.ndarray:
-        """Create a mask for above (True) and below (False) a line
-
-        Args:
-            E1: First point of intercept, ordered as Ex, Eg
-            E2: Second point of intercept
-
-        Returns:
-            The boolean array with counts below the line set to False
-
-        TODO:
-            - Write as a property with memonized output for unchanged matrix
-
-        NOTE:
-            This method and Jørgen's original method give 2 pixels difference
-            Probably because of how the interpolated line is drawn
-        """
-        # Transform from energy to index basis
-        # NOTE: Ex and Ey refers to x- and y-direction
-        # not excitation and gamma
-        Ex1, Ey1 = E1
-        Ex2, Ey2 = E2
-        Ix = self.indices_Eg([Ex1, Ex2])
-        Iy = self.indices_Ex([Ey1, Ey2])
-
-        # Interpolate between the two points
-        assert(Ix[1] != Ix[0])
-        a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
-        b = Iy[0] - a*Ix[0]
-        line = lambda x: a*x + b  # NOQA E731
-
-        # Mask all indices below this line to 0
-        i_mesh, j_mesh = np.meshgrid(self.range_Eg, self.range_Ex)
-        mask = np.where(j_mesh < line(i_mesh), True, False)
-        return mask
-
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: Optional[float] = None,
-                  inplace: bool = True) -> Optional[Matrix]:
+                  inplace: bool = False) -> Optional[Matrix]:
         """Create a trapezoidal cut or mask delimited by the diagonal of the
             matrix
 
@@ -659,10 +654,14 @@ class Matrix(AbstractArray):
 
         TODO:
             -possibility to have inclusive or exclusive cut
+            -Remove and move into geometry as Trapezoid
         """
-        matrix = self.copy()
+        matrix = self.clone()
+        Ex_min = self.to_same_Ex(Ex_min)
+        Ex_max = self.to_same_Ex(Ex_max)
+        Eg_min = self.to_same_Eg(Eg_min)
 
-        matrix.cut("Ex", Emin=Ex_min, Emax=Ex_max)
+        matrix.cut("Ex", Emin=Ex_min, Emax=Ex_max, inplace=True)
         if Eg_max is None:
             lastEx = matrix[-1, :]
             try:
@@ -670,8 +669,9 @@ class Matrix(AbstractArray):
             except IndexError():
                 raise ValueError("Last Ex column has no non-zero elements")
             Eg_max = matrix.Eg[iEg_max]
+        Eg_max = self.to_same_Eg(Eg_max)
 
-        matrix.cut("Eg", Emin=Eg_min, Emax=Eg_max)
+        matrix.cut("Eg", Emin=Eg_min, Emax=Eg_max, inplace=True)
 
         Eg, Ex = np.meshgrid(matrix.Eg, matrix.Ex)
         mask = np.zeros_like(matrix.values, dtype=bool)
@@ -685,26 +685,47 @@ class Matrix(AbstractArray):
 
         if inplace:
             self.values = matrix.values
-            self.Ex = matrix.Ex
-            self.Eg = matrix.Eg
-            self.state = matrix.state
+            self._Ex = matrix._Ex
+            self._Eg = matrix._Eg
         else:
             return matrix
 
-    def rebin(self, axis: Union[int, str],
-              mids: Optional[Sequence[float]] = None,
-              factor: Optional[float] = None,
-              inplace: bool = True) -> Optional[Matrix]:
+    @overload
+    def rebin(self, axis: int | str,
+              bins: Sequence[float] | None = None,
+              factor: float | None = None,
+              binwidth: Unitlike | None = None,
+              numbins: int | None = None,
+              inplace: Literal[False] = ...) -> Matrix: ...
+
+    @overload
+    def rebin(self, axis: int | str,
+              bins: Sequence[float] | None = None,
+              factor: float | None = None,
+              binwidth: Unitlike | None = None,
+              numbins: int | None = None,
+              inplace: Literal[True] = ...) -> None: ...
+
+    def rebin(self, axis: int | str,
+              bins: Sequence[float] | None = None,
+              factor: float | None = None,
+              binwidth: Unitlike | None = None,
+              numbins: int | None = None,
+              inplace: bool = False) -> Matrix | None:
         """ Rebins one axis of the matrix
 
         Args:
             axis: the axis to rebin.
-            mids: The new mids along the axis. Can not be
-                given alongside 'factor'.
+            bins: The new mids along the axis. Can not be
+                given alongside 'factor' or 'binwidth'.
             factor: The factor by which the step size shall be
-                changed. Can not be given alongside 'mids'.
+                changed. Can not be given alongside 'mids'
+                or 'binwidth'.
+            binwidth: The new bin width. Can not be given
+                alongside `factor` or `mids`.
             inplace: Whether to change the axis and values
                 inplace or return the rebinned matrix.
+                Defaults to `False`.
         Returns:
             The rebinned Matrix if inplace is 'False'.
         Raises:
@@ -712,48 +733,47 @@ class Matrix(AbstractArray):
         """
 
         axis: int = to_plot_axis(axis)
-        if not (mids is None) ^ (factor is None):
-            raise ValueError("Either 'mids' or 'factor' must be"
-                             " specified, but not both.")
-        mids_old = self.Ex if axis else self.Eg
-
         if axis == 2:
             if inplace:
-                self.rebin(axis=0, mids=mids, factor=factor, inplace=inplace)
-                self.rebin(axis=1, mids=mids, factor=factor, inplace=inplace)
-                return None
+                self.rebin(axis=0, bins=bins, factor=factor,
+                           binwidth=binwidth, inplace=inplace,
+                           numbins=numbins)
+                self.rebin(axis=1, bins=bins, factor=factor,
+                           binwidth=binwidth, inplace=inplace,
+                           numbins=numbins)
+                return
             else:
-                new = self.rebin(axis=0, mids=mids,
-                                 factor=factor, inplace=False)
-                new.rebin(axis=1, mids=mids, factor=factor, inplace=True)
-                return new
+                new = self.rebin(axis=0, bins=bins, factor=factor,
+                                 binwidth=binwidth, inplace=inplace,
+                                 numbins=numbins)
+                return new.rebin(axis=1, bins=bins, factor=factor,
+                                 binwidth=binwidth, inplace=inplace,
+                                 numbins=numbins)
 
-        if factor is not None:
-            if factor <= 0:
-                raise ValueError("'factor' must be positive")
-            num_mids = int(len(mids_old)/factor)
-            mids, step = np.linspace(mids_old[0], mids_old[-1],
-                                     num=num_mids, retstep=True)
-            LOG.debug("Rebinning with factor %g, giving %g mids",
-                      factor, num_mids)
-            LOG.debug("Old step size: %g\nNew step size: %g",
-                      mids_old[1] - mids_old[0], step)
-            mids = np.asarray(mids, dtype=float)
+        oldbins = self.Ex if axis else self.Eg
+        transform = self.to_same_Ex if axis else self.to_same_Eg
+        unit = self.Ex_units if axis else self.Eg_units
+
+        newbins = handle_rebin_arguments(bins=oldbins, transform=transform,
+                                         LOG=LOG, factor=factor, newbins=bins,
+                                         binwidth=binwidth, numbins=numbins)
 
         naxis = (axis + 1) % 2
-        rebinned = rebin_2D(self.values, mids_old, mids, naxis)
+        rebinned = rebin_2D(self.values, oldbins, newbins, naxis)
+
+
         if inplace:
             self.values = rebinned
             if axis:
-                self.Ex = mids
+                self._Ex = newbins * unit
             else:
-                self.Eg = mids
+                self._Eg = newbins * unit
             self.verify_integrity()
         else:
             if naxis:
-                return Matrix(Eg=mids, Ex=self.Ex, values=rebinned)
+                return self.clone(Eg=newbins*unit, values=rebinned)
             else:
-                return Matrix(Eg=self.Eg, Ex=mids, values=rebinned)
+                return self.clone(Ex=newbins*unit, values=rebinned)
 
     def diagonal_elements(self) -> Iterator[Tuple[int, int]]:
         """ Iterates over the last non-zero elements
@@ -767,17 +787,6 @@ class Matrix(AbstractArray):
         """
         return diagonal_elements(self.values)
 
-    def fill(self, Eg: float, Ex: float, count: float = 1.0) -> None:
-        """ Add counts to the bin containing Eg and Ex.
-        Args:
-            Eg (float): Eg energy value (x-axis value)
-            Ex (float): Ex energy value (y-axis value)
-            count (float, optional): Number to add to the bin. Defaults to 1.
-        """
-        warnings.warn("Creating a Matrix with zeros as entries by the "
-                      "shape argument is depreciated. Use "
-                      "Matrix", DeprecationWarning)
-        raise 
 
     def fill_negative(self, window_size: int):
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
@@ -799,25 +808,27 @@ class Matrix(AbstractArray):
         self.fill_negative(window_size=window_size)
         self.remove_negative()
 
-    def index_Eg(self, E: float) -> int:
+    def index_Eg(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Eg value """
-        return index(self.Eg, E)
-        # return np.abs(self.Eg - E).argmin()
+        E = self.to_same_Eg(E)
+        i = index(self.Eg, E)
+        return i
 
-    def index_Ex(self, E: float) -> int:
+    def index_Ex(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Ex value """
-        return index(self.Ex, E)
-        # return np.abs(self.Ex - E).argmin()
+        E = self.to_same_Ex(E)
+        Ex = self.Ex
+        return index(Ex, E)
 
-    def indices_Eg(self, E: Iterable[float]) -> np.ndarray:
+    def indices_Eg(self, E: Iterable[Unitlike]) -> ArrayInt:
         """ Returns the closest indices corresponding to the Eg value"""
         indices = [self.index_Eg(e) for e in E]
-        return np.array(indices)
+        return np.array(indices, dtype=int)
 
-    def indices_Ex(self, E: Iterable[float]) -> np.ndarray:
+    def indices_Ex(self, E: Iterable[Unitlike]) -> ArrayInt:
         """ Returns the closest indices corresponding to the Ex value"""
         indices = [self.index_Ex(e) for e in E]
-        return np.array(indices)
+        return np.array(indices, dtype=int)
 
     @property
     def range_Eg(self) -> np.ndarray:
@@ -854,19 +865,69 @@ class Matrix(AbstractArray):
             raise ValueError(f"state must be str or MatrixState"
                              f". Got {type(state)}")
 
+    def to_same_Ex(self, E: Unitlike) -> float:
+        """ Convert the units of E to the unit of `Ex` and return magnitude.
+
+        Args:
+            E: Convert its units to the same units of `Ex`.
+               If `E` is dimensionless, assume to be of the same unit
+               as `Ex`.
+        """
+        E = ureg.Quantity(E)
+        if not E.dimensionless:
+            E = E.to(self.Ex_units)
+        return E.magnitude
+
+    def to_same_Eg(self, E: Unitlike) -> float:
+        """ Convert the units of E to the unit of `Eg` and return magnitude.
+
+        Args:
+            E: Convert its units to the same units of `Eg`.
+               If `E` is dimensionless, assume to be of the same unit
+               as `Eg`.
+        """
+        E = ureg.Quantity(E)
+        if not E.dimensionless:
+            E = E.to(self.Eg_units)
+        return E.magnitude
+
+    def to(self, unit: str, inplace: bool = False) -> Matrix:
+        """ Returns a copy with units set to `unit`.
+
+        Args:
+            unit: The unit to transform to.
+        Returns:
+            A copy of the matrix with the unit of `Ex` and
+            `Eg` set to `unit`.
+        """
+        if inplace:
+            self._Eg = self._Eg.to(unit)
+            self._Ex = self._Ex.to(unit)
+            return self
+
+        new = self.clone(Ex=self._Ex.to(unit), Eg=self._Eg.to(unit))
+        return new
+
     def to_lower_bin(self):
         """ Transform Eg and Ex from mid bin (=default) to lower bin. """
-        dEx = (self.Ex[1] - self.Ex[0])/2
-        dEg = (self.Eg[1] - self.Eg[0])/2
-        self.Ex -= dEx
-        self.Eg -= dEg
+        dEx = (self._Ex[1] - self._Ex[0])/2
+        dEg = (self._Eg[1] - self._Eg[0])/2
+        self._Ex -= dEx
+        self._Eg -= dEg
 
-    def to_mid_bin(self):
+    def to_mid_bin(self) -> Matrix:
         """ Transform Eg and Ex from lower bin to mid bin (=default). """
-        dEx = (self.Ex[1] - self.Ex[0])/2
-        dEg = (self.Eg[1] - self.Eg[0])/2
-        self.Ex += dEx
-        self.Eg += dEg
+        dEx = (self._Ex[1] - self._Ex[0])/2
+        dEg = (self._Eg[1] - self._Eg[0])/2
+        self._Ex += dEx
+        self._Eg += dEg
+        return self
+
+    def set_order(self, order: str) -> Matrix:
+        self.values = self.values.copy(order=order)
+        self._Ex = self._Ex.copy(order=order)
+        self._Eg = self._Eg.copy(order=order)
+        return self
 
     def iter(self) -> Iterator[Tuple[int, int]]:
         for row in range(self.shape[0]):
@@ -891,83 +952,227 @@ class Matrix(AbstractArray):
             raise TypeError("Other must be a Matrix")
         if np.any(self.shape != other.shape):
             raise ValueError("Must have equal number of energy bins.")
-        if not np.allclose(self.Ex, other.Ex, **kwargs) \
-           or not np.allclose(self.Eg, other.Eg, **kwargs):
+        if not np.allclose(self._Ex, other._Ex, **kwargs) \
+           or not np.allclose(self._Eg, other._Eg, **kwargs):
             raise ValueError("Must have equal energy binning.")
         else:
             return True
 
+    @property
+    def dEx(self) -> float:
+        if True: #self.is_equidistant():
+            return self.Ex[1] - self.Ex[0]
+        else:
+            Ex = self.Ex
+            return (np.roll(Ex, 1) - self.Ex)[1:]
+
+    @property
+    def dEg(self) -> float:
+        if True: #self.is_equidistant():
+            return self.Eg[1] - self.Eg[0]
+        else:
+            Eg = self.Eg
+            return (np.roll(Eg, 1) - self.Eg)[1:]
+
     def __matmul__(self, other: Matrix) -> Matrix:
-        result = self.copy()
         # cannot use has_equal_binning as we don't need the same
         # shape for Ex and Eg.
-        if isinstance(other, Matrix):
-            if len(self.Eg) != len(self.Ex):
-                raise ValueError("Must have equal number of energy bins.")
-            if not np.allclose(self.Eg, other.Eg):
-                raise ValueError("Must have equal energy binning on Eg.")
+        if isinstance(other, type(self)):
+            if not np.allclose(self.Eg, other.Ex):
+                raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
         else:
-            NotImplementedError("Type not implemented")
+            raise NotImplementedError(f"Matrix@{type(other)} not implemented")
 
-        result.values = result.values@other.values
-        return result
+        Ex = self.Ex
+        Eg = other.Ex
+        values = self.values@other.values
+        return Matrix(values=values, Ex=Ex, Eg=Eg)
+
+    @property
+    def summary(self) -> str:
+        if self.is_equidistant():
+            m, n = self.shape
+            s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
+            s += f"{n} bins with dEᵧ: {self.dEg}\n"
+            s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
+            s += f"{m} bins with dEₓ: {self.dEx}\n"
+            s += f"Total counts: {self.sum()}\n"
+        else:
+            s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
+            s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
+            s += f"Variable bin width.\n"
+        s +="\nValues:\n" 
+        return s
+
 
     def __str__(self) -> str:
-        return str(self.values) + "\n" + str(self.Ex) + '\n' + str(self.Eg)
+        summary = self.summary
+        if self.std is not None:
+            return summary+str(self.values)+'\nStd: \n'+str(self.std)
+        else:
+            return summary+str(self.values)
+
+    @property
+    def Ex(self) -> np.ndarray:
+        return self._Ex.magnitude
+
+    @property
+    def Eg(self) -> np.ndarray:
+        return self._Eg.magnitude
+
+    @property
+    def Eg_units(self) -> Any:
+        return self._Eg.units
+
+    @property
+    def Ex_units(self) -> Any:
+        return self._Ex.units
+
+    def clone(self, **kwargs) -> Matrix:
+        """ Copies the object.
+
+        Any keyword argument will override the equivalent
+        attribute in the copy. For example, matrix.clone(Eg=[1,2,3])
+        tries to set the gamma energy to [1,2,3].
+
+        kwargs: Any keyword argument is overwritten
+            in the copy.
+        Returns:
+            The copy
+        """
+        Eg = kwargs.pop('Eg', self._Eg)
+        Ex = kwargs.pop('Ex', self._Ex)
+        values = kwargs.pop('values', self.values)
+        std = kwargs.pop('std', self.std)
+        order = kwargs.pop('order', None)
+        Ex_units = kwargs.pop('Ex_units', self.Ex_units)
+        Eg_units = kwargs.pop('Eg_units', self.Eg_units)
+        xlabel = kwargs.pop('xlabel', self.xlabel)
+        ylabel = kwargs.pop('ylabel', self.ylabel)
+        for key in kwargs.keys():
+            raise RuntimeError(f"Matrix has no setable attribute {key}.")
+
+        matrix = Matrix(Ex=Ex, Eg=Eg, values=values, std=std,
+                        Ex_units=Ex_units, Eg_units=Eg_units,
+                        xlabel=xlabel, ylabel=ylabel)
+        if order is not None:
+            matrix.set_order(order)
+        return matrix
 
 
 class IndexLocator:
     def __init__(self, matrix: Matrix):
         self.mat = matrix
 
-    def __getitem__(self, key):
-        if len(key) == 2:
-            eg, ex = key
-            Eg = self.mat.Eg.__getitem__(eg)
-            Ex = self.mat.Ex.__getitem__(ex)
-            values = self.mat.values.__getitem__(key)
-            return Matrix(Eg=Eg, Ex=Ex, values=values)
-        else:
-            raise ValueError("Give two indices [x, y]")
+    def __getitem__(self, key) -> Matrix | Vector:
+        if len(key) != 2:
+            raise ValueError("Expect two integer indices [i, j].")
+
+        ex, eg = key
+        Eg = self.mat.Eg.__getitem__(eg)
+        Ex = self.mat.Ex.__getitem__(ex)
+        values = self.mat.values.__getitem__(key)
+        if isinstance(Eg, float):
+            return Vector(values, E=Ex, E_label=self.mat.ylabel)
+        elif isinstance(Ex, float):
+            return Vector(values, E=Eg, E_label=self.mat.xlabel)
+        return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
 
 
 class ValueLocator:
     def __init__(self, matrix: Matrix):
         self.mat = matrix
 
-    def __getitem__(self, key):
-        if len(key) == 2:
-            eg, ex = key
-            if isinstance(eg, (int, float)):
-                ieg = self.mat.index_Eg(eg)
-            else:
-                start = None if eg.start is None else self.mat.index_Eg(eg.start)
-                stop = None if eg.stop is None else self.mat.index_Eg(eg.stop)
-                if eg.step is not None:
-                    dx = self.mat.Eg[1] - self.mat.Eg[0]
-                    step = np.ceil(eg.step / dx)
-                else:
-                    step = None
-                ieg = slice(start, stop, step)
+    @overload
+    def parse_Eg(self, eg: Unitlike) -> int: ...
 
-            if isinstance(ex, (int, float)):
-                iex = self.mat.index_Ex(ex)
-            else:
-                start = None if ex.start is None else self.mat.index_Ex(ex.start)
-                stop = None if ex.stop is None else self.mat.index_Ex(ex.stop)
-                if ex.step is not None:
-                    dx = self.mat.Ex[1] - self.mat.Ex[0]
-                    step = np.ceil(ex.step / dx)
-                else:
-                    step = None
-                iex = slice(start, stop, step)
+    @overload
+    def parse_Eg(self, eg: slice) -> slice: ...
+
+    def parse_Eg(self, eg: Unitlike | slice) -> int | slice:
+        if isinstance(eg, Unitlike):
+            return self.mat.index_Eg(eg)
+        elif isinstance(eg, slice):
+            return parse_unit_slice(eg, self.mat.index_Eg, self.mat.dEg, len(self.mat.Eg))
+        else:
+            raise ArgumentError(f"Expected slice or Unitlike, got type: {type(eg)}")
+
+    @overload
+    def parse_Ex(self, ex: Unitlike) -> int: ...
+
+    @overload
+    def parse_Ex(self, ex: slice) -> slice: ...
+
+    def parse_Ex(self, ex: Unitlike | slice) -> int | slice:
+        if isinstance(ex, Unitlike):
+            return self.mat.index_Ex(ex)
+        elif isinstance(ex, slice):
+            return parse_unit_slice(ex, self.mat.index_Ex, self.mat.dEx, len(self.mat.Ex))
+        else:
+            raise ArgumentError(f"Expected slice or Unitlike, got type: {type(ex)}")
+
+    def __getitem__(self, key) -> Matrix | Vector:
+        if len(key) == 2:
+            ex, eg = key
+            iex: int | slice = self.parse_Ex(ex)
+            ieg: int | slice = self.parse_Eg(eg)
+            if isinstance(iex, int) and isinstance(ieg, int):
+                raise ArgumentError("Can not cast scalar to Matrix or Vector")
 
             Eg = self.mat.Eg.__getitem__(ieg)
             Ex = self.mat.Ex.__getitem__(iex)
             values = self.mat.values.__getitem__((iex, ieg))
-            return Matrix(Eg=Eg, Ex=Ex, values=values)
+            std = None
+            if self.mat.std is not None:
+                std = self.mat.std.__getitem__((iex, ieg))
+            if isinstance(iex, int):
+                return Vector(values=values, E=Eg, E_label=self.mat.xlabel)
+            if isinstance(ieg, int):
+                return Vector(values=values, E=Ex, E_label=self.mat.ylabel)
+
+            return self.mat.clone(values=values, Ex=Ex, Eg=Eg, std=std)
         else:
-            raise ValueError("Give two indices [x, y]")
+            raise ValueError("Expect two indices [x, y]")
+
+    def __setitem__(self, key, val):
+        if len(key) == 2:
+            ex, eg = key
+            iex: int | slice = self.parse_Ex(ex)
+            ieg: int | slice = self.parse_Eg(eg)
+
+            self.mat.values[iex, ieg] = val
+        else:
+            raise ValueError("Expect two indices [x, y]")
+
+
+@overload
+def preparse(s: None) -> tuple[Literal[False], None]: ...
+@overload
+def preparse(s: Unitlike) -> tuple[bool, Unitlike]: ...
+
+def preparse(s: Unitlike | None) -> tuple[bool, Unitlike | None]:
+    inclusive = False
+    if isinstance(s, str):
+        s = s.strip()
+        if s[0] == '<':
+            s = s[1:]
+        elif s[0] == '>':
+            inclusive = True
+            s = s[1:]
+
+    return (inclusive, s)
+
+def parse_unit_slice(s: slice, index: Callable[[Unitlike], int],
+                     dx: float, length: int) -> slice:
+    start = None if s.start is None else index(s.start)
+    inclusive, stop_ = preparse(s.stop)
+    stop = None if stop_ is None else index(stop_)
+    if inclusive and stop < length:
+        assert stop is not None
+        stop += 1
+
+    step = None if s.step is None else np.ceil(s.step / dx)
+    return slice(start, stop, step)
 
 
 class MeshLocator(ticker.Locator):

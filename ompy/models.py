@@ -299,15 +299,13 @@ class ExtrapolationModelLow(AbstractExtrapolationModel):
 
     def autorange(self, gsf: Vector):
         """ Set Emin and Emax in MeV from gsf if not set before """
-        gsf = gsf.copy()
-        gsf.to_MeV()
+        gsf = gsf.clone().to('MeV')
         self.Emin = 0 if self.Emin is None else self.Emin
         self.Emax = gsf.E[0] if self.Emax is None else self.Emax
 
     def autofitrange(self, gsf: Vector):
         """ Guess(!) Efit in MeV from gsf if not set before"""
-        gsf = gsf.copy()
-        gsf.to_MeV()
+        gsf = gsf.clone().to('MeV')
         fraction = int(len(gsf.E) / 6)
         if self.Efit[0] is None:
             if len(gsf.E) < 8:
@@ -354,15 +352,13 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
 
     def autorange(self, gsf: Vector):
         """ Set Emin and Emax in MeV from gsf if not set before """
-        gsf = gsf.copy()
-        gsf.to_MeV()
+        gsf = gsf.clone().to('MeV')
         self.Emin = 0 if self.Emin is None else self.Emin
         self.Emax = 20 if self.Emax is None else self.Emax
 
     def autofitrange(self, gsf: Vector, check_existing: bool = True):
         """ Guess(!) Efit in MeV from gsf if not set before"""
-        gsf = gsf.copy()
-        gsf.to_MeV()
+        gsf = gsf.clone().to('MeV')
         fraction = int(len(gsf.E) / 6)
         if self.Efit[0] is None:
             if len(gsf.E) < 8:

@@ -6,6 +6,10 @@ from itertools import product
 from typing import Optional, Tuple, Iterator, Any, Union
 import inspect
 import re
+from matplotlib import patches
+import matplotlib.pyplot as plt
+import scipy.ndimage as nd
+from .header import ArrayFloat, arraylike, Unitlike, ArrayKeV
 
 
 def div0(a, b):
@@ -14,8 +18,8 @@ def div0(a, b):
     # use the fancy function.
     if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
         with np.errstate(divide='ignore', invalid='ignore'):
-            c = np.true_divide(a, b )
-            c[ ~ np.isfinite(c )] = 0  # -inf inf NaN
+            c = np.true_divide(a, b)
+            c[~ np.isfinite(c )] = 0  # -inf inf NaN
     else:
         if b == 0:
             c = 0
@@ -321,6 +325,35 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     ----------
     im
         The AxesImage to be labeled.
+    # iex, ieg = list(zip(*mat.diagonal_elements()))
+    # ieg = list(ieg)
+    # for i, v in enumerate(ieg):
+    #     if v >= len(mat.Eg):
+    #         ieg[i] = len(mat.Eg) - 1
+    # eg, ex = [mat.Eg[i] for i in ieg], [mat.Ex[i] for i in iex]
+    # args, _kwargs = cut.get_args('trapezoid')
+    # arg = lambda i: args[i] if i < len(args) else None
+    # Ex_min = _kwargs.get('Ex_min', arg(0))
+    # Ex_max = _kwargs.get('Ex_max', arg(1))
+    # Eg_min = _kwargs.get('Eg_min', arg(2))
+    # if len(args) >= 4:
+    #     Eg_max = _kwargs.get('Eg_max', arg(3))
+    # else:
+    #     Eg_max = _kwargs.get('Eg_max', arg(3))
+
+    # if Eg_max is None:
+    #     lastEx = mat[-1, :]
+    #     try:
+    #         iEg_max = np.nonzero(lastEx)[0][-1]
+    #     except IndexError():
+    #         raise ValueError("Last Ex column has no non-zero elements")
+    #     Eg_max = mat.Eg[iEg_max]
+
+    # Eg_min = matrix.to_same_Eg(Eg_min)
+    # Eg_max = matrix.to_same_Eg(Eg_max)
+    # Ex_min = matrix.to_same_Ex(Ex_min)
+    # Ex_max = matrix.to_same_Ex(Ex_max)
+
     data
         Data used to annotate.  If None, the image's data is used.  Optional.
     valfmt
@@ -430,3 +463,236 @@ def _retrieve_name(var: Any) -> str:
     assert match is not None, "Retrieving of name failed"
     name = match.group(1)
     return name
+
+
+def only_one_not_none(*args):
+    x = only_one(*[arg is not None for arg in args])
+    return x
+
+
+def only_one(*args):
+    """ One and exactly one of the arguments evaluate to true """
+    already_true = False
+    for arg in args:
+        if arg and not already_true:
+            already_true = True
+        elif arg and already_true:
+            return False
+    return already_true
+
+
+def plot_trapezoid(cut: 'Action', matrix: 'Matrix',
+                   ax=None, plot_matrix=True, **kwargs):
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    mat = cut.act_on(matrix, inplace=False)[0]
+    Eg_max = mat.Eg.max()
+    Eg_min = mat.Eg.min()
+    Ex_max = mat.Ex.max()
+    Ex_min = mat.Ex.min()
+
+    dEg = Eg_max - Ex_max
+    if dEg > 0:
+        binwidth = mat.Eg[1]-mat.Eg[0]
+        dEg = np.ceil(dEg/binwidth) * binwidth
+    x = [Eg_min, Ex_min+dEg, Ex_max+dEg, Eg_min]
+    y = [Ex_min, Ex_min, Ex_max, Ex_max]
+    if plot_matrix:
+        matrix.plot(ax=ax)
+    ax.add_patch(patches.Polygon(xy=list(zip(x, y)), fill=False, **kwargs))
+    return ax
+
+
+def ascii_plot(matrix: 'Matrix', shape=(5, 5)):
+    """Plots a rebinned ascii version of the matrix
+
+    Args:
+        shape (tuple, optional): Shape of the rebinned matrix
+    """
+    values = np.unique(np.sort(matrix.values.flatten()))
+    values = values[values > 0]
+    N = len(values)/4
+
+    def block(count):
+        i = np.argmin(np.abs(count - values))
+        b = int(i // N)
+        return ['░░', '▒▒', '▓▓', '██'][b]
+
+    for row in reversed(range(matrix.shape[0])):
+        print('│', end='')
+        for col in range(matrix.shape[1]):
+            elem = matrix[row, col]
+            if elem == 0:
+                print('  ', end='')
+            else:
+                print(block(elem), end='')
+        print('')
+    print('└', end='')
+    for col in range(matrix.shape[1]):
+        print('──', end='')
+    print('')
+
+def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
+                            kernel_size: Union[str, int,
+                                               Tuple[int, int]] = 'auto'):
+    """ Check if matrix contains too many clustered zeroes
+
+    Only bins above the diagonal are checked. Note that the diagonal
+    is assumed to begin at the last non-zero bin. The zeroes are found
+    by running a counting convolution over a normalized matrix, counting
+    how many zeroes that are within the (NxN) kernel. If this is larger than
+    threshold %, returns true.
+
+    Args:
+        mat: The matrix
+        threshold: Number between 0 and 1. Controls how many zeroes must be
+                   present within the kernel matrix to count as too many.
+                   Increasing the threshold makes the test less sensitive.
+                   Defaults to 0.1, that is, 10% zero bins within the kernel.
+        kernel_size: The size of the kernel. If a single number,
+                     creates a square kernel.
+                     Increasing the kernel will detect more un-clustered zeroes.
+                     Can be either 'auto' or int. If 'auto', defaults to 1/5th
+                     the size of the smallest dimension of the matrix.
+    Returns:
+        True if clustered zeroes are detected.
+    """
+    if isinstance(kernel_size, str):
+        if kernel_size != 'auto':
+            raise ValueError("Kernel size must be 'auto' or int.")
+        width = max(int(0.2*mat.shape[0]), 2)
+        height = max(int(0.2*mat.shape[1]), 2)
+    elif isinstance(kernel_size, int):
+        width = height = kernel_size
+    else:
+        width, height = kernel_size
+    #print(width, height)
+    kernel = np.array(np.ones((width, height)))
+    v = mat.values
+    vv = v/v
+    vv[np.isnan(vv)] = 0
+    # Size we convolve in 2D, each pixel in the convolution
+    # will contain information about a subarray of the matrix.
+    # However, we know that beyond the diagonal is noise
+    # so we must skip all pixels that have been convolved
+    # with bins from beyond the diagonal. This is done by
+    # setting them to NaN and discarding all NaNs in the
+    # convolution.
+    for i, j in mat.diagonal_elements():
+        vv[i, j:] = np.NaN
+    conv = nd.convolve(vv, kernel)
+    m2 = mat.clone(values=conv)
+    #m2.plot()
+    mask = conv < (1 - threshold)*width*height
+    mask = np.array(mask, dtype=float)
+    mask[np.isnan(conv)] = np.nan
+    #fig, ax = plt.subplots()
+
+    found = False
+    for i, row in enumerate(mask):
+        for j, elem in enumerate(row):
+            if np.isnan(elem):
+                break
+            if elem:
+                #print(elem)
+                #print(i, j)
+                mask[i, j] = -5
+                found = True
+                break
+        if found:
+            break
+    #ax.pcolormesh(mask)
+    return found
+
+def plot_projection_rectangle(ax: 'Axes', matrix: 'Matrix', axis: int | str,
+                              Emin: float | None = None,
+                              Emax: float | None = None,
+                              **kwargs):
+        axis = to_plot_axis(axis)
+        if axis not in (0, 1):
+            raise ValueError(f"Axis must be 0 or 1, got: {axis}")
+
+        isEx = axis == 1
+        index = matrix.index_Ex if isEx else matrix.index_Eg
+        E = matrix.Ex if isEx else matrix.Eg
+        E2 = matrix.Eg if isEx else matrix.Ex
+        emin = E[index(Emin)] if Emin is not None else E[0]
+        emax = E[index(Emax)] if Emax is not None else E[-1]
+        start = (emin, 0) if isEx else (0, emin)
+        w = emax - emin if isEx else E[-1]
+        h = emax - emin if not isEx else E2[-1]
+        kwargs |= {'fill': False}
+        kwargs |= {'lw': 1}
+        kwargs |= {'edgecolor': 'r'}
+        rectangle = patches.Rectangle(start, width=w, height=h, **kwargs)
+        ax.add_patch(rectangle)
+        return ax
+
+
+def to_plot_axis(axis: int | str) -> int:
+    """Maps axis to 0, 1 or 2 according to which axis is specified
+
+    Args:
+        axis: Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y'), or
+              (2, 'both', 'egex', 'exeg', 'xy', 'yx')
+    Returns:
+        An int describing the axis in the basis of the plot,
+        _not_ the values' dimension.
+
+    Raises:
+        ValueError if the axis is not supported
+    """
+    try:
+        axis = axis.lower()
+    except AttributeError:
+        pass
+
+    if axis in (0, 'eg', 'x'):
+        return 0
+    elif axis in (1, 'ex', 'y'):
+        return 1
+    elif axis in (2, 'both', 'egex', 'exeg', 'xy', 'yx'):
+        return 2
+    else:
+        raise ValueError(f"Unrecognized axis: {axis}")
+
+
+def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
+                           newbins: arraylike | None = None,
+                           factor: float | None = None,
+                           binwidth: Unitlike | None = None,
+                           numbins: int | None = None) -> ArrayFloat:
+    if not only_one_not_none(newbins, factor, binwidth, numbins):
+        print(newbins, factor, binwidth, numbins)
+        raise ValueError("Either 'bins', 'factor', `numbins` or 'binwidth' must be"
+                            " specified, but not more than one.")
+
+    binwidth_ = transform(binwidth) if binwidth is not None else None
+    newbins_ = transform(newbins) if newbins is not None else None
+
+    if factor is not None:
+        if factor <= 0:
+            raise ValueError("`factor` must be positive")
+        numbins = int(len(bins)/factor)
+
+    if numbins is not None:
+        newbins_, step = np.linspace(bins[0], bins[-1],
+                                 num=numbins, retstep=True)
+        LOG.debug("Rebinning with factor %g, giving %g mids",
+                    factor, len(newbins_))
+        LOG.debug("Old step size: %g\nNew step size: %g",
+                    bins[1] - bins[0], step)
+
+    if binwidth_ is not None:
+        newbins_ = np.arange(bins[0], bins[-1], binwidth_, dtype=float)
+
+    assert newbins_ is not None
+
+    if not np.isclose(newbins_[-1], bins[-1]) or not np.isclose(newbins_[0], bins[0]):
+        LOG.warning("The rebinning resizes the energy vector.")
+    if len(newbins_) > len(bins):
+        raise ValueError("Can not rebin to more bins")
+
+    return newbins_
+

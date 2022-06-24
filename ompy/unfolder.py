@@ -5,12 +5,12 @@ import warnings
 from typing import Optional, Tuple, Callable
 import termtables as tt
 from scipy.ndimage import gaussian_filter1d
-from copy import copy
 from .gauss_smoothing import gauss_smoothing_matrix_1D
 from .library import div0, i_from_E
 from .matrix import Matrix
 from .matrixstate import MatrixState
 from .rebin import rebin_1D
+from . import Bounded, Toggle
 
 
 LOG = logging.getLogger(__name__)
@@ -65,6 +65,10 @@ class Unfolder:
         - Unfolding for a single spectrum (currently needs to be mocked as a
             Matrix).
     """
+    num_iter = Bounded(10, min=1, type=int)
+    minimum_iterations = Bounded(5, min=1, type=int)
+    use_compton_subtraction = Toggle(True)
+
     def __init__(self, num_iter: int = 200, response: Optional[Matrix] = None):
         """Unfolds the gamma-detector response of a spectrum
 
@@ -74,13 +78,11 @@ class Unfolder:
         """
         self.num_iter = num_iter
         self.weight_fluctuation: float = 1e-3
-        self.minimum_iterations: int = 5
 
         self._R: Optional[Matrix] = response
         self.raw: Optional[Matrix] = None
         self.r: Optional[np.ndarray] = None
 
-        self.use_compton_subtraction: bool = True
         self.response_tab: Optional[pandas.DataFrame] = None
         self.FWHM_tweak_multiplier: Optional[dict[str, float]] = None
 
@@ -101,7 +103,6 @@ class Unfolder:
         if self.raw.state != MatrixState.RAW:
             warnings.warn("Trying to unfold matrix that is not raw")
 
-        assert self.R is not None, "Response R must be set"
         assert self.R.shape[0] == self.R.shape[1],\
             "Response R must be a square matrix"
 
@@ -139,7 +140,7 @@ class Unfolder:
         """
         if response is not None:
             self.R = response
-        self.raw = copy(raw)
+        self.raw = raw.to('keV')
         # Set up the arrays
         self.update_values()
         unfolded_cube = np.zeros((self.num_iter, *self.r.shape))
@@ -180,7 +181,7 @@ class Unfolder:
         if self.use_compton_subtraction:
             unfolded = self.compton_subtraction(unfolded)
 
-        unfolded = Matrix(unfolded, Eg=self.raw.Eg, Ex=self.raw.Ex)
+        unfolded = raw.clone(values=unfolded)
         unfolded.state = "unfolded"
 
         self.remove_negative(unfolded)
@@ -239,9 +240,9 @@ class Unfolder:
             np.ndarray: column vector of fluctuations in each Ex bin
         """
 
-        a1 = self.raw.Eg[1] - self.raw.Eg[0]
-        couns_smoothed = gaussian_filter1d(counts, sigma=sigma / a1, axis=1)
-        fluctuations = div0(couns_smoothed - counts, couns_smoothed)
+        smoothed = gaussian_filter1d(counts, sigma=sigma / self.raw.dEg,
+                                     axis=1)
+        fluctuations = div0(smoothed - counts, smoothed)
         fluctuations = np.sum(np.abs(fluctuations), axis=1)
 
         return fluctuations
@@ -284,13 +285,12 @@ class Unfolder:
         Returns:
             folded (Matrix): Folded matrix
         """
-        assert self.R is not None, "Need to load response first"
-        folded = matrix.copy()
-        folded.values = matrix.values@self.R.values
+        folded = matrix.clone(values=matrix.values@self.R.values)
         return folded
 
     @property
     def R(self) -> Matrix:
+        assert self._R is not None, "Set the response matrix."
         return self._R
 
     @R.setter
@@ -350,11 +350,7 @@ class Unfolder:
 
         keys_needed = ["fe", "se", "de", "511"]
         if self.FWHM_tweak_multiplier is None:
-            FWHM_tweak = dict()
-            FWHM_tweak["fe"] = 1
-            FWHM_tweak["se"] = 1
-            FWHM_tweak["de"] = 1
-            FWHM_tweak["511"] = 1
+            FWHM_tweak = {'fe': 1, 'se': 1, 'de': 1, '511': 1}
         else:
             if all(key in self.FWHM_tweak_multiplier for key in keys_needed):
                 FWHM_tweak = self.FWHM_tweak_multiplier

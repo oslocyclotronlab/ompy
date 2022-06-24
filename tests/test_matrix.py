@@ -1,8 +1,50 @@
-import pytest
-import ompy as om
-import numpy as np
-from numpy.testing import assert_equal, assert_almost_equal
+import warnings
 from typing import Tuple
+
+import numpy as np
+import ompy as om
+import pytest
+from numpy.testing import assert_allclose, assert_equal
+from ompy import Matrix
+
+
+def compare_unitful(x, y):
+    try:
+        x.units
+        x_unitful = True
+    except AttributeError:
+        x_unitful = False
+
+    try:
+        y.units
+        y_unitful = True
+    except AttributeError:
+        y_unitful = False
+
+    if x_unitful and y_unitful:
+        assert_equal(x.units, y.units)
+        assert_allclose(x.magnitude, y.magnitude)
+    elif x_unitful and not y_unitful:
+        assert_allclose(x.magnitude, y)
+    elif not x_unitful and y_unitful:
+        assert_allclose(x, y.magnitude)
+    else:
+        assert_allclose(x, y)
+
+
+def assert_matrix(mat, values, Ex, Eg, std=None):
+    compare_unitful(mat.Ex, Ex)
+    compare_unitful(mat.Eg, Eg)
+    assert_allclose(mat.values, values)
+    if std is None:
+        assert_equal(mat.std, None)
+    else:
+        assert_allclose(mat.std, std)
+
+
+def assert_matrices(mat, expect):
+    assert_matrix(mat, expect.values, expect.Ex,
+                  expect.Eg, expect.std)
 
 
 def ones(shape: Tuple[int, int]) -> om.Matrix:
@@ -25,18 +67,148 @@ def ones(shape: Tuple[int, int]) -> om.Matrix:
 
 
 class TestInit:
-    def test_values(self):
-        Eg = np.linspace(0, 1, 100)
-        Ex = np.linspace(-1, 1, 50)
-        values = np.linspace(0, 100, 100*50)
-        mat = om.Matrix(values=values, Eg=Eg, Ex=Ex)
+    def test_wrong_arguments(self):
+        with pytest.raises(ValueError):
+            _ = om.Matrix()
+        with pytest.raises(ValueError):
+            _ = om.Matrix(Eg=[1, 2], Ex=[2, 3])
+        with pytest.raises(ValueError):
+            _ = om.Matrix(Eg=[1, 2], values=[12, 3])
+        with pytest.raises(ValueError):
+            _ = om.Matrix(Ex=[1, 2], values=[12, 3])
 
+    def test_values(self):
+        Ex = np.linspace(-1, 1, 100)
+        Eg = np.linspace(0, 1, 50)
+        values = np.linspace(0, 100, 100*50)
 
         with pytest.raises(ValueError):
-            om.Vector(vals, [1, 2, 3, 4, 5])
+            _ = om.Matrix(values=values, Eg=Eg, Ex=Ex)
+
+        values = values.reshape((100, 50))
+
+        with pytest.raises(ValueError):
+            _ = Matrix(Eg=Eg, Ex=Eg, values=values)
+        with pytest.raises(ValueError):
+            _ = Matrix(Eg=Ex, Ex=Ex, values=values)
+
+        mat = Matrix(Eg=Eg, Ex=Ex, values=values)
+        mat.verify_integrity()
+        assert_matrix(mat, values, Ex, Eg)
+
+        with pytest.raises(ValueError):
+            Matrix(Eg=Eg, Ex=Ex, values=values, std=Ex)
+
+        with pytest.raises(ValueError):
+            Matrix(Eg=Eg, Ex=Ex, values=values, std=values.T)
+
+    def test_copy(self):
+        Ex = np.linspace(-1, 1, 100)
+        Eg = np.linspace(0, 1, 50)
+        values = np.linspace(0, 100, 100*50).reshape((100, 50))
+        std = 0.1*values
+
+        Ex2 = np.linspace(-1, 1, 100)
+        Eg2 = np.linspace(0, 1, 50)
+        values2 = np.linspace(0, 100, 100*50).reshape((100, 50))
+        std2 = 0.1*values2
+
+        mat = Matrix(Eg=Eg, Ex=Ex, values=values, std=std,
+                     copy=True)
+        assert_matrix(mat, values, Ex, Eg, std)
+
+        values[0] += 1
+        Ex[0] += 1
+        Eg[0] += 1
+        std[0] += 1
+        assert_matrix(mat, values2, Ex2, Eg2, std2)
+
+    def test_units(self):
+        Ex = np.linspace(-1, 1, 100)
+        Eg = np.linspace(0, 1, 50)
+        values = np.linspace(0, 100, 100*50).reshape((100, 50))
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values)
+        assert(mat.Ex_units == om.u.keV)
+        assert(mat.Eg_units == om.u.keV)
+
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values, units='MeV')
+        assert(mat.Ex_units == om.u.MeV)
+        assert(mat.Eg_units == om.u.MeV)
+        assert_matrix(mat, values, Ex, Eg)
+
+        Ex = np.linspace(0, 1, 10) * om.ureg.MeV
+        Eg = np.linspace(0, 1, 10) * om.ureg.GeV
+        values = np.linspace(0, 100, 100).reshape((10, 10))
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values)
+        assert(mat.Ex_units == om.u.MeV)
+        assert(mat.Eg_units == om.u.GeV)
+        assert_matrix(mat, values, Ex, Eg)
 
     def test_path(self):
-        pass
+        warnings.warn("Test not implemented")
+
+
+class TestArithmetic:
+    def test(self):
+        Ex = np.linspace(0, 1, 100)
+        Eg = np.linspace(0, 1, 50)
+        values = np.linspace(-1, 1, 50*100).reshape((100, 50))
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values)
+        mat2 = Matrix(Ex=Ex, Eg=Eg, values=values, units='MeV')
+        mat3 = Matrix(Ex=Eg, Eg=Ex, values=values.T)
+        for op in ['+', '-', '*', '/']:
+            fact = eval(f"values{op}values")
+            trial = eval(f"mat{op}mat")
+            assert_allclose(trial.values, fact)
+
+            fact = eval(f"values{op}5.0")
+            trial = eval(f"mat{op}5.0")
+            assert_allclose(trial.values, fact)
+
+            fact = eval(f"2.1{op}values")
+            trial = eval(f"2.1{op}mat")
+            assert_allclose(trial.values, fact)
+
+            with pytest.raises(ValueError):
+                eval(f"mat{op}mat2")
+            with pytest.raises(ValueError):
+                eval(f"mat{op}mat3")
+
+
+def test_to():
+    Ex = np.linspace(0, 1, 10) * om.ureg.MeV
+    Eg = np.linspace(0, 1, 10) * om.ureg.GeV
+    values = np.linspace(0, 100, 100).reshape((10, 10))
+    mat = Matrix(values=values, Ex=Ex, Eg=Eg)
+    mat2 = mat.to('keV')
+
+    assert(mat.Ex_units == om.u.MeV)
+    assert(mat.Eg_units == om.u.GeV)
+    assert(mat2.Ex_units == om.u.keV)
+    assert(mat2.Eg_units == om.u.keV)
+    assert_allclose(mat2.values, values)
+    assert_allclose(mat2.Eg, Eg.magnitude * 1e6)
+    assert_allclose(mat2.Ex, Ex.magnitude * 1e3)
+
+
+def test_to_E():
+    Ex = np.linspace(0, 1, 10) * om.ureg.MeV
+    Eg = np.linspace(0, 1, 10) * om.ureg.GeV
+    values = np.linspace(0, 100, 100).reshape((10, 10))
+    mat = Matrix(values=values, Ex=Ex, Eg=Eg)
+    assert_equal(type(mat.to_same_Ex(0.1)), float)
+    assert_equal(type(mat.to_same_Ex(0.1*om.ureg.keV)), float)
+    assert_equal(type(mat.to_same_Ex('800 keV')), float)
+    assert_equal(type(mat.to_same_Eg(0.1)), float)
+    assert_equal(type(mat.to_same_Eg(0.1*om.ureg.keV)), float)
+    assert_equal(type(mat.to_same_Eg('800 keV')), float)
+
+    assert_allclose(mat.to_same_Ex(0.1), 0.1)
+    assert_allclose(mat.to_same_Ex(0.1*om.ureg.keV), 0.1e-3)
+    assert_allclose(mat.to_same_Ex('800 keV'), 0.8)
+    assert_allclose(mat.to_same_Eg(0.1), 0.1)
+    assert_allclose(mat.to_same_Eg(0.1*om.ureg.keV), 0.1e-6)
+    assert_allclose(mat.to_same_Eg('800 keV'), 0.8e-3)
 
 
 @pytest.fixture()
@@ -44,55 +216,161 @@ def Si28():
     return om.example_raw('Si28')
 
 
-@pytest.mark.parametrize(
-        "axis,Emin,Emax,shape",
-        [('Ex', None, None, (10, 10)),
-         ('Ex', None, 8,    (8, 10)),
-         ('Eg', None, 8,    (10, 8)),
-         ('Eg', 1,    None, (10, 9)),
-         ('Ex', 5.5,  5.5,  (1, 10))],)
-def test_cut_shape(axis, Emin, Emax, shape):
-    mat = ones((10, 10)).cut(axis, Emin, Emax, inplace=False)
-    assert mat.shape == shape
-    assert len(mat.Eg) == shape[1]
-    assert len(mat.Ex) == shape[0]
+def test_clone():
+    Ex = np.linspace(-1, 1)
+    Eg = np.linspace(-2, 4)
+    values = np.random.random((50, 50))
+    std = 0.5*values
+
+    mat = om.Matrix(Ex=Ex, Eg=Eg, values=values, std=std)
+    mat2 = mat.clone()
+    assert_matrices(mat, mat2)
+    mat3 = mat.clone(Ex=0.2*Eg)
+    assert_allclose(mat3.values, values)
+    assert_allclose(mat3.std, std)
+    assert_allclose(mat3.Eg, Eg)
+    assert_allclose(mat3.Ex, 0.2*Eg)
+
+    mat3 = mat.clone(Eg=0.2*Ex)
+    assert_allclose(mat3.values, values)
+    assert_allclose(mat3.std, std)
+    assert_allclose(mat3.Eg, 0.2*Ex)
+    assert_allclose(mat3.Ex, Ex)
+
+    mat3 = mat.clone(values=values.T)
+    assert_allclose(mat3.values, values.T)
+    assert_allclose(mat3.std, std)
+    assert_allclose(mat3.Eg, Eg)
+    assert_allclose(mat3.Ex, Ex)
+
+    mat3 = mat.clone(std=0.5*std)
+    assert_allclose(mat3.values, values)
+    assert_allclose(mat3.std, 0.5*std)
+    assert_allclose(mat3.Eg, Eg)
+    assert_allclose(mat3.Ex, Ex)
+
+    mat3 = mat.clone(Eg=Ex, Ex=Eg, values=values**2, std=0.5*std)
+    assert_allclose(mat3.values, values**2)
+    assert_allclose(mat3.std, 0.5*std)
+    assert_allclose(mat3.Eg, Ex)
+    assert_allclose(mat3.Ex, Eg)
+
+    with pytest.raises(RuntimeError):
+        mat.clone(duck=5)
 
 
-@pytest.mark.parametrize(
-        "Emin,Emax,vector",
-        [(-2, 1, np.array([-1, 0])),
-         (-1, None, np.array([0, 1])),
-         (None, 1.6, np.array([-1, 0, 1])),
-         (-1.2, 1.6, np.array([-1, 0, 1]))])
-def test_cut_limit(Emin, Emax, vector):
-    values = np.zeros((5, 3))
-    values[:, 0] = -1
-    values[:, 2] = 1
-    Eg = [-1.2, 0.2, 1.6]
-    mat = om.Matrix(values=values, Eg=Eg)
-    mat.cut('Eg', Emin, Emax)
-    assert mat[0, :].shape == vector.shape
-    assert np.all(mat[0, :] == vector)
+class TestCut:
+    def test_unitless(self):
+        Ex = np.linspace(0, 120, 120)
+        Eg = np.linspace(0, 180, 180)*om.ureg.MeV
+        values = np.random.random((120, 180))
+        mat = Matrix(values=values, Ex=Ex, Eg=Eg)
+
+        cut = mat.cut('Ex', None, None)
+        assert_equal(cut.shape, mat.shape)
+        assert_equal(cut.shape, values.shape)
+        assert_matrix(cut, values, Ex, Eg)
+
+        cut = mat.cut('Ex', Emin=60)
+        assert_allclose(cut.Ex.max(), 120)
+        assert_allclose(cut.Ex.min(), Ex[Ex>60][0])
+        assert_allclose(cut.Eg.max(), Eg.magnitude.max())
+        assert_allclose(cut.Eg.min(), Eg.magnitude.min())
+
+        cut = mat.cut('Ex', Emax=60)
+        assert_allclose(cut.Ex.max(), Ex[Ex<60][-1])
+        assert_allclose(cut.Ex.min(), 0)
+        assert_allclose(cut.Eg.max(), Eg.magnitude.max())
+        assert_allclose(cut.Eg.min(), Eg.magnitude.min())
+
+        cut = mat.cut('Ex', Emin=50, Emax=100)
+        assert_allclose(cut.Ex.max(), Ex[Ex<100][-1])
+        assert_allclose(cut.Ex.min(), Ex[Ex>50][0])
+        assert_allclose(cut.Eg.max(), Eg.magnitude.max())
+        assert_allclose(cut.Eg.min(), Eg.magnitude.min())
+
+        Eg = Eg.magnitude
+        cut = mat.cut('Eg', Emin=60)
+        assert_allclose(cut.Eg.max(), 180)
+        assert_allclose(cut.Eg.min(), Eg[Eg>60][0])
+        assert_allclose(cut.Ex.max(), Ex.max())
+        assert_allclose(cut.Ex.min(), Ex.min())
+
+        cut = mat.cut('Eg', Emax=60)
+        assert_allclose(cut.Eg.max(), Eg[Eg<60][-1])
+        assert_allclose(cut.Eg.min(), 0)
+        assert_allclose(cut.Ex.max(), Ex.max())
+        assert_allclose(cut.Ex.min(), Ex.min())
+
+        cut = mat.cut('Eg', Emin=50, Emax=100)
+        assert_allclose(cut.Eg.max(), Eg[Eg<100][-1])
+        assert_allclose(cut.Eg.min(), Eg[Eg>50][0])
+        assert_allclose(cut.Ex.max(), Ex.max())
+        assert_allclose(cut.Ex.min(), Ex.min())
+
+    def test_units(self):
+        Ex = np.linspace(0, 120, 120)
+        Eg = np.linspace(0, 180, 180)*om.ureg.MeV
+        values = np.random.random((120, 180))
+        mat = Matrix(values=values, Ex=Ex, Eg=Eg)
+
+        cut = mat.cut('Ex', Emin='50 keV')
+        assert_allclose(cut.Ex.min(), Ex[Ex>50][0])
+        cut = mat.cut('Ex', Emin=om.Q_(50, 'keV'))
+        assert_allclose(cut.Ex.min(), Ex[Ex>50][0])
+        cut = mat.cut('Ex', Emin=50*om.ureg.keV)
+        assert_allclose(cut.Ex.min(), Ex[Ex>50][0])
+
+        Eg2 = Eg.magnitude
+        cut = mat.cut('Eg', Emin='50 MeV')
+        assert_allclose(cut.Eg.min(), Eg2[Eg2>50][0])
+        cut = mat.cut('Eg', Emin=om.Q_(50, 'MeV'))
+        assert_allclose(cut.Eg.min(), Eg2[Eg2>50][0])
+        cut = mat.cut('Eg', Emin=50*om.ureg.MeV)
+        assert_allclose(cut.Eg.min(), Eg2[Eg2>50][0])
+
+        cut = mat.cut('Eg', Emin='6000 keV', Emax='0.1 GeV')
+        assert_allclose(cut.Eg.min(), Eg2[Eg2>6][0])
+        assert_allclose(cut.Eg.max(), Eg2[Eg2<100][-1])
 
 
 def test_cut_Si(Si28):
-    Si28.cut('Ex', Emin=0.0)
+    Si28.cut('Ex', Emin=0.0, inplace=True)
     assert Si28.Ex[0] > 0
 
 
-@pytest.mark.parametrize(
-        "E,index",
-        [(-10.5, 0),
-         (-11, 0),
-         (-10.1, 0),
-         (-9.4, 1),
-         (10, 20),
-         (9.5, 20),
-         (8.6, 19)])
-def test_index(E, index):
-    mat = ones((10, 10))
-    mat.Ex = np.arange(-10.5, 10.5)
-    assert mat.index_Ex(E) == index
+class TestIndex:
+    def test_index(self):
+        Ex = np.linspace(0, 1, 10)
+        Eg = np.linspace(-1, 5, 11)
+        values = np.random.random((10, 11))
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values)
+        for i, E in enumerate(Ex):
+            assert_equal(i, mat.index_Ex(E))
+        for i, E in enumerate(Eg):
+            assert_equal(i, mat.index_Eg(E))
+        assert_equal(0, mat.index_Ex(-10))
+        assert_equal(0, mat.index_Eg(-10))
+        assert_equal(9, mat.index_Ex(10))
+        assert_equal(10, mat.index_Eg(10))
+
+    def test_units(self):
+        Ex = np.linspace(0, 1, 10)*om.ureg('MeV')
+        Eg = np.linspace(-1, 5, 11)
+        values = np.random.random((10, 11))
+        mat = Matrix(Ex=Ex, Eg=Eg, values=values)
+        for i, E in enumerate(Ex):
+            assert_equal(i, mat.index_Ex(E))
+        for i, E in enumerate(Ex.to('keV')):
+            assert_equal(i, mat.index_Ex(E))
+        for i, E in enumerate(Eg):
+            assert_equal(i, mat.index_Eg(E))
+        assert_equal(0, mat.index_Ex(-10))
+        assert_equal(0, mat.index_Eg(-10))
+        assert_equal(9, mat.index_Ex(10))
+        assert_equal(10, mat.index_Eg(10))
+        assert_equal(2, mat.index_Eg(10*om.ureg('eV')))
+
 
 
 @pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')  # noqa
@@ -125,18 +403,18 @@ def test_bin_shift(Ex, Eg):
     values = np.ones((len(Ex), len(Eg)), dtype="float")
     mat = om.Matrix(values=values, Ex=Ex, Eg=Eg)
 
-    assert_almost_equal(Ex, mat.Ex)
-    assert_almost_equal(Eg, mat.Eg)
+    assert_allclose(Ex, mat.Ex)
+    assert_allclose(Eg, mat.Eg)
 
     mat.to_lower_bin()
     mat.to_mid_bin()
-    assert_almost_equal(Ex, mat.Ex)
-    assert_almost_equal(Eg, mat.Eg)
+    assert_allclose(Ex, mat.Ex)
+    assert_allclose(Eg, mat.Eg)
 
     mat.to_mid_bin()
     mat.to_lower_bin()
-    assert_almost_equal(Ex, mat.Ex)
-    assert_almost_equal(Eg, mat.Eg)
+    assert_allclose(Ex, mat.Ex)
+    assert_allclose(Eg, mat.Eg)
 
 
 @pytest.mark.parametrize(
@@ -174,6 +452,29 @@ def test_save_which_error(Ex, Eg):
     with pytest.raises(NotImplementedError):
         mat.save("/tmp/mat.npy", which='Im not real')
 
+
+def test_loc():
+    Ex = np.linspace(0, 10)
+    Eg = np.linspace(-2.1, 103, 104)
+    values = np.random.random((len(Ex), len(Eg)))
+    std = 0.1*values
+    mat = om.Matrix(values=values, Ex=Ex, Eg=Eg, std=std)
+    mat2 = mat.loc[:, :]
+    assert_matrices(mat2, mat)
+
+    mat2 = mat.loc[0:, :]
+    assert_matrices(mat2, mat)
+
+    mat2 = mat.loc[:10, :]
+    assert_allclose(mat2.Ex, np.linspace(0, 10)[:-1])
+
+    mat2 = mat.loc[:'<10 keV', :]
+    assert_allclose(mat2.Ex, np.linspace(0, 10)[:-1])
+
+    mat2 = mat.loc[:'>10 keV', :]
+    assert_matrices(mat2, mat)
+
+    #mat2 = mat.loc[:, '1 keV':'>98 keV']
 
 # This does not work as of now...
 # def test_mutable():
