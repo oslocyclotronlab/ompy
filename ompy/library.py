@@ -664,7 +664,6 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
                            binwidth: Unitlike | None = None,
                            numbins: int | None = None) -> ArrayFloat:
     if not only_one_not_none(newbins, factor, binwidth, numbins):
-        print(newbins, factor, binwidth, numbins)
         raise ValueError("Either 'bins', 'factor', `numbins` or 'binwidth' must be"
                             " specified, but not more than one.")
 

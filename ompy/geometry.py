@@ -12,15 +12,15 @@ if TYPE_CHECKING:
 
 class Geometry(ABC):
 
-    @abstractmethod
+   # @abstractmethod
     @overload
     def apply(self, matrix: Matrix, inplace: Literal[False] = ...) -> None: ...
 
-    @abstractmethod
+   # @abstractmethod
     @overload
     def apply(self, matrix: Matrix, inplace: Literal[True] = ...) -> Matrix: ...
 
-    @abstractmethod
+   # @abstractmethod
     def apply(self, matrix: Matrix, inplace: bool = False) -> Matrix | None:
         ...
 

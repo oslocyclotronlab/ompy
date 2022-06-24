@@ -350,7 +350,8 @@ class Matrix(AbstractArray):
              vmax: float | None = None,
              midbin_ticks: bool = False,
              add_cbar: Literal[True] = ...,
-             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar]]: ...
+             **kwargs) -> (Axes, (QuadMesh, Colorbar)): ...
+
     @overload
     def plot(self, *, ax: Axes | None = None,
              title: str | None = None,
@@ -359,7 +360,7 @@ class Matrix(AbstractArray):
              vmax: float | None = None,
              midbin_ticks: bool = False,
              add_cbar: Literal[False] = ...,
-             **kwargs) -> tuple[Axes, tuple[QuadMesh, None]]: ...
+             **kwargs) -> (Axes, (QuadMesh, None)): ...
 
     def plot(self, *, ax: Axes | None = None,
              title: str | None = None,
@@ -368,7 +369,7 @@ class Matrix(AbstractArray):
              vmax: float | None = None,
              midbin_ticks: bool = False,
              add_cbar: bool = True,
-             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
+             **kwargs) -> (Axes, (QuadMesh, Colorbar | None)):
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -625,7 +626,7 @@ class Matrix(AbstractArray):
             The matrix with counts above diagonal removed (if inplace is
             False).
         """
-        #TODO Fix by using detector resolution
+        # TODO Fix by using detector resolution
         line = Line(p1=p1, p2=p2, slope=slope)
         mask = line.above(self)
 
@@ -736,18 +737,18 @@ class Matrix(AbstractArray):
         if axis == 2:
             if inplace:
                 self.rebin(axis=0, bins=bins, factor=factor,
-                           binwidth=binwidth, inplace=inplace,
+                           binwidth=binwidth, inplace=True,
                            numbins=numbins)
                 self.rebin(axis=1, bins=bins, factor=factor,
-                           binwidth=binwidth, inplace=inplace,
+                           binwidth=binwidth, inplace=True,
                            numbins=numbins)
                 return
             else:
                 new = self.rebin(axis=0, bins=bins, factor=factor,
-                                 binwidth=binwidth, inplace=inplace,
+                                 binwidth=binwidth, inplace=False,
                                  numbins=numbins)
                 return new.rebin(axis=1, bins=bins, factor=factor,
-                                 binwidth=binwidth, inplace=inplace,
+                                 binwidth=binwidth, inplace=False,
                                  numbins=numbins)
 
         oldbins = self.Ex if axis else self.Eg
@@ -977,7 +978,8 @@ class Matrix(AbstractArray):
     def __matmul__(self, other: Matrix) -> Matrix:
         # cannot use has_equal_binning as we don't need the same
         # shape for Ex and Eg.
-        if isinstance(other, type(self)):
+        # HACK isinstance doesn't work
+        if str(other.__class__.__name__) == 'Matrix':
             if not np.allclose(self.Eg, other.Ex):
                 raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
         else:

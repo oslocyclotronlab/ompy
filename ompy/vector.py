@@ -443,9 +443,6 @@ class Vector(AbstractArray):
         Returns:
             The rebinned vector if inplace is 'False'.
         """
-        if not only_one_not_none(bins, factor, binwidth, numbins):
-            raise ValueError("Either 'bins', 'factor', `numbins` or 'binwidth' must be"
-                             " specified, but not more than one.")
         oldbins = self.E
         unit = self.units
 
@@ -454,14 +451,14 @@ class Vector(AbstractArray):
                                          binwidth=binwidth)
 
         rebinned = rebin_1D(self.values, oldbins, newbins)
-        bins *= unit
+        newbins *= unit
 
         if inplace:
             self.values = rebinned
-            self._E = bins
+            self._E = newbins
             self.verify_integrity()
         else:
-            return self.clone(E=bins, values=rebinned)
+            return self.clone(E=newbins, values=rebinned)
 
     @overload
     def rebin_like(self, other: Vector, inplace: Literal[False] = ...) -> Vector: ...
@@ -703,7 +700,8 @@ class Vector(AbstractArray):
             de = self.de
             unit = f"{self.units:~}"
             s = f"Energy: {emin} to {emax} [{unit}]\n"
-            s += f"Binwidth: {de}\n"
+            s += f"{len(self.E)} bins with dE: {de}\n"
+            s += f"Total counts: {self.sum()}\n"
             if self.std is not None:
                 return s+str(self.values)+'\n'+str(self.std)
             else:
