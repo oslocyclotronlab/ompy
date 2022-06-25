@@ -12,6 +12,7 @@ from .models import ResultsNormalized, ExtrapolationModelLow,\
                     ExtrapolationModelHigh, NormalizationParameters
 from .normalizer_nld import NormalizerNLD
 from .spinfunctions import SpinFunctions
+from .stubs import Pathlike
 from .vector import Vector
 
 
@@ -49,7 +50,7 @@ class NormalizerGSF(AbstractNormalizer):
                  nld_model: Callable[..., Any] | None = None,
                  alpha: float | None = None,
                  gsf: Vector | None = None,
-                 path: Union[str, Path] | None = 'saved_run/normalizers',
+                 path: Pathlike | None = 'saved_run/normalizers',
                  regenerate: bool = False,
                  norm_pars: NormalizationParameters | None = None,
                  ) -> None:
@@ -223,7 +224,7 @@ class NormalizerGSF(AbstractNormalizer):
 
     def extrapolate(self,
                     gsf: Vector | None = None,
-                    E: np.ndarray] = [None, None | None
+                    E: np.ndarray = None,
                     ) -> (Vector, Vector):
         """ Extrapolate gsf using given models
 

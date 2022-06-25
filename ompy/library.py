@@ -1,7 +1,7 @@
 import inspect
 import re
 from itertools import product
-from typing import Iterator, Any, Union
+from typing import Iterator, Any, Union, Tuple
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -403,7 +403,7 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     return texts
 
 
-def diagonal_elements(matrix: np.ndarray) -> Iterator[(int, int)]:
+def diagonal_elements(matrix: np.ndarray) -> Iterator[Tuple[int, int]]:
     """ Iterates over the last non-zero elements
 
     Args:
@@ -537,7 +537,7 @@ def ascii_plot(matrix: 'Matrix', shape=(5, 5)):
 
 
 def contains_zeroes_patches(mat: 'Matrix', threshold: float = 0.1,
-                            kernel_size: str | int | (int, int) = 'auto'):
+                            kernel_size: str | int | Tuple[int, int] = 'auto'):
     """ Check if matrix contains too many clustered zeroes
 
     Only bins above the diagonal are checked. Note that the diagonal

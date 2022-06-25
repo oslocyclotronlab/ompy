@@ -14,9 +14,9 @@ from .extractor import Extractor
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
-Point2D = (float, float)
-Points2D = (Point2D, Point2D)
-Interval = (float, float)
+Point2D = Tuple[float, float]
+Points2D = Tuple[Point2D, Point2D]
+Interval = Tuple[float, float]
 array = np.ndarray
 
 
@@ -87,13 +87,13 @@ class Shape:
         self.matrix: Matrix = matrix
         self.spinmodel = None
         self.gsf: Vector = Vector([0], [0])
-        self.gsfs: (Vector, Vector] = Vector([0], [0]), Vector([0], [0))
+        self.gsfs: Tuple[Vector, Vector] = Vector([0], [0]), Vector([0], [0])
         self.reg: Any | None = None
         self.fit_region: array | None = None
 
     def add_diagonal(self, intercept=0, slope=1, *,
                      spin: float, parity: float,
-                     points: Iterable[Point2D] = [],
+                     points = [],
                      thickness: float = 10):
         # TODO ensure that the order of Eg is preserved
         if not points:
@@ -106,19 +106,19 @@ class Shape:
         self.diagonals.append(Diagonal(diagonal, spin, parity))
 
     def compute_gsf(self, kind='log') -> Vector:
-        unsewed: List[(Vector, Vector]) = self.compute_gsf_unsewed()
+        unsewed: List[(Vector, Vector)] = self.compute_gsf_unsewed()
         self.gsf, *self.gsfs = self.sew(unsewed, kind=kind)
         return self.gsf
 
-    def compute_gsf_unsewed(self) -> List[(Vector, Vector]):
-        gsfs: List[(Vector, Vector]] = [)
+    def compute_gsf_unsewed(self) -> List[Tuple[Vector, Vector]]:
+        gsfs: List[Tuple[Vector, Vector]] = []
         for diagonal in self.diagonals:
             gsf = diagonal.compute_gsf(self.spinmodel)
             gsfs.append(gsf)
 
         return gsfs
 
-    def sew(self, gsfs: List[(Vector, Vector]], kind='log') -> Tuple[Vector, Vector, Vector):
+    def sew(self, gsfs: List[Tuple[Vector, Vector]], kind='log') -> Tuple[Vector, Vector, Vector]:
         # TODO Prettify
         (diagonal_1, Egs_1), (diagonal_2, Egs_2) = gsfs
         # Assumes all have same Ex, diagonal_1.E == diagonal_2.E

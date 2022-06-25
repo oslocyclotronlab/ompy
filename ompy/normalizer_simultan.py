@@ -215,7 +215,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
     def optimize(self, num: int,
                  args_nld: Iterable,
-                 guess: Dict[str, float]) -> (Dict[str, (float, float]], Dict[str, List[float])):  # noqa
+                 guess: Dict[str, float]) -> Tuple[Dict[str, Tuple[float, float]], Dict[str, List[float]]]:  # noqa
         """Find parameters given model constraints and an initial guess
 
         Employs Multinest.
@@ -344,7 +344,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
         return popt, samples
 
-    def lnlike(self, x: (float, float, float, float, float),
+    def lnlike(self, x: Tuple[float, float, float, float, float],
                args_nld: Iterable) -> float:
         """Compute log likelihood  of the normalization fitting
 

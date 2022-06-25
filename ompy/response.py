@@ -292,7 +292,7 @@ class Response():
         Eout: np.ndarray = None,
         fwhm_abs: float = None,
         return_table: bool = False,
-    ) -> Union[Matrix, (Matrix, pd.DataFrame]):
+    ) -> Matrix | Tuple[Matrix, pd.DataFrame]:
         """ Interpolated the response matrix
 
         Perform the interpolation for the energy range specified in Eout with

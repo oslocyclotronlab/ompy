@@ -3,6 +3,7 @@ from .vector import Vector
 from .abstractarray import AbstractArray, to_plot_axis
 from typing import Union, Tuple, Optional
 import numpy as np
+from .stubs import array
 
 
 def zeros_like(array: AbstractArray,
@@ -27,10 +28,7 @@ def empty_like(array: AbstractArray,
         raise ValueError(f"Expected Array, not {type(array)}.")
 
 
-def zeros(array: Union[np.ndarray,
-                       (int),
-                       (int, int),
-                       int],
+def zeros(array: array | int | Tuple[int, int],
           **kwargs) -> AbstractArray:
     raise NotImplementedError()
     if isinstance(array, np.ndarray):

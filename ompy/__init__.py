@@ -55,7 +55,7 @@ else:
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor
     from .action import Action
-    from .decomposition import nld_T_product, index
+    from .decomposition import nld_T_product, index, index_2
     from .normalizer_nld import (NormalizerNLD, load_levels_discrete,
                                  load_levels_smooth)
     from .normalizer_gsf import NormalizerGSF

@@ -186,7 +186,7 @@ class AbstractExtrapolationModel(Model):
     # if method is "fit"
     model: Callable[..., Any] = field(default=None,
             metadata='extrapolation model')  # noqa
-    Efit: (float, float) | None = \
+    Efit: Tuple[float, float] | None = \
               field(default_factory=NonTuple2,
                     metadata='Fit range')  # noqa
 
@@ -413,13 +413,13 @@ class NormalizationParameters(Model):
     _A: int | None = field(default=None,
             metadata="Mass number of the nucleus")  # noqa
     #: Average s-wave resonance spacing D0 [eV]
-    D0: (float, float) | None = field(default=None,
+    D0: Tuple[float, float] | None = field(default=None,
             metadata='Average s-wave resonance spacing D0 [eV]')  # noqa
     #: Total average radiative width  [meV]
-    Gg: (float, float) | None = field(default=None,
+    Gg: Tuple[float, float] | None = field(default=None,
             metadata='Total average radiative width  [meV]')  # noqa
     #: Neutron separation energy [MeV]
-    Sn: (float, float) | None = field(default=None,
+    Sn: Tuple[float, float] | None = field(default=None,
             metadata='Neutron separation energy [MeV]')  # noqa
     #: "Target" (A-1 nucleus) ground state spin
     Jtarget: float | None = field(default=None,
@@ -459,7 +459,7 @@ class NormalizationParameters(Model):
 
     def E_grid(self,
                retstep: bool = True
-               ) -> np.ndarray | (np.ndarray, float):
+               ) -> np.ndarray | Tuple[np.ndarray, float]:
         """Wrapps np.linspace creates linearly spaced array from Emin to Emax
 
         Args:

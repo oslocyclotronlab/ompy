@@ -20,7 +20,7 @@ from .filehandling import load_discrete
 from .models import ResultsNormalized, NormalizationParameters
 from .abstract_normalizer import AbstractNormalizer
 
-TupleDict = Dict[str, (float, float])
+TupleDict = Dict[str, Tuple[float, float]]
 
 
 class NormalizerNLD(AbstractNormalizer):
@@ -136,8 +136,8 @@ class NormalizerNLD(AbstractNormalizer):
         """ Wrapper around normalize """
         self.normalize(*args, **kwargs)
 
-    def normalize(self, *, limit_low: (float, float) | None = None,
-                  limit_high: (float, float) | None = None,
+    def normalize(self, *, limit_low: Tuple[float, float] | None = None,
+                  limit_high: Tuple[float, float] | None = None,
                   nld: Vector | None = None,
                   discrete: Vector | None = None,
                   bounds: TupleDict | None = None,
@@ -222,10 +222,9 @@ class NormalizerNLD(AbstractNormalizer):
 
         #self.save()  # save instance
 
-    def initial_guess(self, limit_low: (float, float) | None = None,
-                      limit_high: (float, float) | None = None
-                      ) -> (Tuple[float, float, float, float),
-                                 Dict[str, float]]:
+    def initial_guess(self, limit_low: Tuple[float, float] | None = None,
+                      limit_high: Tuple[float, float] | None = None
+                      ) -> (Tuple[float, float, float, float], Dict[str, float]):
         """ Find an inital guess for the constant, α, T and D₀
 
         Uses differential evolution to perform the guessing.
@@ -475,7 +474,7 @@ class NormalizerNLD(AbstractNormalizer):
         return fig, ax
 
     @staticmethod
-    def lnlike(x: (float, float, float, float), nld_low: Vector,
+    def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
                nld_high: Vector, discrete: Vector,
                model: Callable[..., ndarray],
                Sn, nldSn) -> float:
@@ -524,8 +523,8 @@ class NormalizerNLD(AbstractNormalizer):
         return ct
 
     @staticmethod
-    def nldSn_from_D0(D0: Union[float, (float, float]),
-                      Sn: Union[float, (float, float]), Jtarget: float,
+    def nldSn_from_D0(D0: float | Tuple[float, float],
+                      Sn: float | Tuple[float, float], Jtarget: float,
                       spincutModel: str, spincutPars: Dict[str, Any],
                       **kwargs) -> (float, float):
         """Calculate nld(Sn) from D0
@@ -577,7 +576,7 @@ class NormalizerNLD(AbstractNormalizer):
 
     @staticmethod
     def D0_from_nldSn(nld_model: Callable[..., Any],
-                      Sn: Union[float, (float, float]), Jtarget: float,
+                      Sn: Union[float, Tuple[float, float]], Jtarget: float,
                       spincutModel: str, spincutPars: Dict[str, Any],
                       **kwargs) -> (float, float):
         """Calculate D0 from nld(Sn), assuming equiparity.

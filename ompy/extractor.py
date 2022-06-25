@@ -634,7 +634,7 @@ class Extractor:
 
 
 def normalize(mat: Matrix,
-              std: Matrix]) -> Tuple[np.ndarray, np.ndarray | None:
+              std: Matrix | None) -> Tuple[np.ndarray, np.ndarray]:
     """Matrix normalization per row taking into account the std. dev
 
     Error propagation assuming gaussian error propagation.

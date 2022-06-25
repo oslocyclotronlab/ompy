@@ -7,9 +7,10 @@ import pandas as pd
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 
+from ompy.stubs import Pathlike, array
 
-def mama_read(filename: str) -> Union[(ndarray, ndarray),
-                                      (ndarray, ndarray, ndarray]):
+
+def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray, ndarray]:
     """Read 1d and 2d mama spectra/matrices
 
     Args:
@@ -279,14 +280,14 @@ def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
     np.savetxt(path, mat, header=header)
 
 
-def load_txt_2D(path: Union[str, Path]
+def load_txt_2D(path: Pathlike
                 ) -> (np.ndarray, np.ndarray, np.ndarray):
     mat = np.loadtxt(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
-def load_numpy_1D(path: Union[str, Path]
-                  ) -> (np.ndarray, np.ndarray, np.ndarray) | None:
+def load_numpy_1D(path: Pathlike
+                  ) -> (np.ndarray, np.ndarray, np.ndarray):
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
@@ -298,8 +299,8 @@ def load_numpy_1D(path: Union[str, Path]
 
 
 def save_numpy_1D(values: np.ndarray, E: np.ndarray,
-                  std: Union[np.ndarray, None],
-                  path: Union[str, Path]) -> None:
+                  std: array | None,
+                  path: Pathlike) -> None:
     mat = None
     if std is None:
         mat = np.column_stack((E, values))

@@ -194,14 +194,13 @@ class EnsembleNormalizer(AbstractNormalizer):
                                                              size=N)
         return self.normalizer_gsf.res
 
-    def plot(self, ax: (Any, Any) = None,
+    def plot(self, ax = None,
              add_figlegend: bool = True,
              n_plot: bool = 5,
              plot_model_stats: bool = False,
              random_state: np.random.RandomState | None = None,
              return_stats: bool = False,
-             **kwargs) -> Union[(Any, Any),
-                                (Any, Any, (Any, Any])):
+             **kwargs):
         """Plots randomly drawn samples
 
         Args:
@@ -323,7 +322,7 @@ class EnsembleNormalizer(AbstractNormalizer):
                 samples = samples.append(df)
         return samples
 
-    def plot_selection(self, *, ax: (Any, Any),
+    def plot_selection(self, *, ax: Tuple[Any, Any],
                        samples: pd.DataFrame,
                        normalizer_nld: NormalizerNLD | None,
                        normalizer_gsf: NormalizerGSF | None,
@@ -433,9 +432,9 @@ class EnsembleNormalizer(AbstractNormalizer):
         np.array([vec_extend_values(xi, Eunion) for xi in array])
 
     @staticmethod
-    def plot_vector_stats(ax: (Any, Any),
+    def plot_vector_stats(ax: Tuple[Any, Any],
                           samples: pd.DataFrame,
-                          percentiles: (float, float),
+                          percentiles: Tuple[float, float],
                           color: Any) -> Tuple[Any,
                                                pd.DataFrame, pd.DataFrame]:
         """ Helper for plotting of stats from a vector
@@ -503,8 +502,8 @@ class EnsembleNormalizer(AbstractNormalizer):
     @staticmethod
     def stats_from_df(df: pd.DataFrame,
                       fmap: Callable[[Vector, np.array], None],
-                      shape_out: (int, int),
-                      percentiles: (float, float)) -> pd.DataFrame:
+                      shape_out: Tuple[int, int],
+                      percentiles: Tuple[float, float]) -> pd.DataFrame:
         """Helper to get median, 68% or similar from a collection of Vectors
 
         Args:
@@ -533,7 +532,7 @@ class EnsembleNormalizer(AbstractNormalizer):
     def plot_nld_ext_stats(ax: Any, *, x: np.ndarray,
                            samples: pd.DataFrame,
                            normalizer_nld: NormalizerNLD,
-                           percentiles: (float, float),
+                           percentiles: Tuple[float, float],
                            **kwargs) -> pd.DataFrame:
         """Helper for plotting statistics of the nld extrapolation
 
@@ -568,7 +567,7 @@ class EnsembleNormalizer(AbstractNormalizer):
     def plot_gsf_ext_stats(ax: Any, *, xlow: np.ndarray, xhigh: np.ndarray,
                            samples: pd.DataFrame,
                            normalizer_gsf: NormalizerGSF,
-                           percentiles: (float, float),
+                           percentiles: Tuple[float, float],
                            color: Any) -> (pd.DataFrame, pd.DataFrame):
         """Helper for plotting statistics of the gsf extrapolations
 

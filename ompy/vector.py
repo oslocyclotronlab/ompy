@@ -666,14 +666,14 @@ class Vector(AbstractArray):
         new = self.clone(E=self._E.to(unit))
         return new
 
-    def index(self, E: float) -> int:
+    def index(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the E value
 
         Args:
             E: The value which index to find. If dimensionless,
                assumes the same units as `Vector.E`
         """
-        return index(self.E, self.to_same(E))
+        return np.searchsorted(self.E, self.to_same(E))
 
     def set_order(self, order: str) -> None:
         """ Wrapper around numpy to set the alignment """

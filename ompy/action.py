@@ -1,9 +1,10 @@
-from typing import Union, List, Iterable, Any, Callable, Tuple, Dict
+from typing import Union, List, Iterable, Any, Callable, Tuple, Dict, TypeVar, Generic
 from .matrix import Matrix
 from .vector import Vector
 
+T = TypeVar('T', Matrix, Vector)
 
-class Action:
+class Action(Generic[T]):
     """ Allows for delayed method calls """
     def __init__(self, base='Matrix'):
         self.base = base
@@ -15,7 +16,7 @@ class Action:
         else:
             raise ValueError("'base' must be 'Matrix' or 'Vector'")
 
-    def __call__(self, target: Union[Matrix, Vector]) -> None:
+    def __call__(self, target: T) -> None:
         return self.act_on(target)
 
     def patch(self, base):
@@ -24,14 +25,14 @@ class Action:
             if callable(obj):
                 setattr(self, name, wrap(self, name))
 
-    def act_on(self, target: Union[Matrix, Vector], **kwargs) -> List[Any]:
+    def act_on(self, target: T, **kwargs) -> List[Any]:
         ret_vals: List[Any] = []
         for func, args, _kwargs in self.calls:
             ret = getattr(target, func)(*args, **(_kwargs | kwargs))
             ret_vals.append(ret)
         return ret_vals
 
-    def map(self, collection: Iterable[Union[Matrix, Vector]]) -> List[List[Any]]:
+    def map(self, collection: Iterable[T]) -> List[List[Any]]:
         ret_vals: List[List[Any]] = []
         for member in collection:
             ret = self.act_on(member)
@@ -42,7 +43,7 @@ class Action:
         for call in self.calls:
             call[2].update(kwargs)
 
-    def get_args(self, method: str) -> ((Any, ...], Dict[str, Any)):
+    def get_args(self, method: str) -> ([Any, ...], Dict[str, Any]):
         for (name, args, kwargs) in self.calls:
             if name == method:
                 return args, kwargs

@@ -5,7 +5,7 @@ import logging
 import warnings
 from ctypes import ArgumentError
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator, Sequence, Union, Callable, overload, Literal)
+from typing import (Any, Dict, Iterable, Iterator, Sequence, Union, Callable, overload, Literal, Tuple)
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -797,7 +797,7 @@ class Matrix(AbstractArray):
         self.values = np.where(self.values > 0, self.values, 0)
 
     def fill_and_remove_negative(self,
-                                 window_size: (int, np.ndarray) = 20):
+                                 window_size: Tuple[int, array] = 20):
         """ Combination of :meth:`ompy.Matrix.fill_negative` and
         :meth:`ompy.Matrix.remove_negative`
 
@@ -811,24 +811,22 @@ class Matrix(AbstractArray):
     def index_Eg(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Eg value """
         E = self.to_same_Eg(E)
-        i = index(self.Eg, E)
-        return i
+        return np.searchsorted(self.Eg, E)
 
     def index_Ex(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Ex value """
         E = self.to_same_Ex(E)
-        Ex = self.Ex
-        return index(Ex, E)
+        return np.searchsorted(self.Ex, E)
 
     def indices_Eg(self, E: Iterable[Unitlike]) -> ArrayInt:
         """ Returns the closest indices corresponding to the Eg value"""
-        indices = [self.index_Eg(e) for e in E]
-        return np.array(indices, dtype=int)
+        e = [self.to_same_Eg(e_) for e_ in E]
+        return np.searchsorted(self.Eg, e)
 
     def indices_Ex(self, E: Iterable[Unitlike]) -> ArrayInt:
         """ Returns the closest indices corresponding to the Ex value"""
-        indices = [self.index_Ex(e) for e in E]
-        return np.array(indices, dtype=int)
+        e = [self.to_same_Ex(e_) for e_ in E]
+        return np.searchsorted(self.Ex, e)
 
     @property
     def range_Eg(self) -> np.ndarray:

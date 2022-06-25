@@ -4,6 +4,7 @@ import logging
 import copy
 from typing import Union, Tuple, Sequence
 import numpy as np
+from .stubs import arraylike
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -21,7 +22,7 @@ class AbstractArray:
         """ Raise error as it is implemented in subclass only """
         raise NotImplementedError()
 
-    def same_shape(self, other: Sequence[float], error: bool = False) -> bool:
+    def same_shape(self, other: arraylike, error: bool = False) -> bool:
         return self.has_equal_binning()
 
     def clone(self, **kwargs) -> AbstractArray:
@@ -44,7 +45,7 @@ class AbstractArray:
                 setattr(new, attr, val)
         return new
 
-    def verify_equdistant(self, axis: Union[int, str]):
+    def verify_equdistant(self, axis: int | str):
         """ Runs checks to verify if energy arrays are equidistant
 
         axis: The axis to project onto.
@@ -170,7 +171,7 @@ class AbstractArray:
         raise NotImplementedError()
 
     @property
-    def shape(self) -> Union[(int], (int, int)):
+    def shape(self) -> int | Tuple[int, int]:
         return self.values.shape
 
     def __getitem__(self, key):
