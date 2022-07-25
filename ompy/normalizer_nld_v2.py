@@ -12,7 +12,7 @@ from scipy.optimize import differential_evolution
 from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
-from .stats import truncnorm_ppf
+from .stats import truncnorm_ppf, normal_ppf
 from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
@@ -122,7 +122,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
 
         # Handle the method parameters
-        self.smooth_levels_fwhm = 0.1
+        self.smooth_levels_fwhm = 0.3
         self.nld = None if nld is None else nld.copy()
         self.discrete = discrete
 
@@ -266,16 +266,24 @@ class NormalizerNLD(AbstractNormalizer):
         nld_high = self.nld.cut(*limit_high, inplace=False)
 
         # Artificially increase the nld rel error at low
-        #nld_low.std = nld_low.values * 0.3
-        #nld_low.std *= np.sqrt(2)  # Maybe I'm wrong, it should be twice as high?
+        nld_low.std = nld_low.values * 0.3
         # Instead we will be looking at the cumulative NLD
 
         nldSn = self.nldSn_from_D0(**self.norm_pars.asdict())[1]
         rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
-        def neglnlike(*args, **kwargs):
-            return - self.lnlike(*args, **kwargs)
+        if self.norm_pars.rhoSn is not None:
+            nldSn = self.norm_pars.rhoSn
+
+        def neglnlike(x, *args, **kwargs):
+            # We have a requirement that T, Eshift should fit NLDSn,
+            # therefore we will add a really lot to ensure that this
+            # is the case in the DE
+            Eshift = self.norm_pars.Sn[0] - x[2] * np.log(x[2]*nldSn[0])
+            EshiftSigma = nldSn[1]*x[2]/nldSn[0]
+            EshiftError = ((Eshift - x[3])/EshiftSigma)**2
+            return EshiftError - self.lnlike(x, *args, **kwargs)
         args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
                 nldSn)
         res = differential_evolution(neglnlike, bounds=bounds, args=args,
@@ -343,6 +351,9 @@ class NormalizerNLD(AbstractNormalizer):
         a_Eshift = (lower_Eshift - mu_Eshift) / sigma_Eshift
         b_Eshift = (upper_Eshift - mu_Eshift) / sigma_Eshift
 
+        mu_rhoSn, sigma_rhoSn = self.norm_pars.rhoSn
+        Sn = self.norm_pars.Sn[0]
+
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
@@ -354,8 +365,11 @@ class NormalizerNLD(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
-                                    b_Eshift)*sigma_Eshift + mu_Eshift
+            rhoSn = normal_ppf(cube[3])*sigma_rhoSn + mu_rhoSn
+            cube[3] = Sn - cube[2]*np.log(cube[2] * rhoSn)
+
+            #cube[3] = truncnorm_ppf(cube[3], a_Eshift,
+                                    #b_Eshift)*sigma_Eshift + mu_Eshift
 
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
@@ -488,32 +502,6 @@ class NormalizerNLD(AbstractNormalizer):
 
         return fig, ax
 
-    def lnlike_v2(self, x: Tuple[float, float, float, float], nld_low: Vector,
-                  nld_high: Vector, discrete: Vector,
-                  model: Callable[..., ndarray],
-                  Sn, nldSn) -> float:
-        """ Compute log likelihood of the ...
-        """
-        A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
-        transformed_low = nld_low.transform(A, alpha, inplace=False)
-        transformed_high = nld_high.transform(A, alpha, inplace=False)
-
-        err_low = transformed_low.error(discrete)
-        expected = Vector(E=transformed_high.E,
-                          values=model(E=transformed_high.E,
-                                       T=T, Eshift=Eshift))
-        err_high = transformed_high.error(expected)
-
-        # calculate the D0-equivalent of T and Eshift used
-        D0 = self.D0_from_nldSn(lambda E: model(E, T=T, Eshift=Eshift), **self.norm_pars.asdict())
-
-        err_nldSn = ((D0 - self.norm_pars.D0[0])/self.norm_pars.D0[1])**2
-
-        ln_stds = (np.log(transformed_low.std).sum()
-                   + np.log(transformed_high.std).sum())
-
-        return -0.5*(err_low + err_high + err_nldSn + ln_stds)
-
     @staticmethod
     def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
                nld_high: Vector, discrete: Vector,
@@ -533,7 +521,6 @@ class NormalizerNLD(AbstractNormalizer):
             model: The model to use when fitting the upper region.
                 Must support the keyword arguments
                 ``model(E=..., T=..., Eshift=...) -> ndarray``
-
         Returns:
             lnlike: log likelihood
         """
@@ -547,8 +534,18 @@ class NormalizerNLD(AbstractNormalizer):
                                        T=T, Eshift=Eshift))
         err_high = transformed_high.error(expected)
 
+        # To ensure that the nldSn is weighted about as
+        # much as the exp data we will multiply with
+        # the number of points used to fit the `high`
+        # part of the NLD. This is reasonable because
+        # we trust this measurement equally as much
+        # as the measured NLD. This is meant to remove
+        # some bias introduced by having many points and only a single
+        # point at Sn.
+        nldSn_factor = 0  # len(transformed_high.E)
+
         nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
-        err_nldSn = ((nldSn[0] - nldSn_model)/nldSn[1])**2
+        err_nldSn = nldSn_factor*((nldSn[0] - nldSn_model)/nldSn[1])**2
 
         ln_stds = (np.log(transformed_low.std).sum()
                    + np.log(transformed_high.std).sum())

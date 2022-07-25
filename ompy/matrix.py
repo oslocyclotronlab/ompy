@@ -85,7 +85,8 @@ class Matrix(AbstractArray):
                  std: Optional[np.ndarray] = None,
                  path: Optional[Union[str, Path]] = None,
                  shape: Optional[Tuple[int, int]] = None,
-                 state: Union[str, MatrixState] = None):
+                 state: Union[str, MatrixState] = None,
+                 **kwargs):
         """
         There is the option to initialize it in an empty state.
         In that case, all class variables will be None.
@@ -132,7 +133,7 @@ class Matrix(AbstractArray):
         self.std = std
 
         if path is not None:
-            self.load(path)
+            self.load(path, **kwargs)
         self.verify_integrity()
 
         self.state = state
@@ -680,11 +681,18 @@ class Matrix(AbstractArray):
         mask[Eg >= Ex + dEg] = True
         matrix[mask] = 0
 
+        matrix.std = self.std
+        if self.std is not None:
+            mat = Matrix(Ex=self.Ex, Eg=self.Eg, values=self.std)
+            mat.trapezoid(Ex_min, Ex_max, Eg_min, Eg_max, inplace=True)
+            matrix.std = mat.values
+
         if inplace:
             self.values = matrix.values
             self.Ex = matrix.Ex
             self.Eg = matrix.Eg
             self.state = matrix.state
+            self.std = matrix.std
         else:
             return matrix
 

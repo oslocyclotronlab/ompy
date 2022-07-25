@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import warnings
 from contextlib import redirect_stdout
 from numpy import ndarray
-from scipy.optimize import differential_evolution
+from scipy.optimize import differential_evolution, curve_fit
 from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
@@ -113,8 +113,7 @@ class NormalizerNLD(AbstractNormalizer):
         self._D0 = None
         self._smooth_levels_fwhm = None
         self.norm_pars = norm_pars
-        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-1, 20], 'T': [0.1, 1],
-                       'Eshift': [-5, 5]}  # D0 bounds set later
+        self.bounds = {'A': [0.1, 1e3], 'alpha': [1e-1, 20]}  # D0 bounds set later
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
         self.de_kwargs = {"seed": 65424}
@@ -225,8 +224,8 @@ class NormalizerNLD(AbstractNormalizer):
         self.res.nld = transformed
         self.res.pars = popt
         self.res.samples = samples
-        ext_model = lambda E: self.model(E, T=popt['T'][0],
-                                         Eshift=popt['Eshift'][0])
+        ext_model = lambda E: self.const_temperature(E, T=popt['T'][0],
+                                                     Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
 
         self.save()  # save instance
@@ -274,17 +273,25 @@ class NormalizerNLD(AbstractNormalizer):
         rel_uncertainty = self.norm_pars.D0[1]/self.norm_pars.D0[0]
         nldSn = np.array([nldSn, nldSn * rel_uncertainty])
 
+        # Then...
+        self.coefs = np.polyfit(nld_high.E, np.log(nld_high.values), 1)
+        self.LOG.debug(f"Found best polynomial: a={self.coefs[1]}, b={self.coefs[0]}")
+
+        # We fit the model using curve_fit
+        self.ct_model = lambda E, A, alpha: A*np.exp(self.coefs[1]+(self.coefs[0]+alpha)*E)
+
         def neglnlike(*args, **kwargs):
             return - self.lnlike(*args, **kwargs)
-        args = (nld_low, nld_high, discrete, self.model, self.norm_pars.Sn[0],
+        args = (nld_low, nld_high, discrete, self.ct_model, self.norm_pars.Sn[0],
                 nldSn)
         res = differential_evolution(neglnlike, bounds=bounds, args=args,
                                      **self.de_kwargs)
 
         self.LOG.info("DE results:\n%s", tt.to_string([res.x.tolist()],
-                      header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
+                      header=['A', 'α [MeV⁻¹]']))#, 'T [MeV]', 'Eshift [MeV]']))
 
-        p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
+        #p0 = dict(zip(["A", "alpha", "T", "Eshift"], (res.x).T))
+        p0 = dict(zip(["A", "alpha"], (res.x).T))
         for key, res in p0.items():
             if res in self.bounds[key]:
                 self.LOG.warning(f"DE result for {key} is at edge its bound:"
@@ -325,10 +332,10 @@ class NormalizerNLD(AbstractNormalizer):
                                       "α < 0")
         alpha_exponent = np.log10(guess['alpha'])
 
-        if guess['T'] < 0:
-            raise ValueError("Prior selection not implemented for T < 0; "
-                             "negative temperature is unphysical")
-        T_exponent = np.log10(guess['T'])
+        #if guess['T'] < 0:
+        #    raise ValueError("Prior selection not implemented for T < 0; "
+        #                     "negative temperature is unphysical")
+        #T_exponent = np.log10(guess['T'])
 
         A = guess['A']
 
@@ -352,13 +359,13 @@ class NormalizerNLD(AbstractNormalizer):
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
             # log-uniform prior
             # if T = 1e2, it's between 1e1 and 1e3
-            cube[2] = 10**(cube[2]*2 + (T_exponent-1))
+            # cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
-                                    b_Eshift)*sigma_Eshift + mu_Eshift
+            # cube[3] = truncnorm_ppf(cube[3], a_Eshift,
+            #                        b_Eshift)*sigma_Eshift + mu_Eshift
 
-            if np.isinf(cube[3]):
-                self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
+            # if np.isinf(cube[3]):
+            #    self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
         def loglike(cube, ndim, nparams):
             return self.lnlike(cube, *args)
@@ -387,6 +394,19 @@ class NormalizerNLD(AbstractNormalizer):
 
         samples = analyzer.get_equal_weighted_posterior()[:, :-1]
         samples = dict(zip(names, samples.T))
+
+        T = self.coefs[0] + samples['alpha']
+        Eshift = -T*(np.log(T*samples['A']) + self.coefs[1])
+        samples['T'] = T
+        samples['Eshift'] = Eshift
+
+        names += ['T', 'Eshift']
+        stats['marginals'].append({'1sigma': (np.quantile(T, 0.16),
+                                              np.quantile(T, 0.84)),
+                                   'median': np.quantile(T, 0.5)})
+        stats['marginals'].append({'1sigma': (np.quantile(Eshift, 0.16),
+                                              np.quantile(Eshift, 0.84)),
+                                   'median': np.quantile(Eshift, 0.5)})
 
         # Format the output
         popt = dict()
@@ -488,32 +508,6 @@ class NormalizerNLD(AbstractNormalizer):
 
         return fig, ax
 
-    def lnlike_v2(self, x: Tuple[float, float, float, float], nld_low: Vector,
-                  nld_high: Vector, discrete: Vector,
-                  model: Callable[..., ndarray],
-                  Sn, nldSn) -> float:
-        """ Compute log likelihood of the ...
-        """
-        A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
-        transformed_low = nld_low.transform(A, alpha, inplace=False)
-        transformed_high = nld_high.transform(A, alpha, inplace=False)
-
-        err_low = transformed_low.error(discrete)
-        expected = Vector(E=transformed_high.E,
-                          values=model(E=transformed_high.E,
-                                       T=T, Eshift=Eshift))
-        err_high = transformed_high.error(expected)
-
-        # calculate the D0-equivalent of T and Eshift used
-        D0 = self.D0_from_nldSn(lambda E: model(E, T=T, Eshift=Eshift), **self.norm_pars.asdict())
-
-        err_nldSn = ((D0 - self.norm_pars.D0[0])/self.norm_pars.D0[1])**2
-
-        ln_stds = (np.log(transformed_low.std).sum()
-                   + np.log(transformed_high.std).sum())
-
-        return -0.5*(err_low + err_high + err_nldSn + ln_stds)
-
     @staticmethod
     def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
                nld_high: Vector, discrete: Vector,
@@ -537,17 +531,18 @@ class NormalizerNLD(AbstractNormalizer):
         Returns:
             lnlike: log likelihood
         """
-        A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
+        #A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
+        A, alpha = x[:2]  # slicing needed for multinest?
         transformed_low = nld_low.transform(A, alpha, inplace=False)
         transformed_high = nld_high.transform(A, alpha, inplace=False)
 
         err_low = transformed_low.error(discrete)
         expected = Vector(E=transformed_high.E,
                           values=model(E=transformed_high.E,
-                                       T=T, Eshift=Eshift))
+                                       A=A, alpha=alpha))
         err_high = transformed_high.error(expected)
 
-        nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
+        nldSn_model = model(E=Sn, A=A, alpha=alpha)
         err_nldSn = ((nldSn[0] - nldSn_model)/nldSn[1])**2
 
         ln_stds = (np.log(transformed_low.std).sum()

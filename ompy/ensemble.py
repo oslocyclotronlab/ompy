@@ -126,6 +126,11 @@ class Ensemble:
 
         self.raw.state = "raw"
 
+    def __len__(self) -> int:
+        """ Returns the number of ensemble members
+        """
+        return self.size
+
     def load(self, path: Optional[Union[str, Path]] = None):
         """ Loads a saved ensamble. Alternative to `regenerate`.
 
@@ -417,7 +422,7 @@ class Ensemble:
         self.std_firstgen = firstgen_std
 
     def generate_gaussian(self, state: str,
-                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray: # noqa
+                          rstate: Optional[np.random.Generator] = np.random.default_rng) -> np.ndarray:  # noqa
         """Generates an array with Gaussian perturbations of a matrix.
         Note that entries are truncated at 0 (only positive).
 

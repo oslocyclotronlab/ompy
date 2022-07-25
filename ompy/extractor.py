@@ -353,7 +353,8 @@ class Extractor:
 
         # Convert transmission coefficient to the more useful
         # gamma strength function
-        gsf = T/(2*np.pi*matrix.Eg**3)
+        Eg = matrix.Eg / 1e3  # Ensure we devide by MeV and not keV
+        gsf = T/(2*np.pi*Eg**3)
 
         if product:
             nld_0 = np.where(np.isnan(nld), np.zeros_like(nld), nld)

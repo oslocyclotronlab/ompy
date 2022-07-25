@@ -443,6 +443,9 @@ class NormalizationParameters(Model):
     #: Parameters necessary for the spin cut model
     _spincutPars: Dict[str, Any] = field(default=None,
             metadata='parameters necessary for the spin cut model')  # noqa
+    #: Optional, user given NLD at Sn
+    rhoSn: Optional[Tuple[float, float]] = field(default=None,
+            metadata='Level density at the neutron separation energy')  # noqa
 
     #: Optional Parameters (do not check in `is_changed`).
     #: Defaults to ["A", "Z", "exclude_check_change"]

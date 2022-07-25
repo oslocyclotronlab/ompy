@@ -268,17 +268,22 @@ class EnsembleNormalizer(AbstractNormalizer):
             else:
                 fig, ax_stats = plt.subplots(2, 1)  # dummy
             Emin = samples["nld"].iloc[0].E[-1]
-            x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=20)
+            if self.normalizer_simultan is None:
+                Emin = self.normalizer_nld.limit_high[0]
+            elif self.normalizer_simultan is not None:
+                Emin = self.normalizer_simultan.normalizer_nld.limit_high[0]
+            x = np.linspace(Emin, normalizer_nld.norm_pars.Sn[0], num=101)
             stats_nld_model = \
                 self.plot_nld_ext_stats(ax_stats[0], x=x, samples=samples,
                                         normalizer_nld=normalizer_nld,
                                         percentiles=percentiles,
                                         color=colors[2],
                                         label="model")
+            stats_nld_model['x'] = x
 
             E = samples["gsf"].iloc[0].E
-            xlow = np.linspace(0.001, E[0], num=20)
-            xhigh = np.linspace(E[-1], normalizer_gsf.norm_pars.Sn[0], num=20)
+            xlow = np.linspace(0.001, E[0], num=101)
+            xhigh = np.linspace(E[-1], normalizer_gsf.norm_pars.Sn[0], num=101)
             stats_gsf_model = \
                 self.plot_gsf_ext_stats(ax_stats[1], xlow=xlow, xhigh=xhigh,
                                         samples=samples,
@@ -525,6 +530,8 @@ class EnsembleNormalizer(AbstractNormalizer):
         np.fromiter(map(fmap, indexed, repeat(out)), dtype=float)
         stats = pd.DataFrame(out[:, :])
         stats = pd.DataFrame({'median': stats.median(),
+                              'mean': stats.mean(),
+                              'std': stats.std(),
                               'low': stats.quantile(percentiles[0], axis=0),
                               'high': stats.quantile(percentiles[1], axis=0)})
         return stats

@@ -130,6 +130,7 @@ else:
 fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
+openmp = False
 
 extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
 extra_link_args = []
@@ -162,7 +163,7 @@ ext_modules_pybind11 = [
 
 install_requires = [
  "cython",
- "numpy>=1.20.0",
+ "numpy>=1.20.0,<1.22.0",
  "pandas",
  "matplotlib",
  "termtables",

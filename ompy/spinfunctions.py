@@ -22,10 +22,15 @@ class SpinFunctions:
         self.model = model
         self.pars = pars
 
-    def get_sigma2(self):
+    def get_sigma2(self, Ex: Optional[Union[float, Sequence]] = None,
+                   **kwargs):
         """ Get the square of the spin cut for a specified model """
         model = self.model
         pars = self.pars
+
+        pars['Ex'] = Ex
+        for key, value in kwargs.items():
+            pars[key] = value
 
         if model == "const":
             pars_req = {"sigma"}
@@ -49,7 +54,10 @@ class SpinFunctions:
             raise TypeError(
                 "\nError: Spincut model not supported; check spelling\n")
 
-    def distribution(self) -> Tuple[float, np.ndarray]:
+    def distribution(self, Ex: Optional[Union[float, Sequence]] = None,
+                     J: Optional[Union[float, Sequence]] = None,
+                     **kwargs
+                     ) -> Tuple[float, np.ndarray]:
         """Get spin distribution
 
         Note: Assuming equal parity
@@ -59,17 +67,19 @@ class SpinFunctions:
                 depends on input Ex and J and is squeezed if only one of them
                 is an array. If both are arrays: `spinDist[Ex,J]`
         """
-        sigma2 = self.get_sigma2()
+        sigma2 = self.get_sigma2(Ex, **kwargs)
         sigma2 = sigma2[np.newaxis]  # ability to transpose "1D" array
 
-        spinDist = ((2. * self.J + 1.) / (2. * sigma2.T)
-                    * np.exp(-np.power(self.J + 0.5, 2.) / (2. * sigma2.T)))
+        J = self.J if J is None else J
+
+        spinDist = ((2. * J + 1.) / (2. * sigma2.T)
+                    * np.exp(-np.power(J + 0.5, 2.) / (2. * sigma2.T)))
         return np.squeeze(spinDist)  # return 1D if Ex or J is single entry
 
     # different spin cut models
 
     def gconst(self, sigma: float,
-              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence]:  # noqa
         """
         Constant spin-cutoff parameter
 
@@ -83,7 +93,7 @@ class SpinFunctions:
         return np.full_like(Ex, sigma**2)
 
     def gEB05(self, mass: int, NLDa: float, Eshift: float,
-              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence] : # noqa
+              Ex: Optional[Union[float, Sequence]] = None) -> Union[float, Sequence]: # noqa
         """
         Von Egidy & B PRC72,044311(2005), Eq. (4)
         The rigid moment of inertia formula (RMI)
