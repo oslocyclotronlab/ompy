@@ -12,7 +12,7 @@ from scipy.interpolate import interp1d, RectBivariateSpline
 from scipy.stats import truncnorm
 
 from .stubs import ArrayFloat, arraylike, Unitlike, ArrayKeV
-
+from . import ureg
 
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
@@ -697,3 +697,105 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
         raise ValueError("Can not rebin to more bins")
 
     return newbins_
+
+def from_unit(quantity: Unitlike, default: Unitlike) -> float:
+    unit = ureg.Unit(default)
+    match quantity:
+        case str():
+            return ureg.Quantity(quantity).to(unit).magnitude
+        case ureg.Quantity():
+            return quantity.to(unit).magnitude
+        case _:
+            return quantity
+
+def into_unit(quantity: Unitlike, default: Unitlike) -> Unitlike:
+    value = from_unit(quantity, default)
+    return value * ureg.Unit(default)
+
+
+from scipy.optimize import curve_fit
+def fit_resolution(mat: 'Matrix'):
+    def OSCAR(e):
+        a0 = 60.6473
+        a1 = 0.45802
+        a2 = 2.655517e-4
+        return np.sqrt(a0 + a1 * e + a2 * e ** 2)
+
+    ps = []
+    Eg = mat.Eg
+    for ex_i in range(mat.shape[0]):
+        e_diagonal = mat.Ex[ex_i]
+        #if e_diagonal < 800:
+        #    continue
+        eg_i = mat.index_Eg(e_diagonal)
+        if eg_i > mat.shape[1] - 1:
+            break
+        eg = mat.Eg[eg_i]
+        at_diag = mat[ex_i, eg_i]
+        # Cut off most of the data to force a fit
+        sigma = OSCAR(e_diagonal)
+        values = mat[ex_i, :]
+        cutoff = 2*sigma
+        mask = (eg - cutoff < Eg) & (Eg < eg + cutoff)
+        v = values[mask]
+        E = Eg[mask]
+        if len(E) < 10:
+            continue
+        p0 = [at_diag, e_diagonal, sigma]
+        try:
+            popt, pcov = curve_fit(ngaussian, E, v, p0=p0)
+        except RuntimeError:
+            continue
+        y = ngaussian(E, *popt)
+        plot = False
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(E, v, '.')
+            ax.plot(E, y)
+            ax.set_title(f"Ex = {e_diagonal:.2f}")
+        ps.append([e_diagonal, *popt])
+        #if e_diagonal > 2000:
+        #    break
+    return np.vstack(ps)
+
+
+from numba import njit
+@njit
+def ngaussian(x, A: float, mu: float, sigma: float):
+    return A* np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
+
+from .geometry import Line, ThickLine
+def diagonal_sum(mat: 'Matrix', slope=1, thickness=1):
+    N_Ex = mat.shape[0]
+    I = np.array(range(-N_Ex+1, N_Ex))
+    Ex = np.hstack([-1*mat.Ex[-1*I[I < 0]], mat.Ex[I[I >= 0]]])
+    S = []
+    for ex_i, ex in zip(I, Ex):
+        line = Line(p1=(0, ex), slope=slope)
+        tline = ThickLine(line, thickness=thickness)
+        mask = tline.within(mat)
+        #print(ex_i, mask.sum())
+        S.append(mat[mask])
+    summed = np.array([sum(s) for s in S])
+    average = np.array([np.mean(s) for s in S])
+    return I, Ex, summed, average, S
+
+def diagonal_sum_2(mat: 'Matrix', slope=1, thickness=1):
+    N_Ex = mat.shape[0]
+    S = []
+    Ex = []
+    # The Ex-distance caused by the thickness
+    offset = thickness / (np.cos(np.arctan(slope)))
+    print(offset)
+    ex = -mat.Ex[-1]
+    while ex < mat.Ex[-1]:
+        Ex.append(ex)
+        line = Line(p1=(0, ex), slope=slope)
+        tline = ThickLine(line, thickness=thickness)
+        mask = tline.within(mat)
+        #print(ex_i, mask.sum())
+        S.append(mat[mask])
+        ex += offset
+    summed = np.array([sum(s) for s in S])
+    average = np.array([np.mean(s) for s in S])
+    return np.array(Ex), summed, average, S

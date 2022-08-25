@@ -31,6 +31,7 @@ else:
     ureg.setup_matplotlib()
     u = ureg
     Q_ = ureg.Quantity
+    Quantity = ureg.Quantity
 
     import warnings
     warnings.simplefilter('always', DeprecationWarning)
@@ -67,4 +68,5 @@ else:
     from .library import (div0, fill_negative_gauss, fill_negative_max,
                           plot_trapezoid, contains_zeroes_patches,
                           ascii_plot, plot_projection_rectangle)
+    from .detector import Detector, OSCAR
     from .introspection import logging, hooks

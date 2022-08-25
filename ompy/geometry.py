@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from abc import ABC, abstractmethod
+from .library import from_unit
 
 if TYPE_CHECKING:
     from .matrix import Matrix
@@ -12,15 +13,15 @@ if TYPE_CHECKING:
 
 class Geometry(ABC):
 
-   # @abstractmethod
+    # @abstractmethod
     @overload
     def apply(self, matrix: Matrix, inplace: Literal[False] = ...) -> None: ...
 
-   # @abstractmethod
+    # @abstractmethod
     @overload
     def apply(self, matrix: Matrix, inplace: Literal[True] = ...) -> Matrix: ...
 
-   # @abstractmethod
+    # @abstractmethod
     def apply(self, matrix: Matrix, inplace: bool = False) -> Matrix | None:
         ...
 
@@ -35,20 +36,23 @@ class Geometry(ABC):
 
     @staticmethod
     def resolve(point: PointUnit, matrix: Matrix) -> PointI:
-        ieg = matrix.index_Eg(point[0])
-        iex = matrix.index_Ex(point[1])
+        ieg = matrix.index_Eg_extended(point[0])
+        iex = matrix.index_Ex_extended(point[1])
         return ieg, iex
 
-    @overload
     @staticmethod
-    def maybe_resolve(point: PointUnit , matrix: Matrix) -> PointI: ...
     @overload
+    def maybe_resolve(point: PointUnit, matrix: Matrix) -> PointI: ...
     @staticmethod
-    def maybe_resolve(point: None , matrix: Matrix) -> None: ...
+    @overload
+    def maybe_resolve(point: None, matrix: Matrix) -> None: ...
+
     @staticmethod
     def maybe_resolve(point: PointUnit | None, matrix: Matrix) -> PointI | None:
         if point is not None:
             return Geometry.resolve(point, matrix)
+        return None
+
 
 class Line(Geometry):
     def __init__(self, *, p1: PointUnit | None = None,
@@ -60,10 +64,14 @@ class Line(Geometry):
         self.slope = slope
 
     def resolve_self(self, matrix: Matrix) -> (PointI, PointI):
-        p1 = Geometry.maybe_resolve(self.p1, matrix)
-        p2 = Geometry.maybe_resolve(self.p2, matrix)
-        p1, p2 = refine_points(p1, p2, self.slope)
-        return p1, p2
+        p1: Point | None = Geometry.maybe_resolve(self.p1, matrix)
+        p2: Point | None = Geometry.maybe_resolve(self.p2, matrix)
+        slope = self.slope
+        # Correct for binning
+        if slope is not None:
+            slope *= matrix.dEg / matrix.dEx
+        p: Points = refine_points(p1, p2, slope)
+        return p
 
     def above(self, matrix: Matrix) -> ArrayBool:
         p1, p2 = self.resolve_self(matrix)
@@ -75,6 +83,11 @@ class Line(Geometry):
         mask = line_mask(matrix, p1, p2, 'at')
         return mask
 
+    def below(self, matrix: Matrix) -> ArrayBool:
+        p1, p2 = self.resolve_self(matrix)
+        mask = line_mask(matrix, p1, p2, 'below')
+        return mask
+
     def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
         mask = self.at(matrix)
         Eg, Ex = matrix.plot_bins()
@@ -84,6 +97,41 @@ class Line(Geometry):
         ax.pcolormesh(Eg, Ex, masked, cmap=palette,
                       norm=colors.Normalize(vmin=-1.0, vmax=0.5))
         return ax
+
+    def parallel_shift(self, delta: Unitlike) -> Line:
+        p1_ = from_unit(self.p1, 'keV')
+        p2_ = from_unit(self.p2, 'keV')
+        d = from_unit(delta, 'keV')
+        p1, p2 = refine_points(p1_, p2_, self.slope)
+        p1 = np.array(p1)
+        p2 = np.array(p2)
+        # Normal to the line
+        n = (p2 - p1) / np.linalg.norm(p2 - p1)
+        # 90 degrees to the line
+        v = np.array([-n[1], n[0]])
+        # Shift the line by thickness
+        p3 = p1 + v * d
+        p4 = p2 + v * d
+        return Line(p1=p3, p2=p4)
+
+
+class ThickLine(Geometry):
+    def __init__(self, line: Line, thickness: Unitlike):
+        super().__init__()
+        self.line = line
+        self.thickness = thickness
+        self.upper = line.parallel_shift(thickness)
+        self.lower = line.parallel_shift(-self.thickness)
+
+    def within(self, matrix: Matrix) -> ArrayBool:
+        mask = self.upper.above(matrix) & self.lower.below(matrix)
+        return mask
+
+    def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
+        self.line.draw(matrix, ax, color)
+        self.upper.draw(matrix, ax, color='y')
+        return self.lower.draw(matrix, ax, color='y')
+
 
 
 def line_mask(matrix: Matrix, p1: PointI, p2: PointI,
@@ -151,6 +199,6 @@ def points_from_partial(slope: float, point: Point) -> Points:
     return points_from_ab(intercept, slope)
 
 def points_from_ab(intercept: float, slope: float) -> Points:
-    Eg0, Eg1 = 0, 5000
+    Eg0, Eg1 = 0.0, 5000.0
     Ex0, Ex1 = intercept, slope*Eg1 + intercept
     return ((Eg0, Ex0), (Eg1, Ex1))

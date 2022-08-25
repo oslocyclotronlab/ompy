@@ -184,7 +184,7 @@ class Unfolder:
         unfolded = raw.clone(values=unfolded)
         unfolded.state = "unfolded"
 
-        self.remove_negative(unfolded)
+        unfolded[unfolded < 0] = 0
         return unfolded
 
     def step(self, unfolded: np.ndarray, folded: np.ndarray,

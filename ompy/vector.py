@@ -690,6 +690,14 @@ class Vector(AbstractArray):
         else:
             return (self.E - np.roll(self.E, 1))[1:]
 
+    def last_nonzero(self) -> int:
+        """ Returns the index of the last nonzero value """
+        j = len(self)
+        while (j := j - 1) >= 0:
+            if self[j] != 0:
+                break
+        return j
+
     def __matmul__(self, other: Vector) -> Vector:
         result = self.clone()
         if isinstance(other, Vector):
