@@ -11,7 +11,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import ticker
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
 from . import ureg
 from .abstractarray import AbstractArray, to_plot_axis
@@ -406,6 +406,10 @@ class Matrix(AbstractArray):
                 if _max - _min > 10:
                     vmin = 10**(int(_max-6))
             norm = LogNorm(vmin=vmin, vmax=vmax)
+        elif scale == 'symlog':
+            lintresh = kwargs.pop('lintresh', 1e-1)
+            linscale = kwargs.pop('linscale', 1)
+            norm = SymLogNorm(lintresh, linscale, vmin, vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
         else:
@@ -1043,7 +1047,13 @@ class Matrix(AbstractArray):
         return Matrix(values=values, Ex=Ex, Eg=Eg)
 
     @property
-    def summary(self) -> str:
+    def T(self) -> 'Matrix':
+        values = self.values.T
+        assert self.std is None
+        return self.clone(values=values, Eg=self.Ex, Ex=self.Eg)
+
+    @property
+    def _summary(self) -> str:
         if self.is_equidistant():
             m, n = self.shape
             s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
@@ -1055,12 +1065,14 @@ class Matrix(AbstractArray):
             s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
             s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
             s += f"Variable bin width.\n"
-        s +="\nValues:\n" 
         return s
 
+    def summary(self):
+        print(self._summary)
 
     def __str__(self) -> str:
-        summary = self.summary
+        summary = self._summary
+        summary += "\nValues:\n" 
         if self.std is not None:
             return summary+str(self.values)+'\nStd: \n'+str(self.std)
         else:
