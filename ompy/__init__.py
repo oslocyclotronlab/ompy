@@ -47,7 +47,7 @@ else:
     from .matrix import Matrix
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .vector import Vector
-    from .ufunc import zeros_like, empty_like
+    from .ufunc import zeros_like, empty_like, empty
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble

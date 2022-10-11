@@ -193,7 +193,7 @@ class Matrix(AbstractArray):
         if self.Eg.ndim == 1:
             if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
-                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
+                                  f" ({shape[0]}, _{shape[1]}_) ≠ "
                                   f"{len(self.Eg)}"))
         else:
             raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
@@ -838,12 +838,13 @@ class Matrix(AbstractArray):
     def index_Eg(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Eg value """
         E = self.to_same_Eg(E)
-        return np.searchsorted(self.Eg, E)
+        # Almost as fast, but numba is much faster(!?)
+        return index(self.Eg, E) #np.searchsorted(self.Eg, E, side='left')
 
     def index_Ex(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Ex value """
         E = self.to_same_Ex(E)
-        return np.searchsorted(self.Ex, E)
+        return index(self.Ex, E) #np.searchsorted(self.Ex, E, side='left')
 
     def index_Eg_extended(self, E: Unitlike) -> float:
         """ Assumes a continuous mapping R[index] -> R[energy] """
@@ -1031,26 +1032,33 @@ class Matrix(AbstractArray):
         values = self.values[rmin:rmax+1, cmin:cmax+1]
         return self.__class__(values, Ex=self.Ex[rmin:rmax+1], Eg=self.Eg[cmin:cmax+1])
 
-    def __matmul__(self, other: Matrix) -> Matrix:
+    def __matmul__(self, other: Matrix | Vector) -> Matrix | Vector:
         # cannot use has_equal_binning as we don't need the same
         # shape for Ex and Eg.
-        # HACK isinstance doesn't work
+        # HACK isinstance doesn't work (autoreload?)
         if str(other.__class__.__name__) == 'Matrix':
             if not np.allclose(self.Eg, other.Ex):
                 raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
+        elif str(other.__class__.__name__) == 'Vector':
+            if not np.allclose(self.Eg, other.E):
+                raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
+            values = self.values @ other.values
+            return Vector(values=values, E=other.E)
         else:
             raise NotImplementedError(f"Matrix@{type(other)} not implemented")
 
         Ex = self.Ex
-        Eg = other.Ex
+        Eg = other.Eg
         values = self.values@other.values
+        # TODO how to handle labels??
         return Matrix(values=values, Ex=Ex, Eg=Eg)
 
     @property
     def T(self) -> 'Matrix':
         values = self.values.T
         assert self.std is None
-        return self.clone(values=values, Eg=self.Ex, Ex=self.Eg)
+        return self.clone(values=values, Eg=self.Ex, Ex=self.Eg,
+                          xlabel=self.ylabel, ylabel=self.xlabel)
 
     @property
     def _summary(self) -> str:
@@ -1060,7 +1068,7 @@ class Matrix(AbstractArray):
             s += f"{n} bins with dEᵧ: {self.dEg}\n"
             s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
             s += f"{m} bins with dEₓ: {self.dEx}\n"
-            s += f"Total counts: {self.sum()}\n"
+            s += f"Total counts: {self.sum():,}\n"
         else:
             s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
             s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
