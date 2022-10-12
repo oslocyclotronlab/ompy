@@ -21,7 +21,7 @@ class Validator:
         # Autoreload has a bug where it is unable to reload decorators.
         # This seems to (?) circumvent the bug
         if obj is None:
-            print("TRIED TO SET TO NONE. Using autoreload?")
+            #print("TRIED TO SET TO NONE. Using autoreload?")
             return
         return getattr(obj, self.private_name)
 

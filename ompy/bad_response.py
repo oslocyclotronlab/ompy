@@ -13,10 +13,9 @@ from pathlib import Path
 from typing import Union, Optional, Tuple, Dict, Any
 from scipy.interpolate import interp1d
 import logging
-from numba import njit, int32, float32, float64, jit
+from numba import njit, int32, float32, float64, jit, prange
 from collections import OrderedDict
 from numba.experimental import jitclass
-from tqdm.autonotebook import tqdm
 
 #from .rebin import rebin_1D
 from .library import div0
@@ -56,6 +55,31 @@ class ComptonNeighbours(object):
     def energies(self):
         return np.array([self.elow, self.ehigh])
 
+spec2 = OrderedDict()
+spec2['x'] = float64[::1]
+spec2['y'] = float64[::1]
+@jitclass(spec2)
+class Intp(object):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __call__(self, x):
+        return self.call(x)
+
+    def call(self, x):
+        i = index(self.x, x)
+        if x < self.x[i]:
+            return 0.0
+        if x > self.x[-1]:
+            return 0.0
+
+        x0 = self.x[i]
+        x1 = self.x[i+1]
+        y0 = self.y[i]
+        y1 = self.y[i+1]
+        t = (x - x0)/(x1 - x0)
+        return (1 - t)*y0 + t*y1
 
 class Response():
     """ Interpolates response read from file for current setup
@@ -287,10 +311,10 @@ class Response():
         self.pcmp = self.cmp_matrix.sum(axis=1)
 
         # Full energy, single escape, etc:
-        self.pFE = div0(self.resp['FE'], self.sum_spec)
-        self.pSE = div0(self.resp['SE'], self.sum_spec)
-        self.pDE = div0(self.resp['DE'], self.sum_spec)
-        self.p511 = div0(self.resp['c511'], self.sum_spec)
+        pFE = div0(self.resp['FE'], self.sum_spec).to_numpy()
+        pSE = div0(self.resp['SE'], self.sum_spec).to_numpy()
+        pDE = div0(self.resp['DE'], self.sum_spec).to_numpy()
+        p511 = div0(self.resp['c511'], self.sum_spec).to_numpy()
 
         # Interpolate the peak structures except Compton (handled separately)
 
@@ -306,10 +330,10 @@ class Response():
             return lambda x: np.interp(x, Eg, y)
 
         self.f_pcmp = interpolate(self.pcmp)
-        self.f_pFE = interpolate(self.pFE)
-        self.f_pSE = interpolate(self.pSE, fill_value=0)
-        self.f_pDE = interpolate(self.pDE, fill_value=0)
-        self.f_p511 = interpolate(self.p511, fill_value=0)
+        self.f_pFE = interpolate(pFE)
+        self.f_pSE = interpolate(pSE, fill_value=0)
+        self.f_pDE = interpolate(pDE, fill_value=0)
+        self.f_p511 = interpolate(p511, fill_value=0)
         self.f_fwhm_rel_perCent_norm = interpolate(self.resp['FWHM_rel_norm'])
         # TODO: Should this be extrapolated, too?
         self.f_Eff_tot = interpolate(self.resp['Eff_tot'])
@@ -317,6 +341,13 @@ class Response():
         fwhm_rel_1330 = (self.fwhm_abs.magnitude / 1330 * 100)
         self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm'] *
                                               fwhm_rel_1330)
+
+        fpFE = Intp(Eg, pFE)
+        fpSE = Intp(Eg, pSE)
+        fpDE = Intp(Eg, pDE)
+        f511 = Intp(Eg, p511)
+        self.interpolated = (fpFE, fpSE, fpDE, f511)
+
 
         def f_fwhm_abs(E):  # noqa
             return E * self.f_fwhm_rel_perCent(E) / 100
@@ -372,10 +403,14 @@ class Response():
         self.N_out = N_out
         fwhm_abs_array = Eout * self.f_fwhm_rel_perCent(Eout) / 100
 
-        R = np.zeros((N_out, N_out))
         Eg = self.resp['Eg'].to_numpy()
-        # Loop over rows of the response matrix
-        # TODO for speedup: Change this to a cython
+        pFE, pSE, pDE, p511 = self.interpolated
+
+        #R = interpolate_body(E=Eout, Eg=Eg, fwhm=fwhm_abs_array, compton_mat=self.cmp_matrix,
+        #                     Ecmp=self.Ecmp_array, truncate=self.truncate, pFE=pFE, pSE=pSE, pDE=pDE, p511=p511)
+        R = np.zeros((N_out, N_out))
+
+
         for j, E in enumerate(Eout):
             oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma
@@ -390,10 +425,10 @@ class Response():
                 fan_method_compton(E, compton, i_start=i_bsc+1, i_stop=i_Egmax,
                                    Eout=self.Eout)
             if i_last <= i_bsc + 2:  # fan method didn't do anything
-                R_high = self.linear_to_end(E,
+                R_high = linear_to_end(E,
                                             compton,
                                             i_start=i_bsc + 1,
-                                            i_stop=i_Egmax)
+                                            i_stop=i_Egmax, Nout=N_out)
                 R[j, :] += R_low + R_high
             else:
                 R_high = fan_to_end(E,
@@ -401,7 +436,7 @@ class Response():
                                     i_start=i_last + 1,
                                     i_stop=i_Egmax,
                                     fwhm_abs_array=fwhm_abs_array,
-                                    Eout=self.Eout)
+                                    Eout=Eout)
                 R[j, :] += R_low + R_fan + R_high
 
             # coorecton below E_sim[0]
@@ -409,7 +444,8 @@ class Response():
                 R[j, j + 1:] = 0
 
             # TODO This is a 30% bottleneck
-            discrete_peaks = self.discrete_peaks(j, fwhm_abs_array)
+            discrete_peaks = mdiscrete_peaks(Eout, j, fwhm_abs_array, self.truncate,
+                                            pFE, pSE, pDE, p511)
             R[j, :] += discrete_peaks
 
             # smooth if compton background was not smoothed before (?)
@@ -476,85 +512,65 @@ class Response():
 
 
 
-    def linear_to_end(self, E: float, compton: ComptonNeighbours, i_start: int,
-                      i_stop: int) -> np.ndarray:
-        """Interpolate one-to-one from the last fan energy to the Emax
+@njit()
+def interpolate_body(E, Eg, fwhm, compton_mat, Ecmp, truncate,
+                     pFE, pSE, pDE, p511):
+    N = len(E)
+    R = np.zeros((N, N))
+    for j in range(N):
+        e = E[j]
+        oneSigma = fwhm[j] / 2.35
+        Egmax = e + 6 * oneSigma
+        i_Egmax = min(index(E, Egmax), N - 1)
+        #LOG.debug(f"Response for E {E:.0f} calc up to {Eout[i_Egmax]:.0f}")
 
-        Args:
-            E (float): Incident energy
-            compton (dict): Dict. with information about the compton spectra
-               to interpolate between
-            i_start (int): Index where to start (usually end of fan method)
-            i_stop (int): Index where to stop (usually E+n*resolution)
+        # TODO This is a 50% bottleneck
+        compton = get_closest_compton(e, Eg, compton_mat, E, Ecmp)
 
-        Returns:
-            np.ndarray: Response for `E`
-        """
-        R = np.zeros(self.N_out)
-        #fcmp = interpolate_compton(compton, E)
-        fcmp = interpolate_compton_2(compton, E)
-        R[i_start:i_stop + 1] = fcmp[i_start:i_stop + 1]
-        R[R < 0] = 0
-        return R
-
-    #@njit
-
-    def discrete_peaks(self, i_response: int,
-                       fwhm_abs_array: np.ndarray) -> np.ndarray:
-        """Add discrete peaks for a given channel and smooth them
-
-        Args:
-            i_response (int): Channel in response matrix
-            fwhm_abs_array (np.ndarray): Array with fwhms for each channel
-
-        Returns:
-            Array with smoothed discrete peaks
-        """
-        discrete_peaks = np.zeros(self.N_out)
-        Eout = self.Eout
-        E_fe = Eout[i_response]
-
-        # Add single-escape peak
-        E_se = E_fe - 511
-        if E_se >= 0 and E_se >= Eout[0]:
-            i_floor, i_ceil, floor_distance\
-                = two_channel_split(E_se, Eout)
-            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_pSE(E_fe)
-            discrete_peaks[i_ceil] += floor_distance * self.f_pSE(E_fe)
-
-        # Repeat for double-escape peak
-        E_de = E_fe - 2 * 511
-        if E_de >= 0 and E_de >= Eout[0]:
-            i_floor, i_ceil, floor_distance\
-                = two_channel_split(E_de, Eout)
-            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_pDE(E_fe)
-            discrete_peaks[i_ceil] += floor_distance * self.f_pDE(E_fe)
-
-        # Add 511 annihilation peak
-        if E_fe > 511 and 511 >= Eout[0]:
-            E_511 = 511
-            i_floor, i_ceil, floor_distance\
-                = two_channel_split(E_511, Eout)
-            discrete_peaks[i_floor] += (1 - floor_distance) * self.f_p511(E_fe)
-            discrete_peaks[i_ceil] += floor_distance * self.f_p511(E_fe)
-
-            #if not self.smooth_compton:
-            # Do common smoothing of the discrete_peaks array:
-        if self.smooth_fe:
-            discrete_peaks[i_response] = self.f_pFE(E_fe)
-            discrete_peaks = gauss_smoothing(discrete_peaks,
-                                                Eout,
-                                                fwhm_abs_array,
-                                                truncate=self.truncate)
+        R_low, i_bsc = linear_backscatter(E, e, compton)
+        R_fan, i_last = \
+            fan_method_compton(e, compton, i_start=i_bsc+1, i_stop=i_Egmax,
+                                Eout=E)
+        if i_last <= i_bsc + 2:  # fan method didn't do anything
+            R_high = linear_to_end(e,
+                                    compton,
+                                    i_start=i_bsc + 1,
+                                    i_stop=i_Egmax,
+                                    Nout=N)
+            R[j, :] += R_low + R_high
         else:
-            discrete_peaks = gauss_smoothing(discrete_peaks,
-                                                Eout,
-                                                fwhm_abs_array,
-                                                truncate=self.truncate)
-            discrete_peaks[i_response] = self.f_pFE(E_fe)
+            R_high = fan_to_end(e,
+                                compton,
+                                i_start=i_last + 1,
+                                i_stop=i_Egmax,
+                                fwhm_abs_array=fwhm,
+                                Eout=E)
+            R[j, :] += R_low + R_fan + R_high
 
+        # correction below E_sim[0]
+        if e < Eg[0]:
+            R[j, j + 1:] = 0
 
-        return discrete_peaks
+        discrete_peaks = mdiscrete_peaks(E, j, fwhm, truncate,
+                                        pFE, pSE, pDE, p511)
+        R[j, :] += discrete_peaks
+
+        # smooth if compton background was not smoothed before (?)
+        # if performed here, no need to smooth twice, see discrete_peaks
+        # TODO Whay is the reasoning here?
+        if False:
+            R[j, :] = gauss_smoothing(R[j, :],
+                                        E,
+                                        fwhm,
+                                        truncate=truncate)
+
+    # normalize (preserve probability)
+    normalize(R)
+
+    R = np.where(R < 0, 0.0, R)
+    # Remove any negative elements from response matrix:
+    return R
+
 
 @njit
 def E_compton(Eg, theta):
@@ -888,6 +904,28 @@ def div0_2(a, b):
         return 0.0
     return c
 
+@njit
+def linear_to_end(E: float, compton: ComptonNeighbours, i_start: int,
+                    i_stop: int, Nout) -> np.ndarray:
+    """Interpolate one-to-one from the last fan energy to the Emax
+
+    Args:
+        E (float): Incident energy
+        compton (dict): Dict. with information about the compton spectra
+            to interpolate between
+        i_start (int): Index where to start (usually end of fan method)
+        i_stop (int): Index where to stop (usually E+n*resolution)
+
+    Returns:
+        np.ndarray: Response for `E`
+    """
+    R = np.zeros(Nout)
+    #fcmp = interpolate_compton(compton, E)
+    fcmp = interpolate_compton_2(compton, E)
+    R[i_start:i_stop + 1] = fcmp[i_start:i_stop + 1]
+    R[R < 0] = 0
+    return R
+
 
 @njit
 def linear_backscatter(Eout, E: float,
@@ -1085,33 +1123,9 @@ def normalize(R):
 
 
 
-spec2 = OrderedDict()
-spec2['x'] = float64[::1]
-spec2['y'] = float64[::1]
-class Intp(object):
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
 
-    def __call__(self, x):
-        return self.call(x)
-
-    def call(self, x):
-        i = index(self.x, x)
-        if x < self.x[i]:
-            return 0.0
-        if x > self.x[-1]:
-            return 0.0
-
-        x0 = self.x[i]
-        x1 = self.x[i+1]
-        y0 = self.y[i]
-        y1 = self.y[i+1]
-        t = (x - x0)/(x1 - x0)
-        return (1 - t)*y0 + t*y1
-
-
-def discrete_peaks(Eout, i_response: int,
+@njit
+def mdiscrete_peaks(Eout, i_response: int,
                     fwhm_abs_array: np.ndarray, truncate:  float,
                    pFE: Intp, pSE: Intp, pDE: Intp, p511: Intp) -> np.ndarray:
     """Add discrete peaks for a given channel and smooth them
@@ -1125,31 +1139,31 @@ def discrete_peaks(Eout, i_response: int,
     """
     discrete_peaks = np.zeros(len(Eout))
     E_fe = Eout[i_response]
-    discrete_peaks[i_response] = pFE(E_fe)
+    discrete_peaks[i_response] = pFE.call(E_fe)
 
     # Add single-escape peak
     E_se = E_fe - 511
     if E_se >= 0 and E_se >= Eout[0]:
         i_floor, i_ceil, floor_distance\
             = two_channel_split(E_se, Eout)
-        discrete_peaks[i_floor] += (1 - floor_distance) * pSE(E_fe)
-        discrete_peaks[i_ceil] += floor_distance * pSE(E_fe)
+        discrete_peaks[i_floor] += (1 - floor_distance) * pSE.call(E_fe)
+        discrete_peaks[i_ceil] += floor_distance * pSE.call(E_fe)
 
     # Repeat for double-escape peak
     E_de = E_fe - 2 * 511
     if E_de >= 0 and E_de >= Eout[0]:
         i_floor, i_ceil, floor_distance\
             = two_channel_split(E_de, Eout)
-        discrete_peaks[i_floor] += (1 - floor_distance) * pDE(E_fe)
-        discrete_peaks[i_ceil] += floor_distance * pDE(E_fe)
+        discrete_peaks[i_floor] += (1 - floor_distance) * pDE.call(E_fe)
+        discrete_peaks[i_ceil] += floor_distance * pDE.call(E_fe)
 
     # Add 511 annihilation peak
     if E_fe > 511 and 511 >= Eout[0]:
         E_511 = 511
         i_floor, i_ceil, floor_distance\
             = two_channel_split(E_511, Eout)
-        discrete_peaks[i_floor] += (1 - floor_distance) * p511(E_fe)
-        discrete_peaks[i_ceil] += floor_distance * p511(E_fe)
+        discrete_peaks[i_floor] += (1 - floor_distance) * p511.call(E_fe)
+        discrete_peaks[i_ceil] += floor_distance * p511.call(E_fe)
 
         #if not self.smooth_compton:
         # Do common smoothing of the discrete_peaks array:
@@ -1159,50 +1173,3 @@ def discrete_peaks(Eout, i_response: int,
                                         truncate=truncate)
 
     return discrete_peaks
-
-def simulate_response(read: Path, write: Path, number: int = 1):
-    read = Path(read)
-    header, resp = load_resp(read)
-    compton_paths, compton_vectors = load_compton(read)
-    write = Path(write)
-    for i in tqdm(range(number)):
-        path = Path(str(write) + f'_{i}')
-        path.mkdir(exist_ok=True)
-        simulate_columns(path, header, resp)
-        simulate_all_compton(path, compton_paths, compton_vectors)
-
-
-def load_compton(path: Path):
-    cmps = list(path.glob("cmp*"))
-    vectors = [Vector(path=cmp) for cmp in cmps]
-    return cmps, vectors
-
-def load_resp(path: Path) -> tuple[list[str], np.ndarray]:
-    path = path / 'resp.dat'
-    with path.open() as infile:
-        header = [next(infile) for _ in range(5)]
-    resp = np.loadtxt(path, skiprows=5)
-    return header, resp
-
-def simulate_columns(path: Path, header: list[str], resp):
-    fe = np.random.poisson(resp[:, 3])
-    de = np.random.poisson(resp[:, 4])
-    se = np.random.poisson(resp[:, 5])
-    c511 = np.random.poisson(resp[:, 6])
-    with open(path / 'resp.dat', 'w') as outfile:
-        line = ''.join(header)
-        for i in range(len(fe)):
-            line += f'{int(resp[i, 0]):5g}    {resp[i, 1]:.4e}    {resp[i, 2]:.4e}    '
-            line += f'{fe[i]:.4e}    {de[i]:.4e}    {se[i]:.4e}    {c511[i]:.4e}'
-            line += '\n'
-        line = line[:-1]
-        outfile.write(line)
-
-def simulate_all_compton(path: Path, paths, vectors):
-    for cmp_path, vector in zip(paths, vectors):
-        new_path = path / cmp_path.name
-        vec = Vector(E=vector.E, values=np.random.poisson(vector))
-        vec.save(path=new_path)
-
-def simulate_compton():
-    pass 

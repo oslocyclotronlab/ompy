@@ -16,7 +16,6 @@ import logging
 from numba import njit, int32, float32, float64, jit
 from collections import OrderedDict
 from numba.experimental import jitclass
-from tqdm.autonotebook import tqdm
 
 #from .rebin import rebin_1D
 from .library import div0
@@ -513,6 +512,7 @@ class Response():
         discrete_peaks = np.zeros(self.N_out)
         Eout = self.Eout
         E_fe = Eout[i_response]
+        discrete_peaks[i_response] = self.f_pFE(E_fe)
 
         # Add single-escape peak
         E_se = E_fe - 511
@@ -540,19 +540,10 @@ class Response():
 
             #if not self.smooth_compton:
             # Do common smoothing of the discrete_peaks array:
-        if self.smooth_fe:
-            discrete_peaks[i_response] = self.f_pFE(E_fe)
-            discrete_peaks = gauss_smoothing(discrete_peaks,
-                                                Eout,
-                                                fwhm_abs_array,
-                                                truncate=self.truncate)
-        else:
-            discrete_peaks = gauss_smoothing(discrete_peaks,
-                                                Eout,
-                                                fwhm_abs_array,
-                                                truncate=self.truncate)
-            discrete_peaks[i_response] = self.f_pFE(E_fe)
-
+        discrete_peaks = gauss_smoothing(discrete_peaks,
+                                            Eout,
+                                            fwhm_abs_array,
+                                            truncate=self.truncate)
 
         return discrete_peaks
 
@@ -1159,50 +1150,3 @@ def discrete_peaks(Eout, i_response: int,
                                         truncate=truncate)
 
     return discrete_peaks
-
-def simulate_response(read: Path, write: Path, number: int = 1):
-    read = Path(read)
-    header, resp = load_resp(read)
-    compton_paths, compton_vectors = load_compton(read)
-    write = Path(write)
-    for i in tqdm(range(number)):
-        path = Path(str(write) + f'_{i}')
-        path.mkdir(exist_ok=True)
-        simulate_columns(path, header, resp)
-        simulate_all_compton(path, compton_paths, compton_vectors)
-
-
-def load_compton(path: Path):
-    cmps = list(path.glob("cmp*"))
-    vectors = [Vector(path=cmp) for cmp in cmps]
-    return cmps, vectors
-
-def load_resp(path: Path) -> tuple[list[str], np.ndarray]:
-    path = path / 'resp.dat'
-    with path.open() as infile:
-        header = [next(infile) for _ in range(5)]
-    resp = np.loadtxt(path, skiprows=5)
-    return header, resp
-
-def simulate_columns(path: Path, header: list[str], resp):
-    fe = np.random.poisson(resp[:, 3])
-    de = np.random.poisson(resp[:, 4])
-    se = np.random.poisson(resp[:, 5])
-    c511 = np.random.poisson(resp[:, 6])
-    with open(path / 'resp.dat', 'w') as outfile:
-        line = ''.join(header)
-        for i in range(len(fe)):
-            line += f'{int(resp[i, 0]):5g}    {resp[i, 1]:.4e}    {resp[i, 2]:.4e}    '
-            line += f'{fe[i]:.4e}    {de[i]:.4e}    {se[i]:.4e}    {c511[i]:.4e}'
-            line += '\n'
-        line = line[:-1]
-        outfile.write(line)
-
-def simulate_all_compton(path: Path, paths, vectors):
-    for cmp_path, vector in zip(paths, vectors):
-        new_path = path / cmp_path.name
-        vec = Vector(E=vector.E, values=np.random.poisson(vector))
-        vec.save(path=new_path)
-
-def simulate_compton():
-    pass 
