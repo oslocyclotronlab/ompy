@@ -1053,6 +1053,9 @@ class Matrix(AbstractArray):
         # TODO how to handle labels??
         return Matrix(values=values, Ex=Ex, Eg=Eg)
 
+    def __neg__(self):
+        return self.clone(values=-self.values)
+
     @property
     def T(self) -> 'Matrix':
         values = self.values.T

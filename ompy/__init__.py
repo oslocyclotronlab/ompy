@@ -69,4 +69,5 @@ else:
                           plot_trapezoid, contains_zeroes_patches,
                           ascii_plot, plot_projection_rectangle)
     from .detector import Detector, OSCAR
+    from .peakselect import get_fwhm
     from .introspection import logging, hooks

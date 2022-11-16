@@ -24,7 +24,7 @@ from .library import div0
 #from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
 from .vector import Vector
-from .stubs import Pathlike
+from .stubs import Pathlike, Unitlike
 from . import Toggle, Unitful
 
 LOG = logging.getLogger(__name__)
@@ -82,7 +82,8 @@ class Response():
     smooth_compton = Toggle(False)
     # Whether to smooth the full energy peak
     smooth_fe = Toggle(True)
-    fwhm_abs = Unitful('0 keV')
+    fwhm = Unitful('0 keV')
+    fwhm_peak = Unitful('1330 keV')
 
     def __init__(self, path: Pathlike):
         """
@@ -314,7 +315,9 @@ class Response():
         # TODO: Should this be extrapolated, too?
         self.f_Eff_tot = interpolate(self.resp['Eff_tot'])
 
-        fwhm_rel_1330 = (self.fwhm_abs.magnitude / 1330 * 100)
+        print(self.fwhm)
+        print(self.fwhm_peak)
+        fwhm_rel_1330 = (self.fwhm.magnitude / self.fwhm_peak.magnitude * 100)
         self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm'] *
                                               fwhm_rel_1330)
 
@@ -326,8 +329,9 @@ class Response():
     #@njit()
     def interpolate(
         self,
-        Eout: np.ndarray = None,
-        fwhm_abs: float = None,
+        Eout: np.ndarray,
+        fwhm: Unitlike,
+        fwhm_peak: Unitful = 1330,
         return_table: bool = False,
     ) -> Matrix | Tuple[Matrix, pd.DataFrame]:
         """ Interpolated the response matrix
@@ -350,7 +354,7 @@ class Response():
             folderpath: The path to the folder containing Compton spectra and
             resp.dat
             Eout_array: The desired energies of the output response matrix.
-            fwhm_abs: The experimental absolute full-width-half-max at 1.33
+            fwhm: The experimental absolute full-width-half-max at 1.33
                       MeV. Note: In the article it is recommended to use 1/10
                       of the real FWHM for unfolding.
             return_table (optional): Returns "all" output, see below
@@ -363,7 +367,8 @@ class Response():
                 FE, SE (...) probabilities, and so on
         """
         self.Eout = Eout
-        self.fwhm_abs = fwhm_abs
+        self.fwhm = fwhm
+        self.fwhm_peak = fwhm_peak
 
         self.get_probabilities()
         self.iterpolate_checks()
@@ -456,9 +461,9 @@ class Response():
 
     def iterpolate_checks(self):
         """ Check on the inputs to `interpolate` """
-        assert(0 <= self.fwhm_abs.magnitude <= 1000), \
+        assert(0 <= self.fwhm.magnitude <= 1000), \
             "Check the fwhm_abs, probably it's wrong."\
-            "\nNormal Oscar≃30 keV, Now: {} keV".format(self.fwhm_abs.magnitude)
+            "\nNormal Oscar≃30 keV, Now: {} keV".format(self.fwhm.magnitude)
 
         Eout = self.Eout
         if len(Eout) <= 1:
