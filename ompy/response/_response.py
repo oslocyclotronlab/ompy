@@ -13,10 +13,11 @@ from pathlib import Path
 from typing import Union, Optional, Tuple, Dict, Any
 from scipy.interpolate import interp1d
 import logging
+from numba import njit
 
 from .rebin import rebin_1D
 from .library import div0
-from .decomposition import index
+#from .decomposition import index
 from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
 from .vector import Vector
@@ -287,6 +288,7 @@ class Response():
 
         self.f_fwhm_abs = f_fwhm_abs
 
+    #@njit()
     def interpolate(
         self,
         Eout: np.ndarray = None,
@@ -342,7 +344,7 @@ class Response():
             oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma
             i_Egmax = min(index(Eout, Egmax), N_out - 1)
-            LOG.debug(f"Response for E {E:.0f} calc up to {Eout[i_Egmax]:.0f}")
+            #LOG.debug(f"Response for E {E:.0f} calc up to {Eout[i_Egmax]:.0f}")
 
             compton = self.get_closest_compton(E)
 
@@ -384,7 +386,7 @@ class Response():
 
         # Remove any negative elements from response matrix:
         if len(R[R < 0]) != 0:
-            LOG.debug(f"{len(R[R < 0])} entries in R were set to 0")
+            #LOG.debug(f"{len(R[R < 0])} entries in R were set to 0")
             R[R < 0] = 0
 
         response = Matrix(values=R,
@@ -553,6 +555,7 @@ class Response():
         R[R < 0] = 0
         return R
 
+    @njit
     def fan_to_end(self, E: float, compton: dict, i_start: int, i_stop: int,
                    fwhm_abs_array: np.ndarray) -> np.ndarray:
         """Linear(!) fan interpolation from Compton edge to Emax
@@ -614,8 +617,8 @@ class Response():
             R[i] = y
 
         if len(R[R < 0]) != 0:
-            LOG.debug(f"In linear fan method, {len(R[R < 0])} entries in R"
-                      "are negative and now set to 0")
+            #LOG.debug(f"In linear fan method, {len(R[R < 0])} entries in R"
+            #          "are negative and now set to 0")
             R[R < 0] = 0
 
         return R
@@ -632,6 +635,10 @@ class Response():
             i_stop (int): Index where to stop (usually E+n*resolution). Note
                 that it can be stopped earlier, which will be reported through
                 `i_last`
+
+        Note Erlend: This is incorrect. Interpolates only along a single theta-line,
+        but as theta-lines fan out for higher Eg, must loop over more bins from
+        the higher Eg spectrum and take a weighted sum.
 
         Returns:
             (np.ndarray, int): `R` is Response for `E`, and `i_last` last
@@ -793,3 +800,12 @@ class Response():
         floor_distance = (bin_as_float - i_floor)
 
         return i_floor, i_ceil, floor_distance
+
+@njit
+def index(E, e):
+    i = 0
+    while i < len(E):
+        if E[i] > e:
+            return i-1
+        i += 1
+    return i-1

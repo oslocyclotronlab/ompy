@@ -18,7 +18,7 @@ from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
 from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
-from .vector import Vector
+from . import Vector
 from .stats import truncnorm_ppf
 
 

@@ -11,21 +11,21 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import ticker
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
-from . import ureg
+from .. import ureg
+from .index import index
 from .abstractarray import AbstractArray, to_plot_axis
-from .decomposition import index
 from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
                            save_tar, save_txt_2D)
-from .geometry import Line
-from .library import (diagonal_elements, div0, fill_negative_gauss,
+from ..geometry import Line
+from ..library import (diagonal_elements, div0, fill_negative_gauss,
                       handle_rebin_arguments)
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
-from .stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
-                    Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike)
+from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
+                    Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
 from .vector import Vector
 
 LOG = logging.getLogger(__name__)
@@ -193,7 +193,7 @@ class Matrix(AbstractArray):
         if self.Eg.ndim == 1:
             if shape[1] != len(self.Eg):
                 raise ValueError(("Shape mismatch between matrix and Eg:"
-                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
+                                  f" ({shape[0]}, _{shape[1]}_) ≠ "
                                   f"{len(self.Eg)}"))
         else:
             raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
@@ -406,6 +406,10 @@ class Matrix(AbstractArray):
                 if _max - _min > 10:
                     vmin = 10**(int(_max-6))
             norm = LogNorm(vmin=vmin, vmax=vmax)
+        elif scale == 'symlog':
+            lintresh = kwargs.pop('lintresh', 1e-1)
+            linscale = kwargs.pop('linscale', 1)
+            norm = SymLogNorm(lintresh, linscale, vmin, vmax)
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
         else:
@@ -446,7 +450,10 @@ class Matrix(AbstractArray):
                 # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
             else:
                 return f'x={x:1.0f}, y={y:1.0f}'
-        ax.format_coord = format_coord
+        # TODO: Takes waaaay to much CPU
+        def nop(x, y):
+            return ''
+        ax.format_coord = nop
 
         cbar: Colorbar | None = None
         if add_cbar:
@@ -787,36 +794,67 @@ class Matrix(AbstractArray):
         """
         return diagonal_elements(self.values)
 
+    @overload
+    def fill_negative(self, window: numeric | array, inplace: bool = Literal[False]) -> Matrix: ...
+    @overload
+    def fill_negative(self, window: numeric | array, inplace: bool = Literal[True]) -> None: ...
 
-    def fill_negative(self, window_size: int):
+    def fill_negative(self, window: numeric | array, inplace: bool = False) -> Matrix | None:
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
-        self.values = fill_negative_gauss(self.values, self.Eg, window_size)
+        if not inplace:
+            return self.clone(values=fill_negative_gauss(self.values, self.Eg, window))
+        self.values = fill_negative_gauss(self.values, self.Eg, window)
 
-    def remove_negative(self):
+    def remove_negative(self, inplace=False) -> Matrix | None:
         """ Entries with negative values are set to 0 """
-        self.values = np.where(self.values > 0, self.values, 0)
+        raise DeprecationWarning("Use matrix[matrix < 0] = 0 instead")
+        if not inplace:
+            return self.clone(values=np.where(self.values > 0, self.values, 0))
+        self.values[self.values > 0] = np.where(self.values > 0, self.values, 0)
 
-    def fill_and_remove_negative(self,
-                                 window_size: Tuple[int, array] = 20):
+    @overload
+    def fill_and_remove_negative(self, window: numeric | array, inplace=Literal[False]) -> Matrix: ...
+
+    @overload
+    def fill_and_remove_negative(self, window: numeric | array, inplace=Literal[True]) -> None: ...
+
+    def fill_and_remove_negative(self, window: numeric | array = 20, inplace=False) -> Matrix | None:
         """ Combination of :meth:`ompy.Matrix.fill_negative` and
         :meth:`ompy.Matrix.remove_negative`
 
         Args:
-            window_size: See `fill_negative`. Defaults to 20 (arbitrary)!.
+            window: See `fill_negative`. Defaults to 20 (arbitrary)!.
+            inplace: Whether to change the matrix inplace or return a modified copy.
             """
-
-        self.fill_negative(window_size=window_size)
-        self.remove_negative()
+        if window == 20:
+            warnings.warn("Window size 20 is arbitrary. Consider setting it to an informed value > 0")
+        if not inplace:
+            clone: Matrix = self.fill_negative(window, inplace=False)
+            clone[clone < 0] = 0
+            return clone
+        self.fill_negative(window=window, inplace=True)
+        self.values[self.values < 0] = 0
 
     def index_Eg(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Eg value """
         E = self.to_same_Eg(E)
-        return np.searchsorted(self.Eg, E)
+        # Almost as fast, but numba is much faster(!?)
+        return index(self.Eg, E) #np.searchsorted(self.Eg, E, side='left')
 
     def index_Ex(self, E: Unitlike) -> int:
         """ Returns the closest index corresponding to the Ex value """
         E = self.to_same_Ex(E)
-        return np.searchsorted(self.Ex, E)
+        return index(self.Ex, E) #np.searchsorted(self.Ex, E, side='left')
+
+    def index_Eg_extended(self, E: Unitlike) -> float:
+        """ Assumes a continuous mapping R[index] -> R[energy] """
+        E = self.to_same_Eg(E)
+        return (E-self.Eg[0])/self.dEg
+
+    def index_Ex_extended(self, E: Unitlike) -> float:
+        """ Assumes a continuous mapping R[index] -> R[energy] """
+        E = self.to_same_Eg(E)
+        return (E-self.Ex[0])/self.dEx
 
     def indices_Eg(self, E: Iterable[Unitlike]) -> ArrayInt:
         """ Returns the closest indices corresponding to the Eg value"""
@@ -972,40 +1010,80 @@ class Matrix(AbstractArray):
             Eg = self.Eg
             return (np.roll(Eg, 1) - self.Eg)[1:]
 
-    def __matmul__(self, other: Matrix) -> Matrix:
+    def from_mask(self, mask: ArrayBool) -> Matrix | Vector:
+        """ Returns a copy of the matrix with only the rows and columns  where `mask` is True.
+
+        A Vector is returned if the matrix is 1D.
+        """
+        if mask.shape != self.shape:
+            raise ValueError("Mask must have same shape as matrix.")
+
+        # Compute the bounding box of True values in mask
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        rmin, rmax = np.where(rows)[0][[0, -1]]
+        cmin, cmax = np.where(cols)[0][[0, -1]]
+        if rmin == rmax:
+            if cmin == cmax:
+                raise ValueError("Mask is a scalar. Use ordinary indexing.")
+            return Vector(values = self.values[rmin, cmin:cmax+1], E=self.Ex[rmin:rmax+1])
+        elif cmin == cmax:
+            return Vector(values = self.values[rmin:rmax+1, cmin], E=self.Eg[cmin:cmax+1])
+        values = self.values[rmin:rmax+1, cmin:cmax+1]
+        return self.__class__(values, Ex=self.Ex[rmin:rmax+1], Eg=self.Eg[cmin:cmax+1])
+
+    def __matmul__(self, other: Matrix | Vector) -> Matrix | Vector:
         # cannot use has_equal_binning as we don't need the same
         # shape for Ex and Eg.
-        # HACK isinstance doesn't work
+        # HACK isinstance doesn't work (autoreload?)
         if str(other.__class__.__name__) == 'Matrix':
             if not np.allclose(self.Eg, other.Ex):
                 raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
+        elif str(other.__class__.__name__) == 'Vector':
+            if not np.allclose(self.Eg, other.E):
+                raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
+            values = self.values @ other.values
+            return Vector(values=values, E=other.E)
         else:
             raise NotImplementedError(f"Matrix@{type(other)} not implemented")
 
         Ex = self.Ex
-        Eg = other.Ex
+        Eg = other.Eg
         values = self.values@other.values
+        # TODO how to handle labels??
         return Matrix(values=values, Ex=Ex, Eg=Eg)
 
+    def __neg__(self):
+        return self.clone(values=-self.values)
+
     @property
-    def summary(self) -> str:
+    def T(self) -> 'Matrix':
+        values = self.values.T
+        assert self.std is None
+        return self.clone(values=values, Eg=self.Ex, Ex=self.Eg,
+                          xlabel=self.ylabel, ylabel=self.xlabel)
+
+    @property
+    def _summary(self) -> str:
         if self.is_equidistant():
             m, n = self.shape
             s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
             s += f"{n} bins with dEᵧ: {self.dEg}\n"
             s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
             s += f"{m} bins with dEₓ: {self.dEx}\n"
-            s += f"Total counts: {self.sum()}\n"
+            s += f"Total counts: {self.sum():,}\n"
         else:
             s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
             s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
             s += f"Variable bin width.\n"
-        s +="\nValues:\n" 
         return s
 
+    def summary(self):
+        print(self._summary)
 
     def __str__(self) -> str:
-        summary = self.summary
+        summary = self._summary
+        summary += "\nValues:\n" 
         if self.std is not None:
             return summary+str(self.values)+'\nStd: \n'+str(self.std)
         else:
@@ -1058,6 +1136,13 @@ class Matrix(AbstractArray):
             matrix.set_order(order)
         return matrix
 
+    def __lt__(self, other):
+        match other:
+            case Matrix():
+                raise NotImplementedError("Matrix <= Matrix not implemented")
+            case _:
+                return self.values <= other
+
 
 class IndexLocator:
     def __init__(self, matrix: Matrix):
@@ -1073,9 +1158,9 @@ class IndexLocator:
         Eg = self.mat.Eg.__getitem__(eg)
         Ex = self.mat.Ex.__getitem__(ex)
         values = self.mat.values.__getitem__(key)
-        if isinstance(Eg, float):
+        if isinstance(eg, (int, np.integer)):
             return Vector(values, E=Ex, E_label=self.mat.ylabel)
-        elif isinstance(Ex, float):
+        elif isinstance(ex, (int, np.integer)):
             return Vector(values, E=Eg, E_label=self.mat.xlabel)
         return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
 
@@ -1130,9 +1215,9 @@ class ValueLocator:
             std = None
             if self.mat.std is not None:
                 std = self.mat.std.__getitem__((iex, ieg))
-            if isinstance(iex, int):
+            if isinstance(iex, (int, np.integer)):
                 return Vector(values=values, E=Eg, E_label=self.mat.xlabel)
-            if isinstance(ieg, int):
+            if isinstance(ieg, (int, np.integer)):
                 return Vector(values=values, E=Ex, E_label=self.mat.ylabel)
 
             return self.mat.clone(values=values, Ex=Ex, Eg=Eg, std=std)

@@ -3,10 +3,8 @@ import logging
 import termtables as tt
 import numpy as np
 from typing import Tuple, Optional
-from .matrix import Matrix
-from .vector import Vector
+from .array import Matrix, Vector, rebin_2D
 from .library import div0
-from .rebin import rebin_2D
 from .action import Action
 #from . import ureg, Q_, DimensionalityError
 from . import Unitful, Bounded, Choice

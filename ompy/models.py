@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, fields, asdict
 from typing import Optional, Union, Tuple, Any, Dict, Callable, List
 from scipy.optimize import curve_fit
 
-from .vector import Vector
+from . import Vector
 
 
 def NonTuple2():

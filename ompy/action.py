@@ -1,6 +1,5 @@
 from typing import Union, List, Iterable, Any, Callable, Tuple, Dict, TypeVar, Generic
-from .matrix import Matrix
-from .vector import Vector
+from . import Vector, Matrix
 
 T = TypeVar('T', Matrix, Vector)
 

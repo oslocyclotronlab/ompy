@@ -1,9 +1,8 @@
-from .matrix import Matrix
-from .vector import Vector
+from . import Matrix, Vector
 from .abstractarray import AbstractArray, to_plot_axis
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, overload, Literal
 import numpy as np
-from .stubs import array
+from ..stubs import array
 
 
 def zeros_like(array: AbstractArray,
@@ -16,6 +15,13 @@ def zeros_like(array: AbstractArray,
     else:
         raise ValueError(f"Expected Array, not {type(array)}.")
 
+@overload
+def empty_like(array: Matrix, **kwargs) -> Matrix: ...
+
+
+@overload
+def empty_like(array: Vector, **kwargs) -> Vector: ...
+
 
 def empty_like(array: AbstractArray,
                **kwargs) -> AbstractArray:
@@ -26,6 +32,18 @@ def empty_like(array: AbstractArray,
         return Vector(E=array.E, values=np.empty_like(array.values, **kwargs))
     else:
         raise ValueError(f"Expected Array, not {type(array)}.")
+
+@overload
+def empty(ex: ..., eg: None, **kwargs) -> Vector: ...
+@overload
+def empty(ex: ..., eg: array, **kwargs) -> Matrix: ...
+
+def empty(ex: array, eg: array | None = None, **kwargs):
+    if eg is None:
+        values = np.empty(len(ex), **kwargs)
+        return Vector(E=ex, values=values)
+    values = np.empty((len(ex), len(eg)), **kwargs)
+    return Matrix(values=values, Ex=ex, Eg=eg)
 
 
 def zeros(array: array | int | Tuple[int, int],

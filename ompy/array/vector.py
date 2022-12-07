@@ -9,15 +9,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 
-from . import ureg, DimensionalityError
+from .. import ureg, DimensionalityError
+from .index import index
 from .abstractarray import AbstractArray
-from .decomposition import index
 from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D)
-from .library import div0, handle_rebin_arguments, only_one_not_none
+from ..library import div0, handle_rebin_arguments, only_one_not_none
 from .rebin import rebin_1D
-from .stubs import Unitlike, arraylike, Axes
+from ..stubs import Unitlike, arraylike, Axes
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -69,7 +69,7 @@ class Vector(AbstractArray):
         try:
             unit = E.units
         except AttributeError:
-            unit = ureg(units)
+            unit = ureg.Unit(units)
 
         if copy:
             def fetch(x):
@@ -690,6 +690,14 @@ class Vector(AbstractArray):
         else:
             return (self.E - np.roll(self.E, 1))[1:]
 
+    def last_nonzero(self) -> int:
+        """ Returns the index of the last nonzero value """
+        j = len(self)
+        while (j := j - 1) >= 0:
+            if self[j] != 0:
+                break
+        return j
+
     def __matmul__(self, other: Vector) -> Vector:
         result = self.clone()
         if isinstance(other, Vector):
@@ -749,32 +757,73 @@ class Vector(AbstractArray):
     def units(self) -> Any:
         return self._E.units
 
+    def enumerate(self) -> Iterable[Tuple[int, float, float]]:
+        """ Returns an iterator over the indices and values """
+        for i, e in enumerate(self.E):
+            yield i, e, self.values[i]
+
+
+# class ValueLocator:
+#     def __init__(self, vector: Vector):
+#         self.vec = vector
+
+#     def __getitem__(self, value):
+#         if not isinstance(value, slice):
+#             indices = self.vec.index(value)
+#         else:
+#             start = None if value.start is None else self.vec.index(value.start)
+#             stop = None if value.stop is None else self.vec.index(value.stop)
+#             if value.step is not None:
+#                 dx = self.vec[1] - self.vec[0]
+#                 step = np.ceil(value.step / dx)
+#             else:
+#                 step = None
+#             indices = slice(start, stop, step)
+
+#         E = self.vec.E.__getitem__(indices)
+#         values = self.vec.values.__getitem__(indices)
+#         if self.vec.std is not None:
+#             std = self.vec.std.__getitem__(indices)
+#         else:
+#             std = None
+#         return self.vec.clone(E=E, values=values, std=std)
+
 
 class ValueLocator:
     def __init__(self, vector: Vector):
         self.vec = vector
 
-    def __getitem__(self, value):
-        if not isinstance(value, slice):
-            indices = self.vec.index(value)
-        else:
-            start = None if value.start is None else self.vec.index(value.start)
-            stop = None if value.stop is None else self.vec.index(value.stop)
-            if value.step is not None:
-                dx = self.vec[1] - self.vec[0]
-                step = np.ceil(value.step / dx)
-            else:
-                step = None
-            indices = slice(start, stop, step)
+    @overload
+    def parse(self, e: Unitlike) -> int: ...
 
-        E = self.vec.E.__getitem__(indices)
-        values = self.vec.values.__getitem__(indices)
-        if self.vec.std is not None:
-            std = self.vec.std.__getitem__(indices)
-        else:
-            std = None
-        return self.vec.clone(E=E, values=values, std=std)
+    @overload
+    def parse(self, e: slice) -> slice: ...
 
+    def parse(self, e: Unitlike | slice) -> int | slice:
+        match e:
+            case int() | float() | str() | ureg.Unit():
+                return self.vec.index(e)
+            case slice():
+                return parse_unit_slice(e, self.vec.index, self.vec.dE, len(self.vec.E))
+            case _:
+                raise ArgumentError(f"Expected slice or Unitlike, got type: {type(e)}")
+
+    def __getitem__(self, key) -> Vector | float:
+        i: int | slice = self.parse(key)
+        match i:
+            case int():
+                return self.vec.values.__getitem__((i,))
+            case slice():
+                E = self.vec.E.__getitem__(i)
+                values = self.vec.values.__getitem__((i,))
+                std = None
+                if self.vec.std is not None:
+                    std = self.vec.std.__getitem__((i,))
+                return Vector(values=values, E=E, E_label=self.vec.label, std=std)
+
+    def __setitem__(self, key, val):
+        i: int | slice = self.parse(key)
+        self.vec.values[i] = val
 
 class IndexLocator:
     def __init__(self, vector: Vector):

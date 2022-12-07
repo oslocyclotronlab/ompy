@@ -13,7 +13,7 @@ from .models import ResultsNormalized, ExtrapolationModelLow,\
 from .normalizer_nld import NormalizerNLD
 from .spinfunctions import SpinFunctions
 from .stubs import Pathlike
-from .vector import Vector
+from . import Vector
 
 
 class NormalizerGSF(AbstractNormalizer):

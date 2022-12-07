@@ -19,7 +19,7 @@ except ImportError:
 # build me (i.e. compile Cython modules) for testing in this directory using
 # python setup.py build_ext --inplace
 
-# Version rutine taken from numpy
+# Version routine taken from numpy
 MAJOR = 1
 MINOR = 1
 MICRO = 0
@@ -148,7 +148,8 @@ ext_modules = [
                   extra_link_args=extra_link_args,
                   include_dirs=[numpy.get_include()]
                   ),
-        Extension("ompy.rebin", ["ompy/rebin.pyx"], include_dirs=[numpy.get_include()]),
+        Extension("ompy.array.rebin", ["ompy/array/rebin.pyx"], include_dirs=[numpy.get_include()]),
+        Extension("ompy.array.index", ["ompy/array/index.pyx"], include_dirs=[numpy.get_include()]),
         Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
         ]
 
