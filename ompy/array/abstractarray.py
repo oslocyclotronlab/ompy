@@ -4,7 +4,7 @@ import logging
 import copy
 from typing import Union, Tuple, Sequence
 import numpy as np
-from .stubs import arraylike
+from ..stubs import arraylike
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)

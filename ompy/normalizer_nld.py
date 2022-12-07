@@ -13,10 +13,10 @@ from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
 from scipy.stats import truncnorm
-from .vector import Vector
+from . import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
-from .filehandling import load_discrete
+from .array import load_discrete
 from .models import ResultsNormalized, NormalizationParameters
 from .abstract_normalizer import AbstractNormalizer
 

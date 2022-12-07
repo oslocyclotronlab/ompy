@@ -12,8 +12,7 @@ from pathlib import Path
 from typing import Optional, Union, Any, Tuple, List
 from scipy.optimize import minimize
 from .ensemble import Ensemble
-from .matrix import Matrix
-from .vector import Vector
+from . import Matrix
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
 from .library import contains_zeroes_patches

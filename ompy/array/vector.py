@@ -9,15 +9,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 
-from . import ureg, DimensionalityError
+from .. import ureg, DimensionalityError
+from .index import index
 from .abstractarray import AbstractArray
-from .decomposition import index
 from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D)
-from .library import div0, handle_rebin_arguments, only_one_not_none
+from ..library import div0, handle_rebin_arguments, only_one_not_none
 from .rebin import rebin_1D
-from .stubs import Unitlike, arraylike, Axes
+from ..stubs import Unitlike, arraylike, Axes
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -756,6 +756,11 @@ class Vector(AbstractArray):
     @property
     def units(self) -> Any:
         return self._E.units
+
+    def enumerate(self) -> Iterable[Tuple[int, float, float]]:
+        """ Returns an iterator over the indices and values """
+        for i, e in enumerate(self.E):
+            yield i, e, self.values[i]
 
 
 # class ValueLocator:

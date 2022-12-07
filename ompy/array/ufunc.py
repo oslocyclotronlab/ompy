@@ -2,7 +2,7 @@ from . import Matrix, Vector
 from .abstractarray import AbstractArray, to_plot_axis
 from typing import Union, Tuple, Optional, overload, Literal
 import numpy as np
-from .stubs import array
+from ..stubs import array
 
 
 def zeros_like(array: AbstractArray,

@@ -7,9 +7,8 @@ import termtables as tt
 from scipy.ndimage import gaussian_filter1d
 from .gauss_smoothing import gauss_smoothing_matrix_1D
 from .library import div0, i_from_E
-from .matrix import Matrix
-from .matrixstate import MatrixState
-from .rebin import rebin_1D
+from . import Matrix
+from .array import MatrixState, rebin_1D
 from . import Bounded, Toggle
 
 

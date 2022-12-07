@@ -5,9 +5,7 @@ from sklearn.linear_model import LinearRegression
 from scipy.optimize import minimize
 import logging
 from typing import Optional, Tuple, List, Iterable, Callable, Any, Union
-from .matrix import Matrix
-from . import zeros_like, empty_like
-from .vector import Vector
+from . import zeros_like, empty_like, Matrix, Vector
 from .library import log_interp1d
 from .extractor import Extractor
 

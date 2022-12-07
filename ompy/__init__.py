@@ -10,20 +10,6 @@ if __OMPY_SETUP__:
     import sys
     sys.stderr.write('Running from ompy source directory.\n')
 else:
-    try:
-        from ompy.rebin import *
-        # if importing one of the cython modules fails, it may hint on it
-        # not beeing installed correctly
-    except ImportError:
-        msg = """Error importing ompy: you should not try to import ompy from
-        its source directory unless it is a submodule; please exit the ompy
-        source tree, and relaunch your python interpreter from there.
-        If it is a submodule, you probably forgor to run
-        `python setup.py build_ext --inplace` in the folder."""
-        raise ImportError(msg)
-    from .version import GIT_REVISION as __git_revision__
-    from .version import VERSION as __version__
-    from .version import FULLVERSION as __full_version__
 
     from pint import UnitRegistry
     from pint.errors import DimensionalityError
@@ -32,6 +18,22 @@ else:
     u = ureg
     Q_ = ureg.Quantity
     Quantity = ureg.Quantity
+
+    try:
+        from ompy.decomposition import *
+        # if importing one of the cython modules fails, it may hint on it
+        # not beeing installed correctly
+    except ImportError as e:
+        msg = f"""Error importing ompy: you should not try to import ompy from
+        its source directory unless it is a submodule; please exit the ompy
+        source tree, and relaunch your python interpreter from there.
+        If it is a submodule, you probably forgor to run
+        `python setup.py build_ext --inplace` in the folder.
+        Original exception was: {e}"""
+        raise ImportError(msg)
+    from .version import GIT_REVISION as __git_revision__
+    from .version import VERSION as __version__
+    from .version import FULLVERSION as __full_version__
 
     import warnings
     warnings.simplefilter('always', DeprecationWarning)
@@ -43,11 +45,8 @@ else:
     #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
-    from .abstractarray import AbstractArray
-    from .matrix import Matrix
+    from .array import Vector, Matrix, zeros_like, empty_like, empty
     from .models import Model, NormalizationParameters, ResultsNormalized
-    from .vector import Vector
-    from .ufunc import zeros_like, empty_like, empty
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble
@@ -56,18 +55,17 @@ else:
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor
     from .action import Action
-    from .decomposition import nld_T_product, index, index_2
+    #from .decomposition import nld_T_product, index, index_2
     from .normalizer_nld import (NormalizerNLD, load_levels_discrete,
                                  load_levels_smooth)
     from .normalizer_gsf import NormalizerGSF
     from .normalizer_simultan import NormalizerSimultan
     from .ensembleNormalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
-    #from .modelcontext import Model
     from .shape import Shape, normalize_to_shape
     from .library import (div0, fill_negative_gauss, fill_negative_max,
                           plot_trapezoid, contains_zeroes_patches,
                           ascii_plot, plot_projection_rectangle)
     from .detector import Detector, OSCAR
-    from .peakselect import get_fwhm
+    from .peakselect import fit_gauss
     from .introspection import logging, hooks

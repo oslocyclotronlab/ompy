@@ -3,7 +3,7 @@ import numpy as np
 cimport cython
 cimport numpy as np
 
-from .matrix import to_plot_axis
+from .array import to_plot_axis
 
 DTYPE = np.float64
 

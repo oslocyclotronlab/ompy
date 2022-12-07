@@ -1,6 +1,6 @@
 import os
 from typing import Tuple, List
-from .matrix import Matrix
+from . import Matrix
 import numpy as np
 
 EXAMPLES = {'dy164': {'raw': "../../example_data/Dy164_raw.m",

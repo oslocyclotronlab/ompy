@@ -4,7 +4,7 @@ from typing import Optional, Union
 import dill
 import numpy as np
 
-from .vector import Vector
+from . import Vector
 
 
 class AbstractNormalizer():

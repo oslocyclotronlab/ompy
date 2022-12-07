@@ -13,18 +13,18 @@ import numpy as np
 from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
-from . import ureg
+from .. import ureg
+from .index import index
 from .abstractarray import AbstractArray, to_plot_axis
-from .decomposition import index
 from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
                            save_tar, save_txt_2D)
-from .geometry import Line
-from .library import (diagonal_elements, div0, fill_negative_gauss,
+from ..geometry import Line
+from ..library import (diagonal_elements, div0, fill_negative_gauss,
                       handle_rebin_arguments)
 from .matrixstate import MatrixState
 from .rebin import rebin_2D
-from .stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
+from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
                     Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
 from .vector import Vector
 

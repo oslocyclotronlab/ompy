@@ -10,8 +10,7 @@ from itertools import repeat
 from typing import Callable, Union, List, Optional, Any, Tuple
 from pathlib import Path
 from numpy import ndarray
-from .matrix import Matrix
-from .rebin import rebin_2D
+from .array import Matrix, rebin_2D
 from .action import Action
 from .stubs import Unitlike
 

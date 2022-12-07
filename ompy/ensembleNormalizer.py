@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .abstract_normalizer import AbstractNormalizer
 from .models import ResultsNormalized
-from .vector import Vector
+from . import Vector
 from .extractor import Extractor
 from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
