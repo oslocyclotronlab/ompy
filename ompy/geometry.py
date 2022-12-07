@@ -50,6 +50,7 @@ class Geometry(ABC):
         if point is not None:
             return Geometry.resolve(point, matrix)
 
+
 class Line(Geometry):
     def __init__(self, *, p1: PointUnit | None = None,
                  p2: PointUnit | None = None,
@@ -73,6 +74,11 @@ class Line(Geometry):
     def at(self, matrix: Matrix) -> ArrayBool:
         p1, p2 = self.resolve_self(matrix)
         mask = line_mask(matrix, p1, p2, 'at')
+        return mask
+
+    def below(self, matrix: Matrix) -> ArrayBool:
+        p1, p2 = self.resolve_self(matrix)
+        mask = line_mask(matrix, p1, p2, 'below')
         return mask
 
     def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:

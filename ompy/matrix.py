@@ -1064,8 +1064,10 @@ class IndexLocator:
         self.mat = matrix
 
     def __getitem__(self, key) -> Matrix | Vector:
+        if isinstance(key, array):
+            return self.linear_index(key)
         if len(key) != 2:
-            raise ValueError("Expect two integer indices [i, j].")
+            raise ValueError("Expected [mask] or two integers [i, j]")
 
         ex, eg = key
         Eg = self.mat.Eg.__getitem__(eg)
@@ -1076,6 +1078,10 @@ class IndexLocator:
         elif isinstance(Ex, float):
             return Vector(values, E=Eg, E_label=self.mat.xlabel)
         return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
+
+    def linear_index(self, indices) -> Matrix:
+        values = np.where(indices, self.mat.values, 0)
+        return self.mat.clone(values=values)
 
 
 class ValueLocator:
