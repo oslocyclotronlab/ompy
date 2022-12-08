@@ -14,8 +14,24 @@ from typing import Union, Tuple
 
 import numpy as np
 import pandas as pd
-from numba import njit, int32, float32, float64
-from numba.experimental import jitclass
+from warnings import warn
+try:
+    from numba import njit, int32, float32, float64
+    from numba.experimental import jitclass
+except ImportError:
+    warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
+    int32 = np.int32
+    float32 = np.float32
+    float64 = np.float64
+
+    def nop_decorator(func, *aargs, **kkwargs):
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrapper
+    njit = nop_decorator
+    jitclass = nop_decorator
+
+
 from scipy.interpolate import interp1d
 from tqdm.autonotebook import tqdm
 
@@ -39,7 +55,7 @@ spec['high'] = float64[::1]
 
 
 @jitclass(spec)
-class ComptonNeighbours(object):
+class ComptonNeighbours:
     def __init__(self, ilow, ihigh, elow, ehigh, low, high):
         self.ilow = ilow
         self.ihigh = ihigh
@@ -83,7 +99,7 @@ class Response:
     fwhm = Unitful('0 keV')
     fwhm_peak = Unitful('1330 keV')
 
-    def __init__(self, path: Pathlike):
+    def __init__(self, path: Pathlike, **kwargs):
         """
 
 
@@ -107,13 +123,12 @@ class Response:
         if path.is_dir():
             LOG.debug(f"Loading response from directory: {path}")
             self.resp, self.compton_matrix, self.Ecmp_array = self.LoadDir(
-                path)  # Better names would be adventagious
+                path, **kwargs)
         elif path.is_file():
             LOG.debug(f"Loading response from file: {path}")
             self.resp, self.compton_matrix, self.Ecmp_array = self.LoadZip(
-                path)
+                path, **kwargs)
         elif not path.exists():
-
             raise ValueError(f"Path {path} does not exist")
 
         # after how many sigma to truncate gaussian smoothing
@@ -184,9 +199,10 @@ class Response:
                                                  N_cmp)
 
     def LoadDir(self,
-                path: Union[str, Path],
-                resp_name: str | None = 'resp.dat',
-                spec_prefix: str | None = 'cmp'):
+                path: Pathlike,
+                name: str = 'resp.dat',
+                prefix: str = 'cmp',
+                suffix: str = '.m'):
         """
         Method for loading response file and compton spectra from a folder.
 
@@ -208,7 +224,7 @@ class Response:
         # and discrete peaks
         resp = []
         Nlines = -1
-        with open(os.path.join(path, resp_name)) as file:
+        with open(os.path.join(path, name)) as file:
             while True:
                 line = file.readline()
                 if not line:
@@ -244,7 +260,7 @@ class Response:
         N_Eg = len(Eg_sim_array)
         fnames = []
         for i in range(0, N_Eg):
-            fnames.append(f"{spec_prefix}{Eg_sim_array[i]:.0f}.m")
+            fnames.append(f"{prefix}{Eg_sim_array[i]:.0f}{suffix}")
 
         last = Vector(path=os.path.join(path, fnames[-1]))
         N_cmp = last.shape[0]
@@ -327,7 +343,7 @@ class Response:
             self,
             Eout: np.ndarray,
             fwhm: Unitlike,
-            fwhm_peak: Unitful = 1330,
+            fwhm_peak: Unitlike = 1330,
             return_table: bool = False,
             compton: float = 1.0,
             full_energy: float = 1.0,
@@ -1103,7 +1119,7 @@ spec2['x'] = float64[::1]
 spec2['y'] = float64[::1]
 
 
-class Intp(object):
+class Intp:
     def __init__(self, x, y):
         self.x = x
         self.y = y
