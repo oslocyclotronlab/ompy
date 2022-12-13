@@ -804,7 +804,7 @@ class ValueLocator:
             case int() | float() | str() | ureg.Unit():
                 return self.vec.index(e)
             case slice():
-                return parse_unit_slice(e, self.vec.index, self.vec.dE, len(self.vec.E))
+                return parse_unit_slice(e, self.vec.index, self.vec.de, len(self.vec.E))
             case _:
                 raise ArgumentError(f"Expected slice or Unitlike, got type: {type(e)}")
 
@@ -819,7 +819,7 @@ class ValueLocator:
                 std = None
                 if self.vec.std is not None:
                     std = self.vec.std.__getitem__((i,))
-                return Vector(values=values, E=E, E_label=self.vec.label, std=std)
+                return Vector(values=values, E=E, E_label=self.vec.E_label, std=std)
 
     def __setitem__(self, key, val):
         i: int | slice = self.parse(key)
@@ -836,3 +836,28 @@ class IndexLocator:
             return Vector(E=E, values=values)
         else:
             raise ValueError("Expect one integer index [i].")
+
+
+def parse_unit_slice(s: slice, index: Callable[[Unitlike], int],
+                     dx: float, length: int) -> slice:
+    start = None if s.start is None else index(s.start)
+    inclusive, stop_ = preparse(s.stop)
+    stop = None if stop_ is None else index(stop_)
+    if inclusive and stop < length:
+        assert stop is not None
+        stop += 1
+
+    step = None if s.step is None else np.ceil(s.step / dx)
+    return slice(start, stop, step)
+
+def preparse(s: Unitlike | None) -> (bool, Unitlike | None):
+    inclusive = False
+    if isinstance(s, str):
+        s = s.strip()
+        if s[0] == '<':
+            s = s[1:]
+        elif s[0] == '>':
+            inclusive = True
+            s = s[1:]
+
+    return (inclusive, s)

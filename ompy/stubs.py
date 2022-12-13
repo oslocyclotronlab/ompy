@@ -12,6 +12,7 @@ from matplotlib.collections import QuadMesh
 from typing import TypeAlias, Any
 #Unitlike = UnitLike | int | float
 Unit = type(ureg('keV'))
+keV = Unit
 Unitlike: TypeAlias = float | int | str | Unit
 Pathlike: TypeAlias = Path | str
 ArrayKeV = type(Q_(np.asarray([3.0, 4.0]), 'keV'))

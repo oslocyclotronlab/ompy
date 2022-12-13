@@ -46,11 +46,12 @@ else:
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
     from .array import Vector, Matrix, zeros_like, empty_like, empty
+    from .database import Nucleus, get_nucleus, get_nucleus_df
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble
-    from .response import Response
+    from .response import Response, Calibrator
     from .gauss_smoothing import *
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor

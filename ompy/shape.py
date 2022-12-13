@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
+#from sklearn.linear_model import LinearRegression
 from scipy.optimize import minimize
 import logging
 from typing import Optional, Tuple, List, Iterable, Callable, Any, Union

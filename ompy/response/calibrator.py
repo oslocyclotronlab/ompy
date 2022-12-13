@@ -44,11 +44,9 @@ class Calibrator:
         spectrum (Vector): The experimental spectrum
     """
 
-    def __init__(self, R: Response, spectrum: Vector,
-                 ignore: Mask = np.ndarray([])):
+    def __init__(self, R: Response, spectrum: Vector):
         self.R = R
         self.spectrum = spectrum
-        self.ignore = ignore
         self._fwhm_fit: GaussFit | None = None
 
     def calibrate(self):

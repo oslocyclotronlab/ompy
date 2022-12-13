@@ -290,21 +290,35 @@ class Response:
                           double_escape: float = 1.0, c511: float = 1.0) -> None:
         """ Interpolate full-energy peak probabilities (...) """
         # total number of counts for each of the loaded responses
-        normalization = compton * self.compton_matrix.sum(axis=1) \
-                        + full_energy * self.resp['FE'] + single_escape * self.resp['SE'] \
-                        + double_escape * self.resp['DE'] + c511 * self.resp['c511']
+        normalization = self.compton_matrix.sum(axis=1) + \
+                        self.resp['FE'] + self.resp['SE'] + \
+                        self.resp['DE'] + self.resp['c511']
         normalization = np.array(normalization)
+
+        total = compton + full_energy + single_escape + double_escape + c511
+
         # normalize "compton" spectra
         self.cmp_matrix = div0(self.compton_matrix,
                                normalization.reshape((len(normalization), 1)))
+        self.cmp_matrix *= compton / total
         # Vector of total Compton probability
         pcmp = self.cmp_matrix.sum(axis=1)
 
         # Full energy, single escape, etc:
-        pFE = div0(self.resp['FE'], normalization)
-        pSE = div0(self.resp['SE'], normalization)
-        pDE = div0(self.resp['DE'], normalization)
-        p511 = div0(self.resp['c511'], normalization)
+        pFE = div0(self.resp['FE'], normalization) * full_energy / total
+        pSE = div0(self.resp['SE'], normalization) * single_escape / total
+        pDE = div0(self.resp['DE'], normalization) * double_escape / total
+        p511 = div0(self.resp['c511'], normalization) * c511 / total
+
+        N = pFE + pSE + pDE + p511 + pcmp
+        N = N[0]
+        pFE /= N
+        pSE /= N
+        pDE /= N
+        p511 /= N
+        self.cmp_matrix = div0(self.cmp_matrix, N)
+        pcmp = self.cmp_matrix.sum(axis=1)
+
 
         # Interpolate the peak structures except Compton (handled separately)
 
