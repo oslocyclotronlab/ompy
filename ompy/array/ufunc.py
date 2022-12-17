@@ -4,6 +4,10 @@ from typing import Union, Tuple, Optional, overload, Literal
 import numpy as np
 from ..stubs import array
 
+@overload
+def zeros_like(array: Vector, **kwargs) -> Vector: ...
+@overload
+def zeros_like(array: Matrix, **kwargs) -> Matrix: ...
 
 def zeros_like(array: AbstractArray,
                **kwargs) -> AbstractArray:

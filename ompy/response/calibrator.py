@@ -1,4 +1,6 @@
+from __future__ import annotations
 from . import Response
+from .response import E_compton
 from .. import Vector, zeros_like
 from ..peakselect import fit_gauss, GaussFit
 from ..stubs import Unitlike, ArrayBool, Axes
@@ -6,20 +8,11 @@ from dataclasses import dataclass
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
+from typing import Any
+from .responsedata import Components
 
 Mask = ArrayBool
 
-
-@dataclass
-class Components:
-    compton: float = 1.0
-    FE: float = 1.0
-    DE: float = 1.0
-    SE: float = 1.0
-    c511: float = 1.0
-
-    def to_dict(self) -> dict[str, float]:
-        return {k: getattr(self, k) for k in self.__dataclass_fields__}
 
 
 @dataclass
@@ -40,8 +33,9 @@ class Calibrator:
         4. TODO: Fit SE, DE and 511
 
     Attributes:
-        response (Response): The response to calibrate
+        R (Response): The response to calibrate
         spectrum (Vector): The experimental spectrum
+
     """
 
     def __init__(self, R: Response, spectrum: Vector):
@@ -56,6 +50,54 @@ class Calibrator:
             components: The calibrated components
         """
         pass
+
+    def calibrate_compton(self, fe_region: Mask, ignore: Mask | None = None):
+        """ Calibrate the Compton component
+
+        Args:
+            fe_region (Mask): The region to fit the FE component
+            ignore (Mask): A mask of the spectrum to ignore
+        """
+        if ignore is None:
+            ignore = np.zeros_like(self.spectrum, dtype=bool)
+
+        def loss(p) -> float:
+            R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, compton=p[0]).T
+            fe_e, fe_C, fe_fit = self.fit_FE(fe_region, Components(compton=p[0]))
+            compton_edge = E_compton(fe_e, np.pi)
+            region = ~ignore & (self.spectrum.E < compton_edge)
+
+            delta = zeros_like(self.spectrum)
+            delta.loc[fe_e] = fe_C
+            folded = R@delta
+            mse: float = np.mean((folded - self.spectrum)[region]**2)
+            return mse
+
+        p0 = np.asarray([1.0])
+        res = minimize(loss, p0, bounds=[(0.0, 10.0)], method='Nelder-Mead')
+        print(res)
+        components = Components(compton=res.x[0])
+        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, **components.to_dict()).T
+        R0 = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm).T
+        e, C, _ = self.fit_FE(fe_region, components)
+        print(C)
+        ax=self.spectrum.plot()
+        delta = zeros_like(self.spectrum)
+        delta.loc[e] = C
+        #delta.plot(ax=ax)
+        folded = R@delta
+        folded.plot(ax=ax, label='R')
+
+        e, C, _ = self.fit_FE(fe_region)
+        print(C)
+        delta = zeros_like(self.spectrum)
+        delta.loc[e] = C
+        #delta.plot(ax=ax)
+        folded0 = R0@delta
+        folded0.plot(ax=ax, label='R0')
+        ax.legend()
+        #plt.show()
+        return components, Components(), C
 
     def calibrate_FWHM(self, e: Unitlike | None = None,
                        fwhm: float | None = None) -> Response:
@@ -73,7 +115,7 @@ class Calibrator:
         self.fwhm_fit = fit_gauss(self.spectrum, region)
         return self.fwhm_fit
 
-    def fit_FE(self, region: Mask):
+    def fit_FE(self, region: Mask, components: Components = Components()) -> tuple[float, float, Any]:
         """ Fit the FE component
 
         TODO: Allow one to redo with a "n-sigma" region fit using the 
@@ -87,7 +129,7 @@ class Calibrator:
         emax = fe.E[-1]
         fe: np.ndarray = fe.values
         # Cut the response
-        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm).T
+        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, **components.to_dict()).T
 
         def loss(p) -> float:
             e, C = p
@@ -108,20 +150,18 @@ class Calibrator:
             return mse
 
         p0 = [(emin+emax)/2, fe.sum()]
-        print(f"p0: {p0}")
+        #print(f"p0: {p0}")
         res = minimize(loss, p0, method='Nelder-Mead')
         e, C = res.x
-        print(res)
-        ax=self.spectrum.plot()
-        delta = zeros_like(self.spectrum)
-        delta.loc[e] = C
-        delta.plot(ax=ax)
-        folded = R@delta
-        folded.plot(ax=ax)
-        plt.show()
-
-    def calibrate_compton(self, ignore: Mask = np.array([])):
-        pass
+        # print(res)
+        # ax=self.spectrum.plot()
+        # delta = zeros_like(self.spectrum)
+        # delta.loc[e] = C
+        # delta.plot(ax=ax)
+        # folded = R@delta
+        # folded.plot(ax=ax)
+        # plt.show()
+        return e, C, res
 
     def plot(self, ax: Axes | None = None, **kwargs) -> Axes:
         """ Plot the calibration

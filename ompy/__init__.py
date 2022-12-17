@@ -51,7 +51,8 @@ else:
     from .unfolder import Unfolder
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble
-    from .response import Response, Calibrator
+    from . import response
+    from .response import Response, Calibrator, ResponseData, ResponseInterpolation
     from .gauss_smoothing import *
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor

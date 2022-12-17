@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import re
 import numpy as np
 import pandas as pd
+import warnings
 
 # A list over the periodic elements
 ELEMENTS = ['H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn', 'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og']
@@ -68,7 +69,6 @@ class Nucleus:
         return f"{self.name} (A={self.A}, Z={self.Z}, N={self.N}) with {len(self.levels)} levels and {len(self.gammas)} gammas."
 
 
-
 @dataclass
 class Spin:
     spin: int
@@ -115,6 +115,7 @@ class Level:
 
     def __str__(self):
         return f"{self.E:.2f} keV, {self._jpi_str()}"
+
 
 @dataclass
 class Gamma:
@@ -230,6 +231,8 @@ class LevelScheme:
         s = ""
         for level in self.levels:
             s += f"{level}\n"
+        return s
+
 
 class GammaScheme:
     def __init__(self, gammas: list[Gamma] | None = None):
@@ -258,9 +261,52 @@ class GammaScheme:
         assert ax is not None
 
         for gamma in self.gammas:
-            print(gamma.Ei, gamma.E)
             ax.scatter(gamma.E, gamma.Ei, **kwargs)
 
+        return ax
+
+    def transitions(self, eps=20, E0_eps=1e3) -> tuple(np.ndarray, list[list[Gamma]]):
+        """Find transitions in the gamma scheme. """
+        # FIXME This is wrong. Each transition has in itself a whole cascade.
+        # A tree structure is much better
+        warnings.warn("THIS IS A WRONG IMPLEMENTATION")
+        ex: list[float] = []
+        eg: list[list[Gamma]] = []
+
+        def cascade(Ef, transitions, gammas):
+            for i, transition in enumerate(reversed(transitions)):
+                Ei = transition.Ei
+                if abs(Ef - Ei) <= eps:
+                    gammas.append(transition)
+                    n = len(transitions) - i - 1
+                    if n <= 0 or transition.Ef <= E0_eps:
+                        return gammas
+                    return cascade(transition.Ef, transitions[:n], gammas)
+            print(f"No known decays from {Ef}")
+            return gammas
+
+        for i, transition in enumerate(self.gammas):
+            ex.append(transition.Ei)
+            if transition.Ef > E0_eps:
+                transitions = cascade(transition.Ef, self.gammas[:i], [])
+                eg.append(transitions)
+            else:
+                eg.append([transition])
+        return np.asarray(ex), eg
+
+    def scatter_cascades(self, generation=None, ax: Axes | None = None, **kwargs) -> Axes:
+        if ax is None:
+            _, ax = plt.subplots()
+        assert ax is not None
+
+        ex, eg = self.transitions()
+        for Ex, transitions in zip(ex, eg):
+            if generation is not None:
+                if len(transitions) >= generation:
+                    ax.scatter(transitions[generation-1].Eg, Ex, **kwargs)
+            else:
+                for transition in transitions:
+                    ax.scatter(transition.Eg, Ex, **kwargs)
         return ax
 
     def append(self, gamma: Gamma):

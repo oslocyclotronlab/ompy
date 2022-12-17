@@ -289,39 +289,21 @@ class Response:
     def get_probabilities(self, compton: float = 1.0, full_energy: float = 1.0, single_escape: float = 1.0,
                           double_escape: float = 1.0, c511: float = 1.0) -> None:
         """ Interpolate full-energy peak probabilities (...) """
-        # total number of counts for each of the loaded responses
-        normalization = self.compton_matrix.sum(axis=1) + \
-                        self.resp['FE'] + self.resp['SE'] + \
-                        self.resp['DE'] + self.resp['c511']
-        normalization = np.array(normalization)
+        FE = self.resp['FE'].to_numpy()
+        SE = self.resp['SE'].to_numpy()
+        DE = self.resp['DE'].to_numpy()
+        C511 = self.resp['c511'].to_numpy()
+        pcmp = self.compton_matrix.sum(axis=1)
 
-        total = compton + full_energy + single_escape + double_escape + c511
-
-        # normalize "compton" spectra
-        self.cmp_matrix = div0(self.compton_matrix,
-                               normalization.reshape((len(normalization), 1)))
-        self.cmp_matrix *= compton / total
-        # Vector of total Compton probability
-        pcmp = self.cmp_matrix.sum(axis=1)
-
-        # Full energy, single escape, etc:
-        pFE = div0(self.resp['FE'], normalization) * full_energy / total
-        pSE = div0(self.resp['SE'], normalization) * single_escape / total
-        pDE = div0(self.resp['DE'], normalization) * double_escape / total
-        p511 = div0(self.resp['c511'], normalization) * c511 / total
-
-        N = pFE + pSE + pDE + p511 + pcmp
-        N = N[0]
-        pFE /= N
-        pSE /= N
-        pDE /= N
-        p511 /= N
-        self.cmp_matrix = div0(self.cmp_matrix, N)
-        pcmp = self.cmp_matrix.sum(axis=1)
-
+        # Each bin is normalized to sum to 1, weighting included
+        N = compton*pcmp + full_energy*FE + single_escape*SE + double_escape*DE + c511*C511
+        pFE = full_energy*FE/N
+        pSE = single_escape*SE/N
+        pDE = double_escape*DE/N
+        p511 = c511*C511/N
+        self.cmp_matrix = div0(self.compton_matrix, compton*N.reshape((-1, 1)))
 
         # Interpolate the peak structures except Compton (handled separately)
-
         Eg = self.resp['Eg'].to_numpy()
 
         def _interpolate(y, fill_value="extrapolate"):
@@ -347,10 +329,10 @@ class Response:
         self.f_fwhm_rel_perCent = interpolate(self.resp['FWHM_rel_norm'] *
                                               fwhm_rel_1330)
 
-        def f_fwhm_abs(E):  # noqa
-            return E * self.f_fwhm_rel_perCent(E) / 100
+        #def f_fwhm_abs(E):  # noqa
+        #    return E * self.f_fwhm_rel_perCent(E) / 100
 
-        self.f_fwhm_abs = f_fwhm_abs
+        #self.f_fwhm_abs = f_fwhm_abs
 
     # @njit()
     def interpolate(
@@ -412,8 +394,6 @@ class Response:
         R = np.zeros((N_out, N_out))
         Eg = self.resp['Eg'].to_numpy()
         # Loop over rows of the response matrix
-        # TODO for speedup: Change this to a cython
-        # Nevermind, this loop is not the bottleneck
         for j, E in enumerate(Eout):
             oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma

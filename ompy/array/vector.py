@@ -479,6 +479,7 @@ class Vector(AbstractArray):
             inplace: Whether to rebin inplace or return a copy.
                 Defaults to `False`.
         """
+        warnings.warn("This gives wrong result when the start and end bins are different")
         bins = self.to_same(other._E)
         return self.rebin(bins=bins, inplace=inplace)
 
@@ -673,6 +674,8 @@ class Vector(AbstractArray):
             E: The value which index to find. If dimensionless,
                assumes the same units as `Vector.E`
         """
+        # TODO Replace with numba
+        warnings.warn("Probably buggy")
         return np.searchsorted(self.E, self.to_same(E))
 
     def set_order(self, order: str) -> None:
@@ -708,19 +711,28 @@ class Vector(AbstractArray):
         result.values = result.values @ other.values
         return result
 
+    @property
+    def _summary(self) -> str:
+        emin = self.E[0]
+        emax = self.E[-1]
+        de = self.de
+        unit = f"{self.units:~}"
+        s = f"Energy: {emin} to {emax} [{unit}]\n"
+        s += f"{len(self.E)} bins with dE: {de} {unit}\n"
+        s += f"Total counts: {self.sum()}\n"
+        return s
+
+    def summary(self) -> None:
+        print(self._summary)
+
     def __str__(self) -> str:
+        summary = self._summary
+        summary += "\nValues:\n"
         if self.is_equidistant():
-            emin = self.E[0]
-            emax = self.E[-1]
-            de = self.de
-            unit = f"{self.units:~}"
-            s = f"Energy: {emin} to {emax} [{unit}]\n"
-            s += f"{len(self.E)} bins with dE: {de}\n"
-            s += f"Total counts: {self.sum()}\n"
             if self.std is not None:
-                return s + str(self.values) + '\n' + str(self.std)
+                return summary + str(self.values) + '\n' + str(self.std)
             else:
-                return s + str(self.values)
+                return summary + str(self.values)
         else:
             if self.std is not None:
                 return (f"{self.values}\n{self.std}\n{self.E} "
