@@ -10,11 +10,24 @@ import warnings
 TODO: Find a good weighting of the backscattering and compton interpolations
     - The final lerp makes sagging curves. Why? Fix.
        + Nevermind, it seems to be a visual artifact when the compton edge changes a lot between two energies.
+    - The first bin is always 0. Why?
+      + Because of indexing error. Not fixed.
+    - For GPU precompute [N = len(E true), M = len(E measured)]:
+      - The compton edge as 1xM
+      - Backscattering 1xM
+      - theta matrix N x M upper diagonal
+      - scattered matrix from theta NxM
+      - Fanlow NxM
+      - Fanhigh NxM
+      - de/dtheta matrices NxM
+      - fan lerped NxM
+    - The fan-method is slightly incorrect. A fan will pass through more bins in the higher compton
+      than the lower, which is not accounted for.
 """
 
 try:
     #raise ImportError
-    from numba import njit, int32, float32, float64
+    from numba import njit, int32, float32, float64, prange
     from numba.experimental import jitclass
     from numba.typed import List as NList
     from numba.types import ListType
@@ -25,20 +38,21 @@ except ImportError as e:
     int32 = np.int32
     float32 = np.float32
     float64 = np.float64
+    prange = range
 
     def nop_decorator(func, *aargs, **kkwargs):
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
 
-    def nop_nop(nop):
+    def nop_nop(*aargs, **kkwargs):
         def decorator(func):
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
             return wrapper
         return decorator
 
-    njit = nop_decorator
+    njit = nop_nop #nop_decorator
     jitclass = nop_nop
     NList = list
     ListType = list
@@ -51,6 +65,7 @@ spec2["compton"] = ListType(NVector.class_type.instance_type) if NUMPY else list
 @jitclass(spec2)
 class ComptonList:
     def __init__(self, E, compton):
+        assert len(E) == len(compton)
         self.E = E
         self.compton = compton
 
@@ -144,16 +159,16 @@ def interpolate_compton(p: ResponseData, E: np.ndarray, sigma: Vector, nsigma: i
     """
     if p.E[0] > E[0] or p.E[-1] < E[-1]:
         raise ValueError("Compton interpolation range out of bounds")
-    #assert len(E) == len(sigma), "E and sigma must be the same length and be parameterised at the same energies"
     compton: ComptonList = make_compton_list(p)
     sigma_ = NVector(sigma.E, sigma.values)
-    assert len(compton.compton_E) == len(sigma_), "Compton and sigma must be parameterised at the same energies"
+    assert np.allclose(compton.compton_E, sigma.E), "Compton and sigma must be parameterised at the same energies"
     R = _interpolate_compton(compton, E, sigma_, nsigma)
     Eg = np.asarray(compton.compton_E)
-    return Matrix(Eg=Eg, Ex=E, values=R, xlabel="Measured energy", ylabel="True energy")
+    return Matrix(Eg=Eg, Ex=E, values=R, xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
 
 
-@njit
+# Parallel fails by some reason
+@njit(fastmath=True)
 def _interpolate_compton(compton: ComptonList, E: np.ndarray, sigma: NVector, nsigma: int) -> np.ndarray:
     """Interpolate Compton probabilities.
 
@@ -167,26 +182,25 @@ def _interpolate_compton(compton: ComptonList, E: np.ndarray, sigma: NVector, ns
     Returns:
         Matrix: Interpolated Compton probabilities
     """
-    # BUG Doesn't work for differently binned low and high
-    BACKSCATTER_DOMINATES = 511/2  # Solve equation  backscatter energy = compton edge
     N = len(E)
-    M = len(compton.compton_E)
+    CE = compton.compton_E
+    M = len(CE)
     R = np.zeros((N, M))
-    # For speed we mutate these two arrays inplace and reuse them
-    backscatter = ComptonVector(0.0, NVector(compton.compton_E, np.zeros(M)))
-    fan = ComptonVector(0.0, NVector(compton.compton_E, np.zeros(M)))
     # Logistical weight from 0 to 1 and 0.5 at 800 keV
     weight = 1 / (1 + np.exp(-1/100 * (E - 800)))
-    for i, e in enumerate(E):
-        backscatter.e = e
-        fan.e = e
+    for i in prange(N):
+        e = E[i]
+        # Faster to allocate new vectors in order to use parallel loop
+        backscatter = ComptonVector(e, NVector(CE, np.zeros(M)))  # FIXME When index is fixed, use empty
+        fan = ComptonVector(e, NVector(CE, np.zeros(M)))
         # The two closest compton spectra at e
         low, high = compton.closest(e)
 
         compton_lerp_mut(backscatter, low, high)
         fan_mut(fan, low, high)
         lerp_from_edge_mut(fan, low, high, sigma, nsigma)
-        R[i, :] = weight[i] * fan.vector.values + (1 - weight[i]) * backscatter.vector.values
+        for j in prange(M):
+            R[i, j] = weight[i] * fan.vector.values[j] + (1 - weight[i]) * backscatter.vector.values[j]
     return R
 
 
@@ -200,11 +214,14 @@ def compton_lerp(low: ComptonVector, high: ComptonVector, e: float) -> np.ndarra
     return intp
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def compton_lerp_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector):
     t = (mid.e - low.e) / (high.e - low.e)
     stop = len(mid)
-    for i in range(stop):
+    for i in prange(stop):
+        # These at() are a massive bottleneck. Can't remove them unless all vectors are equally binned
+        # No, wait, we *can* remove them because the bad vectors are only longer, but have the same
+        # calibration.
         mid[i] = (1.0 - t) * low[i] + t * high[i]
 
 
@@ -233,13 +250,13 @@ def make_compton_list(p: ResponseData) -> ComptonList:
     return ComptonList(E, compton)
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def fan_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector):
     """ Interpolate the probabilities for a given energy at equal angle. Mutates R in place. """
     stop = mid.index(mid.edge())
 
     e = mid.e
-    for i in range(stop):
+    for i in prange(stop):
         ei = mid.E[i]
         if ei < 0.1:
             continue
@@ -266,30 +283,31 @@ def fan_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector):
         mid[i] = intp / dEdtheta(e, theta)
 
 
-@njit
+@njit(parallel=True, fastmath=True)
 def lerp_from_edge_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector,
                        sigma: NVector, nsigma: int) -> None:
     """ Interpolate the probabilities for a given energy at equal angle. Mutates R in place. """
     edge_low = low.edge()
+    edge_mid = mid.edge()
     edge_high = high.edge()
+
     stop_low = low.e + nsigma*sigma.at(edge_low)
+    stop_mid = mid.e + nsigma*sigma.at(edge_mid)
     stop_high = high.e + nsigma*sigma.at(edge_high)
 
-    edge_mid = mid.edge()
-    stop_mid = mid.e + nsigma*sigma.at(edge_mid)
-    start = mid.index(edge_mid)
     # Stop at the end or 10% higher than the high compton. High compton is of course always higher, than mid,
     # but to be on the safe side we go a bit higher in case of higher laying structures.
     #stop = low.index(min(low.E[-1], 1.1*stop_high))
     #print(low.e, stop)
     #stop = min(len(mid), mid.index(stop_mid))  # FIXME. Just a test
+    start = mid.index(edge_mid)
     stop = len(mid)
 
     # Partially precompute the weighting lerp
     t = (mid.e - low.e) / (high.e - low.e)
     wlerp = lambda low, high: (1.0 - t) * low + t * high
 
-    for i in range(start, stop):
+    for i in prange(start, stop):
         eg = mid.E[i]
         elow = lerp(eg, edge_mid, stop_mid, edge_low, stop_low)
         ehigh = lerp(eg, edge_mid, stop_mid, edge_high, stop_high)
@@ -367,7 +385,7 @@ def test_whole(p: ResponseData, intp: 'ResponseInterpolation', e: float, nsigma=
     return intpv, lowv, highv
 
 
-@njit
+@njit(fastmath=True)
 def electron_energy(Eg: float, theta: float) -> float:
     """
     Calculates the energy of an electron that is scattered an angle
@@ -388,7 +406,7 @@ def electron_energy(Eg: float, theta: float) -> float:
     return np.where(Eg > 0.1, electron, Eg)
 
 
-@njit
+@njit(fastmath=True)
 def compton_edge(e: float) -> float:
     """ The Compton edge energy. Same as electron_energy(e, π) """
     if e < 0.1:
@@ -397,13 +415,13 @@ def compton_edge(e: float) -> float:
     return e - scattered
 
 
-@njit
+@njit(fastmath=True)
 def backscatter_energy(e: float) -> float:
     """ The backscatter energy """
     return e - compton_edge(e)
 
 
-@njit
+@njit(fastmath=True)
 def dEdtheta(Eg: float, theta: float) -> float:
     """
     Derivative of electron energy with respect to theta.
@@ -419,7 +437,7 @@ def dEdtheta(Eg: float, theta: float) -> float:
     b = (1 + Eg / 511 * (1 - np.cos(theta))) ** 2
     return a / b
 
-@njit
+@njit(parallel=True)
 def compton_angle(e, ei):
     r = 1e-14 if e-ei < 1e-14 else e-ei
     z = ei / (e / 511 * r)

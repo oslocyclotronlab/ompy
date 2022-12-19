@@ -21,12 +21,30 @@ except ImportError:
 
 @njit
 def index(E: np.ndarray, e: float64) -> int:
+    if e < E[0]:
+        raise IndexError("Energy below bounds.")
     i = 0
     while i < len(E):
         if E[i] > e:
             return i - 1
         i += 1
+    #if e > E[-1] + (E[-1] - E[-2]):
+    #    raise IndexError("Energy above bounds.")
     return i - 1
+
+
+# @njit
+# def index(E: np.ndarray, e: float64) -> int:
+#     if e < E[0]:
+#         return 0
+#         #raise IndexError("Energy below bounds.")
+#     i = 0
+#     while i < len(E):
+#         if E[i] > e:
+#             return i
+#         i += 1
+#
+#     return i-1
 
 @njit
 def index_mid(E: np.ndarray, e: float64) -> int:

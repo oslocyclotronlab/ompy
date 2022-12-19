@@ -62,7 +62,8 @@ class Calibrator:
             ignore = np.zeros_like(self.spectrum, dtype=bool)
 
         def loss(p) -> float:
-            R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, compton=p[0]).T
+            R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, 
+                                   fwhm_peak=self.fwhm_fit.mu, compton=p[0]).T
             fe_e, fe_C, fe_fit = self.fit_FE(fe_region, Components(compton=p[0]))
             compton_edge = E_compton(fe_e, np.pi)
             region = ~ignore & (self.spectrum.E < compton_edge)
@@ -77,8 +78,8 @@ class Calibrator:
         res = minimize(loss, p0, bounds=[(0.0, 10.0)], method='Nelder-Mead')
         print(res)
         components = Components(compton=res.x[0])
-        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, **components.to_dict()).T
-        R0 = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm).T
+        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, fwhm_peak=self.fwhm_fit.mu, **components.to_dict()).T
+        R0 = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, fwhm_peak=self.fwhm_fit.mu).T
         e, C, _ = self.fit_FE(fe_region, components)
         print(C)
         ax=self.spectrum.plot()

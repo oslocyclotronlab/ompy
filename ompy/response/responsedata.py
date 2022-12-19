@@ -9,6 +9,11 @@ import matplotlib.pyplot as plt
 from typing import overload, Literal
 import warnings
 
+"""
+TODO: Remove prefix/suffix and only use a glob pattern.
+"""
+
+
 ResponseFunctionName = Literal['Oscar2017', 'Oscar2020']
 RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2017_scale1.15"}
 
