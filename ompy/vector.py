@@ -562,6 +562,11 @@ class Vector(AbstractArray):
         """ Returns the closest index corresponding to the E value """
         return index(self.E, E)
 
+    def indices(self, E: Iterable[float]) -> ndarray:
+        """ Returns the closest indices correspoinding to the E values """
+        indices = [self.index(e) for e in E]
+        return np.array(indices)
+
     def __matmul__(self, other: Vector) -> Vector:
         result = self.copy()
         if isinstance(other, Vector):

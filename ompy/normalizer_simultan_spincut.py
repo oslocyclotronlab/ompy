@@ -6,7 +6,6 @@ import termtables as tt
 from numpy import ndarray
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any, Callable, Dict, Iterable, List
-from scipy.optimize import differential_evolution
 import pymultinest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
@@ -20,7 +19,7 @@ from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
-from .stats import truncnorm_ppf
+from .stats import truncnorm_ppf, normal_ppf
 
 
 class NormalizerSimultan(AbstractNormalizer):
@@ -123,7 +122,7 @@ class NormalizerSimultan(AbstractNormalizer):
 
         # reset internal state
         self.res = ResultsNormalized(name="Results NLD")
-        norm_pars_org = copy.deepcopy(self.normalizer_nld.norm_pars)
+
         self.normalizer_nld = copy.deepcopy(self.self_if_none(normalizer_nld))
         self.normalizer_gsf = copy.deepcopy(self.self_if_none(normalizer_gsf))
         for norm in [self.normalizer_nld, self.normalizer_gsf]:
@@ -140,8 +139,6 @@ class NormalizerSimultan(AbstractNormalizer):
         nld = nld.copy()
         nld.to_MeV()
         nld.cut_nan()
-
-        self.LOG.info(f"Normalizing #{num}")
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an
@@ -160,7 +157,7 @@ class NormalizerSimultan(AbstractNormalizer):
         self.normalizer_gsf.gsf_in = gsf  # update before initial guess
 
         # Use DE to get an inital guess before optimizing
-        args_nld, guess = self.initial_guess(num)
+        args_nld, guess = self.initial_guess()
         # Optimize using multinest
         popt, samples = self.optimize(num, args_nld, guess)
 
@@ -188,11 +185,9 @@ class NormalizerSimultan(AbstractNormalizer):
         for model in [self.res.gsf_model_low, self.res.gsf_model_high]:
             model.shift_after = model.shift
 
-        self.normalizer_nld.norm_pars = copy.deepcopy(norm_pars_org)
-        self.normalizer_gsf.norm_pars = copy.deepcopy(norm_pars_org)
         self.save()  # save instance
 
-    def initial_guess(self, num: int) -> None:
+    def initial_guess(self) -> None:
         """ Find an inital guess for normalization parameters
 
         Uses guess of normalizer_nld and corresponding normalization of gsf
@@ -211,25 +206,15 @@ class NormalizerSimultan(AbstractNormalizer):
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
 
-        normalizer_gsf.normalize(nld=nld, nld_model=nld_model, alpha=alpha, num=num)
+        normalizer_gsf.normalize(nld=nld, nld_model=nld_model, alpha=alpha)
         guess["B"] = normalizer_gsf.res.pars["B"][0]
 
-        # If D0 is not consistent with model prediction we should do a
-        # MLE from the simultan likelihood.
-        bounds = list(normalizer_nld.bounds.values())
-        bounds.append([0, 4*guess["B"]])
-
-        def neglnlike(x, *args):
-            return -self.lnlike(x, args)
-        res = differential_evolution(neglnlike, bounds=bounds, args=args_nld,
-                                     **normalizer_nld.de_kwargs)
-
         guess_print = copy.deepcopy(guess)
-        self.LOG.info("DE results/initial guess (# %d):\n%s", num,
-                      tt.to_string([res.x.tolist()],
+        self.LOG.info("DE results/initial guess:\n%s",
+                      tt.to_string([list(guess_print.values())],
                                    header=['A', 'α [MeV⁻¹]', 'T [MeV]',
                                            'Eshift [MeV]', 'B']))
-        guess = dict(zip(["A", "alpha", "T", "Eshift", "B"], (res.x).T))
+
         return args_nld, guess
 
     def optimize(self, num: int,
@@ -289,6 +274,9 @@ class NormalizerSimultan(AbstractNormalizer):
         a_B = (lower_B - mu_B) / sigma_B
         b_B = (upper_B - mu_B) / sigma_B
 
+        mu_sigmaSn, sigma_sigmaSn = self.normalizer_nld.norm_pars.spincutPars['sigmaSn']
+        mu_sigmaD, sigma_sigmaD = self.normalizer_nld.norm_pars.spincutPars['sigmaD']
+
         def prior(cube, ndim, nparams):
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
@@ -306,6 +294,11 @@ class NormalizerSimultan(AbstractNormalizer):
             # truncated normal prior
             cube[4] = truncnorm_ppf(cube[4], a_B, b_B)*sigma_B + mu_B
 
+            # sigmas
+            cube[5] = normal_ppf(cube[5])*sigma_sigmaD + mu_sigmaD
+            cube[6] = normal_ppf(cube[6])*sigma_sigmaSn + mu_sigmaSn
+            
+
             if np.isinf(cube[3]):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
 
@@ -319,19 +312,19 @@ class NormalizerSimultan(AbstractNormalizer):
         path = self.multinest_path / f"sim_norm_{num}_"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        self.LOG.info("Starting multinest (# %d): ", num)
+        self.LOG.info("Starting multinest: ")
         self.LOG.debug("with following keywords %s:", self.multinest_kwargs)
         #  Hack where stdout from Multinest is redirected as info messages
-        self.LOG.write = lambda msg: (self.LOG.info("# %d: %s", num, msg) if msg != '\n'  # noqa
+        self.LOG.write = lambda msg: (self.LOG.info(msg) if msg != '\n'
                                       else None)
 
         with redirect_stdout(self.LOG):
-            pymultinest.run(loglike, prior, len(guess),
+            pymultinest.run(loglike, prior, len(guess)+2,
                             outputfiles_basename=str(path),
                             **self.multinest_kwargs)
 
         # Save parameters for analyzer
-        names = list(guess.keys())
+        names = list(guess.keys()) + ['sigmaD', 'sigmaSn']
         json.dump(names, open(str(path) + 'params.json', 'w'))
         analyzer = pymultinest.Analyzer(len(guess),
                                         outputfiles_basename=str(path))
@@ -354,9 +347,9 @@ class NormalizerSimultan(AbstractNormalizer):
             fmts = '\t'.join([fmt + " ± " + fmt])
             vals.append(fmts % (med, sigma))
 
-        self.LOG.info("Multinest results (# %d):\n%s", num,
-                      tt.to_string([vals], header=['A', 'α [MeV⁻¹]', 'T [MeV]',
-                                                   'Eshift [MeV]', 'B']))
+        self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
+                      header=['A', 'α [MeV⁻¹]', 'T [MeV]',
+                              'Eshift [MeV]', 'B', 'σD', 'σSn']))
 
         # reset state
         self.normalizer_gsf.norm_pars = norm_pars_org
@@ -378,21 +371,28 @@ class NormalizerSimultan(AbstractNormalizer):
         Returns:
             lnlike: log likelihood
         """
-        A, alpha, T, Eshift, B = x[:5]  # slicing needed for multinest?
+        A, alpha, T, Eshift, B, sigmaD, sigmaSn = x[:7]  # slicing needed for multinest?
 
         normalizer_gsf = self.normalizer_gsf
         normalizer_nld = self.normalizer_nld
 
-        err_nld = normalizer_nld.lnlike(x[:4], *args_nld)
+        err_nld = normalizer_nld.lnlike_v2(x[:4], *args_nld)
 
         nld = normalizer_nld.nld.transform(A, alpha, inplace=False)
         nld_model = lambda E: normalizer_nld.model(E, T=T, Eshift=Eshift)  # noqa
 
         normalizer_gsf.nld_model = nld_model
         normalizer_gsf.nld = nld
+
+        # Change to the new sigmaD and sigmaSn
+        normalizer_nld.norm_pars.spincutPars['sigma2_disc'][1] = sigmaD**2
+        normalizer_nld.norm_pars.spincutPars['sigma2_Sn'][1] = sigmaSn**2
+        normalizer_gsf.norm_pars.spincutPars['sigma2_disc'][1] = sigmaD**2
+        normalizer_gsf.norm_pars.spincutPars['sigma2_Sn'][1] = sigmaSn**2
+
         # calculate the D0-equivalent of T and Eshift used
         D0 = normalizer_nld.D0_from_nldSn(nld_model,
-                                          **normalizer_nld.norm_pars.asdict())
+                                          **normalizer_gsf.norm_pars.asdict())
         normalizer_gsf.norm_pars.D0 = [D0, np.nan]  # dummy uncertainty
         normalizer_gsf._gsf = normalizer_gsf.gsf_in.transform(B, alpha,
                                                               inplace=False)

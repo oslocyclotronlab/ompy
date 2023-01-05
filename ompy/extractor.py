@@ -14,6 +14,7 @@ from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
+from .error_finder import ErrorFinder
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -47,6 +48,8 @@ class Extractor:
         trapezoid (Action[Matrix]): The Action cutting the matrices of the
             Ensemble into the desired shape where from the nld and gsf will be
             extracted from.
+        error_estimator (ErrorFinder): The algorithm used to estimate the
+            relative errors of the extracted NLD and γSF.
         path (path): The path to save and/or load nld and gsf to/from.
         extend_diagonal_by_resolution (bool, optional): If `True`,
             the fit will be extended beyond Ex=Eg by the (FWHM) of the
@@ -58,6 +61,11 @@ class Extractor:
         seed (int): Random seed for reproducibility of results.
         resolution_Ex (float or np.ndarray, optional): Resolution (FWHM) along
             Ex axis (particle detector resolution). Defaults to 150 keV
+        rel_err_missing (float): Relative error used for points that cannot be
+            estimated by error_estimator object.
+        suppress_warning (bool): Suppress warnings. The warnings are usually
+            expected. Set this attribute to `True` in order to avoid enourmous
+            amounts of warnings in your notebooks.
 
 
     TODO:
@@ -67,11 +75,13 @@ class Extractor:
     """
     def __init__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None,
+                 error_estimator: Optional[ErrorFinder] = None,
                  path: Optional[Union[str, Path]] =
                  'saved_run/extractor'):
         """
         ensemble (Ensemble, optional): see above
         trapezoid (Action[Matrix], optional): see above
+        error_estimator (ErrorFinder, optional): see above
         path (Path or str, optional): see above
         """
         self.ensemble = ensemble
@@ -81,6 +91,7 @@ class Extractor:
         self.nld: List[Vector] = []
         self.gsf: List[Vector] = []
         self.trapezoid = trapezoid
+        self.error_estimator = error_estimator
 
         if path is None:
             self.path = None
@@ -96,18 +107,29 @@ class Extractor:
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
 
+        self.rel_err_missing = 0.3
+        self.suppress_warning = False
+
     def __call__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None):
         return self.extract_from(ensemble, trapezoid)
 
     def extract_from(self, ensemble: Optional[Ensemble] = None,
                      trapezoid: Optional[Action] = None,
-                     regenerate: Optional[bool] = None):
+                     error_estimator: Optional[ErrorFinder] = None,
+                     regenerate: Optional[bool] = None,
+                     return_trace: Optional[bool] = False) -> Union[None, Any]:
         """Decompose each first generation matrix in an Ensemble
 
         If `regenerate` is `True` it saves the extracted nld and gsf to file,
         or loads them if already generated. Exposes the vectors in the
         attributes self.nld and self.gsf.
+
+        If the error_estimator attribute or argument is set then relative
+        errors will be estimated using the provided algorithm. Points in the
+        nld and gsf that the algorithm are unable to estimate will be set to
+        30%. If error_estimator isn't set (is None), then the std attribute
+        of nld and gsf will not be set.
 
         Args:
             ensemble (Ensemble, optional): The ensemble to extract nld and gsf
@@ -115,9 +137,17 @@ class Extractor:
             trapezoid (Action, optional): An Action describing the cut to apply
                 to the matrices to obtain the desired region for extracting nld
                 and gsf.
+            error_estimator (ErrorFinder, optional): Object responsible for
+                estimating the relative errors of the extracted nld and gsf.
             regenerate (bool, optional): Whether to regenerate all nld and gsf
                 even if they are found on disk.
-
+            return_trace (bool, optional): If the trace from the ErrorFinder
+                algorithm should be returned or not. If `error_estimator`
+                argument and `error_estimator` attribute are both None this
+                will have no affect.
+        Returns: Trace from inference sampling of the relative errors if
+            `return_trace` argument is true and either the `error_estimator`
+            argument or attribute are set.
         Raises:
             ValueError: If no Ensemble instance is provided here or earlier.
         """
@@ -129,6 +159,8 @@ class Extractor:
             self.trapezoid = trapezoid
         elif self.trapezoid is None:
             raise ValueError("A 'trapezoid' cut must be given'")
+        if error_estimator is not None:
+            self.error_estimator = error_estimator
         if regenerate is None:
             regenerate = self.regenerate
         self.path = Path(self.path)
@@ -153,7 +185,30 @@ class Extractor:
         self.nld = nlds
         self.gsf = gsfs
 
+        trace = None
+
+        if self.error_estimator is not None and regenerate:
+            LOG.debug("Estimating relative errors")
+
+            # We allways get the trace. If the user doesn't want it, we do
+            # not give it. Doesn't matter really!
+            nld_rel_err, gsf_rel_err, trace = self.error_estimator(nlds, gsfs,
+                                                                   full=True)
+            nld_rel_err.to_keV()
+            gsf_rel_err.to_keV()
+            for i, (nld, gsf) in enumerate(zip(self.nld, self.gsf)):
+                nld.std = self.rel_err_missing * nld.values
+                gsf.std = self.rel_err_missing * gsf.values
+                idx_nld = nld.indices(nld_rel_err.E)
+                idx_gsf = gsf.indices(gsf_rel_err.E)
+                nld.std[idx_nld] = nld_rel_err.values * nld.values[idx_nld]
+                gsf.std[idx_gsf] = gsf_rel_err.values * gsf.values[idx_gsf]
+                nld.save(self.path / f'nld_{i}.npy')  # Overwrite with errors!
+                gsf.save(self.path / f'gsf_{i}.npy')  # Overwrite with errors!
+
         self.check_unconstrained_results()
+        if return_trace:
+            return trace  # If error_estimator is not set, then allways None.
 
     def step(self, num: int) -> Tuple[Vector, Vector]:
         """ Wrapper around _extract in order to be consistent with other classes
@@ -298,7 +353,8 @@ class Extractor:
 
         # Convert transmission coefficient to the more useful
         # gamma strength function
-        gsf = T/(2*np.pi*matrix.Eg**3)
+        Eg = matrix.Eg / 1e3  # Ensure we devide by MeV and not keV
+        gsf = T/(2*np.pi*Eg**3)
 
         if product:
             nld_0 = np.where(np.isnan(nld), np.zeros_like(nld), nld)
@@ -536,18 +592,20 @@ class Extractor:
         for i, vec in enumerate(self.nld):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"nld #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for nld in extractor.nld:\n"
-                            "#     nld.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"nld #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for nld in extractor.nld:\n"
+                                "#     nld.cut_nan()\n")
 
         for i, vec in enumerate(self.nld):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"gsf #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for gsf in extractor.gsf:\n"
-                            "#     gsf.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"gsf #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for gsf in extractor.gsf:\n"
+                                "#     gsf.cut_nan()\n")
 
         return contains_nan
 

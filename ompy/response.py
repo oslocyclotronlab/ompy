@@ -21,6 +21,11 @@ from .gauss_smoothing import gauss_smoothing
 from .matrix import Matrix
 from .vector import Vector
 
+if 'JPY_PARENT_PID' in os.environ:
+    from tqdm import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
+
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
@@ -325,7 +330,7 @@ class Response():
         R = np.zeros((N_out, N_out))
         # Loop over rows of the response matrix
         # TODO for speedup: Change this to a cython
-        for j, E in enumerate(Eout):
+        for j, E in enumerate(tqdm(Eout)):
             oneSigma = fwhm_abs_array[j] / 2.35
             Egmax = E + 6 * oneSigma
             i_Egmax = min(index(Eout, Egmax), N_out-1)

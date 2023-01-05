@@ -130,6 +130,7 @@ else:
 fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
+openmp = False
 
 extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
 extra_link_args = []
@@ -171,7 +172,8 @@ install_requires = [
  "uncertainties>=3.0.3",
  "tqdm",
  "pathos",
- "pybind11>=2.6.0"
+ "pybind11>=2.6.0",
+ "pymc"
 ]
 
 setup(name='OMpy',

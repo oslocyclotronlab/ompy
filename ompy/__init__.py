@@ -44,8 +44,15 @@ else:
     from .decomposition import nld_T_product, index
     from .normalizer_nld import (NormalizerNLD, load_levels_discrete,
                                  load_levels_smooth)
+    from .normalizer_nld_v2 import NormalizerNLD as NormalizerNLDv2
+    from .normalizer_ct import NormalizerNLD as NormalizerNLDct
+    from .normalizer_simultan_ct import NormalizerSimultan as NormalizerSimultanCT
+    from .normalizer_simultan_v2 import NormalizerSimultan as NormalizerSimultanV2
+    from .normalizer_simultan_spincut import NormalizerSimultan as NormalizerSimultanSC
     from .normalizer_gsf import NormalizerGSF
     from .normalizer_simultan import NormalizerSimultan
-    from .ensembleNormalizer import EnsembleNormalizer
+    from .ensemble_normalizer import EnsembleNormalizer
     from .models import NormalizationParameters, ResultsNormalized
     from .introspection import logging, hooks
+    from .dist import FermiDirac
+    from .error_finder import ErrorFinder
