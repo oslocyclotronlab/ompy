@@ -1,12 +1,13 @@
-import pymc3 as pm
+import pymc as pm
+import numpy as np
 from typing import List, Tuple
 
-import aesara.tensor as at
-from aesara.tensor.random.op import RandomVariable
+import pytensor.tensor as at
+from pytensor.tensor.random.op import RandomVariable
 
-from pymc3.distributions.continuous import (PositiveContinuous,
+from pymc.distributions.continuous import (PositiveContinuous,
                                             assert_negative_support)
-from pymc3.distributions.dist_math import bound
+#from pymc.distributions.dist_math import bound
 
 """
 TODO:
@@ -22,13 +23,14 @@ class FermiDiracRV(RandomVariable):
     ndim_supp: int = 0
 
     # Number of parameters for the RV
-    ndim_params: List[int] = [0, 0]
+    ndims_params: List[int] = [0, 0]
 
     # Datatype, floatX is continious
     dtype: str = "floatX"
 
     # Print name
     _print_name: Tuple[str, str] = ("FermiDirac", "\\operatorname{FermiDirac}")
+
 
     @classmethod
     def rng_fn(cls,

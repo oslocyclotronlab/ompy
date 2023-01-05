@@ -163,7 +163,7 @@ ext_modules_pybind11 = [
 
 install_requires = [
  "cython",
- "numpy>=1.20.0,<1.22.0",
+ "numpy>=1.20.0",
  "pandas",
  "matplotlib",
  "termtables",
@@ -173,7 +173,7 @@ install_requires = [
  "tqdm",
  "pathos",
  "pybind11>=2.6.0",
- "pymc3>=3.11.2,<4.0"
+ "pymc"
 ]
 
 setup(name='OMpy',

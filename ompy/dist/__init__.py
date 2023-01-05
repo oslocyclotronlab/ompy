@@ -1,4 +1,4 @@
-import pymc3 as pm
+import pymc as pm
 from packaging import version
 
 if version.parse(pm.__version__) < version.parse("4.0.0"):

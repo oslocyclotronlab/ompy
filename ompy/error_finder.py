@@ -1,6 +1,6 @@
 import logging
 import numpy as np
-import pymc3 as pm
+import pymc as pm
 import termtables as tt
 
 from numpy import ndarray
