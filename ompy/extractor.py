@@ -14,6 +14,7 @@ from .matrix import Matrix
 from .vector import Vector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
+from .pyrhosigchi import pyrhosigchi
 
 if 'JPY_PARENT_PID' in os.environ:
     from tqdm import tqdm_notebook as tqdm
@@ -102,7 +103,46 @@ class Extractor:
 
     def extract_from(self, ensemble: Optional[Ensemble] = None,
                      trapezoid: Optional[Action] = None,
-                     regenerate: Optional[bool] = None):
+                     regenerate: Optional[bool] = None,
+                     algorithm: Optional[str] = "standard"):
+        """Decompose each first generation matrix in an Ensemble
+
+        If `regenerate` is `True` it saves the extracted nld and gsf to file,
+        or loads them if already generated. Exposes the vectors in the
+        attributes self.nld and self.gsf.
+
+        Args:
+            ensemble (Ensemble, optional): The ensemble to extract nld and gsf
+                from. Can be provided in when initializing instead.
+            trapezoid (Action, optional): An Action describing the cut to apply
+                to the matrices to obtain the desired region for extracting nld
+                and gsf.
+            regenerate (bool, optional): Whether to regenerate all nld and gsf
+                even if they are found on disk.
+
+        Raises:
+            ValueError: If no Ensemble instance is provided here or earlier.
+        """
+        if ensemble is not None:
+            self.ensemble = ensemble
+        elif self.ensemble is None:
+            raise ValueError("ensemble must be given")
+        if trapezoid is not None:
+            self.trapezoid = trapezoid
+        elif self.trapezoid is None:
+            raise ValueError("A 'trapezoid' cut must be given'")
+        if regenerate is None:
+            regenerate = self.regenerate
+        self.path = Path(self.path)
+
+        if algorithm == "standard":
+            self.standard(ensemble, trapezoid, regenerate)
+        elif algorithm == "rhosigchi":
+            self.rhosigchi(ensemble, trapezoid, regenerate)
+
+    def standard(self, ensemble: Optional[Ensemble] = None,
+                 trapezoid: Optional[Action] = None,
+                 regenerate: Optional[bool] = None):
         """Decompose each first generation matrix in an Ensemble
 
         If `regenerate` is `True` it saves the extracted nld and gsf to file,
@@ -145,6 +185,76 @@ class Extractor:
                 gsfs.append(Vector(path=gsf_path))
             else:
                 nld, gsf = self.step(i)
+                nld.save(nld_path)
+                gsf.save(gsf_path)
+                nlds.append(nld)
+                gsfs.append(gsf)
+
+        self.nld = nlds
+        self.gsf = gsfs
+
+        self.check_unconstrained_results()
+
+    def rhosigchi(self, ensemble: Optional[Ensemble] = None,
+                  trapezoid: Optional[Action] = None,
+                  regenerate: Optional[bool] = None) -> None:
+        """ Normalize the ensemble using the rhosigchi algorithm.
+        Args:
+        Returns:
+        """
+        if ensemble is not None:
+            self.ensemble = ensemble
+        elif self.ensemble is None:
+            raise ValueError("ensemble must be given")
+        if trapezoid is not None:
+            self.trapezoid = trapezoid
+        elif self.trapezoid is None:
+            raise ValueError("A 'trapezoid' cut must be given'")
+        if regenerate is None:
+            regenerate = self.regenerate
+        self.path = Path(self.path)
+
+        first_gen_mean = Matrix(Ex=ensemble.firstgen.Ex,
+                                Eg=ensemble.firstgen.Eg,
+                                values=np.mean(ensemble.firstgen_ensemble,
+                                               axis=0))
+
+        first_gen_std = Matrix(Ex=ensemble.firstgen.Ex,
+                               Eg=ensemble.firstgen.Eg,
+                               values=np.mean(ensemble.firstgen_ensemble,
+                                              axis=0))
+
+        nlds = []
+        gsfs = []
+
+        #kinda stupid, but we need to do it...
+        Ex_min, Ex_max, Eg_min = None, None, None
+        for call in self.trapezoid.calls:
+            if 'trapezoid' in call:
+                Ex_min = call[-1]['Ex_min']
+                Ex_max = call[-1]['Ex_max']
+                Eg_min = call[-1]['Eg_min']
+
+        np.random.seed(self.seed)  # seed also in `__init__`
+        for i in tqdm(range(self.ensemble.size)):
+            nld_path = self.path / f'nld_{i}.npy'
+            gsf_path = self.path / f'gsf_{i}.npy'
+            if nld_path.exists() and gsf_path.exists() and not regenerate:
+                LOG.debug(f"loading from {nld_path} and {gsf_path}")
+                nlds.append(Vector(path=nld_path))
+                gsfs.append(Vector(path=gsf_path))
+            else:
+                nld, gsf = pyrhosigchi(first_gen_mean, first_gen_std,
+                                       Ex_min, Ex_max, Eg_min, 101)
+                # To be in line with how this class handles unconstrained
+                # numbers we will set values that are 0 to nan
+                nld.std[nld.values == 0] = np.nan
+                nld.values[nld.values == 0] = np.nan
+                gsf.std[gsf.values == 0] = np.nan
+                gsf.values[gsf.values == 0] = np.nan
+                # And convert to correct units for gsf
+                gsf.values = gsf.values/(2*np.pi*(gsf.E/1e3)**3)
+                gsf.std = gsf.std/(2*np.pi*(gsf.E/1e3)**3)
                 nld.save(nld_path)
                 gsf.save(gsf_path)
                 nlds.append(nld)
