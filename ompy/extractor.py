@@ -96,6 +96,7 @@ class Extractor:
 
         self.extend_fit_by_resolution: bool = False
         self.resolution_Ex = 150  # keV
+        self.suppress_warning: bool = False
 
     def __call__(self, ensemble: Optional[Ensemble] = None,
                  trapezoid: Optional[Action] = None):
@@ -235,7 +236,7 @@ class Extractor:
                 Ex_max = call[-1]['Ex_max']
                 Eg_min = call[-1]['Eg_min']
 
-        np.random.seed(self.seed)  # seed also in `__init__`
+        rng = np.random.default_rng(self.seed)  # seed also in `__init__`
         for i in tqdm(range(self.ensemble.size)):
             nld_path = self.path / f'nld_{i}.npy'
             gsf_path = self.path / f'gsf_{i}.npy'
@@ -244,8 +245,13 @@ class Extractor:
                 nlds.append(Vector(path=nld_path))
                 gsfs.append(Vector(path=gsf_path))
             else:
-                nld, gsf = pyrhosigchi(first_gen_mean, first_gen_std,
-                                       Ex_min, Ex_max, Eg_min, 101)
+                first_gen_mat = Matrix(values=ensemble.firstgen_ensemble[i],
+                                       Ex=first_gen_mean.Ex,
+                                       Eg=first_gen_mean.Eg)
+                nld, gsf = pyrhosigchi(first_gen_mat,
+                                       first_gen_std,
+                                       Ex_min, Ex_max, Eg_min, 101,
+                                       rng=rng)
                 # To be in line with how this class handles unconstrained
                 # numbers we will set values that are 0 to nan
                 nld.std[nld.values == 0] = np.nan
@@ -646,18 +652,20 @@ class Extractor:
         for i, vec in enumerate(self.nld):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"nld #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for nld in extractor.nld:\n"
-                            "#     nld.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"nld #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for nld in extractor.nld:\n"
+                                "#     nld.cut_nan()\n")
 
-        for i, vec in enumerate(self.nld):
+        for i, vec in enumerate(self.gsf):
             if np.isnan(vec.values).any():
                 contains_nan = True
-                LOG.warning(f"gsf #{i} contains nan's.\n"
-                            "Consider removing them e.g. with:\n"
-                            "# for gsf in extractor.gsf:\n"
-                            "#     gsf.cut_nan()\n")
+                if not self.suppress_warning:
+                    LOG.warning(f"gsf #{i} contains nan's.\n"
+                                "Consider removing them e.g. with:\n"
+                                "# for gsf in extractor.gsf:\n"
+                                "#     gsf.cut_nan()\n")
 
         return contains_nan
 
