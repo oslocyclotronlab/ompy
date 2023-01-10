@@ -1,6 +1,6 @@
 from __future__ import annotations
 from ..stubs import Pathlike, Axes, keV, Unitlike
-from .. import Vector
+from .. import Vector, Matrix
 from pathlib import Path
 from dataclasses import dataclass
 import pandas as pd
@@ -162,11 +162,16 @@ class ResponseData:
 
     @property
     def E_compton(self) -> np.ndarray:
-        return self.compton[0].E
+        i = np.argmax([len(cmp) for cmp in self.compton])
+        return self.compton[i].E
 
-    def compton_matrix(self) -> np.ndarray:
-        raise NotImplementedError()
-        return np.array([cmp.values for cmp in self.compton])
+    def compton_matrix(self) -> Matrix:
+        max_length = max(len(cmp) for cmp in self.compton)
+        mat = np.zeros((len(self.compton), max_length))
+        for i, cmp in enumerate(self.compton):
+            mat[i, :len(cmp)] = cmp.values
+        return Matrix(Ex=self.E, Eg=self.E_compton, values=mat,
+                      xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
 
     def compton_sum(self) -> Vector:
         return Vector(E=self.E, values=np.asarray([cmp.values.sum() for cmp in self.compton]))

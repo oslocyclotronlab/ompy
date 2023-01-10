@@ -129,7 +129,7 @@ class ComptonVector:
 
     def edge(self):
         """ The Compton edge energy """
-        return electron_energy(self.e, np.pi)
+        return compton_edge(self.e)
 
     def np(self) -> np.ndarray:
         return self.vector.values
@@ -291,10 +291,14 @@ def lerp_from_edge_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVect
     edge_mid = mid.edge()
     edge_high = high.edge()
 
-    stop_low = low.e + nsigma*sigma.at(edge_low)
-    stop_mid = mid.e + nsigma*sigma.at(edge_mid)
-    stop_high = high.e + nsigma*sigma.at(edge_high)
+    # FIXME Bug? Should it be edge_low + ...
+    # stop_low = low.e + nsigma*sigma.at(edge_low)
+    # stop_mid = mid.e + nsigma*sigma.at(edge_mid)
+    # stop_high = high.e + nsigma*sigma.at(edge_high)
 
+    stop_low = edge_low + nsigma*sigma.at(edge_low)
+    stop_mid = edge_mid + nsigma*sigma.at(edge_mid)
+    stop_high = edge_high + nsigma*sigma.at(edge_high)
     # Stop at the end or 10% higher than the high compton. High compton is of course always higher, than mid,
     # but to be on the safe side we go a bit higher in case of higher laying structures.
     #stop = low.index(min(low.E[-1], 1.1*stop_high))
@@ -309,6 +313,7 @@ def lerp_from_edge_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVect
 
     for i in prange(start, stop):
         eg = mid.E[i]
+        # TODO Lerps share common t
         elow = lerp(eg, edge_mid, stop_mid, edge_low, stop_low)
         ehigh = lerp(eg, edge_mid, stop_mid, edge_high, stop_high)
         mid[i] = wlerp(low.at(elow), high.at(ehigh))
@@ -411,8 +416,9 @@ def compton_edge(e: float) -> float:
     """ The Compton edge energy. Same as electron_energy(e, π) """
     if e < 0.1:
         return e
-    scattered = e / (1 + e / 511 * 2)
-    return e - scattered
+    #scattered = e / (1 + e / 511 * 2)
+    #return e - scattered
+    return 2*e**2 / (2*e + 511)
 
 
 @njit(fastmath=True)
