@@ -347,7 +347,8 @@ def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
     gsfv = np.zeros((nit, imax+u0))
     nldv[0, :] = nld[0, :]
 
-    for i in tqdm(range(nunc)):
+    #for i in tqdm(range(nunc)):
+    for i in range(nunc):
         first_gen_perturbed = first_gen.values + \
             Finv_vec(rng.random(size=first_gen.shape)) \
             * first_gen_std.values
