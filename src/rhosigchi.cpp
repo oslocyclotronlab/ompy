@@ -1,5 +1,8 @@
 #include<pybind11/pybind11.h>
 #include<pybind11/numpy.h>
+#include <pybind11/iostream.h>
+
+#include<iostream>
 
 namespace py = pybind11;
 
@@ -20,9 +23,9 @@ public:
     Array(py::array_t<T, py::array::c_style | py::array::forcecast> &array)
         : data( array.mutable_data() )
         , ndim( array.ndim() )
-        , xsize( ( ndim >= 1 ) ? array.shape()[0] : 0 )
-        , ysize( ( ndim >= 2 ) ? array.shape()[1] : 0 )
-        , zsize( ( ndim >= 3 ) ? array.shape()[2] : 0 )
+        , xsize( ( ndim >= 1 ) ? array.shape()[0] : 1 )
+        , ysize( ( ndim >= 2 ) ? array.shape()[1] : 1 )
+        , zsize( ( ndim >= 3 ) ? array.shape()[2] : 1 )
         {
             if ( array.ndim() > 3 )
                 throw std::runtime_error("Maximum dimentionality is 3.");
@@ -32,6 +35,12 @@ public:
     size_t Xsize() const {  return xsize; }
     size_t Ysize() const {  return ysize; }
     size_t Zsize() const {  return zsize; }
+
+    T *begin(){ return data; }
+    T *begin() const { return data; }
+
+    T *end(){ return data+xsize*ysize*zsize; }
+    T *end() const { return data+xsize*ysize*zsize; }
 
 
     // We will allow access to up to three axis
@@ -119,6 +128,17 @@ public:
             throw std::runtime_error("Index out of bounds, regards from '"+std::string(__PRETTY_FUNCTION__));
         return data[i];
     }
+
+    T *begin(){ return data; }
+    T *begin() const { return data; }
+    T *end(){ return data; }
+    T *end() const { return data; }
+
+    void set_all(const T &v){
+        for ( auto &val : *this ){
+            val = v;
+        }
+    }
 };
 
 template<typename T>
@@ -154,18 +174,24 @@ public:
             throw std::runtime_error("Index out of bounds, regards from '"+std::string(__PRETTY_FUNCTION__));
         return data[i * ydim + j];
     }
+
+    inline size_t xsize() const { return xdim; }
+    inline size_t ysize() const { return ydim; }
 };
 
 
 void iterate(Array<double> FgN, Array<double> sFgN, Array<double> rho, Array<double> sig,
              int jmin, int jmax, int igmin, Array<int> igmax, int iu0, int nit)
 {
+    py::scoped_ostream_redirect stream(std::cout, py::module_::import("sys").attr("stdout"));
     // We expect that whoever calls this function knows that the input needs
     // to have the correct sizes, etc.
     double var, up, down;
     int it, ig, ix, iu, ii;
+    int maxig = *std::max_element(std::begin(igmax), std::end(igmax));
+    int size_use = ( maxig > (jmax+iu0) ) ? maxig : (jmax+iu0);
     SimpleVector<double> fun1(jmax), fun2(jmax), fun3(jmax);
-    SimpleMatrix<double> nom(FgN.Xsize(), FgN.Ysize()), denom(FgN.Xsize(), FgN.Ysize());
+    SimpleMatrix<double> nom(size_use, size_use), denom(size_use, size_use);
     for ( it = 1 ; it < nit ; ++it ){
         if ( it <= 5 )
             var = 1.2;
@@ -186,33 +212,35 @@ void iterate(Array<double> FgN, Array<double> sFgN, Array<double> rho, Array<dou
                 iu = ix - ig + iu0;
                 fun1(ix) += sig(it-1, ig)*rho(it-1,iu);
                 if ( sFgN(ix,ig) > 0 ){
-                    fun2(ix) += (sig(it-1, ig)*rho(it-1,iu)/sFgN(ix,ig))*(sig(it-1, ig)*rho(it-1,iu)/sFgN(ix,ig));
-                    fun3(ix) += sig(it-1, ig)*rho(it-1,iu)*FgN(ix,ig)/(sFgN(ix,ig)*sFgN(ix,ig));
+                    double sr = sig(it-1, ig)*rho(it-1,iu);
+                    fun2(ix) += pow(sr/sFgN(ix,ig), 2);
+                    fun3(ix) += sr*FgN(ix,ig)/pow(sFgN(ix,ig), 2);
                 }
             }
             if ( fun1(ix) > 0 ){
-                fun2(ix) /= fun1(ix)*fun1(ix)*fun1(ix);
-                fun3(ix) /= fun1(ix)*fun1(ix);
+                fun2(ix) /= pow(fun1(ix), 3);
+                fun3(ix) /= pow(fun1(ix), 2);
             } else {
                 fun2(ix) = 0;
                 fun3(ix) = 0;
             }
             for ( ig = igmin ; ig < igmax(ix) ; ++ig ){
                 if ( fun1(ix)*sFgN(ix,ig) > 0 ){
-                    nom(ix,ig) = fun2(ix) - fun3(ix) + FgN(ix,ig)/(fun1(ix)*sFgN(ix,ig)*sFgN(ix,ig));
-                    denom(ix,ig) = 1./((fun1(ix)*sFgN(ix,ig))*(fun1(ix)*sFgN(ix,ig)));
+                    nom(ix,ig) = fun2(ix) - fun3(ix);
+                    nom(ix,ig) += FgN(ix,ig)/(fun1(ix)*pow(sFgN(ix,ig), 2));
+                    denom(ix,ig) = pow(fun1(ix)*sFgN(ix,ig), -2);
                 } else {
                     nom(ix,ig) = 0;
                     denom(ix,ig) = 0;
                 }
             }
         }
-
+        
         // Updating sigma
-        for ( ig = igmin ; ig < igmax(jmax-1) ; ++ig ){
+        for ( ig = igmin ; ig < maxig ; ++ig ){
             up = 0;
             down = 0;
-            ii = MAX(jmin, ig);
+            ii = (ig > jmin) ? ig : jmin;
             for ( ix = ii ; ix < jmax ; ++ix ){
                 iu = ix - ig + iu0;
                 up += rho(it-1, iu)*nom(ix, ig);
@@ -232,16 +260,16 @@ void iterate(Array<double> FgN, Array<double> sFgN, Array<double> rho, Array<dou
         for ( iu = 0 ; iu < jmax - igmin + iu0 ; ++iu ){
             up = 0;
             down = 0;
-            ii = MAX(jmin, iu);
+            ii = (iu > jmin) ? iu : jmin;
             for ( ix = ii ; ix < jmax ; ++ix ){
                 ig = ix - iu + iu0;
-                up = sig(it-1,ig)*nom(ix,ig);
-                down = sig(it-1,ig)*sig(it-1,ig)*denom(ix,ig);
+                up += sig(it-1,ig)*nom(ix,ig);
+                down += sig(it-1,ig)*sig(it-1,ig)*denom(ix,ig);
             }
             if ( down > 0 ){
-                if ( (up/down) > var*rho(it-1,iu) )
+                if ( (up/down) > (var*rho(it-1,iu)) )
                     rho(it,iu) = var*rho(it-1,iu);
-                else if ( (up/down) < rho(it-1,iu)/var )
+                else if ( (up/down) < (rho(it-1,iu)/var) )
                     rho(it,iu) = rho(it-1,iu)/var;
                 else
                     rho(it,iu) = up/down;
@@ -263,6 +291,23 @@ void iterate_proxy(py::array_t<double, py::array::c_style | py::array::forcecast
             jmin, jmax, igmin, Array(igmax), iu0, nit);
 }
 
+double Finv(const double &y0)
+{
+    double xl = -3.0, xh = 3.0, x = 0, yl = 0, yh = 1.0, y = 0.5;
+    while ( abs(y-y0) > 1e-3 ){
+        x=xl+(xh-xl)*(y0-yl)/(yh-yl);
+        y=0.5*(1.+erf(x/1.414213562));
+        if ( y > y0 ){
+            yl = y;
+            xl = x;
+        } else {
+            yh = y;
+            xh = x;
+        }
+    }
+    return x;
+}
+
 
 PYBIND11_MODULE(rhosigchi, m){
     m.doc() = "Implementation of 'iterate' subroutine needed for the rhosigchi algorithm";
@@ -281,4 +326,9 @@ PYBIND11_MODULE(rhosigchi, m){
             nit: Number of iterations
         Returns: None
         )PREFIX");
+    m.def("Finv", &Finv,
+        R"PREFIX(Inverting the monoton increasing function r=F(z) -> z=Finv(r).
+        This means to find the z-value giving the value y0.
+        The function F is the cummulative Gauss function F=1/2(1+erf(z/sqrt(2)).)PREFIX");
+    m.def("Finv_vec", py::vectorize(Finv), "Vectorized version of Finv");
 }
