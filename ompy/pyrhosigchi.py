@@ -241,7 +241,7 @@ def ChiSquare(FgN: np.ndarray, sFgN: np.ndarray,
     for it in range(Rho.shape[0]):
         deg = degrees
         fg_teo = np.zeros(FgN.shape)
-        sumFG = np.zeros(ix)
+        sumFG = np.zeros(imax)
         for ix in range(imin, imax):
             for ig in range(igmin, igmax[ix]):
                 iu = ix - ig + iu0
