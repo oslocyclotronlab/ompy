@@ -27,7 +27,7 @@ jobs:
       run: >-
         python -m
         pip install
-        build
+        build twine
         --user
     - name: Build manylinux Python wheels
       uses: RalfG/python-wheels-manylinux-build@v0.6.0-manylinux2014_x86_64
@@ -36,8 +36,14 @@ jobs:
         build-requirements: 'cython numpy pybind11>=2.6.0'
       env:
         ompy_OpenMP: False
-    - name: Publish distribution 📦 to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Publish distribution to PyPI
+      run: |
+        python -m twine --repository testpypi dist/*-manylinux-*.whl
       with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+    #- name: Publish distribution 📦 to PyPI
+    #  uses: pypa/gh-action-pypi-publish@release/v1
+    #  with:
+    #    password: ${{ secrets.PYPI_API_TOKEN }}
         repository_url: https://test.pypi.org/legacy/
