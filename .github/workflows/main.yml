@@ -43,8 +43,6 @@ jobs:
           cd MultiNest/build
           cmake ..
           make
-        env:
-          FC: /usr/local/bin/gfortran-11
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -55,7 +53,8 @@ jobs:
         run: pytest --cov
         env:
           LD_LIBRARY_PATH: /home/runner/work/ompy/ompy/MultiNest/lib
-      #- name: Upload coverage report.
+      #- name: Upload coverage to Codecov
+      #  uses: codecov/codecov-action@v3
 
   tests-macos:
     name: Run tests for ${{ matrix.os }} on ${{ matrix.python-version }}
@@ -84,6 +83,8 @@ jobs:
           cd MultiNest/build
           cmake ..
           make
+        env:
+          FC: /usr/local/bin/gfortran-11
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
