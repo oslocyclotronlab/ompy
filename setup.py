@@ -108,7 +108,10 @@ git_revision = '%(git_revision)s'
                        'git_revision': GIT_REVISION})
     finally:
         a.close()
-write_version_py()
+try:
+    write_version_py()
+except:
+    pass
 
 # If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
 openmp = os.getenv("ompy_OpenMP")
@@ -144,8 +147,8 @@ ext_modules = [
         Extension("ompy.decomposition",
                   ["ompy/decomposition.pyx"],
                   # on MacOS the clang compiler pretends not to support OpenMP, but in fact it does so
-                  extra_compile_args=extra_compile_args,
-                  extra_link_args=extra_link_args,
+                  #extra_compile_args=extra_compile_args,
+                  #extra_link_args=extra_link_args,
                   include_dirs=[numpy.get_include()]
                   ),
         Extension("ompy.rebin", ["ompy/rebin.pyx"], include_dirs=[numpy.get_include()]),
@@ -174,8 +177,14 @@ install_requires = [
  "pybind11>=2.6.0"
 ]
 
+try:
+    version = get_version_info()[0]
+except:
+    version = VERSION
+
+
 setup(name='OMpy',
-      version=get_version_info()[0],
+      version=version,
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
       author_email=("jorgenem@gmail.com, "
                     "fabio.zeiser@fys.uio.no, "
@@ -188,6 +197,8 @@ setup(name='OMpy',
                             compile_time_env={"OPENMP": openmp}
                             )+ext_modules_pybind11,
       zip_safe=False,
-      install_requires=install_requires
+      setup_requires=["cython", "numpy>=1.20.0", "pybind11>=2.6.0"],
+      package_data={'ompy': ["*.pyx", '*.hpp']},
+      #install_requires=install_requires
       )
 
