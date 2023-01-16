@@ -1,6 +1,6 @@
 import os
 import pytest
-from numpy.testing import assert_equal, assert_almost_equal
+from numpy.testing import assert_almost_equal
 import ompy as om
 
 DATAPATH = os.path.abspath(__file__)
@@ -38,8 +38,6 @@ def test_pyrhosigchi():
 
     nld_correct.cut(Emin=nld.E[0], Emax=nld.E[-1], inplace=True)
     gsf_correct.cut(Emax=gsf.E[-1], inplace=True)
-
-    print(gsf_correct.E, gsf.E)
 
     assert_almost_equal(nld.values, nld_correct.values, decimal=4)
     assert_almost_equal(gsf.values, gsf_correct.values, decimal=4)

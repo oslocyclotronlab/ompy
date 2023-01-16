@@ -380,8 +380,10 @@ def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
 
     nld = Vector(E=np.arange(imax-igmin+u0)*a1+a0,
                  values=nld[-1, :], std=nlderr)
-    gsf = Vector(E=np.arange(imax+u0)*a1+a0,
-                 values=gsf[-1, :], std=gsferr)
+    gsf = Vector(E=np.arange(np.max(igmax))*a1+a0,
+                 values=gsf[-1, :np.max(igmax)],
+                 std=gsferr[:np.max(igmax)])
+
     if diagnostics:
         return nld, gsf, diag
     else:
