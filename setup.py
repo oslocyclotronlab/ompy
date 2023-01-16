@@ -10,6 +10,11 @@ from ctypes.util import find_library
 from pybind11.setup_helpers import Pybind11Extension
 
 try:
+    import wheel.bdist_wheel
+except ImportError:
+    wheel = None
+
+try:
     from Cython.Build import cythonize
     from Cython.Distutils import build_ext
 except ImportError:
@@ -115,6 +120,8 @@ except:
 
 # If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
 openmp = os.getenv("ompy_OpenMP")
+if wheel is not None:  # We do not build with OpenMP if wheel
+    openmp = False
 if openmp is None and platform.system() == 'Darwin':  # Check if macOS
     if find_library("omp") != None:
         openmp = True
@@ -157,7 +164,7 @@ ext_modules = [
 
 ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
-                          ["src/stats.cpp"],
+                          ["ompy/stats/stats.cpp"],
                           extra_compile_args=["-std=c++11", "-mfpmath=sse",
                                               "-O3", "-funroll-loops",
                                               "-march=native"])
@@ -177,28 +184,41 @@ install_requires = [
  "pybind11>=2.6.0"
 ]
 
+def read_version():
+    try:
+        with open("ompy/version_setup.py") as f:
+            ns = {}
+            exec(f.read(), ns)
+            version = ns["full_version"]
+        return version
+    except FileNotFoundError:
+        return VERSION
+
 try:
     version = get_version_info()[0]
 except:
-    version = VERSION
+    version = read_version()
 
 
-setup(name='OMpy',
+setup(name='ompy',
       version=version,
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
       author_email=("jorgenem@gmail.com, "
                     "fabio.zeiser@fys.uio.no, "
                     "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
-      packages=find_packages(),
+      python_requires=">= 3.8",
+      packages=['ompy', 'ompy.stats', 'ompy.introspection'],
+      package_data={
+          "ompy": ["decomposition.pyx", "rebin.pyx", "gauss_smoothing.pyx"],
+          "ompy.stats": ['*.hpp']
+      },
       ext_modules=cythonize(ext_modules,
                             compiler_directives={'language_level': "3",
                                                  'embedsignature': True},
                             compile_time_env={"OPENMP": openmp}
                             )+ext_modules_pybind11,
       zip_safe=False,
-      setup_requires=["cython", "numpy>=1.20.0", "pybind11>=2.6.0"],
-      package_data={'ompy': ["*.pyx", '*.hpp']},
-      #install_requires=install_requires
+      setup_requires=["cython", "numpy>=1.20.0", "pybind11>=2.6.0"]
       )
 
