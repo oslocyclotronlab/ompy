@@ -1,0 +1,37 @@
+name: main
+
+
+# Automatically cancel a previous run.
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+on:
+  push:
+    branches:
+      - workflow # For debugging the workflow..
+    pull_request:
+      - '*'
+
+jobs:
+
+  run-tests:
+    name: Run tests for ${{ matrix.os }} on ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['ubuntu-latest']
+        python-version: ['3.8', '3.9', '3.10']
+
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install OMpy
+        run: pip install -e .
+      - name: Run pytest
+        run: pytest --cov-report=xml --cov=./
+      #- name: Upload coverage report.
