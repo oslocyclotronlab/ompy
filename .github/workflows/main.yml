@@ -43,6 +43,8 @@ jobs:
           cd MultiNest/build
           cmake ..
           make
+        env:
+          FC: /usr/local/bin/gfortran-11
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -89,6 +91,6 @@ jobs:
       - name: Install OMpy
         run: pip install -e .
       - name: Run tests
-        run: pytest --cov
+        run: pytest
         env:
           LD_LIBRARY_PATH: /home/runner/work/ompy/ompy/MultiNest/lib
