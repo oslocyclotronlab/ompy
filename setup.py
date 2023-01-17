@@ -141,7 +141,7 @@ fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
 
-extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
+extra_compile_args = ["-O3"]
 extra_link_args = []
 if openmp and platform.system() == 'Darwin':
     extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
@@ -165,9 +165,7 @@ ext_modules = [
 ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
                           ["ompy/stats/stats.cpp"],
-                          extra_compile_args=["-std=c++11", "-mfpmath=sse",
-                                              "-O3", "-funroll-loops",
-                                              "-march=native"])
+                          extra_compile_args=["-std=c++11", "-O3"])
 ]
 
 install_requires = [
