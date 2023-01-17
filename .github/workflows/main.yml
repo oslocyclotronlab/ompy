@@ -55,6 +55,10 @@ jobs:
         env:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
+      - uses: actions/upload-artifact@v3
+        with:
+          path: wheelhouse/*.whl
+
 
   upload_test:
     name: Upload if test release
