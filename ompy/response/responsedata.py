@@ -15,14 +15,15 @@ TODO: Remove prefix/suffix and only use a glob pattern.
 
 
 ResponseFunctionName = Literal['Oscar2017', 'Oscar2020']
-RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2017_scale1.15"}
+RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2017_scale1.15",
+                      'Oscar2020': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2020"}
 
 
 @dataclass
 class Components:
     FE: float = 1.0
-    DE: float = 1.0
     SE: float = 1.0
+    DE: float = 1.0
     AP: float = 1.0
     compton: float = 1.0
 
@@ -72,6 +73,7 @@ class ResponseData:
         In the derivation most normalization factors disappear, and we are left with
                                     p_i = w_i * c_i / sum(w_i * c_i)
         """
+        warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
         T = compton*self.compton_sum() + FE*self.FE + SE*self.SE + DE*self.DE + AP*self.AP
         if inplace:
             self.FE *= FE / T
@@ -84,9 +86,40 @@ class ResponseData:
         else:
             return self.clone(FE=FE*self.FE / T, SE=SE*self.SE / T, DE=DE*self.DE / T,
                               AP=AP*self.AP / T,
-                              #compton=fix_lengths([compton*cmp / T[i] for i, cmp in enumerate(self.compton)]),
                               compton=[compton*cmp / T[i] for i, cmp in enumerate(self.compton)],
                               is_normalized=True)
+
+    def scale(self, inplace: bool = False) -> ResponseData | None:
+        """ Scale the elements to correct for simulations with different number of runs.
+
+        Algorithm:
+            Weight each element by the median of the [total weighted by the efficiency]
+        Args:
+            inplace: If True, the data is scaled in place. If False, a new ResponseData object is returned.
+
+        Returns:
+            If inplace is True, None is returned. If inplace is False, a new ResponseData object is returned.
+
+        """
+        total = self.FE + self.SE + self.DE + self.AP + self.compton_sum()
+        total_eff = total / self.Eff
+        # Scale all counts to the median. Not obvious if this is correct,
+        # as I would have assumed all elements in total_eff corresponding to the
+        # same simulations should be equal. they are not, but close.
+        median = np.median(total_eff)
+        weight = median / total_eff
+        if inplace:
+            self.FE *= weight
+            self.SE *= weight
+            self.DE *= weight
+            self.AP *= weight
+            for i in self.compton:
+                self.compton[i] *= weight[i]
+        else:
+            return self.clone(FE=self.FE * weight, SE=self.SE * weight, DE=self.DE * weight,
+                              AP=self.AP * weight,
+                              compton=[cmp * weight[i] for i, cmp in enumerate(self.compton)])
+
 
     @overload
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[True] = ...) -> None: ...
@@ -96,7 +129,9 @@ class ResponseData:
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> ResponseData | None:
         warnings.warn("Untested and not sanity-checked.")
-        ratio = fwhm / energy
+        warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
+        old = self.FWHM.loc[energy]
+        ratio = fwhm / old  * self.FWHM.E / energy
         if inplace:
             self.FWHM *= ratio
             self.is_fwhm_normalized = True
@@ -120,7 +155,7 @@ class ResponseData:
                 break
 
         df = pd.DataFrame([line.split() for line in lines[i+2:i+number_of_lines+3]],
-                          columns=['E', 'FWHM', 'Eff', 'FE', 'DE', 'SE', 'AP'])
+                          columns=['E', 'FWHM', 'Eff', 'FE', 'SE', 'DE', 'AP'])
         df = df.astype(float)
         df['E'] = df['E'].astype(int)
         assert len(df) == number_of_lines
@@ -161,7 +196,7 @@ class ResponseData:
         return self.FE.E
 
     @property
-    def E_compton(self) -> np.ndarray:
+    def E_observed(self) -> np.ndarray:
         i = np.argmax([len(cmp) for cmp in self.compton])
         return self.compton[i].E
 
@@ -170,7 +205,7 @@ class ResponseData:
         mat = np.zeros((len(self.compton), max_length))
         for i, cmp in enumerate(self.compton):
             mat[i, :len(cmp)] = cmp.values
-        return Matrix(Ex=self.E, Eg=self.E_compton, values=mat,
+        return Matrix(Ex=self.E, Eg=self.E_observed, values=mat,
                       xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
 
     def compton_sum(self) -> Vector:

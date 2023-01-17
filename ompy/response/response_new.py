@@ -1,8 +1,10 @@
 from __future__ import annotations
-from . import ResponseData, ResponseInterpolation
-from .. import Vector, Matrix
+from . import ResponseData, ResponseInterpolation, interpolate_compton
+from .. import Vector, Matrix, USE_GPU
 import warnings
 import numpy as np
+if USE_GPU:
+    from . import interpolate_gpu
 from collections import OrderedDict
 
 
@@ -25,9 +27,15 @@ except ImportError:
 
 class Response:
     def __init__(self, probabilities: ResponseData,
-                 interpolation: ResponseInterpolation | None = None):
+                 interpolation: ResponseInterpolation | None = None,
+                 compton: Matrix | None = None):
+        if not probabilities.is_normalized:
+            raise ValueError("Probabilities must be normalized.")
+        if not probabilities.is_fwhm_normalized:
+            raise ValueError("FWHM must be normalized to experiment.")
         self.probabilities: ResponseData = probabilities
         self.interpolation: ResponseInterpolation = interpolation or ResponseInterpolation.from_data(probabilities)
+        self.compton: Matrix = compton
 
     def __call__(self, E: Vector) -> Matrix:
         return self.evaluate(E)
@@ -37,10 +45,20 @@ class Response:
             raise ValueError("No interpolation set. Use interpolate() first.")
         pass
 
-    def interpolate_compton(self, E: Vector) -> Matrix:
-        return interpolate_compton(self.probabilities, E)
+    def interpolate_compton(self, E: np.ndarray, GPU: bool = True,
+                            sigma: float = 6) -> Matrix:
+        if self.interpolation is None:
+            raise RuntimeError("Peak interpolations must be done before compton interpolation.")
+        sigmafn = self.interpolation.sigma
+        if USE_GPU and GPU:
+            compton: Matrix = interpolate_gpu(self.probabilities, E, sigmafn, sigma)
+        else:
+            compton: Matrix = interpolate_compton(self.probabilities, E, sigmafn, sigma)
+        self.compton = compton
 
     def clone(self, probabilities: ResponseData = None,
-              interpolation: ResponseInterpolation = None) -> Response:
+              interpolation: ResponseInterpolation = None,
+              compton: Matrix = None) -> Response:
         return Response(probabilities=probabilities or self.probabilities,
-                        interpolation=interpolation or self.interpolation)
+                        interpolation=interpolation or self.interpolation,
+                        compton=compton or self.compton)

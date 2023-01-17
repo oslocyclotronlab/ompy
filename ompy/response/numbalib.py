@@ -3,21 +3,36 @@ import warnings
 from collections import OrderedDict
 
 try:
-    from numba import njit, int32, float32, float64
+    from numba import jit, njit, int32, float32, float64, prange
     from numba.experimental import jitclass
-except ImportError:
+    from numba.typed import List as NList
+    from numba.types import ListType
+    NUMPY = True
+except ImportError as e:
+    NUMPY = False
     warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
     int32 = np.int32
     float32 = np.float32
     float64 = np.float64
+    prange = range
 
     def nop_decorator(func, *aargs, **kkwargs):
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
         return wrapper
-    njit = nop_decorator
-    jitclass = nop_decorator
 
+    def nop_nop(*aargs, **kkwargs):
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
+            return wrapper
+        return decorator
+
+    njit = nop_nop #nop_decorator
+    jit = nop_nop
+    jitclass = nop_nop
+    NList = list
+    ListType = list
 
 @njit
 def index(E: np.ndarray, e: float64) -> int:

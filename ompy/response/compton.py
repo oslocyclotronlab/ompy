@@ -145,7 +145,7 @@ class ComptonVector:
         return len(self.vector)
 
 
-def interpolate_compton(p: ResponseData, E: np.ndarray, sigma: Vector, nsigma: int = 6) -> Matrix:
+def interpolate_compton(p: ResponseData, E: np.ndarray, sigma , nsigma: int = 6) -> Matrix:
     """Interpolate Compton probabilities.
 
     Args:
@@ -160,7 +160,8 @@ def interpolate_compton(p: ResponseData, E: np.ndarray, sigma: Vector, nsigma: i
     if p.E[0] > E[0] or p.E[-1] < E[-1]:
         raise ValueError("Compton interpolation range out of bounds")
     compton: ComptonList = make_compton_list(p)
-    sigma_ = NVector(sigma.E, sigma.values)
+    E_observed = p.E_observed
+    sigma_ = NVector(E=E_observed, values=sigma(E_observed))
     assert np.allclose(compton.compton_E, sigma.E), "Compton and sigma must be parameterised at the same energies"
     R = _interpolate_compton(compton, E, sigma_, nsigma)
     Eg = np.asarray(compton.compton_E)

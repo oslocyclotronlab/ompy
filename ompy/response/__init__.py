@@ -3,10 +3,11 @@ from .response import *
 from .calibrator import *
 from .responsedata import *
 from .interpolation import *
+from .gf3 import GF3Interpolator, GF3Interpolation
+from .interpolations import *
+from .responseinterpolation import *
 from .compton import *
+from .. import USE_GPU
 
-try:
-    from numba import cuda
+if USE_GPU:
     from .comptongpu import *
-except ImportError:
-    warnings.warn("Could not import Numba.cuda, cannot use GPU acceleration")

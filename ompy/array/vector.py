@@ -774,6 +774,10 @@ class Vector(AbstractArray):
         for i, e in enumerate(self.E):
             yield i, e, self.values[i]
 
+    def unpack(self) -> tuple[np.ndarray, np.ndarray]:
+        """ Returns the energy and values as separate arrays """
+        return self.E, self.values
+
 
 # class ValueLocator:
 #     def __init__(self, vector: Vector):
@@ -814,11 +818,11 @@ class ValueLocator:
     def parse(self, e: Unitlike | slice) -> int | slice:
         match e:
             case int() | float() | str() | ureg.Unit():
-                return self.vec.index(e)
+                return int(self.vec.index(e))
             case slice():
                 return parse_unit_slice(e, self.vec.index, self.vec.de, len(self.vec.E))
             case _:
-                raise ArgumentError(f"Expected slice or Unitlike, got type: {type(e)}")
+                raise ValueError(f"Expected slice or Unitlike, got type: {type(e)}")
 
     def __getitem__(self, key) -> Vector | float:
         i: int | slice = self.parse(key)
@@ -832,6 +836,8 @@ class ValueLocator:
                 if self.vec.std is not None:
                     std = self.vec.std.__getitem__((i,))
                 return Vector(values=values, E=E, E_label=self.vec.E_label, std=std)
+            case _:
+                raise RuntimeError("Should not happen")
 
     def __setitem__(self, key, val):
         i: int | slice = self.parse(key)

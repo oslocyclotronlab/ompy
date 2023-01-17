@@ -38,6 +38,19 @@ else:
     import warnings
     warnings.simplefilter('always', DeprecationWarning)
 
+    USE_JIT = False
+    USE_GPU = True
+    try:
+        import numba
+        USE_JIT = True
+        try:
+            from numba import cuda
+            USE_GPU = True
+        except ImportError:
+            warnings.warn("Numba.CUDA could not be imported. GPU acceleration will not be available")
+    except ImportError:
+        warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
+
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .validator import Unitful, Bounded, Choice, Toggle
