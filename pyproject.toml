@@ -50,9 +50,9 @@ before-all = [
     "git clone https://github.com/JohannesBuchner/MultiNest",
     "cd MultiNest/build",
     "cmake ..",
-    "make install"
+    "make"
 ]
-environment = {LD_LIBRARY_PATH="/usr/local/lib", MACOSX_DEPLOYMENT_TARGET="10.14", FC="/usr/local/bin/gfortran-11"}
+environment = {LD_LIBRARY_PATH="/home/runner/work/ompy/ompy/MultiNest/lib", MACOSX_DEPLOYMENT_TARGET="10.14", FC="/usr/local/bin/gfortran-11"}
 
 [tool.cibuildwheel.linux]
 before-all = [
