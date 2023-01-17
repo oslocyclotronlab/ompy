@@ -52,7 +52,7 @@ before-all = [
     "cmake ..",
     "make install"
 ]
-environment = {LD_LIBRARY_PATH="/usr/local/lib", MACOSX_DEPLOYMENT_TARGET="10.14"}
+environment = {LD_LIBRARY_PATH="/usr/local/lib", MACOSX_DEPLOYMENT_TARGET="10.14", FC="/usr/local/bin/gfortran-11"}
 
 [tool.cibuildwheel.linux]
 before-all = [
