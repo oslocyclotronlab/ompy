@@ -29,20 +29,15 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.12.0
         env:
+          LD_LIBRARY_PATH: /home/runner/work/ompy/ompy/MultiNest/lib
           CIBW_BUILD: cp310-manylinux_x86_64
-
-      - name: Install wheel
-        run: |
-          ls -las wheelhouse
-          pip install wheelhouse/OMpy-1.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-
-      #- uses: actions/upload-artifact@v3
-      #  with:
-      #    path: dist/*.tar.gz
-      #- name: Install python
-      #  uses: actions/setup-python@v4
-      #  with:
-      #    python-version: "3.10"
+          CIBW_TEST_COMMAND: pytest {project}/tests
+          CIBW_BEFORE_TEST_LINUX: >
+            git clone https://github.com/JohannesBuchner/MultiNest
+            cd MultiNest/build
+            cmake ..
+            make
+          CIBW_TEST_REQUIRES: pytest pytest-cov
 
 
   #test_wheel:
