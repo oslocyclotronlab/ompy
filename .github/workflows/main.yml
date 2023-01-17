@@ -33,9 +33,9 @@ jobs:
           CIBW_BUILD: cp310-manylinux_x86_64
           CIBW_TEST_COMMAND: pytest {project}/tests
           CIBW_BEFORE_TEST_LINUX: >
-            git clone https://github.com/JohannesBuchner/MultiNest
-            cd MultiNest/build
-            cmake ..
+            git clone https://github.com/JohannesBuchner/MultiNest &&
+            cd MultiNest/build &&
+            cmake ..&&
             make
           CIBW_TEST_REQUIRES: pytest pytest-cov
 
