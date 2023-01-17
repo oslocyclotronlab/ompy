@@ -208,10 +208,11 @@ setup(name='ompy',
                     "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
       python_requires=">= 3.8",
-      packages=['ompy', 'ompy.stats', 'ompy.introspection'],
+      packages=['ompy', 'ompy.examples', 'ompy.stats', 'ompy.introspection'],
       package_data={
           "ompy": ["decomposition.pyx", "rebin.pyx", "gauss_smoothing.pyx"],
-          "ompy.stats": ['*.hpp']
+          "ompy.stats": ['*.hpp'],
+          "ompy.examples": ['*.m']
       },
       ext_modules=cythonize(ext_modules,
                             compiler_directives={'language_level': "3",
