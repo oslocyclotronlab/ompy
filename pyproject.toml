@@ -39,15 +39,14 @@ classifiers = [
 "Bug Tracker" = "https://github.com/oslocyclotronlab/ompy/issues"
 
 [tool.cibuildwheel]
-build = ["*_x86_64", "*_arm64"]
-skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-musllinux-*"]
+build = ["cp310-*_x86_64", "cp311-*_x86_64", "cp310-*_arm64", "cp311-*_arm64"]
+skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-musllinux-*", "pp*"]
 test-requires = "pytest"
 test-command = "pytest {project}/tests"
-test-skip = "*-macosx_arm64 *-macosx_universal2:arm64"
-test-skip = "*-*linux_{aarch64,ppc64le,s390x}"
+test-skip = ["*-macosx_arm64, *-macosx_universal2:arm64", "*-*linux_{aarch64,ppc64le,s390x}"]
 
 [tool.cibuildwheel.macos]
-before-test = [
+before-all = [
     "git clone https://github.com/JohannesBuchner/MultiNest",
     "cd MultiNest/build",
     "cmake ..",
@@ -56,7 +55,7 @@ before-test = [
 environment = {LD_LIBRARY_PATH="/usr/local/lib", MACOSX_DEPLOYMENT_TARGET="10.14"}
 
 [tool.cibuildwheel.linux]
-before-test = [
+before-all = [
     "yum -y install blas-devel lapack-devel",
     "git clone https://github.com/JohannesBuchner/MultiNest",
     "cd MultiNest/build",
