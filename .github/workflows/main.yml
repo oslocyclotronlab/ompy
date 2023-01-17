@@ -10,18 +10,12 @@ concurrency:
 on:
   push:
     branches:
-      - workflow # For debugging the workflow..
-      - main
-      - test_release
-    pull_request:
-      - '*'
-#on:  
-#  push:
-#  pull_request:
-#    branches:
-#      - master
-#  release:
-#    types: [published]
+      - master
+  pull_request:
+      branches:
+        - master
+  release:
+    types: [published]
 
 jobs:
 
