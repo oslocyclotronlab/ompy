@@ -158,7 +158,7 @@ ext_modules_pybind11 = [
                           cxx_std=20,
                           extra_compile_args=["-O3"]),
         Pybind11Extension("ompy.rhosigchi",
-                          ["src/rhosigchi.cpp"],
+                          ["ompy/rhosigchi.cpp"],
                           cxx_std=20,
                           extra_compile_args=["-O3"]),
 ]

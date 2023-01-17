@@ -99,8 +99,9 @@ class Extractor:
         self.suppress_warning: bool = False
 
     def __call__(self, ensemble: Optional[Ensemble] = None,
-                 trapezoid: Optional[Action] = None):
-        return self.extract_from(ensemble, trapezoid)
+                 trapezoid: Optional[Action] = None,
+                 algorithm: Optional[str] = "standard"):
+        return self.extract_from(ensemble, trapezoid, algorithm=algorithm)
 
     def extract_from(self, ensemble: Optional[Ensemble] = None,
                      trapezoid: Optional[Action] = None,
