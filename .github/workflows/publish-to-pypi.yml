@@ -38,6 +38,7 @@ jobs:
         ompy_OpenMP: False
     - name: Publish distribution to PyPI
       run: |
+        ls -las dist/
         python -m twine upload --repository testpypi dist/*-manylinux-*.whl
       env:
         TWINE_USERNAME: __token__
