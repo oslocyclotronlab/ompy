@@ -55,15 +55,12 @@ jobs:
         env:
           CIBW_ARCHS_MACOS: x86_64 arm64
 
-  upload_all:
-
 
   upload_test:
     name: Upload if test release
     needs: [build_sdist, build_wheel]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/test_release'
-
     steps:
       - uses: actions/setup-python@v4
         with: "3.x"
