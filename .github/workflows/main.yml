@@ -32,7 +32,9 @@ jobs:
           CIBW_BUILD: cp310-manylinux_x86_64
 
       - name: Install wheel
-        run: ls -las
+        run: |
+          ls -las wheelhouse
+          pip install wheelhouse/OMpy-1.1.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 
       #- uses: actions/upload-artifact@v3
       #  with:
