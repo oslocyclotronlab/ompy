@@ -14,21 +14,29 @@ on:
       - main
     pull_request:
       - '*'
+#on:  
+#  push:
+#  pull_request:
+#    branches:
+#      - master
+#  release:
+#    types: [published]
 
 jobs:
 
-  build_wheels:
+  build_wheel:
     name: Build wheel on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: ['ubuntu-latest']
+        os: ['ubuntu-latest', 'macos-latest']
     steps:
       - uses: actions/checkout@v3
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.12.0
-
+        env:
+          CIBW_ARCHS_MACOS: x86_64 arm64
 
   #test_wheel:
   #  name: Test wheel on ${{ matrix.os }}
