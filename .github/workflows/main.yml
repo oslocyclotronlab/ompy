@@ -28,16 +28,6 @@ jobs:
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.12.0
-        env:
-          LD_LIBRARY_PATH: /home/runner/work/ompy/ompy/MultiNest/lib
-          CIBW_BUILD: cp310-manylinux_x86_64
-          CIBW_TEST_COMMAND: pytest {project}/tests
-          CIBW_BEFORE_TEST_LINUX: >
-            git clone https://github.com/JohannesBuchner/MultiNest &&
-            cd MultiNest/build &&
-            cmake ..&&
-            make
-          CIBW_TEST_REQUIRES: pytest pytest-cov
 
 
   #test_wheel:

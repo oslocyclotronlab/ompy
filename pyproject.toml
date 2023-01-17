@@ -37,3 +37,27 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/oslocyclotronlab/ompy"
 "Bug Tracker" = "https://github.com/oslocyclotronlab/ompy/issues"
+
+[tool.cibuildwheel]
+build = "cp310-manylinux_x86_64"
+test-requires = "pytest"
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.macos]
+before-test = [
+    "git clone https://github.com/JohannesBuchner/MultiNest",
+    "cd MultiNest/build",
+    "cmake ..",
+    "make install"
+]
+
+
+[tool.cibuildwheel.linux]
+before-test = [
+    "yum -y install blas-devel lapack-devel",
+    "git clone https://github.com/JohannesBuchner/MultiNest",
+    "cd MultiNest/build",
+    "cmake ..",
+    "make install"
+]
+environment = {LD_LIBRARY_PATH="/usr/local/lib"}
