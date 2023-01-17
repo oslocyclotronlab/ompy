@@ -1,0 +1,90 @@
+name: main
+
+
+# Automatically cancel a previous run.
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+
+on:
+  push:
+    branches:
+      - workflow # For debugging the workflow..
+      - main
+      - test_release
+    pull_request:
+      - '*'
+#on:  
+#  push:
+#  pull_request:
+#    branches:
+#      - master
+#  release:
+#    types: [published]
+
+jobs:
+
+  build_sdist:
+    name: Build SDist
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Build SDist
+      run: pipx run build --sdist
+
+    - name: Check metadata
+      run: pipx run twine check dist/*
+
+    - uses: actions/upload-artifact@v3
+      with:
+        path: dist/*.tar.gz
+
+  build_wheel:
+    name: Build wheel on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ['ubuntu-latest']
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.12.0
+        env:
+          CIBW_ARCHS_MACOS: x86_64 arm64
+
+      - uses: actions/upload-artifact@v3
+        with:
+          path: wheelhouse/*.whl
+
+
+  upload_test:
+    name: Upload if test release
+    needs: [build_sdist, build_wheel]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test_release'
+    steps:
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      
+      - uses: actions/download-artifact@v3
+        with:
+          name: artifact
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@v1.6.4
+        with:
+          name: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+
+
+
+  #test_wheel:
+  #  name: Test wheel on ${{ matrix.os }}
+  #  runs-on: ${{ matrix.os }}
+  #  strategy:
+
