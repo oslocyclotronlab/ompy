@@ -7,19 +7,20 @@ from numpy import ndarray
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any, Callable, Dict, Iterable, List
 import pymultinest
+import ultranest
 import matplotlib.pyplot as plt
 from contextlib import redirect_stdout
 
 from .abstract_normalizer import AbstractNormalizer
 from .extractor import Extractor
 from .library import log_interp1d, self_if_none
-from .models import Model, ResultsNormalized, ExtrapolationModelLow,\
-                    ExtrapolationModelHigh, NormalizationParameters
+from .models import (Model, ResultsNormalized, ExtrapolationModelLow,
+                     ExtrapolationModelHigh, NormalizationParameters)
 from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
 from .spinfunctions import SpinFunctions
 from .vector import Vector
-from .stats import truncnorm_ppf
+from .stats import truncnorm_ppf, truncnorm_ppf_vec
 
 
 class NormalizerSimultan(AbstractNormalizer):
@@ -88,8 +89,9 @@ class NormalizerSimultan(AbstractNormalizer):
 
         self.res: Optional[ResultsNormalized] = None
 
-        self.multinest_path: Optional[Path] = Path('multinest')
-        self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
+        self.ultranest_path: Optional[Path] = Path('ultranest')
+        self.ultranest_kwargs: dict = \
+            {'region_class': ultranest.mlfriends.MLFriends}
 
         if path is None:
             self.path = None
@@ -270,10 +272,11 @@ class NormalizerSimultan(AbstractNormalizer):
         a_B = (lower_B - mu_B) / sigma_B
         b_B = (upper_B - mu_B) / sigma_B
 
-        def prior(cube, ndim, nparams):
+        def prior(cube):
+            cube = cube.copy().T
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm_ppf(cube[0], a_A, b_A)*sigma_A + mu_A
+            cube[0] = truncnorm_ppf_vec(cube[0], a_A, b_A)*sigma_A + mu_A
 
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
@@ -282,50 +285,53 @@ class NormalizerSimultan(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
-                                    b_Eshift)*sigma_Eshift + mu_Eshift
+            cube[3] = truncnorm_ppf_vec(cube[3], a_Eshift,
+                                        b_Eshift)*sigma_Eshift + mu_Eshift
             # truncated normal prior
-            cube[4] = truncnorm_ppf(cube[4], a_B, b_B)*sigma_B + mu_B
+            cube[4] = truncnorm_ppf_vec(cube[4], a_B, b_B)*sigma_B + mu_B
 
-            if np.isinf(cube[3]):
+            if np.any(np.isinf(cube[3])):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
+            return cube.T
 
-        def loglike(cube, ndim, nparams):
-            return self.lnlike(cube, args_nld=args_nld)
+        def loglike(cube):
+            l = self.lnlike(cube, args_nld=args_nld)
+            return float(l)
 
         # parameters are changed in the lnlike
         norm_pars_org = copy.deepcopy(self.normalizer_gsf.norm_pars)
 
-        self.multinest_path.mkdir(exist_ok=True)
-        path = self.multinest_path / f"sim_norm_{num}_"
+        self.ultranest_path.mkdir(exist_ok=True)
+        path = self.ultranest_path / f"sim_norm_{num}"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        self.LOG.info("Starting multinest: ")
-        self.LOG.debug("with following keywords %s:", self.multinest_kwargs)
-        #  Hack where stdout from Multinest is redirected as info messages
-        self.LOG.write = lambda msg: (self.LOG.info(msg) if msg != '\n'
-                                      else None)
-
-        with redirect_stdout(self.LOG):
-            pymultinest.run(loglike, prior, len(guess),
-                            outputfiles_basename=str(path),
-                            **self.multinest_kwargs)
-
-        # Save parameters for analyzer
         names = list(guess.keys())
-        json.dump(names, open(str(path) + 'params.json', 'w'))
-        analyzer = pymultinest.Analyzer(len(guess),
-                                        outputfiles_basename=str(path))
 
-        stats = analyzer.get_stats()
+        self.LOG.info("Starting Ultranest")
+        self.LOG.debug("with following keywords %s:", self.ultranest_kwargs)
+        sampler = ultranest.ReactiveNestedSampler(names, loglike,
+                                                  transform=prior,
+                                                  log_dir=path,
+                                                  vectorized=False,
+                                                  resume="overwrite",
+                                                  storage_backend="csv")
 
-        samples = analyzer.get_equal_weighted_posterior()[:, :-1]
+        result = sampler.run(**self.ultranest_kwargs)
+
+        stats = []
+        for i in range(len(result['posterior']['mean'])):
+            stats.append({'mean': result['posterior']['mean'][i],
+                          'median': result['posterior']['median'][i],
+                          '1sigma': (result['posterior']['errlo'][i],
+                                     result['posterior']['errup'][i])})
+
+        samples = result['samples']
         samples = dict(zip(names, samples.T))
 
         # Format the output
         popt = dict()
         vals = []
-        for name, m in zip(names, stats['marginals']):
+        for name, m in zip(names, stats):
             lo, hi = m['1sigma']
             med = m['median']
             sigma = (hi - lo) / 2
@@ -335,7 +341,7 @@ class NormalizerSimultan(AbstractNormalizer):
             fmts = '\t'.join([fmt + " ± " + fmt])
             vals.append(fmts % (med, sigma))
 
-        self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
+        self.LOG.info("Ultranest results:\n%s", tt.to_string([vals],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]',
                               'Eshift [MeV]', 'B']))
 

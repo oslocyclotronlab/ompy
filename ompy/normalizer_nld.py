@@ -118,8 +118,8 @@ class NormalizerNLD(AbstractNormalizer):
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
         self.de_kwargs = {"seed": 65424}
-        self.ultranest_path = Path('ultranest')
-        self.ultranest_kwargs = \
+        self.ultranest_path: Optional[Path] = Path('ultranest')
+        self.ultranest_kwargs: dict = \
             {'region_class': ultranest.mlfriends.MLFriends}
 
         # Handle the method parameters
