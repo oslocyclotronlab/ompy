@@ -83,7 +83,14 @@ class EnsembleNormalizer(AbstractNormalizer):
         self.normalizer_nld = copy.deepcopy(normalizer_nld)
         self.normalizer_gsf = copy.deepcopy(normalizer_gsf)
 
+        if self.normalizer_nld is not None:
+            self.normalizer_nld.ultranest_kwargs['viz_callback'] = False
+            self.normalizer_nld.ultranest_kwargs['show_status'] = False
+
         self.normalizer_simultan = copy.deepcopy(normalizer_simultan)
+        if self.normalizer_simultan is not None:
+            self.normalizer_simultan.ultranest_kwargs['viz_callback'] = False
+            self.normalizer_simultan.ultranest_kwargs['show_status'] = False
 
         self.nprocesses: int = cpu_count()-1 if cpu_count() > 1 else 1
 
