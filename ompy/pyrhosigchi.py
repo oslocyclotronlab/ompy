@@ -213,7 +213,7 @@ def iterate_python(FgN: np.ndarray, sFgN: np.ndarray,
     return Rho, Sig
 
 
-def ChiSquare(FgN: np.ndarray, sFgN: np.ndarray,
+def chisquare(FgN: np.ndarray, sFgN: np.ndarray,
               Rho: np.ndarray, Sig: np.ndarray,
               sRho: np.ndarray, sSig: np.ndarray,
               imin: int, imax: int,
@@ -268,11 +268,11 @@ def ChiSquare(FgN: np.ndarray, sFgN: np.ndarray,
 
 
 def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
-                Ex_max: float, Eg_min: float, nit: int=51, nunc: int=100,
-                extend_diagnoal: float=800,
-                rng: np.random.Generator=np.random.default_rng(4821),
-                diagnostics: bool=False) -> Union[Tuple[Vector, Vector],
-                                                  Tuple[Vector, Vector, dict]]:
+                Ex_max: float, Eg_min: float, nit: int = 51, nunc: int = 100,
+                extend_diagnoal: float = 800,
+                rng: np.random.Generator = np.random.default_rng(4821),
+                diagnostics: bool = False
+                ) -> Union[Tuple[Vector, Vector], Tuple[Vector, Vector, dict]]:
     """ Reimplementation of rhosigchi in python.
     Args:
         first_gen: First generation matrix
@@ -320,9 +320,8 @@ def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
     igmax = np.zeros(imax, dtype=int)
     for ix in range(imin, imax):
         for ig in range(igmin, len(first_gen.Eg)):
-            if first_gen.values[ix, ig] > 0:
-                if igmax[ix] < ig+1:
-                    igmax[ix] = ig+1
+            if first_gen.values[ix, ig] > 0 and igmax[ix] < ig+1:
+                igmax[ix] = ig+1
     u0 = int(abs(a0/a1) + 0.5)
 
     # Next we will normalize
@@ -372,7 +371,7 @@ def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
     nlderr = np.sqrt(nlderr/nunc)
     gsferr = np.sqrt(gsferr/nunc)
 
-    chiSq = ChiSquare(FgN, sFgN, nld, gsf, nlderr, gsferr,
+    chiSq = chisquare(FgN, sFgN, nld, gsf, nlderr, gsferr,
                       imin, imax, igmin, igmax, u0)
 
     diag = {'ChiSq': chiSq.copy(), 'rho': nld.copy(), 'sig': gsf.copy(),

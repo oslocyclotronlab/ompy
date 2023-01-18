@@ -229,7 +229,7 @@ class Extractor:
         nlds = []
         gsfs = []
 
-        #kinda stupid, but we need to do it...
+        # kinda stupid, but we need to do it...
         Ex_min, Ex_max, Eg_min = None, None, None
         for call in self.trapezoid.calls:
             if 'trapezoid' in call:
