@@ -1,14 +1,8 @@
-import os
 import numpy as np
 from typing import Tuple, Sequence, Union
 from .matrix import Matrix
 from .vector import Vector
 from .rhosigchi import iterate, Finv_vec
-
-if 'JPY_PARENT_PID' in os.environ:
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
 
 
 def find_limits(mat: Matrix, Ex_min: float, Ex_max: float, Eg_min: float
@@ -346,7 +340,6 @@ def pyrhosigchi(first_gen: Matrix, first_gen_std: Matrix, Ex_min: float,
     gsfv = np.zeros((nit, imax+u0))
     nldv[0, :] = nld[0, :]
 
-    #for i in tqdm(range(nunc)):
     for i in range(nunc):
         first_gen_perturbed = first_gen.values + \
             Finv_vec(rng.random(size=first_gen.shape)) \
