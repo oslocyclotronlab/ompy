@@ -3,14 +3,15 @@ from ..stubs import Pathlike, Axes, keV, Unitlike
 from .. import Vector, Matrix
 from pathlib import Path
 from dataclasses import dataclass
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import overload, Literal
 import warnings
+from .io import load
 
 """
 TODO: Remove prefix/suffix and only use a glob pattern.
+TODO: FWHM is useless. Make it "optional" for compatibility.
 """
 
 
@@ -44,7 +45,7 @@ class ResponseData:
     AP: Vector
     compton: list[Vector]
     Eff: Vector
-    FWHM: Vector
+    FWHM: Vector | None = None
     is_normalized: bool = False
     is_fwhm_normalized: bool = False
 
@@ -113,7 +114,7 @@ class ResponseData:
             self.SE *= weight
             self.DE *= weight
             self.AP *= weight
-            for i in self.compton:
+            for i in range(len(self.compton)):
                 self.compton[i] *= weight[i]
         else:
             return self.clone(FE=self.FE * weight, SE=self.SE * weight, DE=self.DE * weight,
@@ -128,8 +129,9 @@ class ResponseData:
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> ResponseData: ...
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> ResponseData | None:
-        warnings.warn("Untested and not sanity-checked.")
-        warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
+        #warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
+        if self.FWHM is None:
+            raise ValueError("No FWHM data available.")
         old = self.FWHM.loc[energy]
         ratio = fwhm / old  * self.FWHM.E / energy
         if inplace:
@@ -139,45 +141,18 @@ class ResponseData:
             return self.clone(FWHM=self.FWHM * ratio, is_fwhm_normalized=True)
 
     @staticmethod
-    def from_file(path: Pathlike, name: str = 'resp.dat', prefix: str = 'cmp', suffix: str = '.m') -> ResponseData:
-        path = Path(path)
-        with open(path / name, 'r') as f:
-            lines = f.readlines()
-
-        number_of_lines = 0
-        i = 0
-        while (i := i+1) < len(lines):
-            line = lines[i]
-            # Number of lines. Some resps are misspelled
-            if line.startswith("# Next: Num"):
-                number_of_lines = int(lines[i+1])
-                i += 1
-                break
-
-        df = pd.DataFrame([line.split() for line in lines[i+2:i+number_of_lines+3]],
-                          columns=['E', 'FWHM', 'Eff', 'FE', 'SE', 'DE', 'AP'])
-        df = df.astype(float)
-        df['E'] = df['E'].astype(int)
-        assert len(df) == number_of_lines
-        E = df['E'].to_numpy()
-
-        compton, _ = load_compton(path, prefix, suffix, Eg=E)
-        FE = Vector(E=E, values=df['FE'].to_numpy())
-        DE = Vector(E=E, values=df['DE'].to_numpy())
-        SE = Vector(E=E, values=df['SE'].to_numpy())
-        AP = Vector(E=E, values=df['AP'].to_numpy())
-        Eff = Vector(E=E, values=df['Eff'].to_numpy())
-        FWHM = Vector(E=E, values=df['FWHM'].to_numpy())
+    def from_path(path: Pathlike, **kwargs) -> ResponseData:
+        (FE, SE, DE, AP, Eff, *FWHM), (compton, _) = load(path, **kwargs)
         return ResponseData(FE, SE, DE, AP, compton, Eff, FWHM)
 
     @staticmethod
     def from_db(name: ResponseFunctionName) -> ResponseData:
-        return ResponseData.from_file(RESPONSE_FUNCTIONS[name])
+        return ResponseData.from_path(RESPONSE_FUNCTIONS[name])
 
     def plot(self, ax: Axes | None = None, **kwargs):
-        # TODO Make me pretty
         if ax is None:
-            _, ax = plt.subplots(4, 2)
+            _, ax = plt.subplots(4, 2, constrained_layout=True,
+                                 sharex=True)
         ax = ax.flatten()
         if len(ax) < 7:
             raise ValueError("Need at least 5 axes")
@@ -187,8 +162,17 @@ class ResponseData:
         self.AP.plot(ax=ax[3], **kwargs)
         self.Eff.plot(ax=ax[4], **kwargs)
         self.FWHM.plot(ax=ax[5], **kwargs)
-        for i, cmp in enumerate(self.compton):
-            cmp.plot(ax=ax[6], **kwargs)
+        titles = ['FE', 'SE', 'DE', 'AP', 'Eff', 'FWHM']
+        for i, title in enumerate(titles):
+            ax[i].set_title(title)
+            ax[i].set_xlabel('')
+            ax[i].set_ylabel('')
+        compton = self.compton_matrix()
+        compton.plot(ax=ax[6], **kwargs)
+        ax[7].plot(self.E, self.sum(axis=1))
+        fig = ax[0].figure
+        fig.supxlabel('E [keV]')
+        fig.supylabel('Counts')
         return ax
 
     @property
@@ -236,57 +220,3 @@ class ResponseData:
 
     def __len__(self) -> int:
         return len(self.FE)
-
-
-def load_compton(path: Pathlike, prefix: str = 'cmp', suffix: str = '.m',
-                 Eg: list[int] = None) -> tuple[list[Vector], np.ndarray]:
-    """ Load Compton response data from files.
-
-    Parameters
-    ----------
-    path : Pathlike
-        Path to directory containing the files.
-    prefix : str, optional
-        Prefix of the files, by default 'cmp'
-    suffix : str, optional
-        Suffix of the files, by default '.m'
-    Eg : list[int], optional
-        List of Eg values to load, by default None, in which case it loads all matching files.
-    """
-    path = Path(path)
-    compton: list[Vector] = []
-    # This energy is the true gamma energy. The compton vectors are indexed by the measured gamma energy
-    E: list[int] = []
-    for file in path.glob(f'{prefix}*{suffix}'):
-        e = int(file.stem[len(prefix):])
-        if Eg is not None:
-            if e not in Eg:
-                continue
-        E.append(e)
-        compton.append(Vector(path=file))
-    if not len(compton):
-        raise FileNotFoundError(f'No files found with prefix {prefix} and suffix {suffix}')
-    if Eg is not None and set(E) != set(Eg):
-        raise FileNotFoundError(f'Not all files found. Missing: {set(Eg) - set(E)}')
-    # Sort and check for equal calibration
-    E, compton = zip(*sorted(zip(E, compton), key=lambda x: x[0]))
-    compton = list(compton)
-    for i in range(1, len(compton)):
-        assert compton[i].calibration() == compton[i-1].calibration()
-    return compton, np.asarray(E)
-
-
-def fix_lengths(compton: list):
-    raise NotImplementedError()
-    # Some compton vectors are longer than others. Rebin them to the shortest one
-    minlength = min(len(v) for v in compton)
-    mask = [len(v) == minlength for v in compton]
-    # Find one good vector as a prototype
-    prototype = compton[[i for i in range(len(compton)) if mask[i]][0]]
-    # Rebin all vectors to the prototype
-    wrong_length = [i for i in range(len(compton)) if not mask[i]]
-    #prototype.summary()
-    for i in wrong_length:
-        N = sum(compton[i])
-        compton[i] = compton[i].rebin_like(prototype)
-        compton[i] = compton[i] * N / sum(compton[i])

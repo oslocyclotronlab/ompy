@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import OrderedDict
 
 import numpy as np
@@ -7,6 +8,8 @@ from sympy import diff, exp, log, lambdify
 from . import Interpolator, Interpolation
 from .numbalib import prange, njit, jitclass, float64
 from .. import Vector
+from ..stubs import Pathlike
+from pathlib import Path
 
 spec = OrderedDict()
 spec["a"] = float64
@@ -56,6 +59,23 @@ class GF3Interpolation(Interpolation):
 
     def eval(self, E: np.ndarray) -> np.ndarray:
         return self.gsf3.call(E)
+
+    def _metadata(self) -> dict[str, any]:
+        return {"a": self.gsf3.a,
+                "b": self.gsf3.b,
+                "c": self.gsf3.c,
+                "d": self.gsf3.d,
+                "e": self.gsf3.e,
+                "f": self.gsf3.f,
+                "g": self.gsf3.g}
+
+    @classmethod
+    def from_path(cls, path: Pathlike) -> GF3Interpolation:
+        path = Path(path)
+        points, meta = Interpolation._load(path)
+        a, b, c, d, e, f, g = meta["a"], meta["b"], meta["c"], meta["d"], meta["e"], meta["f"], meta["g"]
+        return GF3Interpolation(points, a,b,c,d,e,f,g)
+
 
     def __str__(self) -> str:
         s = ("GF3Interpolation with parameters:\n"

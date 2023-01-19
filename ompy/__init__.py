@@ -36,7 +36,7 @@ else:
     from .version import FULLVERSION as __full_version__
 
     import warnings
-    warnings.simplefilter('always', DeprecationWarning)
+    #warnings.simplefilter('always', DeprecationWarning)
 
     USE_JIT = False
     USE_GPU = True
@@ -65,7 +65,7 @@ else:
     from .examples import example_raw, list_examples
     from .ensemble import Ensemble
     from . import response
-    from .response import Response, Calibrator, ResponseData, ResponseInterpolation
+    from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
     from .gauss_smoothing import *
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor

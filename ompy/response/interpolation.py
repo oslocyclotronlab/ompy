@@ -1,7 +1,7 @@
 from __future__ import annotations
 from . import ResponseData
 from .numbalib import index, jit, prange
-from ..stubs import Axes, Pathlike
+from ..stubs import Axes, Pathlike, LineKwargs, ErrorBarKwargs
 from .. import Vector
 from dataclasses import dataclass
 from scipy.interpolate import interp1d
@@ -12,6 +12,7 @@ from collections import OrderedDict
 from typing import TypeAlias, Iterable
 from abc import ABC, abstractmethod
 from pathlib import Path
+import json
 
 
 try:
@@ -42,29 +43,57 @@ class Interpolation(ABC):
                 y = self.eval(points.E)
                 return points.clone(values=y)
             case _:
-                return self.eval(points)
+                return self.eval(np.atleast_1d(points))
 
     @abstractmethod
     def eval(self, points: np.ndarray) -> np.ndarray: ...
 
+    @abstractmethod
+    def _metadata(self) -> dict[str, any]: ...
+
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=exist_ok)
-        raise NotImplementedError()
+        path.mkdir(parents=True, exist_ok=exist_ok)
+        # Save attributes to json
+        meta = self._metadata()
+        if 'class' in meta or 'datapath' in meta:
+            raise AssertionError(f"save() and _metadata() implemented incorrectly in {self.__class__.__name__}")
+        meta['class'] = self.__class__.__name__
+        meta['datapath'] = 'data.npy'
+        with (path / 'meta.json').open('w') as f:
+            json.dump(meta, f)
+        self.points.save(path / meta['datapath'])
+
+    @classmethod
+    @abstractmethod
+    def from_path(cls, path: Pathlike) -> Interpolation: ...
 
     @staticmethod
-    def from_file(path: Pathlike) -> Interpolation: ...
+    def _load(path: Pathlike) -> tuple[Vector, dict[str, any]]:
+        path = Path(path)
+        with (path / 'meta.json').open() as f:
+            meta = json.load(f)
+        data = Vector.from_path(path / meta['datapath'])
+        return data, meta
 
-    def plot(self, ax: Axes = None, **kwargs) -> Axes:
+    def plot(self, ax: Axes = None, skw: LineKwargs | None = None,
+             lkw: LineKwargs | None = None, **kwargs) -> Axes:
         if ax is None:
             fig, ax = plt.subplots()
         x = np.linspace(min(1e-3, self.points.E.min()), max(self.points.E.max(), 3e4), 2000)
         y = self(x)
         X, Y = self.points.unpack()
-        kwargs.setdefault('marker', 'x')
+        skw = skw or {}
+        skw.setdefault('marker', 'x')
+        skw.setdefault('mew', 0.5)
+        skw.setdefault('linestyle', '')
+        skw = kwargs | skw
+
+        lkw = lkw or {}
+        lkw = kwargs | lkw
         #self.points.plot(ax=ax, kind='scatter')
-        ax.plot(x, y)
-        ax.scatter(X, Y, **kwargs)
+        ax.plot(X, Y, **skw)
+        ax.plot(x, y, **lkw)
         return ax
 
     def plot_residuals(self, ax: Axes = None, **kwargs) -> Axes:
@@ -90,17 +119,28 @@ class Interpolation(ABC):
 
 
 class PoissonInterpolation(Interpolation):
-    def plot(self, ax: Axes = None, **kwargs) -> Axes:
+    def plot(self, ax: Axes = None, ebkw: ErrorBarKwargs | None = None,
+             lkw: LineKwargs | None = None, **kwargs) -> Axes:
         if ax is None:
             fig, ax = plt.subplots()
         x = np.linspace(min(1e-3, self.points.E.min()), max(self.points.E.max(), 3e4), 2000)
         y = self(x)
         X, Y = self.points.unpack()
-        ax.errorbar(X, Y, yerr=np.sqrt(Y), fmt='', capsize=5, linestyle='')
-        ax.plot(x, y, **kwargs)
+        ebkw = ebkw or {}
+        ebkw.setdefault('fmt', '')
+        ebkw.setdefault('capsize', 2)
+        ebkw.setdefault('capthick', 0.5)
+        ebkw.setdefault('elinewidth', 0.5)
+        ebkw.setdefault('linestyle', '')
+        ebkw = kwargs | ebkw
+        ax.errorbar(X, Y, yerr=np.sqrt(Y), **ebkw)
+        lkw = lkw or {}
+        lkw = kwargs | lkw
+        ax.plot(x, y, **lkw)
         ax.set_xlabel("E [keV]")
         ax.set_ylabel("Counts")
         return ax
+
 
 class LinearInterpolation(Interpolation):
     def __init__(self, data: Vector, intp: interp1d):
@@ -109,6 +149,16 @@ class LinearInterpolation(Interpolation):
 
     def eval(self, points: np.ndarray) -> np.ndarray:
         return self.intp(points)
+
+    def _metadata(self) -> dict[str, any]:
+        return {}
+
+    @staticmethod
+    def from_path(path: Pathlike) -> LinearInterpolation:
+        data, meta = Interpolation._load(path)
+        intp = interp1d(data.E, data.values, bounds_error=False, fill_value='extrapolate')
+        return LinearInterpolation(data, intp)
+
 
 class CompoundInterpolation(Interpolation):
     def __init__(self, points: Vector, interpolations: OrderedDict[float, Interpolation]):
@@ -202,27 +252,3 @@ class Lerp:
         y1 = self.y[i + 1]
         t = (x - x0) / (x1 - x0)
         return (1 - t) * y0 + t * y1
-
-
-# class MultiLerp:
-#     """
-#     Interpolate N points between X and Y parameterized by x and y
-#
-#     """
-#     def __init__(self, x: float, X: np.ndarray,
-#                  y: float, Y: np.ndarray):
-#         self.x = x
-#         self.y = y
-#         self.X = X
-#         self.Y = Y
-#
-#     def __call__(self, z: float) -> np.ndarray:
-#         return self.call(z)
-#
-#     def call(self, z: float) -> np.ndarray:
-#         if z < self.x or z > self.y:
-#             raise ValueError("z is outside of interpolation range.")
-#         Z = np.empty_like(self.x)
-#         for i in range(len(Z)):
-
-

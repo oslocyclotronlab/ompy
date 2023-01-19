@@ -1,5 +1,5 @@
 from __future__ import annotations
-from . import ResponseData, ResponseInterpolation, interpolate_compton
+from . import ResponseData, DiscreteInterpolation, interpolate_compton
 from .. import Vector, Matrix, USE_GPU
 import warnings
 import numpy as np
@@ -27,14 +27,14 @@ except ImportError:
 
 class Response:
     def __init__(self, probabilities: ResponseData,
-                 interpolation: ResponseInterpolation | None = None,
+                 interpolation: DiscreteInterpolation | None = None,
                  compton: Matrix | None = None):
         if not probabilities.is_normalized:
             raise ValueError("Probabilities must be normalized.")
         if not probabilities.is_fwhm_normalized:
             raise ValueError("FWHM must be normalized to experiment.")
         self.probabilities: ResponseData = probabilities
-        self.interpolation: ResponseInterpolation = interpolation or ResponseInterpolation.from_data(probabilities)
+        self.interpolation: DiscreteInterpolation = interpolation or DiscreteInterpolation.from_data(probabilities)
         self.compton: Matrix = compton
 
     def __call__(self, E: Vector) -> Matrix:
@@ -57,7 +57,7 @@ class Response:
         self.compton = compton
 
     def clone(self, probabilities: ResponseData = None,
-              interpolation: ResponseInterpolation = None,
+              interpolation: DiscreteInterpolation = None,
               compton: Matrix = None) -> Response:
         return Response(probabilities=probabilities or self.probabilities,
                         interpolation=interpolation or self.interpolation,

@@ -17,7 +17,7 @@ from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D)
 from ..library import div0, handle_rebin_arguments, only_one_not_none
 from .rebin import rebin_1D
-from ..stubs import Unitlike, arraylike, Axes
+from ..stubs import Unitlike, arraylike, Axes, Pathlike
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -195,6 +195,7 @@ class Vector(AbstractArray):
         ax.set_xlabel(self.E_label + f" [${self.units:~L}$]")
         return ax
 
+
     def save(self, path: Union[str, Path],
              filetype: str | None = None,
              **kwargs) -> None:
@@ -236,7 +237,56 @@ class Vector(AbstractArray):
         else:
             raise ValueError(f"Unknown filetype {filetype}")
 
-    def load(self, path: Union[str, Path],
+    @classmethod
+    def from_path(cls, path: Pathlike, filetype: str | None = None) -> Vector:
+        """Load to a file of specified format
+
+        Units assumed to be keV.
+
+        Args:
+            path (str or Path): Path to Load
+            filetype (str, optional): Filetype. Default uses
+                auto-recognition from suffix.
+
+        Raises:
+            ValueError: Filetype is not supported
+        """
+        path = Path(path)
+        if filetype is None:
+            filetype = filetype_from_suffix(path)
+        filetype = filetype.lower()
+        LOG.debug(f"Loading {path} as {filetype}")
+
+        match filetype:
+            case 'numpy':
+                values, E, std = load_numpy_1D(path)
+            case 'txt':
+                values, E, std = load_txt_1D(path)
+            case 'tar':
+                from_file = load_tar(path)
+                if len(from_file) == 3:
+                    values, E, std = from_file
+                elif len(from_file) == 2:
+                    values, E = from_file
+                    std = None
+                else:
+                    raise ValueError(f"Expected two or three columns\
+                     in file '{path}', got {len(from_file)}")
+            case 'mama':
+                values, E = mama_read(path)
+                std = None
+            case 'csv':
+                values, E, std = load_csv_1D(path)
+            case _:
+                try:
+                    values, E = mama_read(path)
+                except ValueError:  # from within ValueError
+                    raise ValueError(f"Unknown filetype {filetype}")
+        E *= ureg.keV
+        return Vector(E=E, values=values, std=std)
+
+
+    def load(self, path: Pathlike,
              filetype: str | None = None) -> None:
         """Load to a file of specified format
 

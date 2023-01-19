@@ -344,10 +344,10 @@ def index(X: vector, x) -> int:
     return -1
 
 
-@cuda.jit(func_or_sig="f4(f4[::1], f4, f4)", device=True, debug=DEBUG, inline=True)
+@cuda.jit(func_or_sig="f4(f4[::1], f4, i4)", device=True, debug=DEBUG, inline=True)
 def index_from(index: vector, x, start) -> nb.float32:
     """ Find the position of `x` in `index` """
-    i = np.int32(start)
+    i = nb.int32(start)
     while i < len(index):
         if index[i] > x:
             return i - 1

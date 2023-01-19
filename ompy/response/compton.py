@@ -342,7 +342,7 @@ def test_compton_fan(p: ResponseData, e: float) -> tuple[Vector, Vector, Vector]
     return intpv, lowv, highv
 
 
-def test_lerp_end(p: ResponseData, intp: 'ResponseInterpolation', e: float, nsigma=6) -> tuple[Vector, Vector, Vector]:
+def test_lerp_end(p: ResponseData, intp: 'DiscreteInterpolation', e: float, nsigma=6) -> tuple[Vector, Vector, Vector]:
     compton = make_compton_list(p)
     low, high = compton.closest(e)
     R = np.zeros_like(low.np())
@@ -354,7 +354,7 @@ def test_lerp_end(p: ResponseData, intp: 'ResponseInterpolation', e: float, nsig
     intpv = Vector(E=low.E, values=R)
     return intpv, lowv, highv
 
-def test_whole(p: ResponseData, intp: 'ResponseInterpolation', e: float, nsigma=6) -> tuple[Vector, Vector, Vector]:
+def test_whole(p: ResponseData, intp: 'DiscreteInterpolation', e: float, nsigma=6) -> tuple[Vector, Vector, Vector]:
     compton = make_compton_list(p)
     low, high = compton.closest(e)
     R = np.zeros_like(low.np())

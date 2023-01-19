@@ -27,3 +27,5 @@ PointF: TypeAlias = (float, float)
 PointI: TypeAlias = (int, int)
 Points: TypeAlias = (Point, Point)
 numeric: TypeAlias = int | float | np.number
+LineKwargs: TypeAlias = dict[str, Any]
+ErrorBarKwargs: TypeAlias = dict[str, Any]
