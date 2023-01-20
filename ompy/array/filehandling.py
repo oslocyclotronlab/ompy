@@ -1,4 +1,4 @@
-from typing import Union, Iterable, List, Tuple, Optional
+from typing import Union, Iterable, List, Tuple, Optional, Any
 from pathlib import Path
 import tarfile
 import time
@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
+from dataclasses import asdict
 
 from ompy.stubs import Pathlike, array
 
@@ -355,20 +356,39 @@ def save_txt_1D(values: np.ndarray, E: np.ndarray,
     np.savetxt(path, mat, header=header)
 
 
-def filetype_from_suffix(path: Path) -> str:
+def save_npz_1D(path: Pathlike, vector) -> None:
+    mapping = {'X': vector.X, 'values': vector.values, 'meta': asdict(vector.metadata)}
+    if vector.std is not None:
+        mapping['std'] = vector.std
+    np.savez(path, **mapping)
+
+def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
+    with np.load(path, allow_pickle=True, **kwargs) as data:
+        meta = data['meta'][()]
+        X = data['X']
+        values = data['values']
+        std = None if 'std' not in data else data['std']
+    return cls(X=X, values=values, std=std, **meta)
+
+def filetype_from_suffix(path: Path) -> str | None:
     suffix = path.suffix
-    if suffix == '.tar':
-        return 'tar'
-    elif suffix == '.npy':
-        return 'numpy'
-    elif suffix == '.txt':
-        return 'txt'
-    elif suffix == '.m':
-        return 'mama'
-    elif suffix == '.csv':
-        return 'csv'
-    else:
-        return "unknown"
+    match suffix:
+        case '.npy':
+            return 'npy'
+        case '.tar':
+            return 'tar'
+        case '.txt':
+            return 'txt'
+        case '.csv':
+            return 'csv'
+        case '.m':
+            return 'mama'
+        case '.npz':
+            return 'npz'
+        case '':
+            return ''
+        case _:
+            return None
 
 
 def load_discrete(path: Union[str, Path], energy: ndarray,

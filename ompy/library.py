@@ -11,7 +11,7 @@ from matplotlib import patches
 from scipy.interpolate import interp1d, RectBivariateSpline
 from scipy.stats import truncnorm
 
-from .stubs import ArrayFloat, arraylike, Unitlike, ArrayKeV
+from .stubs import ArrayFloat, arraylike, Unitlike, ArrayKeV, Axes
 from . import ureg
 
 def div0(a, b):
@@ -759,8 +759,6 @@ def fit_resolution(mat: 'Matrix'):
     return np.vstack(ps)
 
 
-from numba import njit
-@njit
 def ngaussian(x, A: float, mu: float, sigma: float):
     return A* np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
 
@@ -799,3 +797,9 @@ def diagonal_sum_2(mat: 'Matrix', slope=1, thickness=1):
     summed = np.array([sum(s) for s in S])
     average = np.array([np.mean(s) for s in S])
     return np.array(Ex), summed, average, S
+
+
+def maybe_set(ax: Axes, attr: str, value: Any) -> Any:
+    old = getattr(ax, 'get_' + attr)()
+    if not old:
+        return getattr(ax, 'set_'+attr)(value)

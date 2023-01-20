@@ -9,18 +9,36 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 
-from .. import ureg, DimensionalityError
+from .. import ureg, DimensionalityError, Unit
 from .index import index
 from .abstractarray import AbstractArray
 from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
-                           save_csv_1D, save_numpy_1D, save_tar, save_txt_1D)
-from ..library import div0, handle_rebin_arguments, only_one_not_none
+                           save_csv_1D, save_numpy_1D, save_tar, save_txt_1D,
+                           save_npz_1D, load_npz_1D)
+from ..library import div0, handle_rebin_arguments, only_one_not_none, maybe_set
 from .rebin import rebin_1D
 from ..stubs import Unitlike, arraylike, Axes, Pathlike
+from dataclasses import dataclass, field
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
+
+
+@dataclass(frozen=True)
+class VectorMetadata:
+    xalias: str = 'E'
+    valias: str = ''
+    xlabel: str = 'Energy'
+    ylabel: str = 'Counts'
+    name: str = ''
+    misc: dict[str, any] = field(default_factory=dict)
+
+    def clone(self, **kwargs) -> VectorMetadata:
+        return VectorMetadata(**(self.__dict__ | kwargs))
+
+    def update(self, **kwargs) -> VectorMetadata:
+        return self.clone(**kwargs)
 
 
 class Vector(AbstractArray):
@@ -28,82 +46,102 @@ class Vector(AbstractArray):
 
     Attributes:
         values (np.ndarray): The values at each bin.
-        E (np.ndarray): The energy of each bin. (mid-bin calibration)
-        path (str or Path): The path to load a saved vector from
+        X (np.ndarray): The energy of each bin. (mid-bin calibration)
         std (np.ndarray): The standard deviation of the counts
-        unit (str): Unit of the energies. Can be "keV" or "MeV".
-            Defaults to "keV".
     """
+    # HACK: Descriptors really don't work well with %autoreload.
+    # comment / uncomment this to silence the errors when developing
+    #__slots__ = ('_X', 'values', 'std', 'loc', 'iloc', 'metadata')
 
-    def __init__(self, values: Iterable[float] | None = None,
-                 E: Iterable[float] | None = None,
-                 *,
-                 path: Union[str, Path] | None = None,
+    def __init__(self, *, X: Iterable[float] | None = None,
+                 values: Iterable[float] | None = None,
                  std: Iterable[float] | None = None,
                  copy: bool = True,
-                 units: str | None = "keV",
-                 E_label: str = 'Energy'):
+                 units: Unitlike = "keV",
+                 order: Literal['C', 'F'] = 'C',
+                 metadata: VectorMetadata = VectorMetadata(),
+                 **kwargs):
         """
-        There are two ways to initialize:
-
-        - Providing both `values` and `energy`.
-        - Providing only a path loads a vector from said path.
-
         If no `std` is given, it will default to None
 
         Args:
             values: see above
             E: see above
-            path: see above
             std: see above
             copy: Whether to copy `values` and `E` or by reference.
                 Defaults to True.
-            unit: see above
-            E_label: The default x-label for plotting.
 
         Raises:
            ValueError if the runtime lengths of the arrays are different.
            ValueError if incompatible arguments are provided.
 
         """
+        # Resolve aliasing
+        # First keyword argument is the alias
+        kwiter = kwargs.items().__iter__()
+        xalias = valias = None
+        if X is None:
+            try:
+                xalias, X = next(kwiter)
+            except StopIteration:
+                raise ValueError("No X array provided")
+            if 'xalias' in kwargs:
+                raise ValueError("Cannot set xalias as a keyword argument")
+        # Next keyword is values
+        if values is None:
+            try:
+                valias, values = next(kwiter)
+            except StopIteration:
+                raise ValueError("No values array provided")
+            if 'valias' in kwargs:
+                raise ValueError("Cannot set valias as a keyword argument")
+        # Rest is passed to the metadata
+        kwargs = dict(kwiter)
+        if xalias is not None:
+            kwargs['xalias'] = xalias
+        if valias is not None:
+            kwargs['valias'] = valias
+
         try:
-            unit = E.units
+            unit = X.units
         except AttributeError:
             unit = ureg.Unit(units)
 
         if copy:
             def fetch(x):
-                return np.atleast_1d(np.asarray(x, dtype=float).copy())
+                return np.atleast_1d(np.asarray(x, dtype=float, order=order).copy())
         else:
             def fetch(x):
-                return np.atleast_1d(np.asarray(x, dtype=float))
+                return np.atleast_1d(np.asarray(x, dtype=float, order=order))
 
-        self.std: ndarray | None = None
+        self.values = fetch(values)
+        try:
+            self._X = fetch(X.magnitude) * unit
+        except AttributeError:
+            self._X = fetch(X) * unit
 
-        if path is not None:
-            if values is not None or E is not None:
-                warnings.warn("Loading from path. Other arguments are ignored.")
-            self.load(path)
-            # Always loads as [KeV]
-            self.to(unit, inplace=True)
-        else:
-            if values is None or E is None:
-                raise ValueError("Values and energy must both be given.")
-            else:
-                self.values = fetch(values)
-                try:
-                    self._E = fetch(E.magnitude) * unit
-                except AttributeError:
-                    self._E = fetch(E) * unit
-
-        if std is not None:
-            self.std = fetch(std)
-
+        self.std = fetch(std) if std is not None else None
         self.loc: ValueLocator = ValueLocator(self)
         self.iloc: IndexLocator = IndexLocator(self)
-        self.E_label: str = str(E_label)
+        self.metadata = metadata.update(**kwargs)
 
         self.verify_integrity()
+
+    def is_equidistant(self) -> bool:
+        """ Returns True if the vector is equidistant """
+        return np.allclose(np.diff(self._X), np.diff(self._X)[0])
+
+    def __getattr__(self, item):
+        meta = self.__dict__['metadata']
+        if item == meta.xalias:
+            x = self.X
+        elif item == meta.valias:
+            x = self.__dict__['values']
+        elif item == 'd' + meta.xalias:
+            x = self.dX
+        else:
+            x = super().__getattr__(item)
+        return x
 
     def verify_integrity(self, check_equidistant: bool = False):
         """ Verify the internal consistency of the vector
@@ -115,25 +153,15 @@ class Vector(AbstractArray):
         Raises:
             AssertionError or ValueError if any test fails
         """
-        assert self.values is not None
-        assert self.E is not None
-        if self.E.shape != self.values.shape:
-            raise ValueError("Energy and values must have same shape")
+        if self.X.shape != self.values.shape:
+            raise ValueError(f"Energy and values must have same shape. Got {self.X.shape} and {self.values.shape}.")
         if self.std is not None:
             if self.std.shape != self.values.shape:
                 raise ValueError("std and values must have same shape")
 
-        if check_equidistant and not self.is_equidistant():
-            raise ValueError("Is not equidistant.")
+        #if check_equidistant and not self.is_equidistant():
+        #    raise ValueError("Is not equidistant.")
 
-    def is_equidistant(self) -> bool:
-        """ Check if the width of energy bins are all equal."""
-        if len(self) <= 1:
-            return True
-
-        diff = (self.E - np.roll(self.E, 1))[1:]
-        de = diff[0]
-        return np.all(np.isclose(diff, de * np.ones(diff.shape)))
 
     def calibration(self) -> Dict[str, float]:
         """Calculate and return the calibration coefficients of the energy axes
@@ -141,8 +169,8 @@ class Vector(AbstractArray):
         Formatted as "a{axis}{power of E}"
         """
 
-        calibration = {"a0": self._E[0].to('keV').magnitude,
-                       "a1": (self._E[1] - self._E[0]).to('keV').magnitude}
+        calibration = {"a0": self._X[0].to('keV').magnitude,
+                       "a1": (self._X[1] - self._X[0]).to('keV').magnitude}
         return calibration
 
     def plot(self, ax: Axes | None = None,
@@ -154,8 +182,6 @@ class Vector(AbstractArray):
         Args:
             ax (matplotlib axis, optional): The axis to plot onto. If not
                 provided, a new figure is created
-            scale (str, optional): The scale to use. Can be `linear`
-                (default), `log`, `symlog` or `logit`.
             kind (str, optional):
                 - 'line' : line plot (default) evokes `ax.plot`
                 - 'plot' : same as 'line'
@@ -174,29 +200,29 @@ class Vector(AbstractArray):
             kwargs.setdefault("marker", ".")
             kwargs.setdefault("linestyle", "-")
             if self.std is not None:
-                ax.errorbar(self.E, self.values, yerr=self.std,
+                ax.errorbar(self.X, self.values, yerr=self.std,
                             **kwargs)
             else:
-                ax.plot(self.E, self.values, "o-", **kwargs)
+                ax.plot(self.X, self.values, "o-", **kwargs)
         elif kind == "step":
             kwargs.setdefault("where", "mid")
-            ax.step(self.E, self.values, **kwargs)
+            ax.step(self.X, self.values, **kwargs)
         elif kind == 'bar':
             kwargs.setdefault("align", "center")
             kwargs.setdefault('width', self.de)
             kwargs.setdefault('yerr', self.std)
-            ax.bar(self.E, self.values, **kwargs)
+            ax.bar(self.X, self.values, **kwargs)
         elif kind == 'dot':
             kwargs.setdefault("marker", ".")
-            ax.scatter(self.E, self.values, **kwargs)
+            ax.scatter(self.X, self.values, **kwargs)
         else:
             raise NotImplementedError()
-        ax.set_yscale(scale)
-        ax.set_xlabel(self.E_label + f" [${self.units:~L}$]")
+        maybe_set(ax, 'xlabel', self.xlabel + f" [${self.units:~L}$]")
+        maybe_set(ax, 'ylabel', self.ylabel)
+        maybe_set(ax, 'title', self.name)
         return ax
 
-
-    def save(self, path: Union[str, Path],
+    def save(self, path: Pathlike,
              filetype: str | None = None,
              **kwargs) -> None:
         """Save to a file of specified format
@@ -211,31 +237,43 @@ class Vector(AbstractArray):
         Raises:
             ValueError: Filetype is not supported
         """
-        vector = self.clone()
-        path = Path(path) if isinstance(path, str) else path
+        path = Path(path)
         if filetype is None:
             filetype = filetype_from_suffix(path)
+            if filetype is None:
+                raise ValueError("Filetype could not be determined from suffix: {path}")
+            # Fallback case
+            if filetype == '':
+                filetype = 'npz'
         filetype = filetype.lower()
 
-        E = vector._E.to('keV').magnitude
-        if filetype == 'numpy':
-            save_numpy_1D(vector.values, E, vector.std, path)
-        elif filetype == 'txt':
-            save_txt_1D(vector.values, E, vector.std, path, **kwargs)
-        elif filetype == 'tar':
-            if vector.std is not None:
-                save_tar([vector.values, E, vector.std], path)
-            else:
-                save_tar([vector.values, E], path)
-        elif filetype == 'mama':
-            mama_write(self, path, comment="Made by OMpy", **kwargs)
-            if self.std is not None:
-                warnings.warn("MaMa cannot store std. "
-                              "Consider using another format")
-        elif filetype == 'csv':
-            save_csv_1D(vector.values, E, vector.std, path)
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
+        E = self._X.to('keV').magnitude
+        match filetype:
+            case "npy":
+                warnings.warn("Saving as .npy is deprecated. Use .npz instead.")
+                save_numpy_1D(self.values, E, self.std, path)
+            case 'npz':
+                save_npz_1D(path, self)
+            case "txt":
+                warnings.warn("Saving to .txt does not preserve metadata. Use .npz instead.")
+                save_txt_1D(self.values, E, self.std, path, **kwargs)
+            case 'tar':
+                warnings.warn("Saving to .tar does not preserve metadata. Use .npz instead.")
+                if self.std is not None:
+                    save_tar([self.values, E, self.std], path)
+                else:
+                    save_tar([self.values, E], path)
+            case 'mama':
+                warnings.warn("MAMA format does not preserve metadata.")
+                mama_write(self, path, comment="Made by OMpy", **kwargs)
+                if self.std is not None:
+                    warnings.warn("MaMa cannot store std. "
+                                  "Consider using another format")
+            case 'csv':
+                warnings.warn("CSV format does not preserve metadata.")
+                save_csv_1D(self.values, E, self.std, path)
+            case _:
+                raise ValueError(f"Unknown filetype {filetype}")
 
     @classmethod
     def from_path(cls, path: Pathlike, filetype: str | None = None) -> Vector:
@@ -254,12 +292,20 @@ class Vector(AbstractArray):
         path = Path(path)
         if filetype is None:
             filetype = filetype_from_suffix(path)
+            if filetype is None:
+                raise ValueError("Filetype could not be determined from suffix: {path}")
+            # Fallback case
+            if filetype == '':
+                filetype = 'npz'
+                path = path.with_suffix('.npz')
         filetype = filetype.lower()
         LOG.debug(f"Loading {path} as {filetype}")
 
         match filetype:
-            case 'numpy':
+            case 'npy':
                 values, E, std = load_numpy_1D(path)
+            case 'npz':
+                return load_npz_1D(path, Vector)
             case 'txt':
                 values, E, std = load_txt_1D(path)
             case 'tar':
@@ -285,54 +331,6 @@ class Vector(AbstractArray):
         E *= ureg.keV
         return Vector(E=E, values=values, std=std)
 
-
-    def load(self, path: Pathlike,
-             filetype: str | None = None) -> None:
-        """Load to a file of specified format
-
-        Units assumed to be keV.
-
-        Args:
-            path (str or Path): Path to Load
-            filetype (str, optional): Filetype. Default uses
-                auto-recognition from suffix.
-
-        Raises:
-            ValueError: Filetype is not supported
-        """
-        path = Path(path) if isinstance(path, str) else path
-        if filetype is None:
-            filetype = filetype_from_suffix(path)
-        filetype = filetype.lower()
-        LOG.debug(f"Loading {path} as {filetype}")
-
-        if filetype == 'numpy':
-            self.values, self._E, self.std = load_numpy_1D(path)
-        elif filetype == 'txt':
-            self.values, self._E, self.std = load_txt_1D(path)
-        elif filetype == 'tar':
-            from_file = load_tar(path)
-            if len(from_file) == 3:
-                self.values, self._E, self.std = from_file
-            elif len(from_file) == 2:
-                self.values, self._E = from_file
-                self.std = None
-            else:
-                raise ValueError(f"Expected two or three columns\
-                 in file '{path}', got {len(from_file)}")
-        elif filetype == 'mama':
-            self.values, self._E = mama_read(path)
-            self.std = None
-        elif filetype == 'csv':
-            self.values, self._E, self.std = load_csv_1D(path)
-        else:
-            try:
-                self.values, self._E = mama_read(path)
-            except ValueError:  # from within ValueError
-                raise ValueError(f"Unknown filetype {filetype}")
-        self._E *= ureg.keV
-        self.verify_integrity()
-
     def transform(self, const: float = 1,
                   alpha: float = 0, inplace: bool = True) -> Vector | None:
         """Apply a normalization transformation::
@@ -354,7 +352,7 @@ class Vector(AbstractArray):
         """
         if self.std is not None:
             relative_uncertainty = self.std / self.values
-        transformed = const * self.values * np.exp(alpha * self.E)
+        transformed = const * self.values * np.exp(alpha * self.X)
 
         if self.std is not None:
             std = relative_uncertainty * transformed
@@ -417,25 +415,25 @@ class Vector(AbstractArray):
             The cut vector if `inplace` is True.
         """
         warnings.warn("cut is being deprecation in favor of vec.iloc[j:k]", DeprecationWarning)
-        Emin = Emin if Emin is not None else self.E.min()
-        Emax = Emax if Emax is not None else self.E.max()
+        Emin = Emin if Emin is not None else self.X.min()
+        Emax = Emax if Emax is not None else self.X.max()
         imin = self.index(Emin)
         imax = self.index(Emax)
         cut = slice(imin, imax + 1)
 
         values = self.values[cut]
-        E = self.E[cut] * self.units
+        E = self.X[cut] * self.units
         if self.std is not None:
             std = self.std[cut]
         else:
             std = None
 
         if inplace:
-            self._E = E
+            self._X = E
             self.values = values
             self.std = std
         else:
-            return self.clone(values=values, E=E, std=std)
+            return self.clone(values=values, X=E, std=std)
 
     def drop_nan(self, inplace: bool = False) -> Vector:
         """ Drop the elements that are `np.nan`
@@ -449,14 +447,14 @@ class Vector(AbstractArray):
         inan = np.argwhere(np.isnan(self.values))
 
         values = np.delete(self.values, inan)
-        E = np.delete(self.E, inan) * self.units
+        E = np.delete(self.X, inan) * self.units
         std = None if self.std is None else np.delete(self.std, inan)
         if inplace:
             self.values = values
-            self._E = E
+            self._X = E
             self.std = std
         else:
-            return self.clone(values=values, E=E, std=std)
+            return self.clone(values=values, X=E, std=std)
 
     @overload
     def rebin(self, bins: arraylike | None = None,
@@ -496,7 +494,7 @@ class Vector(AbstractArray):
         Returns:
             The rebinned vector if inplace is 'False'.
         """
-        oldbins = self.E
+        oldbins = self.X
         unit = self.units
 
         newbins = handle_rebin_arguments(bins=oldbins, transform=self.to_same, LOG=LOG,
@@ -508,10 +506,10 @@ class Vector(AbstractArray):
 
         if inplace:
             self.values = rebinned
-            self._E = newbins
+            self._X = newbins
             self.verify_integrity()
         else:
-            return self.clone(E=newbins, values=rebinned)
+            return self.clone(X=newbins, values=rebinned)
 
     @overload
     def rebin_like(self, other: Vector, inplace: Literal[False] = ...) -> Vector:
@@ -530,31 +528,9 @@ class Vector(AbstractArray):
                 Defaults to `False`.
         """
         warnings.warn("This gives wrong result when the start and end bins are different")
-        bins = self.to_same(other._E)
+        bins = self.to_same(other._X)
         return self.rebin(bins=bins, inplace=inplace)
 
-    # def extend_like(self, other: Vector, inplace: bool = False) -> Vector | None:
-    #     """ Resize to match the energy span of `other`.
-
-    #     Args:
-    #         other: Resize to the energy of the given vector.
-    #         inplace: Whether to perform change inplace or return a copy.
-    #             Defaults to `False`.
-    #     """
-    #     emin = min(other.E[0], self.E[0])
-    #     emax = max(other.E[-1], self.E[-1])
-    #     dE = self.E[1] - self.E[0]
-    #     E = np.arange(emin, emax, dE)
-    #     values = np.zeros_like(E)
-    #     ilow = index(E, self.E[0])
-    #     ihigh = index(E, self.E[-1])
-    #     values[ilow:ihigh+1] = self.values
-    #     if inplace:
-    #         self.values = values
-    #         self._E = E
-    #         self.verify_integrity()
-    #     else:
-    #         return self.clone(E=E, values=values)
 
     def closest(self, E: ndarray, side: str | None = 'right',
                 inplace=False) -> Vector | None:
@@ -581,17 +557,17 @@ class Vector(AbstractArray):
                 not sorted.
         """
 
-        if not np.all(self.E[:-1] <= self.E[1:]):
+        if not np.all(self.X[:-1] <= self.X[1:]):
             raise RuntimeError("x-axis not sorted.")
 
         # Convert to same units at strip
-        E_old = self.E
+        E_old = self.X
         E = self.to_same(E)
         indices = np.searchsorted(E_old, E, side=side)
 
         # Ensure that any element outside the range of E will get index
         # -1.
-        indices[indices >= len(self.E)] = 0
+        indices[indices >= len(self.X)] = 0
         indices -= 1
 
         # We need to append 0 to the end to ensure that we fill 0 if any
@@ -606,11 +582,11 @@ class Vector(AbstractArray):
 
         E *= self.units
         if inplace:
-            self._E = E
+            self._X = E
             self.values = values
             self.std = std
         else:
-            return self.clone(values=values, E=E, std=std)
+            return self.clone(values=values, X=E, std=std)
 
     def cumulative(self, factor: Union[float, str] = 1.0,
                    inplace: bool = False) -> Vector | None:
@@ -673,7 +649,7 @@ class Vector(AbstractArray):
             raise ValueError("Must have equal number of energy bins.")
         # NOTE: This automatically compares with the correct units.
         # This does not mean that self.E == other.E in magnitude.
-        if not np.allclose(self._E, other._E, **kwargs):
+        if not np.allclose(self._X, other._X, **kwargs):
             if not error:
                 return False
             raise ValueError("Must have equal energy binning.")
@@ -711,13 +687,13 @@ class Vector(AbstractArray):
 
     def to(self, unit: str, inplace: bool = False) -> Vector:
         if inplace:
-            self._E = self._E.to(unit)
+            self._X = self._X.to(unit)
             return self
 
-        new = self.clone(E=self._E.to(unit))
+        new = self.clone(X=self._X.to(unit))
         return new
 
-    def index(self, E: Unitlike) -> int:
+    def index(self, X: Unitlike) -> int:
         """ Returns the closest index corresponding to the E value
 
         Args:
@@ -726,22 +702,22 @@ class Vector(AbstractArray):
         """
         # TODO Replace with numba
         warnings.warn("Probably buggy")
-        return np.searchsorted(self.E, self.to_same(E))
+        return np.searchsorted(self.X, self.to_same(X))
 
     def set_order(self, order: str) -> None:
         """ Wrapper around numpy to set the alignment """
         self.values = self.values.copy(order=order)
-        self._E = self._E.copy(order=order)
+        self._X = self._X.copy(order=order)
 
     @property
-    def de(self) -> float:
+    def dX(self) -> float:
         if len(self) <= 1:
             raise NotImplementedError()
 
         if self.is_equidistant():
-            return self.E[1] - self.E[0]
+            return self.X[1] - self.X[0]
         else:
-            return (self.E - np.roll(self.E, 1))[1:]
+            return (self.X - np.roll(self.X, 1))[1:]
 
     def last_nonzero(self) -> int:
         """ Returns the index of the last nonzero value """
@@ -763,12 +739,19 @@ class Vector(AbstractArray):
 
     @property
     def _summary(self) -> str:
-        emin = self.E[0]
-        emax = self.E[-1]
-        de = self.de
+        emin = self.X[0]
+        emax = self.X[-1]
+        de = self.dX
         unit = f"{self.units:~}"
-        s = f"Energy: {emin} to {emax} [{unit}]\n"
-        s += f"{len(self.E)} bins with dE: {de} {unit}\n"
+        s = ''
+        s += f'Index alias: {self.metadata.xalias}\tValue alias: {self.metadata.valias}\n'
+        s += f'xlabel: {self.metadata.xlabel}\t ylabel: {self.metadata.ylabel}\n'
+        if len(self.metadata.misc) > 0:
+            s += "Metadata:\n"
+            for key, val in self.metadata.misc.items():
+                s += f'\t{key}: {val}\n'
+        s += f"Index: {emin} to {emax} [{unit}]\n"
+        s += f"{len(self.X)} bins with step: {de} {unit}\n"
         s += f"Total counts: {self.sum()}\n"
         return s
 
@@ -785,13 +768,14 @@ class Vector(AbstractArray):
                 return summary + str(self.values)
         else:
             if self.std is not None:
-                return (f"{self.values}\n{self.std}\n{self.E} "
+                return (f"{self.values}\n{self.std}\n{self.X} "
                         f"[{self.units:~}]")
             else:
-                return (f"{self.values}\n{self.E} "
+                return (f"{self.values}\n{self.X} "
                         f"[{self.units:~}]")
 
-    def clone(self, **kwargs) -> Vector:
+    def clone(self, X=None, values=None, std=None, units=None, order='C',
+              metadata=None, **kwargs) -> Vector:
         """ Copies the object.
 
         Any keyword argument will override the equivalent
@@ -803,56 +787,47 @@ class Vector(AbstractArray):
         Returns:
             The copy
         """
-        E = kwargs.pop('E', self._E)
-        values = kwargs.pop('values', self.values)
-        std = kwargs.pop('std', self.std)
-        units = kwargs.pop('units', self.units)
-        for key in kwargs.keys():
-            raise RuntimeError(f"Vector has no setable attribute {key}.")
-        return Vector(E=E, values=values, std=std, units=units)
-
-    @property
-    def E(self) -> np.ndarray:
-        return self._E.magnitude
+        X = X if X is not None else self._X
+        values = values if values is not None else self.values
+        std = std if std is not None else self.std
+        units = units if units is not None else self.units
+        metadata = metadata if metadata is not None else self.metadata
+        metadata = metadata.update(**kwargs)
+        return Vector(X=X, values=values, std=std, units=units, order=order,
+                      metadata=metadata)
 
     @property
     def units(self) -> Any:
-        return self._E.units
+        return self._X.units
+
+    @property
+    def xlabel(self) -> str:
+        return self.metadata.xlabel
+
+    @property
+    def ylabel(self) -> str:
+        return self.metadata.ylabel
+
+    @property
+    def name(self) -> str:
+        return self.metadata.name
+
+    @property
+    def X(self) -> np.ndarray:
+        return self._X.magnitude
+
+    @property
+    def __values(self) -> np.ndarray:
+        return self.values
 
     def enumerate(self) -> Iterable[Tuple[int, float, float]]:
         """ Returns an iterator over the indices and values """
-        for i, e in enumerate(self.E):
-            yield i, e, self.values[i]
+        for i, x in enumerate(self.X):
+            yield i, x, self.values[i]
 
     def unpack(self) -> tuple[np.ndarray, np.ndarray]:
         """ Returns the energy and values as separate arrays """
-        return self.E, self.values
-
-
-# class ValueLocator:
-#     def __init__(self, vector: Vector):
-#         self.vec = vector
-
-#     def __getitem__(self, value):
-#         if not isinstance(value, slice):
-#             indices = self.vec.index(value)
-#         else:
-#             start = None if value.start is None else self.vec.index(value.start)
-#             stop = None if value.stop is None else self.vec.index(value.stop)
-#             if value.step is not None:
-#                 dx = self.vec[1] - self.vec[0]
-#                 step = np.ceil(value.step / dx)
-#             else:
-#                 step = None
-#             indices = slice(start, stop, step)
-
-#         E = self.vec.E.__getitem__(indices)
-#         values = self.vec.values.__getitem__(indices)
-#         if self.vec.std is not None:
-#             std = self.vec.std.__getitem__(indices)
-#         else:
-#             std = None
-#         return self.vec.clone(E=E, values=values, std=std)
+        return self.X, self.values
 
 
 class ValueLocator:
@@ -870,7 +845,7 @@ class ValueLocator:
             case int() | float() | str() | ureg.Unit():
                 return int(self.vec.index(e))
             case slice():
-                return parse_unit_slice(e, self.vec.index, self.vec.de, len(self.vec.E))
+                return parse_unit_slice(e, self.vec.index, self.vec.dX, len(self.vec.X))
             case _:
                 raise ValueError(f"Expected slice or Unitlike, got type: {type(e)}")
 
@@ -885,7 +860,7 @@ class ValueLocator:
                 std = None
                 if self.vec.std is not None:
                     std = self.vec.std.__getitem__((i,))
-                return Vector(values=values, E=E, E_label=self.vec.E_label, std=std)
+                return self.vec.clone(values=values, X=E)
             case _:
                 raise RuntimeError("Should not happen")
 
@@ -899,9 +874,9 @@ class IndexLocator:
 
     def __getitem__(self, key):
         if True:  # len(key) == 1:
-            E = self.vector.E.__getitem__(key)
+            X = self.vector.X.__getitem__(key)
             values = self.vector.values.__getitem__(key)
-            return Vector(E=E, values=values)
+            return self.vec.clone(X=X, values=values)
         else:
             raise ValueError("Expect one integer index [i].")
 

@@ -184,11 +184,12 @@ class AbstractArray:
         name = self.__class__.__name__
         if attr.startswith("_"):
             raise AttributeError(f"'{name}' object has no attribute {attr}")
-        res = getattr(self.values, attr, None)
+        res = getattr(self.__dict__['values'], attr, None)
         if res is not None:
             return res
-        raise AttributeError(f"Neither {name} nor"
-                             f" {name}.values has '{attr}'")
+        # Can't use AttributeError as that is handled exceptionally and
+        # causes a really, reeally wierd bug
+        raise Exception(f"Neither {name} nor {name}.values has '{attr}'")
 
     def __len__(self) -> int:
         return len(self.values)

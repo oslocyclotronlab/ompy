@@ -14,6 +14,7 @@ import numpy as np
 from pathlib import Path
 import json
 from typing import Literal, overload
+import warnings
 
 
 @dataclass
@@ -23,23 +24,23 @@ class DiscreteInterpolation:
     DE: Interpolation
     AP: Interpolation
     Eff: Interpolation
-    FWHM: Interpolation
+    FWHM: Interpolation | None = None
     is_normalized: bool = False
     is_fwhm_normalized: bool = False
 
     @staticmethod
     def from_data(data: ResponseData, scale: bool = True) -> DiscreteInterpolation:
-        if not data.is_fwhm_normalized:
-            raise ValueError("FWHM must be normalized before interpolation, at least until bug is fixed in FWHM creation")
         if scale:
             data = data.scale()
         FE: FEInterpolation = FEInterpolator(data.FE).interpolate(order=9)
         SE: EscapeInterpolation = EscapeInterpolator(data.SE).interpolate()
         DE: EscapeInterpolation = EscapeInterpolator(data.DE).interpolate()
         AP: AnnihilationInterpolation = AnnihilationInterpolator(data.AP).interpolate()
-        FWHM: FWHMInterpolation = FWHMInterpolator(data.FWHM).interpolate()
+        FWHM = None
+        if data.FWHM is not None:
+            FWHM = FWHMInterpolator(data.FWHM).interpolate()
         Eff: LinearInterpolation = LinearInterpolator(data.Eff).interpolate()
-        return DiscreteInterpolation(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=True)
+        return DiscreteInterpolation(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
 
     def normalize(self, inplace: bool = False) -> DiscreteInterpolation | None:
         pass
@@ -48,18 +49,17 @@ class DiscreteInterpolation:
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[True] = ...) -> None: ...
 
     @overload
-    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> ResponseData: ...
+    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> DiscreteInterpolation: ...
 
-    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> ResponseData | None:
-        raise NotImplementedError("FWHM Must be normalized before interpolation. This is a bug in the initial creation of FWHM")
+    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
+        raise NotImplementedError()
         old = self.FWHM(energy)
-        ratio = fwhm / old  * self.FWHM.E / energy
-
+        ratio = fwhm / old
         if inplace:
-            self.FWHM = fwhm
+            self.FWHM = fwhm * ratio
             self.is_fwhm_normalized = True
         else:
-            return self.clone(FWHM=fwhm, is_fwhm_normalized=True)
+            return self.clone(FWHM=fwhm*ratio, is_fwhm_normalized=True)
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
@@ -125,7 +125,8 @@ class DiscreteInterpolation:
         self.DE.plot(ax=ax[2], **kwargs)
         self.AP.plot(ax=ax[3], **kwargs)
         self.Eff.plot(ax=ax[4], **kwargs)
-        self.FWHM.plot(ax=ax[5], **kwargs)
+        if self.FWHM is not None:
+            self.FWHM.plot(ax=ax[5], **kwargs)
 
         ax[0].set_title("FE")
         ax[1].set_title("SE")

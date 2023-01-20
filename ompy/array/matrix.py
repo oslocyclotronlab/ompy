@@ -31,6 +31,7 @@ from .vector import Vector
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
+#TODO mat*vec[:, None[ doesn't work
 
 class Matrix(AbstractArray):
     """Stores 2d array with energy axes (a matrix).
@@ -481,43 +482,6 @@ class Matrix(AbstractArray):
         # Move the bins back up
         self.to_mid_bin()
         return Eg, Ex
-
-    def projection(self, axis: Union[int, str], Emin: float | None = None,
-                   Emax: float | None = None,
-                   normalize: bool = False) -> Vector:
-        """ Returns the projection along the specified axis
-
-        Args:
-            axis: The axis to project onto. Can be 0 or 1.
-            Emin (optional): The minimum energy to be summed over.
-            Emax (optional): The maximum energy to be summed over.
-            normalize: If True, normalize the counts to 1. Defaults to False.
-
-        Raises:
-            ValueError: If axis is not in [0, 1]
-
-        Returns:
-            The projection and the energies summed onto
-        """
-        warnings.warn("projection is being deprecation in favor of mat.iloc[i, j:k]", DeprecationWarning)
-        axis = to_plot_axis(axis)
-        if axis not in (0, 1):
-            raise ValueError(f"Axis must be 0 or 1, got: {axis}")
-
-        isEx = axis == 1
-
-        selection = self.loc[:, Emin:Emax] if isEx else self.loc[Emin:Emax, :]
-        energy = self._Ex if isEx else self._Eg
-        projection = selection.sum(axis=axis)
-        if normalize:
-            projection = div0(projection, selection.sum(axis=axis).sum())
-
-        if isEx:
-            label = r"Excitation energy $E_{x}$ "
-        else:
-            label = r"$\gamma$-ray energy $E_{\gamma}$"
-
-        return Vector(values=projection, E=energy, E_label=label)
 
     def cut(self, axis: Union[int, str],
             Emin: float | None = None,
@@ -1081,6 +1045,18 @@ class Matrix(AbstractArray):
     def summary(self):
         print(self._summary)
 
+    def sum(self, axis: int | str = 'both') -> Vector | float:
+        axis = to_plot_axis(axis)
+        if axis == 2:
+            return self.values.sum()
+
+        isEx = axis == 0
+        values = self.values.sum(axis=int(not axis))
+        label = self.ylabel if isEx else self.xlabel
+        E = self.Ex if isEx else self.Eg
+        return Vector(E=E, values=values, xlabel=label)
+
+
     def __str__(self) -> str:
         summary = self._summary
         summary += "\nValues:\n" 
@@ -1159,9 +1135,9 @@ class IndexLocator:
         Ex = self.mat.Ex.__getitem__(ex)
         values = self.mat.values.__getitem__(key)
         if isinstance(eg, (int, np.integer)):
-            return Vector(values, E=Ex, E_label=self.mat.ylabel)
+            return Vector(values, E=Ex, xlabel=self.mat.ylabel)
         elif isinstance(ex, (int, np.integer)):
-            return Vector(values, E=Eg, E_label=self.mat.xlabel)
+            return Vector(values, E=Eg, xlabel=self.mat.xlabel)
         return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
 
     def linear_index(self, indices) -> Matrix:
@@ -1216,9 +1192,9 @@ class ValueLocator:
             if self.mat.std is not None:
                 std = self.mat.std.__getitem__((iex, ieg))
             if isinstance(iex, (int, np.integer)):
-                return Vector(values=values, E=Eg, E_label=self.mat.xlabel)
+                return Vector(values=values, E=Eg, xlabel=self.mat.xlabel)
             if isinstance(ieg, (int, np.integer)):
-                return Vector(values=values, E=Ex, E_label=self.mat.ylabel)
+                return Vector(values=values, E=Ex, xlabel=self.mat.ylabel)
 
             return self.mat.clone(values=values, Ex=Ex, Eg=Eg, std=std)
         else:

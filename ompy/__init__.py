@@ -18,6 +18,7 @@ else:
     u = ureg
     Q_ = ureg.Quantity
     Quantity = ureg.Quantity
+    Unit = ureg.Unit
 
     try:
         from ompy.decomposition import *

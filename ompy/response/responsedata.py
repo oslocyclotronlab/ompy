@@ -17,7 +17,7 @@ TODO: FWHM is useless. Make it "optional" for compatibility.
 
 ResponseFunctionName = Literal['Oscar2017', 'Oscar2020']
 RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2017_scale1.15",
-                      'Oscar2020': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2020"}
+                      'Oscar2020': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2020/mama_export"}
 
 
 @dataclass
@@ -43,7 +43,7 @@ class ResponseData:
     SE: Vector
     DE: Vector
     AP: Vector
-    compton: list[Vector]
+    compton: Matrix
     Eff: Vector
     FWHM: Vector | None = None
     is_normalized: bool = False
@@ -81,13 +81,12 @@ class ResponseData:
             self.SE *= SE / T
             self.DE *= DE / T
             self.AP *= AP / T
-            for i, cmp in enumerate(self.compton):
-                self.compton[i] *= compton / T
+            self.compton *= compton / T
             self.is_normalized = True
         else:
             return self.clone(FE=FE*self.FE / T, SE=SE*self.SE / T, DE=DE*self.DE / T,
                               AP=AP*self.AP / T,
-                              compton=[compton*cmp / T[i] for i, cmp in enumerate(self.compton)],
+                              compton=self.compton * compton / T,
                               is_normalized=True)
 
     def scale(self, inplace: bool = False) -> ResponseData | None:
@@ -102,8 +101,7 @@ class ResponseData:
             If inplace is True, None is returned. If inplace is False, a new ResponseData object is returned.
 
         """
-        total = self.FE + self.SE + self.DE + self.AP + self.compton_sum()
-        total_eff = total / self.Eff
+        total_eff = self.sum() / self.Eff
         # Scale all counts to the median. Not obvious if this is correct,
         # as I would have assumed all elements in total_eff corresponding to the
         # same simulations should be equal. they are not, but close.
@@ -114,12 +112,13 @@ class ResponseData:
             self.SE *= weight
             self.DE *= weight
             self.AP *= weight
-            for i in range(len(self.compton)):
-                self.compton[i] *= weight[i]
+            self.compton.values *= weight[:, None]
         else:
+            compton = self.compton.clone()
+            compton.values *= weight[:, None]
             return self.clone(FE=self.FE * weight, SE=self.SE * weight, DE=self.DE * weight,
                               AP=self.AP * weight,
-                              compton=[cmp * weight[i] for i, cmp in enumerate(self.compton)])
+                              compton=compton)
 
 
     @overload
@@ -142,8 +141,8 @@ class ResponseData:
 
     @staticmethod
     def from_path(path: Pathlike, **kwargs) -> ResponseData:
-        (FE, SE, DE, AP, Eff, *FWHM), (compton, _) = load(path, **kwargs)
-        return ResponseData(FE, SE, DE, AP, compton, Eff, FWHM)
+        (FE, SE, DE, AP, Eff, *FWHM), compton = load(path, **kwargs)
+        return ResponseData(FE, SE, DE, AP, compton, Eff, FWHM=FWHM[0] if FWHM else None)
 
     @staticmethod
     def from_db(name: ResponseFunctionName) -> ResponseData:
@@ -161,15 +160,15 @@ class ResponseData:
         self.DE.plot(ax=ax[2], **kwargs)
         self.AP.plot(ax=ax[3], **kwargs)
         self.Eff.plot(ax=ax[4], **kwargs)
-        self.FWHM.plot(ax=ax[5], **kwargs)
-        titles = ['FE', 'SE', 'DE', 'AP', 'Eff', 'FWHM']
-        for i, title in enumerate(titles):
-            ax[i].set_title(title)
+        if self.FWHM is not None:
+            self.FWHM.plot(ax=ax[5], **kwargs)
+        for i in range(6):
             ax[i].set_xlabel('')
             ax[i].set_ylabel('')
-        compton = self.compton_matrix()
-        compton.plot(ax=ax[6], **kwargs)
-        ax[7].plot(self.E, self.sum(axis=1))
+        self.compton.plot(ax=ax[6], **kwargs)
+        self.sum().plot(ax=ax[7], **kwargs)
+        ax[7].set_xlabel('')
+        ax[7].set_ylabel('')
         fig = ax[0].figure
         fig.supxlabel('E [keV]')
         fig.supylabel('Counts')
@@ -181,36 +180,27 @@ class ResponseData:
 
     @property
     def E_observed(self) -> np.ndarray:
-        i = np.argmax([len(cmp) for cmp in self.compton])
-        return self.compton[i].E
-
-    def compton_matrix(self) -> Matrix:
-        max_length = max(len(cmp) for cmp in self.compton)
-        mat = np.zeros((len(self.compton), max_length))
-        for i, cmp in enumerate(self.compton):
-            mat[i, :len(cmp)] = cmp.values
-        return Matrix(Ex=self.E, Eg=self.E_observed, values=mat,
-                      xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+        return self.compton.Eg
 
     def compton_sum(self) -> Vector:
-        return Vector(E=self.E, values=np.asarray([cmp.values.sum() for cmp in self.compton]))
+        return self.compton.sum(axis='Eg')
 
-    def sum(self, axis: int | None = None) -> float:
+    def sum(self, as_vector: bool = False) -> float | Vector:
         FE = self.FE.values
-        DE = self.DE.values
         SE = self.SE.values
+        DE = self.DE.values
         AP = self.AP.values
         cmp = self.compton_sum().values
-        if axis is None:
+        if as_vector:
             return sum(FE + DE + SE + AP + cmp)
         else:
-            return FE + DE + SE + AP + cmp
+            return Vector(E=self.E, values=FE + SE + DE + AP + cmp, name='Total')
 
     def clone(self, FE=None, DE=None, SE=None, AP=None, compton=None, Eff=None,
               FWHM=None, is_normalized=None, is_fwhm_normalized=None) -> ResponseData:
         return ResponseData(FE=FE if FE is not None else self.FE,
-                            DE=DE if DE is not None else self.DE,
                             SE=SE if SE is not None else self.SE,
+                            DE=DE if DE is not None else self.DE,
                             AP=AP if AP is not None else self.AP,
                             compton=compton if compton is not None else self.compton,
                             Eff=Eff if Eff is not None else self.Eff,

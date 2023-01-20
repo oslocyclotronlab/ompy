@@ -1,22 +1,23 @@
 from ..stubs import Pathlike
-from typing import Literal, TypeAlias, Iterable
+from typing import Literal, TypeAlias, Iterable, Any
 from pathlib import Path
-from .. import Vector
+from .. import Vector, Matrix
 from collections import Counter
 import numpy as np
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 import pandas as pd
 from os import scandir
 
 ErrorHandling: TypeAlias = Literal['ignore', 'drop', 'raise', 'rebin']
 Format = Literal['mama', 'ompy', 'numpy', 'feather', 'root']
 
+# TODO: the ompy format should save vectors correctly. Per now the metadata is discarded.
 
-def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vector, ...], tuple[Vector, np.ndarray]]:
+def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
     path = verify_path(path)
     match format:
         case 'mama':
-            discrete = load_discrete_mama(path, **kwargs)
+            discrete = load_discrete_mama(path)
             compton = load_compton_mama(path, Eg=discrete[0].E, **kwargs)
             return discrete, compton
         case 'ompy' | 'numpy':
@@ -28,21 +29,25 @@ def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vecto
         case _:
             raise ValueError(f"Unknown format {format}. Available formats are: {Format}")
 
-def load_npy(path: Pathlike, compton_name: str = 'compton.npz', discrete_name: str = 'discrete.npy') -> tuple[tuple[Vector, ...], tuple[Vector, np.ndarray]]:
+
+def load_npy(path: Pathlike, compton_name: str = 'compton.npz', discrete_name: str = 'discrete.npz') -> tuple[tuple[Vector, ...], Matrix]:
     path = Path(path)
-    comptons = np.load(path / compton_name)
-    discretes = np.load(path / discrete_name)
-    fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
-    E = discretes['E']
-    discrete = (Vector(E=E, values=discretes[field]) for field in fields)
-    E_observed = comptons['E_observed']
-    compton = (Vector(E=E_observed, values=c) for c in comptons.files if c != 'E_observed')
-    # TODO Check for corruption
+    with np.load(path / compton_name) as comptons:
+        E_observed = comptons['E_observed']
+        E_true = comptons['E_true']
+        values = comptons['values']
+    with np.load(path / discrete_name) as discretes:
+        fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
+        E = discretes['E']
+        discrete = tuple(Vector(E=E, values=discretes[field], name=field) for field in fields)
+    compton = Matrix(Ex=E_true, Eg=E_observed, values=values)
+    if not np.allclose(E_true, E):
+        raise RuntimeError("E_true != E. Probably save corruption.")
     return discrete, compton
 
 
 def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int] = None,
-                      handle_error: ErrorHandling = 'raise') -> tuple[list[Vector], np.ndarray]:
+                      handle_error: ErrorHandling = 'raise') -> Matrix:
     """ Load Compton response data from files.
 
     Parameters
@@ -59,21 +64,21 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
     path = Path(path)
     compton: list[Vector] = []
     # This energy is the true gamma energy. The compton vectors are indexed by the measured gamma energy
-    E: list[int] = []
+    Eg_: list[int] = []
     prefix_len = len(pattern.split('*')[0])
-    for file in path.glob(pattern):
+    for file in tqdm(path.glob(pattern)):
         e = int(file.stem[prefix_len:])
         if Eg is not None:
             if e not in Eg:
                 continue
-        E.append(e)
+        Eg_.append(e)
         compton.append(Vector.from_path(file))
     if not len(compton):
         raise FileNotFoundError(f'No files found with glob pattern {pattern} in {path}')
-    if Eg is not None and set(E) != set(Eg):
-        raise FileNotFoundError(f'Not all files found. Missing: {set(Eg) - set(E)}')
+    if Eg is not None and set(Eg_) != set(Eg):
+        raise FileNotFoundError(f'Not all files found. Missing: {set(Eg) - set(Eg_)}')
     # Sort and check for equal calibration
-    E, compton = zip(*sorted(zip(E, compton), key=lambda x: x[0]))
+    E, compton = zip(*sorted(zip(Eg_, compton), key=lambda x: x[0]))
     E = list(E)
     compton = list(compton)
     calibrations = [(i, tuple(cmp.calibration().values())) for i, cmp in enumerate(compton)]
@@ -107,7 +112,15 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
         else:
             raise ValueError(f'Unknown error handling {handle_error}')
 
-    return compton, np.asarray(E)
+    # Fix the lengths
+    i = np.argmax([len(cmp) for cmp in compton])
+    max_length = len(compton[i])
+    mat = np.zeros((len(compton), max_length))
+    for i, cmp in enumerate(compton):
+        mat[i, :len(cmp)] = cmp.values
+    return Matrix(Ex=E, Eg=compton[i].E, values=mat,
+                  xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+
 
 
 def load_discrete_mama(path: Pathlike, name: str = 'resp.dat', read_fwhm: bool = True) -> tuple[Vector, Vector, Vector, Vector, Vector, Vector | None]:
@@ -143,15 +156,15 @@ def load_discrete_mama(path: Pathlike, name: str = 'resp.dat', read_fwhm: bool =
     df['E'] = df['E'].astype(int)
     assert len(df) == number_of_lines, f"Corrupt {path / name}"
     E = df['E'].to_numpy()
-    FE = Vector(E=E, values=df['FE'].to_numpy())
-    DE = Vector(E=E, values=df['DE'].to_numpy())
-    SE = Vector(E=E, values=df['SE'].to_numpy())
-    AP = Vector(E=E, values=df['AP'].to_numpy())
-    Eff = Vector(E=E, values=df['Eff'].to_numpy())
+    FE = Vector(E=E, values=df['FE'].to_numpy(), name='FE')
+    SE = Vector(E=E, values=df['SE'].to_numpy(), name='SE')
+    DE = Vector(E=E, values=df['DE'].to_numpy(), name='DE')
+    AP = Vector(E=E, values=df['AP'].to_numpy(), name='AP')
+    Eff = Vector(E=E, values=df['Eff'].to_numpy(), name='Eff')
     FWHM = None
     if read_fwhm:
         FWHM = Vector(E=E, values=df['FWHM'].to_numpy())
-    return FE, DE, SE, AP, Eff, FWHM
+    return FE, SE, DE, AP, Eff, FWHM
 
 
 #### SAVING ####
@@ -174,16 +187,24 @@ def save(path: Pathlike, data, format: Format = 'ompy', **kwargs) -> None:
 
 def save_npy(path: Pathlike, data, exists_ok: bool = False) -> None:
     path = Path(path)
-    if not exists_ok and path.exists():
-        raise FileExistsError(f'File {path} already exists.')
-    mapping = {e: cmp for e, cmp in zip(data.E, data.compton)}
-    mapping['E_observed'] = data.E_observed
-    np.savez(path / 'compton.npz', **mapping)
+    path.mkdir(parents=True, exist_ok=True)
+    fname = path / 'compton.npz'
+    if fname.exists() and not exists_ok:
+        raise FileExistsError(f'File {fname} already exists.')
+    mapping = {'values': data.compton.values, 'E_observed': data.E_observed,
+               'E_true': data.E}
+    np.savez(fname, **mapping)
+
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
-    arrays = (eval('data.'+name+'.values') for name in fields)
+    arrays = [getattr(data, name).values for name in fields]
     E = data.E
     mapping = {k: v for k, v in zip(fields, arrays)}
-    np.savez(path / 'discrete.npz', **mapping)
+    mapping['E'] = E
+    fname = path / 'discrete.npz'
+    if fname.exists() and not exists_ok:
+        raise FileExistsError(f'File {fname} already exists.')
+    np.savez(fname, **mapping)
+
 
 def convert_mama(output: Pathlike, path: Pathlike | None = None, data: Any | None = None, exist_ok: bool = False, **kwargs) -> None:
     """ Convert MAMA files to ompy format. """
@@ -198,6 +219,7 @@ def convert_mama(output: Pathlike, path: Pathlike | None = None, data: Any | Non
     output = Path(output)
     output.mkdir(exist_ok=exist_ok, parents=True)
     save(output, data, format='ompy', exist_ok=exist_ok)
+
 
 def verify_path(path: Pathlike) -> Path:
     path = Path(path)
