@@ -1,23 +1,20 @@
+from __future__ import annotations
 import numpy as np
 import warnings
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from .index_fn import _index_left, _index_mid, _index_mid_uniform, is_monotone, is_uniform, is_length_congruent
+from .. import float64
+from .rebin import _rebin_uniform_left_left, Preserve
+from typing import TypeAlias, Literal, Type
 
-try:
-    from numba import njit, int32, float32, float64
-    from numba.experimental import jitclass
-except ImportError:
-    warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
-    int32 = np.int32
-    float32 = np.float32
-    float64 = np.float64
+"""
+TODO Mixin architecture is not quite right. Read up.
+-[ ] Implement binary search
+-[ ] Implement conversion methods
+How is rebinning handled?
+"""
 
-    def nop_decorator(func, *aargs, **kkwargs):
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        return wrapper
-    njit = nop_decorator
-    jitclass = nop_decorator
 
 
 class Index(ABC):
@@ -28,10 +25,31 @@ class Index(ABC):
         assert is_monotone(bins), "Bins must be monotone."
         self.X = bins
 
+
+    def rebin(self, other: Index | np.ndarray, values: np.ndarray, preserve: Preserve = 'counts'):
+        match other:
+            case Index():
+                pass
+            case _:
+                other = to_index(values, 'left')
+        return self._rebin(other, values, preserve=preserve)
+
+    @abstractmethod
+    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+        pass
+
     @abstractmethod
     def index(self, x: float64) -> int:
         """ Index of the bin containing x """
         pass
+
+    def __getitem__(self, i: int) -> float:
+        return self.X[i]
+
+
+class Edge(ABC):
+    def __init__(self, boundary: float):
+        self.boundary = boundary
 
     @abstractmethod
     def left_edge(self, i: int) -> float64:
@@ -62,112 +80,217 @@ class Index(ABC):
         """ Check if index is in bounds """
         return self.leftmost <= x <= self.rightmost
 
+    @abstractmethod
+    def is_left(self) -> bool: ...
+
+    @abstractmethod
+    def to_left(self) -> Edge: ...
+
+    @abstractmethod
+    def to_mid(self) -> Edge: ...
+
+    @abstractmethod
+    def other_edge_cls(self) -> Type[Index]: ...
+
+
     def assert_inbounds(self, x: float64):
         """ Assert that x is in bounds """
         if x < self.leftmost:
             raise ValueError(f"{x} is smaller than leftmost edge {self.leftmost}")
-        if x > self.rightmost:
+        if x >= self.rightmost:
             raise ValueError(f"{x} is larger than rightmost edge {self.rightmost}")
 
 
-class LeftEdge:
+class Left(Edge):
     def left_edge(self, i: int) -> float64:
         return self.X[i]
 
     def right_edge(self, i: int) -> float64:
-        return self.X[i] + self.dX
+        return self.X[i] + self.step(i)
 
     def mid(self, i: int) -> float64:
-        return self.X[i] + self.dX / 2
+        return self.X[i] + self.step(i) / 2
+
+    def to_left(self) -> Index:
+        return self
+
+    def to_mid(self) -> Index:
+        bins = self.X + self.steps() / 2
+        return self.other_edge_cls()(bins)
+
+    def index(self, x: float64) -> int:
+        self.assert_inbounds(x)
+        return _index_left(self.X, x)
+
+    def is_left(self) -> bool:
+        return True
 
 
-class MidEdge:
+class Mid(Edge):
     def left_edge(self, i: int) -> float64:
-        return self.X[i] - self.dX / 2
+        return self.X[i] - self.step(i) / 2
 
     def right_edge(self, i: int) -> float64:
-        return self.X[i] + self.dX / 2
+        return self.X[i] + self.step(i) / 2
 
     def mid(self, i: int) -> float64:
         return self.X[i]
 
+    def to_mid(self) -> Index:
+        return self
 
-class UniformIndex(ABC, Index):
+    def to_left(self) -> Index:
+        bins = self.X - self.steps() / 2
+        return self.other_edge_cls()(bins)
+
+    def index(self, x: float64) -> int:
+        self.assert_inbounds(x)
+        return _index_mid_uniform(self.X, x)
+
+    def is_left(self) -> bool:
+        return False
+
+
+class Layout(ABC):
+    def calibration(self) -> tuple[float, float]:
+        """ Energy calibration relative to channel number"""
+        raise NotImplementedError()
+
+    @abstractmethod
+    def steps(self) -> float64: ...
+
+    @abstractmethod
+    def step(self, i: int) -> float64: ...
+
+    @abstractmethod
+    def is_uniform(self) -> bool: ...
+
+
+class Uniform(Layout):
     """ Index for equidistant binning """
     def __init__(self, bins: np.ndarray):
         super().__init__(bins)
-        assert is_equidistant(bins)
+        assert is_uniform(bins)
         self.dX = bins[1] - bins[0]
 
-    @property
-    def step(self) -> float64:
+    def step(self, i: int) -> float64:
         return self.dX
 
+    def steps(self) -> np.ndarray:
+        return np.repeat(self.dX, len(self))
 
-class LeftUniformIndex(UniformIndex, LeftEdge):
+    def is_uniform(self) -> bool:
+        return True
+
+    def is_congruent(self, other) -> bool:
+        if not is_length_congruent(self.X, other.X):
+            return False
+        if not other.uniform():
+            return False
+        dx = self.dX
+        dy = other.dX
+        if np.isclose(dx, dy) and np.isclose(self[0] % dx, other[0] % dy):
+            return True
+        return False
+
+
+class LeftUniformIndex(Left, Uniform, Index):
     """ Index for left-binning """
     def __init__(self, bins: np.ndarray):
         super().__init__(bins)
 
-    def index(self, x: float64) -> int:
-        self.assert_inbounds(x)
-        i = 0
-        while i < len(self.X):
-            if x > self.X[i]:
-                return i
-            i += 1
-        return i - 1
+    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+        if not other.is_uniform():
+            raise NotImplementedError()
+        if not other.is_left():
+            other_ = other.to_left()
+            new = _rebin_uniform_left_left(self.X, other_.X, values, preserve=preserve)
+        else:
+            new = _rebin_uniform_left_left(self.X, other.X, values, preserve=preserve)
+        return other, new
+
+    def other_edge_cls(self) -> Type[Index]:
+        return MidUniformIndex
 
 
-class MidUniformIndex(UniformIndex, MidEdge):
+class MidUniformIndex(Mid, Uniform, Index):
     """ Index for uniform mid-binning """
     def __init__(self, bins: np.ndarray):
         super().__init__(bins)
 
-    def index(self, x: float64) -> int:
-        raise NotImplementedError("Not implemented yet")
-        self.assert_inbounds(x)
-        i = 0
-        while i < len(self.X):
-            if self.X[i] > x:
-                return i - 1
-            i += 1
-        return i - 1
+    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+        if not other.is_uniform():
+            raise NotImplementedError()
+        this = self.to_left()
+        if not other.is_left():
+            other_ = other.to_left()
+            new = _rebin_uniform_left_left(this.X, other_.X, values, preserve=preserve)
+        else:
+            new = _rebin_uniform_left_left(this.X, other.X, values, preserve=preserve)
+        return other, new
+
+    def other_edge_cls(self) -> Type[Index]:
+        return LeftUniformIndex
 
 
-class NonUniformIndex(ABC, Index):
+class NonUniform(Layout):
     """ Index for non-equidistant binning """
     def __init__(self, bins: np.ndarray):
         super().__init__(bins)
+        self.dX = np.diff(self.X)
 
+    def is_uniform(self) -> bool:
+        return False
 
-class LeftNonUniformIndex(NonUniformIndex, LeftEdge):
-    def __init__(self, bins: np.ndarray):
-        super().__init__(bins)
+    def step(self, i: int) -> np.float64:
+        return self.dX[i]
 
-    def index(self, x: float64) -> int:
-        raise NotImplementedError("Not implemented yet")
+    def steps(self) -> np.ndarray:
+        return self.dX
 
-
-class MidNonUniformIndex(NonUniformIndex, MidEdge):
-    def __init__(self, bins: np.ndarray):
-        super().__init__(bins)
-
-    def index(self, x: float64) -> int:
+    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
         raise NotImplementedError()
 
 
-@njit
-def is_monotone(x: np.ndarray) -> bool:
-    """ Check if x is strictly monotone increasing """
-    for i in range(len(x) - 1):
-        if x[i] >= x[i + 1]:
-            return False
-    return True
+class LeftNonUniformIndex(Left, NonUniform, Index):
+    def __init__(self, bins: np.ndarray):
+        super().__init__(bins)
+
+    def index(self, x: float64) -> int:
+        self.assert_inbounds(x)
+        return _index_left(self.X, x)
+
+    def other_edge_cls(self) -> Type[Index]:
+        return MidNonUniformIndex
 
 
-@njit
-def is_equidistant(X: np.ndarray) -> bool:
-    """ Check if X is equidistant """
-    dX = X[1] - X[0]
-    return np.allclose(X[1:] - X[:-1], dX)
+class MidNonUniformIndex(Mid, NonUniform, Index):
+    def __init__(self, bins: np.ndarray):
+        super().__init__(bins)
+
+    def index(self, x: float64) -> int:
+        self.assert_inbounds(x)
+        return _index_mid(self.X, x)
+
+    def other_edge_cls(self) -> Type[Index]:
+        return LeftNonUniformIndex
+
+
+
+Edges: TypeAlias = Literal['left', 'mid']
+def to_index(X: np.ndarray, edge: Edges = 'left') -> Index:
+    X = np.asarray(X)
+    if edge not in {'left', 'mid'}:
+        raise ValueError(f"`edge` must be on of {Edges} not {edge}")
+    if not is_monotone(X):
+        raise ValueError("Indices must be monotone")
+    if is_uniform(X):
+        if edge == 'left':
+            return LeftUniformIndex(X)
+        else:
+            return MidUniformIndex(X)
+    else:
+        if edge == 'left':
+            return LeftNonUniformIndex(X)
+        else:
+            return MidNonUniformIndex(X)

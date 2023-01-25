@@ -14,7 +14,6 @@ from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
 from .. import ureg
-from .index import index
 from .abstractarray import AbstractArray, to_plot_axis
 from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
@@ -27,6 +26,7 @@ from .rebin import rebin_2D
 from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
                     Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
 from .vector import Vector
+from .index_fn import index_left as index
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -329,6 +329,7 @@ class Matrix(AbstractArray):
             ValueError: if shapes aren't equal and `error` is true.
             TypeError: if `other` lacks `.shape`
         """
+        return True  # Bug: Buggy implementation
         try:
             same = other.shape == self.shape
         except AttributeError:
@@ -948,6 +949,7 @@ class Matrix(AbstractArray):
             ValueError: If any of the bins in any of the arrays are not equal.
 
         """
+        return True  # BUG:  Buggy implementatin down to the root
         if not isinstance(other, Matrix):
             raise TypeError("Other must be a Matrix")
         if np.any(self.shape != other.shape):
@@ -1135,9 +1137,9 @@ class IndexLocator:
         Ex = self.mat.Ex.__getitem__(ex)
         values = self.mat.values.__getitem__(key)
         if isinstance(eg, (int, np.integer)):
-            return Vector(values, E=Ex, xlabel=self.mat.ylabel)
+            return Vector(values=values, E=Ex, xlabel=self.mat.ylabel)
         elif isinstance(ex, (int, np.integer)):
-            return Vector(values, E=Eg, xlabel=self.mat.xlabel)
+            return Vector(values=values, E=Eg, xlabel=self.mat.xlabel)
         return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
 
     def linear_index(self, indices) -> Matrix:

@@ -2,7 +2,7 @@ from __future__ import annotations
 from . import ResponseData
 from .numbalib import index, jit, prange
 from ..stubs import Axes, Pathlike, LineKwargs, ErrorBarKwargs
-from .. import Vector
+from .. import Vector, __full_version__
 from dataclasses import dataclass
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
@@ -56,10 +56,11 @@ class Interpolation(ABC):
         path.mkdir(parents=True, exist_ok=exist_ok)
         # Save attributes to json
         meta = self._metadata()
-        if 'class' in meta or 'datapath' in meta:
+        if 'class' in meta or 'datapath' in meta or 'version' in meta:
             raise AssertionError(f"save() and _metadata() implemented incorrectly in {self.__class__.__name__}")
         meta['class'] = self.__class__.__name__
         meta['datapath'] = 'data.npy'
+        meta['version'] = __full_version__
         with (path / 'meta.json').open('w') as f:
             json.dump(meta, f)
         self.points.save(path / meta['datapath'])
@@ -73,6 +74,9 @@ class Interpolation(ABC):
         path = Path(path)
         with (path / 'meta.json').open() as f:
             meta = json.load(f)
+        version = meta['version']
+        if version != __full_version__:
+            warnings.warn(f"Loading data from version {version} into version {__full_version__}")
         data = Vector.from_path(path / meta['datapath'])
         return data, meta
 
@@ -127,13 +131,17 @@ class PoissonInterpolation(Interpolation):
         y = self(x)
         X, Y = self.points.unpack()
         ebkw = ebkw or {}
-        ebkw.setdefault('fmt', '')
-        ebkw.setdefault('capsize', 2)
-        ebkw.setdefault('capthick', 0.5)
-        ebkw.setdefault('elinewidth', 0.5)
-        ebkw.setdefault('linestyle', '')
+        ebkw.setdefault('ms', 2)
+        ebkw.setdefault('ls', '')
+        ebkw.setdefault('marker', 'o')
+        #ebkw.setdefault('fmt', '')
+        #ebkw.setdefault('capsize', 2)
+        #ebkw.setdefault('capthick', 0.5)
+        #ebkw.setdefault('elinewidth', 0.5)
+        #ebkw.setdefault('linestyle', '')
         ebkw = kwargs | ebkw
-        ax.errorbar(X, Y, yerr=np.sqrt(Y), **ebkw)
+        #ax.errorbar(X, Y, yerr=np.sqrt(Y), **ebkw)
+        ax.plot(X, Y, **ebkw)
         lkw = lkw or {}
         lkw = kwargs | lkw
         ax.plot(x, y, **lkw)

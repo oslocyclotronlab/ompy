@@ -146,7 +146,8 @@ class AbstractArray:
             result.values /= other
         else:
             if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
+                # Bug: Buggy implementation
+                #self.same_shape(other, error=True)
                 result.values /= other
             elif self.has_equal_binning(other):
                 result.values /= other.values

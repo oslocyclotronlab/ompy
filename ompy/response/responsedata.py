@@ -74,19 +74,19 @@ class ResponseData:
         In the derivation most normalization factors disappear, and we are left with
                                     p_i = w_i * c_i / sum(w_i * c_i)
         """
-        warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
+
         T = compton*self.compton_sum() + FE*self.FE + SE*self.SE + DE*self.DE + AP*self.AP
         if inplace:
             self.FE *= FE / T
             self.SE *= SE / T
             self.DE *= DE / T
             self.AP *= AP / T
-            self.compton *= compton / T
+            self.compton *= compton / T[:, None]
             self.is_normalized = True
         else:
             return self.clone(FE=FE*self.FE / T, SE=SE*self.SE / T, DE=DE*self.DE / T,
                               AP=AP*self.AP / T,
-                              compton=self.compton * compton / T,
+                              compton=self.compton * compton / T[:, None],
                               is_normalized=True)
 
     def scale(self, inplace: bool = False) -> ResponseData | None:
@@ -171,7 +171,8 @@ class ResponseData:
         ax[7].set_ylabel('')
         fig = ax[0].figure
         fig.supxlabel('E [keV]')
-        fig.supylabel('Counts')
+        label = 'Probability' if self.is_normalized else 'Counts'
+        fig.supylabel(label)
         return ax
 
     @property

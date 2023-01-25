@@ -12,3 +12,5 @@ from .. import USE_GPU
 
 if USE_GPU:
     from .comptongpu import *
+
+from .response_new import Response as ResponseNew

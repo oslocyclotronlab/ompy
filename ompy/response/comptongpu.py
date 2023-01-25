@@ -71,18 +71,24 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
     Returns:
         Matrix: Interpolated Compton probabilities
     """
-    assert p.is_normalized(), "ResponseData must be normalized"
-    assert p.is_fwhm_normalized(), "ResponseData must be FWHM normalized"
+    if not p.is_normalized:
+        p = p.normalize()
 
-    if p.E[0] > E[0] or p.E[-1] < E[-1]:
-        raise ValueError("Compton interpolation range out of bounds")
-    compton: Matrix = p.compton_matrix()
+    compton: Matrix = p.compton
     E_observed: VO = compton.Eg
     E_true: VT = compton.Ex
     sigma: VO = sigma(E_observed)
 
     if len(E) > len(E_observed):
-        raise ValueError("Requested energy resolution too fine for interpolation.")
+        raise ValueError("Requested energy resolution too fine for interpolation.\n"
+                         f"Min bin width {E_observed[1] - E_observed[0]} keV, "
+                         f"requested {E[1] - E[0]} keV.\n"
+                         f"Max number of bins {len(E_observed)}, requested {len(E)}.")
+
+    if E[0] < E_true[0]:
+        raise ValueError(f"Requested energy below lowest true energy, {E[0]} < {E_true[0]}")
+    if E[-1] > E_true[-1]:
+        raise ValueError(f"Requested energy above highest true energy, {E[-1]} > {E_true[-1]}")
 
     R = _interpolate(compton.values, E, E_observed, E_true, sigma, nsigma)
     # These ifs are for debugging

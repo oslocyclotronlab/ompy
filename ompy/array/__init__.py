@@ -1,4 +1,4 @@
-from .index import index
+from .index import *
 from .abstractarray import *
 from .filehandling import *
 from .matrix import *

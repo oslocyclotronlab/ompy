@@ -29,7 +29,7 @@ def loglerp(X, a, b, Y1, Y2):
     return (1 - w) * Y1 + w * Y2
 
 
-class EscapeInterpolation(PoissonInterpolation):
+class EscapeInterpolation(Interpolation):
     def __init__(self, points: Vector, linear: LinearInterpolation, gf3: GF3Interpolation,
                  linear_to: float):
         super().__init__(points)
@@ -50,7 +50,7 @@ class EscapeInterpolation(PoissonInterpolation):
         return {
             "linear_to": self.linear_to,
             "lerppath": 'lerp',
-            "gf3path": 'gf3'
+            "gf3path": 'gf3',
         }
 
     @classmethod
@@ -59,7 +59,8 @@ class EscapeInterpolation(PoissonInterpolation):
         points, meta = Interpolation._load(path)
         gf3 = GF3Interpolation.from_path(path / meta['gf3path'])
         linear = LinearInterpolation.from_path(path / meta['lerppath'])
-        return cls(points, linear, gf3, meta['linear_to'])
+        obj = cls(points, linear, gf3, meta['linear_to'])
+        return obj
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
@@ -67,6 +68,17 @@ class EscapeInterpolation(PoissonInterpolation):
         meta = self._metadata()
         self.linear.save(path / meta['lerppath'])
         self.gf3.save(path / meta['gf3path'])
+
+    def __str__(self) -> str:
+       s = "EscapeInterpolation\n"
+       s += f"\tLinear to: {self.linear_to}\n"
+       gf3 = str(self.gf3)
+       # add tab after each newline in gf3
+       gf3 = gf3.replace("\n", "\n\t\t")
+       s += f"\tGF3: {gf3}\n"
+       s += f"\tLogsitic lerp ({self.linear_to}, 100)\n"
+       return s
+
 
 
 class EscapeInterpolator(Interpolator):
@@ -122,21 +134,29 @@ def fwhm_jac(E: np.ndarray, a0: float, a1: float, a2: float) -> np.ndarray:
 
 
 class FWHMInterpolation(Interpolation):
-    def __init__(self, points: Vector, a0: float, a1: float, a2: float, cov: np.ndarray | None = None):
+    def __init__(self, points: Vector, a0: float, a1: float, a2: float, C: float = 1.0, cov: np.ndarray | None = None):
         super().__init__(points)
         self.a0 = a0
         self.a1 = a1
         self.a2 = a2
+        self.C = C
         self.cov = cov
 
     def eval(self, points: np.ndarray) -> np.ndarray:
-        return fwhm(points, self.a0, self.a1, self.a2)
+        return self.C*fwhm(points, self.a0, self.a1, self.a2)
+
+    def scale(self, C: float, inplace=False) -> FWHMInterpolation | None:
+        if inplace:
+            self.C = C
+            return self
+        return FWHMInterpolation(self.points, self.a0, self.a1, self.a2, C=C, cov=self.cov)
 
     def _metadata(self) -> dict[str, any]:
         meta =  {
             "a0": self.a0,
             "a1": self.a1,
-            "a2": self.a2
+            "a2": self.a2,
+            "C": self.C
         }
         if self.cov is not None:
             meta['covpath'] = 'cov.npy'
@@ -147,8 +167,9 @@ class FWHMInterpolation(Interpolation):
         path = Path(path)
         points, meta = Interpolation._load(path)
         a0, a1, a2 = meta["a0"], meta["a1"], meta["a2"]
+        C = meta["C"]
         cov = np.load(path / meta['covpath']) if 'covpath' in meta else None
-        return FWHMInterpolation(points, a0, a1, a2, cov=cov)
+        return FWHMInterpolation(points, a0, a1, a2, C=C, cov=cov)
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
@@ -158,14 +179,19 @@ class FWHMInterpolation(Interpolation):
             np.save(path / meta['covpath'], self.cov)
 
     def __repr__(self) -> str:
-        return f"FWHMInterpolation({self.a0}, {self.a1}, {self.a2})"
+        return f"FWHMInterpolation({self.a0}, {self.a1}, {self.a2}, {self.C})"
 
     def __str__(self) -> str:
-        err = np.sqrt(np.diag(self.cov))
-        a0 = f"{self.a0: .2e} ± {err[0]: .1e}"
-        a1 = f"{self.a1: .2e} ± {err[1]: .1e}"
-        a2 = f"{self.a2: .2e} ± {err[2]: .1e}"
-        return f"FWHMInterpolation:\n a0: {a0}\n a1: {a1}\n a2: {a2}"
+        if self.cov is not None:
+            err = np.sqrt(np.diag(self.cov))
+            a0 = f"{self.a0: .2e} ± {err[0]: .1e}"
+            a1 = f"{self.a1: .2e} ± {err[1]: .1e}"
+            a2 = f"{self.a2: .2e} ± {err[2]: .1e}"
+        else:
+            a0 = f"{self.a0: .2e}"
+            a1 = f"{self.a1: .2e}"
+            a2 = f"{self.a2: .2e}"
+        return f"FWHMInterpolation:\n a0: {a0}\n a1: {a1}\n a2: {a2}\n C: {self.C}"
 
 
 class FWHMInterpolator(Interpolator):

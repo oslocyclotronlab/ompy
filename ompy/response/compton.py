@@ -157,6 +157,9 @@ def interpolate_compton(p: ResponseData, E: np.ndarray, sigma , nsigma: int = 6)
     Returns:
         Matrix: Interpolated Compton probabilities
     """
+    if not p.is_normalized:
+        raise ValueError("ResponseData must be normalized")
+
     if p.E[0] > E[0] or p.E[-1] < E[-1]:
         raise ValueError("Compton interpolation range out of bounds")
     compton: ComptonList = make_compton_list(p)

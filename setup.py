@@ -148,9 +148,9 @@ ext_modules = [
                   extra_link_args=extra_link_args,
                   include_dirs=[numpy.get_include()]
                   ),
-        Extension("ompy.array.rebin", ["ompy/array/rebin.pyx"], include_dirs=[numpy.get_include()]),
-        Extension("ompy.array.index", ["ompy/array/index.pyx"], include_dirs=[numpy.get_include()]),
-        Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
+        #Extension("ompy.array.rebin", ["ompy/array/rebin.pyx"], include_dirs=[numpy.get_include()]),
+        #Extension("ompy.array.index", ["ompy/array/index.pyx"], include_dirs=[numpy.get_include()]),
+        #Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
         ]
 
 ext_modules_pybind11 = [

@@ -51,6 +51,7 @@ else:
             warnings.warn("Numba.CUDA could not be imported. GPU acceleration will not be available")
     except ImportError:
         warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
+    from .numbalib import jit, njit, nop_nop, int32, float32, float64, prange
 
     # Simply import all functions and classes from all files to make them
     # available at the package level
@@ -67,7 +68,7 @@ else:
     from .ensemble import Ensemble
     from . import response
     from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
-    from .gauss_smoothing import *
+    #from .gauss_smoothing import *
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor
     from .action import Action

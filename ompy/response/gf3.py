@@ -48,14 +48,14 @@ class GSF3:
             if A[i] < 0 or B[i] < 0:
                 out[i] = np.inf
             else:
-                out[i] = np.exp(C * (A[i] ** (-g) + B[i] ** (-g)) ** (-1 / g))
+                out[i] = np.exp(C*(A[i] ** (-g) + B[i] ** (-g)) ** (-1 / g))
         return out
 
 
 class GF3Interpolation(Interpolation):
-    def __init__(self, points: Vector, a: float, b: float, c: float, d: float, e: float, f: float, g: float):
+    def __init__(self, points: Vector, a: float, b: float, c: float, d: float, e: float, f: float, g: float, C: float):
         super().__init__(points)
-        self.gsf3 = GSF3(a, b, c, d, e, f, g, 1.0)
+        self.gsf3 = GSF3(a, b, c, d, e, f, g, C)
 
     def eval(self, E: np.ndarray) -> np.ndarray:
         return self.gsf3.call(E)
@@ -67,14 +67,15 @@ class GF3Interpolation(Interpolation):
                 "d": self.gsf3.d,
                 "e": self.gsf3.e,
                 "f": self.gsf3.f,
-                "g": self.gsf3.g}
+                "g": self.gsf3.g,
+                'C': self.gsf3.C}
 
     @classmethod
     def from_path(cls, path: Pathlike) -> GF3Interpolation:
         path = Path(path)
         points, meta = Interpolation._load(path)
-        a, b, c, d, e, f, g = meta["a"], meta["b"], meta["c"], meta["d"], meta["e"], meta["f"], meta["g"]
-        return GF3Interpolation(points, a,b,c,d,e,f,g)
+        a, b, c, d, e, f, g, C = meta["a"], meta["b"], meta["c"], meta["d"], meta["e"], meta["f"], meta["g"], meta['C']
+        return GF3Interpolation(points, a,b,c,d,e,f,g, C)
 
 
     def __str__(self) -> str:
@@ -93,18 +94,19 @@ class GF3Interpolation(Interpolation):
 class GF3Interpolator(Interpolator):
     def interpolate(self) -> GF3Interpolation:
         x, y = self.x, self.y
-        p0 = [1.5, -0.5, 0.05, 0.5, 0.3, 0.08, 1.8]
+        C = 10*np.log10(np.max(y))
+        p0 = [1.5, -0.5, 0.05, 0.5, 0.3, 0.08, 13, C]
         popt, pcov = curve_fit(gf3, x, y, p0=p0, jac=gf3_jac, maxfev=int(1e6))
         self.cov = pcov
         return GF3Interpolation(self.points, *popt)
 
 
-def jacobian(fn, x, a, b, c, d, e, f, g):
+def jacobian(fn, x, a, b, c, d, e, f, g, C):
     # Numba.njit complains a lot about lambdify and sympy, so
     # the code is not nice nor general.
-    df = [diff(fn, s) for s in (a, b, c, d, e, f, g)]
-    df_l = [lambdify((x, a, b, c, d, e, f, g), dfi) for dfi in df]
-    fnc = [njit(dfi) for dfi in df_l]
+    df = [diff(fn, s) for s in (a, b, c, d, e, f, g, C)]
+    df_l = [lambdify((x, a, b, c, d, e, f, g, C), dfi) for dfi in df]
+    #fnc = [njit(dfi) for dfi in df_l]
     f1 = njit(df_l[0])
     f2 = njit(df_l[1])
     f3 = njit(df_l[2])
@@ -112,12 +114,13 @@ def jacobian(fn, x, a, b, c, d, e, f, g):
     f5 = njit(df_l[4])
     f6 = njit(df_l[5])
     f7 = njit(df_l[6])
+    f8 = njit(df_l[7])
 
     @njit
-    def foo(x, a, b, c, d, e, f, g):
-        return np.vstack((f1(x, a, b, c, d, e, f, g), f2(x, a, b, c, d, e, f, g), f3(x, a, b, c, d, e, f, g),
-                          f4(x, a, b, c, d, e, f, g), f5(x, a, b, c, d, e, f, g), f6(x, a, b, c, d, e, f, g),
-                          f7(x, a, b, c, d, e, f, g))).T
+    def foo(x, a, b, c, d, e, f, g, C):
+        return np.vstack((f1(x, a, b, c, d, e, f, g, C), f2(x, a, b, c, d, e, f, g, C), f3(x, a, b, c, d, e, f, g, C),
+                          f4(x, a, b, c, d, e, f, g, C), f5(x, a, b, c, d, e, f, g, C), f6(x, a, b, c, d, e, f, g, C),
+                          f7(x, a, b, c, d, e, f, g, C), f8(x, a, b, c, d, e, f, g, C))).T
 
     return foo
 
@@ -128,20 +131,20 @@ def jacobian(fn, x, a, b, c, d, e, f, g):
 # we use sympy to do it for us and then jit the result.
 # Yields very fast code:).
 def define_gf3():
-    from sympy.abc import x, a, b, c, d, e, f, g
+    from sympy.abc import x, a, b, c, d, e, f, g, C
     x1 = log(x / 1e2)
     x2 = log(x / 1e6)
 
     f1 = a + b * x1 + c * x1 * x1
     f2 = d + e * x2 + f * x2 * x2
-    fg = exp((f1 ** (-g) + f2 ** (-g)) ** (-1 / g))
-    return fg, (x, a, b, c, d, e, f, g)
+    fg = exp(C*(f1 ** (-g) + f2 ** (-g)) ** (-1 / g))
+    return fg, (x, a, b, c, d, e, f, g, C)
 
 
 def define_gf3_jac():
-    fg, (x, a, b, c, d, e, f, g) = define_gf3()
-    jac = jacobian(fg, x, a, b, c, d, e, f, g, )
-    func = njit(lambdify((x, a, b, c, d, e, f, g), fg))
+    fg, (x, a, b, c, d, e, f, g, C) = define_gf3()
+    jac = jacobian(fg, x, a, b, c, d, e, f, g, C)
+    func = njit(lambdify((x, a, b, c, d, e, f, g, C), fg))
     return func, jac
 
 

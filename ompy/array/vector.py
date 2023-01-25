@@ -10,7 +10,6 @@ import numpy as np
 from numpy import ndarray
 
 from .. import ureg, DimensionalityError, Unit
-from .index import index
 from .abstractarray import AbstractArray
 from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
@@ -876,7 +875,7 @@ class IndexLocator:
         if True:  # len(key) == 1:
             X = self.vector.X.__getitem__(key)
             values = self.vector.values.__getitem__(key)
-            return self.vec.clone(X=X, values=values)
+            return self.vector.clone(X=X, values=values)
         else:
             raise ValueError("Expect one integer index [i].")
 
