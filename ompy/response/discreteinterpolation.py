@@ -133,6 +133,9 @@ class DiscreteInterpolation:
         if self.FWHM is not None:
             self.FWHM.plot(ax=ax[5], **kwargs)
 
+        add_subplot_border(ax[4], 0.5, '#3155cb')
+        add_subplot_border(ax[5], 0.5, '#3155cb')
+
         ax[0].set_title("FE")
         ax[1].set_title("SE")
         ax[2].set_title("DE")
@@ -193,3 +196,26 @@ class DiscreteInterpolation:
         s += f"Eff: {self.Eff}\n"
         s += f"FWHM: {self.FWHM}\n"
         return s
+
+
+def add_subplot_border(ax, width=1, color=None ):
+
+    fig = ax.get_figure()
+
+    # Convert bottom-left and top-right to display coordinates
+    x0, y0 = ax.transAxes.transform((0, 0))
+    x1, y1 = ax.transAxes.transform((1, 1))
+
+    # Convert back to Axes coordinates
+    x0, y0 = ax.transAxes.inverted().transform((x0, y0))
+    x1, y1 = ax.transAxes.inverted().transform((x1, y1))
+
+    rect = plt.Rectangle(
+        (x0, y0), x1-x0, y1-y0,
+        color=color,
+        transform=ax.transAxes,
+        zorder=-1,
+        lw=2*width+1,
+        fill=None,
+    )
+    fig.patches.append(rect)

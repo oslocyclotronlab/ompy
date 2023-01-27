@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 from ..stubs import Pathlike, Axes, keV, Unitlike
-from .. import Vector, Matrix
-from pathlib import Path
+from .. import Vector, Matrix, __full_version__
 from dataclasses import dataclass
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import overload, Literal
-import warnings
-from .io import load
+from .io import load, save
 
 """
 TODO: Remove prefix/suffix and only use a glob pattern.
@@ -146,6 +146,8 @@ class ResponseData:
 
     @staticmethod
     def from_db(name: ResponseFunctionName) -> ResponseData:
+        if name not in RESPONSE_FUNCTIONS.keys():
+            raise ValueError(f"Response function {name} available. Available functions are {list(RESPONSE_FUNCTIONS.keys())}")
         return ResponseData.from_path(RESPONSE_FUNCTIONS[name])
 
     def plot(self, ax: Axes | None = None, **kwargs):
@@ -208,6 +210,9 @@ class ResponseData:
                             FWHM=FWHM if FWHM is not None else self.FWHM,
                             is_normalized=is_normalized if is_normalized is not None else self.is_normalized,
                             is_fwhm_normalized=is_fwhm_normalized if is_fwhm_normalized is not None else self.is_fwhm_normalized)
+
+    def save(self, path: Pathlike, **kwargs) -> None:
+        return save(path, self, **kwargs)
 
     def __len__(self) -> int:
         return len(self.FE)

@@ -1,12 +1,15 @@
 from ..stubs import Pathlike
 from typing import Literal, TypeAlias, Iterable, Any
 from pathlib import Path
-from .. import Vector, Matrix
+from .. import Vector, Matrix, __full_version__
 from collections import Counter
 import numpy as np
 from tqdm.autonotebook import tqdm
 import pandas as pd
 from os import scandir
+from warnings import warn
+import json
+
 
 ErrorHandling: TypeAlias = Literal['ignore', 'drop', 'raise', 'rebin']
 Format = Literal['mama', 'ompy', 'numpy', 'feather', 'root']
@@ -31,17 +34,24 @@ def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vecto
 
 
 def load_npy(path: Pathlike, compton_name: str = 'compton.npz', discrete_name: str = 'discrete.npz') -> tuple[tuple[Vector, ...], Matrix]:
+    # TODO Fix compton matrix saving
     path = Path(path)
     with np.load(path / compton_name) as comptons:
         E_observed = comptons['E_observed']
         E_true = comptons['E_true']
         values = comptons['values']
-    with np.load(path / discrete_name) as discretes:
-        fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
-        E = discretes['E']
-        discrete = tuple(Vector(E=E, values=discretes[field], name=field) for field in fields)
+
+    fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
+    discrete = [Vector.from_path(path / f'{field}.npz') for field in fields]
+    try:
+        fwhm = Vector.from_path(path / 'fwhm.npz')
+    except FileNotFoundError:
+        fwhm = None
+    discrete.append(fwhm)
+    discrete = tuple(discrete)
+
     compton = Matrix(Ex=E_true, Eg=E_observed, values=values)
-    if not np.allclose(E_true, E):
+    if not np.allclose(E_true, discrete[0].E):
         raise RuntimeError("E_true != E. Probably save corruption.")
     return discrete, compton
 
@@ -185,25 +195,29 @@ def save(path: Pathlike, data, format: Format = 'ompy', **kwargs) -> None:
             raise ValueError(f"Unknown format {format}. Available formats are: {Format}")
 
 
-def save_npy(path: Pathlike, data, exists_ok: bool = False) -> None:
+def save_npy(path: Pathlike, data, exist_ok: bool = False) -> None:
+    warn("Old code. Must be updated.")
     path = Path(path)
-    path.mkdir(parents=True, exist_ok=True)
+    path.mkdir(parents=True, exist_ok=exist_ok)
+    meta = {'is_normalized': data.is_normalized, 'is_fwhm_normalized': data.is_fwhm_normalized,
+            'version': __full_version__}
+    with (path / 'meta.json').open('w') as f:
+        json.dump(meta, f)
+
     fname = path / 'compton.npz'
-    if fname.exists() and not exists_ok:
+    if fname.exists() and not exist_ok:
         raise FileExistsError(f'File {fname} already exists.')
+
+    # TODO: Use batch save/load
     mapping = {'values': data.compton.values, 'E_observed': data.E_observed,
                'E_true': data.E}
     np.savez(fname, **mapping)
 
-    fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
-    arrays = [getattr(data, name).values for name in fields]
-    E = data.E
-    mapping = {k: v for k, v in zip(fields, arrays)}
-    mapping['E'] = E
-    fname = path / 'discrete.npz'
-    if fname.exists() and not exists_ok:
-        raise FileExistsError(f'File {fname} already exists.')
-    np.savez(fname, **mapping)
+    fields = ('FE', 'SE', 'DE', 'AP', 'Eff', 'FWHM')
+    for field in fields:
+        vec = getattr(data, field)
+        if vec is not None:
+            vec.save(path / f'{field}.npz')
 
 
 def convert_mama(output: Pathlike, path: Pathlike | None = None, data: Any | None = None, exist_ok: bool = False, **kwargs) -> None:

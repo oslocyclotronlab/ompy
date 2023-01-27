@@ -22,7 +22,8 @@ from ..geometry import Line
 from ..library import (diagonal_elements, div0, fill_negative_gauss,
                       handle_rebin_arguments)
 from .matrixstate import MatrixState
-from .rebin import rebin_2D
+#from .rebin import rebin_2D_uniform_left_left as rebin_2D
+from .rebin_old import rebin_2D
 from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
                     Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
 from .vector import Vector
@@ -234,7 +235,7 @@ class Matrix(AbstractArray):
             filetype = filetype_from_suffix(path)
         filetype = filetype.lower()
 
-        if filetype == 'numpy':
+        if filetype == 'npy':
             self.values, self._Eg, self._Ex = load_numpy_2D(path)
         elif filetype == 'txt':
             self.values, self._Eg, self._Ex = load_txt_2D(path)
@@ -287,7 +288,7 @@ class Matrix(AbstractArray):
 
         Eg = self._Eg.to('keV').magnitude
         Ex = self._Ex.to('keV').magnitude
-        if filetype == 'numpy':
+        if filetype == 'npy':
             save_numpy_2D(values, Eg, Ex, path)
         elif filetype == 'txt':
             save_txt_2D(values, Eg, Ex, path, **kwargs)
@@ -683,6 +684,7 @@ class Matrix(AbstractArray):
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
+              preserve: str = 'counts',
               inplace: bool = False) -> Matrix | None:
         """ Rebins one axis of the matrix
 
@@ -732,6 +734,7 @@ class Matrix(AbstractArray):
 
         naxis = (axis + 1) % 2
         rebinned = rebin_2D(self.values, oldbins, newbins, naxis)
+        #rebinned = rebin_2D(oldbins, newbins, self.values, axis=naxis, preserve=preserve)
 
 
         if inplace:
@@ -1120,6 +1123,26 @@ class Matrix(AbstractArray):
                 raise NotImplementedError("Matrix <= Matrix not implemented")
             case _:
                 return self.values <= other
+
+    def normalize(self, axis: str | int, inplace=False) -> Matrix | None:
+        s = self.sum(axis)
+        axis = to_plot_axis(axis)
+        if not inplace:
+            if axis == 0:
+                values = self.values/s.values[:, np.newaxis]
+            elif axis == 1:
+                values = self.values/s.values[np.newaxis, :]
+            elif axis == 2:
+                values = self.values/s
+            return self.clone(values=values)
+        else:
+            if axis == 0:
+                self.values /= s.values[:, np.newaxis]
+            elif axis == 1:
+                self.values /= s.values[np.newaxis, :]
+            elif axis == 2:
+                self.values /= s
+
 
 
 class IndexLocator:

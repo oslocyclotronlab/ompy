@@ -16,11 +16,6 @@ def is_uniform(X: np.ndarray, rtol=1e-5, atol=1e-8) -> bool:
     dX = X[1] - X[0]
     return np.allclose(X[1:] - X[:-1], dX, rtol=rtol, atol=atol, equal_nan=False)
 
-@njit()
-def overlap(Astart, Aend, Bstart, Bend):
-    start = max(Astart, Bstart)
-    stop = min(Aend, Bend)
-    return max(0.0, stop - start)
 
 @njit()
 def is_length_congruent(X: np.ndarray, Y: np.ndarray) -> bool:

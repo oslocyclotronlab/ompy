@@ -16,7 +16,8 @@ from .filehandling import (filetype_from_suffix, load_csv_1D, load_numpy_1D,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D,
                            save_npz_1D, load_npz_1D)
 from ..library import div0, handle_rebin_arguments, only_one_not_none, maybe_set
-from .rebin import rebin_1D
+#from .rebin import rebin_uniform_left_left as rebin_1D
+from .rebin_old import rebin_1D
 from ..stubs import Unitlike, arraylike, Axes, Pathlike
 from dataclasses import dataclass, field
 
@@ -475,6 +476,7 @@ class Vector(AbstractArray):
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
+              preserve: str = 'counts',
               inplace: bool = False) -> Vector | None:
         """ Rebins vector, assuming equidistant binning
 
@@ -501,6 +503,7 @@ class Vector(AbstractArray):
                                          binwidth=binwidth)
 
         rebinned = rebin_1D(self.values, oldbins, newbins)
+        #rebinned = rebin_1D(oldbins, newbins, self.values, preserve=preserve)
         newbins *= unit
 
         if inplace:
