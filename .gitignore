@@ -127,6 +127,7 @@ tags
 
 notebooks/**/
 docs/source/api
+data/**/R.npy
 
 # Apple attribute file
 .DS_Store

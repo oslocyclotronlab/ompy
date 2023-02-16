@@ -1,4 +1,4 @@
-from typing import Union, Iterable, List, Tuple, Optional, Any
+from typing import Union, Iterable, List, Tuple, Optional, Any, TypeAlias, Literal
 from pathlib import Path
 import tarfile
 import time
@@ -7,8 +7,13 @@ import pandas as pd
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 from dataclasses import asdict
+from .. import __full_version__
+from .index import Index
+from warnings import warn
 
 from ompy.stubs import Pathlike, array
+
+Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz']
 
 
 def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray, ndarray]:
@@ -74,44 +79,40 @@ def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray
         return counts, x_array, y_array
 
 
-def mama_write(mat, filename, comment="", **kwargs):
+def mama_write(mat, filename, **kwargs):
     ndim = mat.values.ndim
     if ndim == 1:
-        mama_write1D(mat, filename, comment, **kwargs)
+        mama_write1D(mat, filename, **kwargs)
     elif ndim == 2:
-        mama_write2D(mat, filename, comment, **kwargs)
+        mama_write2D(mat, filename, **kwargs)
     else:
         NotImplementedError("Mama cannot read ojects with more then 2D.")
 
 
-def mama_write1D(vec, filename, comment="", _assert=True):
+def mama_write1D(vec, filename, _assert=True):
     if _assert:
         assert(vec.shape[0] <= 8192),\
             "Mama cannot handle vectors with dimensions > 8192. "\
             "Rebin before saving."
 
     # Calculate calibration coefficients.
-    calibration = vec.calibration()
-    cal = {
-        "a0x": calibration['a0'],
-        "a1x": calibration['a1'],
-        "a2x": 0,
-    }
 
     # Write mandatory header:
     header_string = '!FILE=Disk \n'
     header_string += '!KIND=Spectrum \n'
     header_string += '!LABORATORY=Oslo Cyclotron Laboratory (OCL) \n'
     header_string += '!EXPERIMENT= oslo_method_python \n'
-    header_string += '!COMMENT={:s} \n'.format(comment)
+    header_string += f'!COMMENT={vec.metadata.misc} \n'
     header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
                                                    time.localtime()) + '   \n'
+    #header_string += '!OMPYVERSION=' + __full_version__ + '   \n'
+    calibration = vec._index.to_unit('keV').to_calibration()
     header_string += (
         '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E \n'
         % (
-            cal["a0x"],
-            cal["a1x"],
-            cal["a2x"],
+            calibration.a0,
+            calibration.a1,
+            calibration.a2
         ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=1,0:{:4d} \n".format(vec.shape[0] - 1)
@@ -138,15 +139,8 @@ def mama_write2D(mat, filename, comment="", _assert=True):
             "Rebin before saving."
 
     # Calculate calibration coefficients.
-    calibration = mat.calibration()
-    cal = {
-        "a0x": calibration['a0y'],
-        "a1x": calibration['a1y'],
-        "a2x": 0,
-        "a0y": calibration['a0x'],
-        "a1y": calibration['a1x'],
-        "a2y": 0
-    }
+    x_calibration = mat.X_index.to_unit('keV').to_calibration()
+    y_calibration = mat.Y_index.to_unit('keV').to_calibration()
 
     # Write mandatory header:
     header_string = '!FILE=Disk \n'
@@ -159,19 +153,18 @@ def mama_write2D(mat, filename, comment="", _assert=True):
     header_string += (
       '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
        % (
-          cal["a0x"],
-          cal["a1x"],
-          cal["a2x"],
-          cal["a0y"],
-          cal["a1y"],
-          cal["a2y"],
+        y_calibration.a0,
+        y_calibration.a1,
+        y_calibration.a2,
+        x_calibration.a0,
+        x_calibration.a1,
+        x_calibration.a2
           ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
         mat.shape[1] - 1, mat.shape[0] - 1)
     header_string += '!CHANNEL=(0:%4d,0:%4d) ' % (mat.shape[1] - 1,
                                                   mat.shape[0] - 1)
-
     footer_string = "!IDEND=\n"
 
     # Write matrix:
@@ -357,7 +350,8 @@ def save_txt_1D(values: np.ndarray, E: np.ndarray,
 
 
 def save_npz_1D(path: Pathlike, vector) -> None:
-    mapping = {'X': vector.X, 'values': vector.values, 'meta': asdict(vector.metadata)}
+    mapping = {'index': vector._index.to_dict(), 'values': vector.values,
+               'meta': asdict(vector.metadata), 'version': __full_version__}
     if vector.std is not None:
         mapping['std'] = vector.std
     np.savez(path, **mapping)
@@ -365,10 +359,32 @@ def save_npz_1D(path: Pathlike, vector) -> None:
 def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
     with np.load(path, allow_pickle=True, **kwargs) as data:
         meta = data['meta'][()]
-        X = data['X']
+        index = Index.from_dict(data['index'][()])
         values = data['values']
         std = None if 'std' not in data else data['std']
-    return cls(X=X, values=values, std=std, **meta)
+        version = data['version']
+        if version != __full_version__:
+            warn(f"Version mismatch when loading {path}: {version} != {__full_version__}")
+    return cls(X=index, values=values, std=std, **meta)
+
+def save_npz_2D(path: Pathlike, matrix) -> None:
+    mapping = {'X index': matrix.X_index.to_dict(),
+               'Y index': matrix.Y_index.to_dict(),
+               'values': matrix.values, 'meta': asdict(matrix.metadata),
+               'version': __full_version__}
+    np.savez(path, **mapping)
+
+def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:
+    with np.load(path, allow_pickle=True, **kwargs) as data:
+        meta = data['meta'][()]
+        X_index = Index.from_dict(data['X index'][()])
+        Y_index = Index.from_dict(data['Y index'][()])
+        values = data['values']
+        version = data['version']
+        if version != __full_version__:
+            warn(f"Version mismatch when loading {path}: {version} != {__full_version__}")
+    return cls(X=X_index, Y=Y_index, values=values, **meta)
+
 
 def filetype_from_suffix(path: Path) -> str | None:
     suffix = path.suffix
@@ -389,6 +405,23 @@ def filetype_from_suffix(path: Path) -> str | None:
             return ''
         case _:
             return None
+
+def resolve_filetype(path: Path, filetype: str | None) -> tuple[Path, Filetype]:
+    if filetype is None:
+        filetype = filetype_from_suffix(path)
+        if filetype is None:
+            raise ValueError("Filetype could not be determined from suffix: {path}")
+        # Fallback case
+        if filetype == '':
+            filetype = 'npz'
+            path = path.with_suffix('.npz')
+    filetype = filetype.lower()
+    # Numpy always adds file extension
+    if filetype == 'npy' and not path.suffix:
+        path = path.with_suffix('.npy')
+    if filetype == 'npz' and not path.suffix:
+        path = path.with_suffix('.npz')
+    return path, filetype
 
 
 def load_discrete(path: Union[str, Path], energy: ndarray,

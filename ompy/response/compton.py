@@ -104,7 +104,7 @@ class ComptonList:
 
     @property
     def compton_E(self) -> np.ndarray:
-        return self.compton[0].E
+        return self.compton[0].E_true
 
 
 spec3 = OrderedDict()
@@ -136,7 +136,7 @@ class ComptonVector:
 
     @property
     def E(self) -> np.ndarray:
-        return self.vector.E
+        return self.vector.E_true
 
     def index(self, e: float64) -> int:
         return self.vector.index(e)
@@ -160,7 +160,7 @@ def interpolate_compton(p: ResponseData, E: np.ndarray, sigma , nsigma: int = 6)
     if not p.is_normalized:
         raise ValueError("ResponseData must be normalized")
 
-    if p.E[0] > E[0] or p.E[-1] < E[-1]:
+    if p.E_true[0] > E[0] or p.E_true[-1] < E[-1]:
         raise ValueError("Compton interpolation range out of bounds")
     compton: ComptonList = make_compton_list(p)
     E_observed = p.E_observed
@@ -247,10 +247,10 @@ def make_compton_list(p: ResponseData) -> ComptonList:
     Returns:
         ComptonList: ComptonList object
     """
-    E = p.E
+    E = p.E_true
     compton = NList()
     for vec in p.compton:
-        compton.append(NVector(vec.E, vec.values))
+        compton.append(NVector(vec.E_true, vec.values))
     return ComptonList(E, compton)
 
 

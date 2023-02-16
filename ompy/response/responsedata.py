@@ -75,7 +75,7 @@ class ResponseData:
                                     p_i = w_i * c_i / sum(w_i * c_i)
         """
 
-        T = compton*self.compton_sum() + FE*self.FE + SE*self.SE + DE*self.DE + AP*self.AP
+        T = compton*self.compton.sum(axis='observed') + FE*self.FE + SE*self.SE + DE*self.DE + AP*self.AP
         if inplace:
             self.FE *= FE / T
             self.SE *= SE / T
@@ -178,26 +178,23 @@ class ResponseData:
         return ax
 
     @property
-    def E(self) -> np.ndarray:
-        return self.FE.E
+    def E_true(self) -> np.ndarray:
+        return self.compton.true
 
     @property
     def E_observed(self) -> np.ndarray:
-        return self.compton.Eg
-
-    def compton_sum(self) -> Vector:
-        return self.compton.sum(axis='Eg')
+        return self.compton.observed
 
     def sum(self, as_vector: bool = False) -> float | Vector:
         FE = self.FE.values
         SE = self.SE.values
         DE = self.DE.values
         AP = self.AP.values
-        cmp = self.compton_sum().values
+        cmp = self.compton.sum(axis='observed').values
         if as_vector:
             return sum(FE + DE + SE + AP + cmp)
         else:
-            return Vector(E=self.E, values=FE + SE + DE + AP + cmp, name='Total')
+            return Vector(E=self.E_true, values=FE + SE + DE + AP + cmp, name='Total')
 
     def clone(self, FE=None, DE=None, SE=None, AP=None, compton=None, Eff=None,
               FWHM=None, is_normalized=None, is_fwhm_normalized=None) -> ResponseData:

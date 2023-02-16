@@ -301,20 +301,20 @@ class ExtrapolationModelLow(AbstractExtrapolationModel):
         """ Set Emin and Emax in MeV from gsf if not set before """
         gsf = gsf.clone().to('MeV')
         self.Emin = 0 if self.Emin is None else self.Emin
-        self.Emax = gsf.E[0] if self.Emax is None else self.Emax
+        self.Emax = gsf.E_true[0] if self.Emax is None else self.Emax
 
     def autofitrange(self, gsf: Vector):
         """ Guess(!) Efit in MeV from gsf if not set before"""
         gsf = gsf.clone().to('MeV')
-        fraction = int(len(gsf.E) / 6)
+        fraction = int(len(gsf.E_true) / 6)
         if self.Efit[0] is None:
-            if len(gsf.E) < 8:
+            if len(gsf.E_true) < 8:
                 raise NotImplementedError("Set Efit manually")
-            self.Efit[0] = gsf.E[2]
+            self.Efit[0] = gsf.E_true[2]
         if self.Efit[1] is None:
-            if len(gsf.E) < 8:
+            if len(gsf.E_true) < 8:
                 raise NotImplementedError("Set Efit manually")
-            self.Efit[1] = gsf.E[fraction+2]
+            self.Efit[1] = gsf.E_true[fraction + 2]
 
     def __model(self, Eg: float | None = None,
                 scale: float | None = None,
@@ -359,15 +359,15 @@ class ExtrapolationModelHigh(AbstractExtrapolationModel):
     def autofitrange(self, gsf: Vector, check_existing: bool = True):
         """ Guess(!) Efit in MeV from gsf if not set before"""
         gsf = gsf.clone().to('MeV')
-        fraction = int(len(gsf.E) / 6)
+        fraction = int(len(gsf.E_true) / 6)
         if self.Efit[0] is None:
-            if len(gsf.E) < 8:
+            if len(gsf.E_true) < 8:
                 raise NotImplementedError("Set Efit manually")
-            self.Efit[0] = gsf.E[-fraction-2]
+            self.Efit[0] = gsf.E_true[-fraction - 2]
         if self.Efit[1] is None:
-            if len(gsf.E) < 8:
+            if len(gsf.E_true) < 8:
                 raise NotImplementedError("Set Efit manually")
-            self.Efit[1] = gsf.E[-2]
+            self.Efit[1] = gsf.E_true[-2]
 
     def __model(self, Eg: float | None = None,
                 scale: float | None = None,

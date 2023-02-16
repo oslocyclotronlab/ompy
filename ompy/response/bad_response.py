@@ -295,7 +295,7 @@ class Response():
                 'DE': DE,
                 'c511': c511
             })
-        return resp, compton_matrix, last.E
+        return resp, compton_matrix, last.E_true
 
     def get_probabilities(self):
         """ Interpolate full-energy peak probabilities (...) """

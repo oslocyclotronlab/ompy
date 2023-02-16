@@ -227,7 +227,7 @@ class FirstGeneration:
                                self.statistical_upper)
         else:
             slide = self.statistical_upper
-        slide = slide.to('keV').magnitude
+        slide = slide.to_unit('keV').magnitude
         values[slide > Eg] = 0.0
 
         # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
@@ -239,8 +239,8 @@ class FirstGeneration:
         # Entry energy where the statistical γ-cascade ends in the
         # yrast line.
         entry = np.maximum(
-            np.minimum(matrix.Ex - self.Ex_entry_shift.to('keV').magnitude,
-                       self.Ex_entry_statistical.to('keV').magnitude),
+            np.minimum(matrix.Ex - self.Ex_entry_shift.to_unit('keV').magnitude,
+                       self.Ex_entry_statistical.to_unit('keV').magnitude),
             0.0)
 
         multiplicity = div0(matrix.Ex - entry, Eg_mean)

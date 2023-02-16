@@ -133,8 +133,8 @@ class NormalizerSimultan(AbstractNormalizer):
         nld = self.self_if_none(nld)
         nld = nld.clone()
         gsf = gsf.clone()
-        nld.to('MeV', inplace=True)
-        gsf.to('MeV', inplace=True)
+        nld.to_unit('MeV', inplace=True)
+        gsf.to_unit('MeV', inplace=True)
 
         # Need to give some sort of standard deviation for sensible results
         # Otherwise deviations at higher level density will have an

@@ -1,178 +1,79 @@
 from __future__ import annotations
 
 import logging
-import copy
-from typing import Union, Tuple, Sequence
 import numpy as np
 from ..stubs import arraylike
+from abc import ABC, abstractmethod
+from .index import Index
+from .. import Unit
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 
-class AbstractArray:
-    def __init__(self):
-        """ Abstract class for Matrix and Vector.
+class AbstractArray(ABC):
+    __default_unit: Unit = Unit('keV')
+    @abstractmethod
+    def is_compatible_with(self, other: AbstractArray | Index) -> bool: ...
 
-        Do not initialize itself.
-        """
-        raise NotImplementedError()
+    @abstractmethod
+    def clone(self, **kwargs) -> AbstractArray: ...
 
-    def has_equal_binning(other: AbstractArray) -> bool:
-        """ Raise error as it is implemented in subclass only """
-        raise NotImplementedError()
-
-    def same_shape(self, other: arraylike, error: bool = False) -> bool:
-        return self.has_equal_binning()
-
-    def clone(self, **kwargs) -> AbstractArray:
-        raise NotImplementedError()
-
-    def copy(self, **kwargs) -> AbstractArray:
-        """ Return a deepcopy of the class
-
-        Args:
-            kwargs: Overwrite attributes of the copied object
-        """
-        LOG.warning("Using copy() risks returning incomplete objects."
-                    " Use clone() instead.")
-        new = copy.deepcopy(self)
-        for attr, val in kwargs.items():
-            if attr in ('E', 'Ex', 'Eg'):
-                logging.debug("Called copy() with %s. Prefixed with '_'", attr)
-                setattr(new, '_'+attr, val)
-            else:
-                setattr(new, attr, val)
-        return new
-
-    def verify_equdistant(self, axis: int | str):
-        """ Runs checks to verify if energy arrays are equidistant
-
-        axis: The axis to project onto.
-                  Can be either of (0, 'Eg', 'x'), (1, 'Ex', 'y')
-        Raises:
-            ValueError: If any check fails
-        """
-        axis = to_plot_axis(axis)
-        isEx = (axis == 1)
-        try:  # better with isinstance, but good for now
-            energy = self.Ex if isEx else self.Eg
-            name = "Ex" if isEx else "Eg"
-        except AttributeError:
-            energy = self.E
-            name = "E"
-
-        # Check shapes:
-        if len(energy) > 2:
-            diff = (energy - np.roll(energy, 1))[1:]  # E_{i} - E_{i-1}
-            try:
-                diffdiff = diff - diff[1]
-                np.testing.assert_array_almost_equal(diffdiff,
-                                                     np.zeros_like(diff))
-            except AssertionError:
-                raise ValueError(f"{name} array is not equispaced")
-
-    def __eq__(self, other) -> None:
-        if self.__class__ != other.__class__:
-            return False
-        else:
-            dicother = other.__dict__
-            truth = []
-            for key, value in self.__dict__.items():
-                if isinstance(value, np.ndarray):
-                    test = np.allclose(value, dicother[key])
-                else:
-                    test = (value == dicother[key])
-                truth.append(test)
-            return all(truth)
+    def check_or_assert(self, other) -> np.ndarray | float:
+        if isinstance(other, AbstractArray):
+            if not self.shape == other.shape:
+                raise ValueError(f"Incompatible shapes. {self.shape} != {other.shape}")
+            if not self.is_compatible_with(other):
+                raise ValueError("Incompatible binning.")
+            if self.std is not None or other.std is not None:
+                raise NotImplementedError("Cannot handle arrays with uncertainties")
+            other = other.values
+        return other
 
     def __sub__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values -= other
-        else:
-            if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
-                result.values -= other
-            elif self.has_equal_binning(other):
-                result.values -= other.values
-        return result
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values - other)
 
     def __rsub__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values = other - result.values
-        else:
-            if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
-                result.values = other - result.values
-            elif self.has_equal_binning(other):
-                result.values = other.values - result.values
+        result = self.clone(values = other - self.values)
         return result
 
     def __add__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values += other
-        else:
-            if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
-                result.values += other
-            elif self.has_equal_binning(other):
-                result.values += other.values
-        return result
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values + other)
 
     def __radd__(self, other) -> AbstractArray:
-        return self.__add__(other)
+        print(type(other))
+        x = self.__add__(other)
+        print("X!!", type(x))
+        return x
 
     def __mul__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values *= other
-        else:
-            if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
-                result.values *= other
-            elif self.has_equal_binning(other):
-                result.values *= other.values
-        return result
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values * other)
 
     def __rmul__(self, other) -> AbstractArray:
-        return self.__mul__(other)
+        other = self.check_or_assert(other)
+        return self.clone(values = other * self.values)
 
     def __truediv__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values /= other
-        else:
-            if isinstance(other, np.ndarray):
-                # Bug: Buggy implementation
-                #self.same_shape(other, error=True)
-                result.values /= other
-            elif self.has_equal_binning(other):
-                result.values /= other.values
-        return result
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values / other)
 
     def __rtruediv__(self, other) -> AbstractArray:
-        result = self.clone()
-        if isinstance(other, (int, float)):
-            result.values = other / result.values
-        else:
-            if isinstance(other, np.ndarray):
-                self.same_shape(other, error=True)
-                result.values = other / result.values
-            elif self.has_equal_binning(other):
-                result.values = other.values / result.values
-        return result
+        other = self.check_or_assert(other)
+        return self.clone(values = other / self.values)
 
-    def __matmul__(self, other) -> AbstractArray:
-        """
-        Implemented in subclasses
-        """
-        raise NotImplementedError()
+    def __pow__(self, val: float) -> AbstractArray:
+        return self.clone(values = self.values ** val)
+
+    @abstractmethod
+    def __matmul__(self, other) -> AbstractArray: ...
+
+    #def __rmatmul__(self, other) -> AbstractArray:
 
     @property
-    def shape(self) -> int | Tuple[int, int]:
+    def shape(self) -> tuple[int, ...]:
         return self.values.shape
 
     def __getitem__(self, key):
@@ -182,6 +83,8 @@ class AbstractArray:
         return self.values.__setitem__(key, item)
 
     def __getattr__(self, attr):
+        """ Fallback to numpy if AbstractArray does not have the attribute
+        """
         name = self.__class__.__name__
         if attr.startswith("_"):
             raise AttributeError(f"'{name}' object has no attribute {attr}")
@@ -195,7 +98,35 @@ class AbstractArray:
     def __len__(self) -> int:
         return len(self.values)
 
+    def __neg__(self):
+        return self.clone(values=-self.values)
 
+    def __lt__(self, other):
+        return self.values < other
+
+    def __gt__(self, other):
+        return self.values > other
+
+    def __le__(self, other):
+        return self.values <= other
+
+    def __ge__(self, other):
+        return self.values >= other
+
+    def __abs__(self):
+        return self.clone(values=np.abs(self.values))
+
+    @property
+    def vlabel(self) -> str:
+        return self.metadata.vlabel
+
+    @property
+    def valias(self) -> str:
+        return self.metadata.valias
+
+    @property
+    def name(self) -> str:
+        return self.metadata.name
 
 def to_plot_axis(axis: int | str) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified

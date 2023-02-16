@@ -28,7 +28,7 @@ class Unitful:
                 value = value.magnitude
         else:
             try:
-                value = value.to(self.units)
+                value = value.to_unit(self.units)
             except DimensionalityError:
                 raise DimensionalityError(value.units, self.units) from None
         return value

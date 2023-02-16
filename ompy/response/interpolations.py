@@ -8,7 +8,7 @@ from scipy.optimize import curve_fit
 
 from .gf3 import GF3Interpolation, GF3Interpolator
 from .interpolation import Interpolator, Interpolation, LinearInterpolator, LinearInterpolation, PoissonInterpolation
-from .numbalib import njit
+from .numbalib import njit, prange
 from .. import Vector
 from ..stubs import Pathlike
 
@@ -89,11 +89,11 @@ class EscapeInterpolator(Interpolator):
         # Linear
         linear_to = linear_to or self.linear_to
         mask_lin = (ESCAPE_LIMIT < X) & (X < linear_to)
-        lin_vec = self.points.iloc[mask_lin]
+        lin_vec = self.points.from_mask(mask_lin)
         lin_intp: LinearInterpolation = LinearInterpolator(lin_vec).interpolate()
         # GSF3
         mask_gf = X > ESCAPE_LINEAR_TO
-        gf_vec = self.points.iloc[mask_gf]
+        gf_vec = self.points.from_mask(mask_gf)
         gf = GF3Interpolator(gf_vec)
         gf_intp = gf.interpolate()
         # HACK: Wrong, but for convenience
@@ -112,11 +112,11 @@ class AnnihilationInterpolator(Interpolator):
         # Linear
         linear_to = linear_to or self.linear_to
         mask_lin = (ESCAPE_LIMIT < X) & (X < linear_to)
-        lin_vec = self.points.iloc[mask_lin]
+        lin_vec = self.points.from_mask(mask_lin)
         lin_intp: LinearInterpolation = LinearInterpolator(lin_vec).interpolate()
         # GSF3
         mask_gf = X > ESCAPE_LINEAR_TO
-        gf_vec = self.points.iloc[mask_gf]
+        gf_vec = self.points.from_mask(mask_gf)
         gf = GF3Interpolator(gf_vec)
         gf_intp = gf.interpolate()
         return AnnihilationInterpolation(self.points, lin_intp, gf_intp, linear_to=linear_to)
@@ -203,22 +203,22 @@ class FWHMInterpolator(Interpolator):
         return FWHMInterpolation(self.points, *p, cov=pcov)
 
 
-@njit
+@njit(parallel=True)
 def polylog(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
     y = np.zeros_like(x)
     xlog = np.log(x)
     xlog[~np.isfinite(xlog)] = 0
-    for i in range(len(p)):
+    for i in prange(len(p)):
         y += p[i] * xlog ** i
     return np.exp(y)
 
 
-@njit
+@njit(parallel=True)
 def polylog_jac(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
     jac = np.empty((len(x), len(p)))
     xlog = np.log(x)
     value = polylog(x, *p)
-    for i in range(len(p)):
+    for i in prange(len(p)):
         jac[:, i] = value * xlog ** i
     return jac
 
@@ -269,13 +269,12 @@ class FEInterpolation(Interpolation):
             s += f" p{i}: {p: .2e} ± {e: .1e}\n"
         return s
 
-
 class FEInterpolator(Interpolator):
     def interpolate(self, order: int = 7, linear_num_points: int = 5) -> FEInterpolation:
-        X, Y = self.x, self.y
         # Linear
         vec_linear = self.points.iloc[:linear_num_points]
         lin_intp: LinearInterpolation = LinearInterpolator(vec_linear).interpolate()
+        X, Y = self.x, self.y
         p0 = [10 ** (-i) for i in range(order)]
         p, cov = curve_fit(polylog, X, Y, p0=p0, jac=polylog_jac)
         self.cov = cov

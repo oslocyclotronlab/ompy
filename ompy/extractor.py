@@ -528,15 +528,15 @@ class Extractor:
             fig = ax[0].figure
 
         if plot_mean:
-            ax[0].errorbar(self.nld[0].E, self.nld_mean(), yerr=self.nld_std(),
+            ax[0].errorbar(self.nld[0].E_true, self.nld_mean(), yerr=self.nld_std(),
                            fmt='o', ms=2, lw=1, color=color, **kwargs)
-            ax[1].errorbar(self.gsf[0].E, self.gsf_mean(), yerr=self.gsf_std(),
+            ax[1].errorbar(self.gsf[0].E_true, self.gsf_mean(), yerr=self.gsf_std(),
                            fmt='o', ms=2, lw=1, color=color, **kwargs)
         else:
             for nld, gsf in zip(self.nld, self.gsf):
-                ax[0].plot(nld.E, nld.values, color=color,
+                ax[0].plot(nld.E_true, nld.values, color=color,
                            alpha=1/len(self.nld), **kwargs)
-                ax[1].plot(gsf.E, gsf.values, color=color,
+                ax[1].plot(gsf.E_true, gsf.values, color=color,
                            alpha=1/len(self.gsf), **kwargs)
         ax[0].set_xlabel("Energy " + f"[${self.nld[0].units:~L}$]")
         ax[1].set_xlabel("Energy " + f"[${self.gsf[0].units:~L}$]")
@@ -587,13 +587,13 @@ class Extractor:
         return np.nanstd([gsf.values for gsf in self.gsf], axis=0)
 
     def ensemble_nld(self) -> Vector:
-        energy = self.nld[0].E
+        energy = self.nld[0].E_true
         values = self.nld_mean()
         std = self.nld_std()
         return Vector(values=values, E=energy, std=std)
 
     def ensemble_gsf(self) -> Vector:
-        energy = self.gsf[0].E
+        energy = self.gsf[0].E_true
         values = self.gsf_mean()
         std = self.gsf_std()
         return Vector(values=values, E=energy, std=std)
@@ -616,12 +616,12 @@ class Extractor:
         if Ex is None:
             Ex = self.ensemble.get_firstgen(member).copy().Ex
         Ex = Ex.copy(order='C')
-        T = (2*np.pi*gsf.E**3)*np.nan_to_num(gsf.values)
-        resolution = np.zeros_like(gsf.E)
+        T = (2 * np.pi * gsf.E_true ** 3) * np.nan_to_num(gsf.values)
+        resolution = np.zeros_like(gsf.E_true)
 
         values = nld_T_product(np.nan_to_num(nld.values), T, resolution,
-                               nld.E, gsf.E, Ex)
-        return Matrix(Eg=gsf.E, Ex=Ex, values=values)
+                               nld.E_true, gsf.E_true, Ex)
+        return Matrix(Eg=gsf.E_true, Ex=Ex, values=values)
 
     def get_product_std(self, Ex: np.ndarray | None = None) -> Matrix:
         products = np.asarray([self.get_product(i, Ex=Ex).values

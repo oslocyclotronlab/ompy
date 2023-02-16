@@ -1,704 +1,409 @@
 import pytest
-import ompy as om
-import warnings
-from numpy.testing import assert_equal, assert_allclose
+from ompy.array import Vector, Index
+from ompy.array.index import LeftUniformIndex, MidUniformIndex
 import numpy as np
-
-
-def compare_unitful(x, y):
-    try:
-        x.units
-        x_unitful = True
-    except AttributeError:
-        x_unitful = False
-
-    try:
-        y.units
-        y_unitful = True
-    except AttributeError:
-        y_unitful = False
-
-    if x_unitful and y_unitful:
-        assert_equal(x.units, y.units)
-        assert_allclose(x.magnitude, y.magnitude)
-    elif x_unitful and not y_unitful:
-        assert_allclose(x.magnitude, y)
-    elif not x_unitful and y_unitful:
-        assert_allclose(x, y.magnitude)
-    else:
-        assert_allclose(x, y)
-
-
-def assert_vector(vec, fact):
-    compare_unitful(vec.E, fact.E)
-    assert_allclose(vec.values, fact.values)
-    if fact.std is None:
-        assert_equal(vec.std, None)
-    else:
-        assert_allclose(vec.std, fact.std)
-
-
-class TestInit:
-    def test_zero_size(self):
-        with pytest.raises(ValueError):
-            _ = om.Vector()
-
-    def test_energy(self):
-        vals = np.linspace(-1, 2, 100)
-        E = np.linspace(0, 1, 100)
-        v = om.Vector(vals, E=E)
-        assert_allclose(v.E, E)
-        assert_equal(v.E.shape, v.values.shape)
-
-    def test_values(self):
-        with pytest.raises(ValueError):
-            _ = om.Vector(values=[1, 2, 3, 4])
-        return
-        values = np.linspace(-4, 5, 100)
-        v = om.Vector(values)
-        v2 = om.Vector(values=values)
-        assert_allclose(v.values, v2.values)
-        assert_allclose(v.values, values)
-
-    def test_both(self):
-        E = np.linspace(0, 1, 100)
-        vals = np.linspace(2, 3.4, 100)
-        vec = om.Vector(values=vals, E=E)
-        vec2 = om.Vector(vals, E)
-        compare_unitful(E, vec.E)
-        assert_allclose(vals, vec.values)
-        assert_allclose(vec2.values, vec.values)
-        compare_unitful(vec2.E, vec.E)
-
-        # Wrong size
-        with pytest.raises(ValueError):
-            om.Vector(vals, [1, 2, 3, 4, 5])
-
-        with pytest.raises(ValueError):
-            om.Vector(vals, E, std=[1, 2, 3])
-
-        with pytest.raises(ValueError):
-            vec = om.Vector(vals, E=np.random.random(100))
-            vec.verify_integrity(check_equidistant=True)
-
-        vec = om.Vector([1.0], [2.0])
-        assert vec.is_equidistant()
-
-
-    def test_unit(self):
-        val = np.linspace(0, 1, 100)
-        E = np.linspace(0, 1, 100)
-        vec = om.Vector(val, E=E)
-        assert(vec.units == om.ureg('keV'))
-        val = np.linspace(0, 1, 10)
-        E = np.linspace(0, 100, 10)*om.ureg('MeV')
-        vec2 = om.Vector(val, E=E)
-        assert(vec2.units == om.ureg('MeV'))
-        E = np.linspace(0, 100, 10)
-        vec3 = om.Vector(val, E=E, units='MeV')
-        assert(vec3.units == om.ureg('MeV'))
-
-    def test_reference(self):
-        E = np.linspace(0, 1)
-        val = 2*E
-        std = 0.1*E
-        # Numpy seems to copy sometimes and use reference other times.
-        vec = om.Vector(E=E, values=val, copy=False, std=std)
-        assert_allclose(vec.E, E)
-        assert_allclose(vec.values, val)
-        assert_allclose(vec.std, std)
-
-    def test_load(self):
-        E = np.linspace(0, 1)
-        val = 2*E
-        std = 0.1*E
-        vec = om.Vector(E=1e-3*E, values=val, std=std, units='MeV')
-        vec.save("/tmp/test.npy")
-        vec = om.Vector(path="test.npy")
-        assert_allclose(vec.E, E)
-        assert_allclose(vec.values, val)
-        assert_allclose(vec.std, std)
-
-        with pytest.warns(UserWarning):
-            om.Vector(path='test.npy', values=val)
-
-
-class TestArithmetic:
-    def test_mul(self):
-        values = np.array([1, 2, 3, 4, 5])
-        E = np.linspace(0, 100, 5)
-        vec = om.Vector(values=values, E=E)
-        assert_allclose(values*values, (vec*values).values)
-        assert_allclose(5*values, (vec*5).values)
-        assert_allclose(values*values, (vec*vec).values)
-
-        vec2 = om.Vector(values=2*values, E=E)
-        assert_allclose(2*values*values, (vec*vec2).values)
-
-        vec3 = om.Vector(values=1+values, E=1e-3*E, units='MeV')
-        assert_allclose((1+values)*values, (vec*vec3).values)
-
-        vec4 = om.Vector(values=2*values, E=2*E)
-        with pytest.raises(ValueError):
-            vec*vec4
-
-        vec5 = om.Vector(values=2*values, E=E, units='MeV')
-        with pytest.raises(ValueError):
-            vec*vec5
-
-        with pytest.raises(ValueError):
-            vec*np.linspace(0, 1)
-
-    def test_add(self):
-        values = np.array([1, 2, 3, 4, 5])
-        E = np.linspace(0, 100, 5)
-        vec = om.Vector(values=values, E=E)
-        assert_allclose(values+values, (vec+values).values)
-        assert_allclose(5+values, (vec+5).values)
-        assert_allclose(values+values, (vec+vec).values)
-
-        vec2 = om.Vector(values=2*values, E=E)
-        assert_allclose(2*values+values, (vec+vec2).values)
-
-        vec3 = om.Vector(values=1+values, E=1e-3*E, units='MeV')
-        assert_allclose((1+values)+values, (vec+vec3).values)
-
-        vec4 = om.Vector(values=2*values, E=2*E)
-        with pytest.raises(ValueError):
-            vec+vec4
-
-        vec5 = om.Vector(values=2*values, E=E, units='MeV')
-        with pytest.raises(ValueError):
-            vec+vec5
-
-        with pytest.raises(ValueError):
-            vec+np.linspace(0, 1)
-
-    def test_sub(self):
-        values = np.array([1, 2, 3, 4, 5])
-        E = np.linspace(0, 100, 5)
-        vec = om.Vector(values=values, E=E)
-        assert_allclose(values-values, (vec-values).values)
-        assert_allclose(values-5, (vec-5).values)
-        assert_allclose(5-values, (5-vec).values)
-        assert_allclose(values-values, (vec-vec).values)
-
-        vec2 = om.Vector(values=2*values, E=E)
-        assert_allclose(2*values-values, (vec2 - vec).values)
-
-        vec3 = om.Vector(values=1+values, E=1e-3*E, units='MeV')
-        assert_allclose((1+values)-values, (vec3-vec).values)
-
-        vec4 = om.Vector(values=2*values, E=2*E)
-        with pytest.raises(ValueError):
-            vec-vec4
-
-        vec5 = om.Vector(values=2*values, E=E, units='MeV')
-        with pytest.raises(ValueError):
-            vec-vec5
-
-        with pytest.raises(ValueError):
-            vec-np.linspace(0, 1)
-
-    def test_div(self):
-        values = np.array([1, 2, 3, 4, 5])
-        E = np.linspace(0, 100, 5)
-        vec = om.Vector(values=values, E=E)
-        assert_allclose(values/values, (vec/values).values)
-        assert_allclose(values/5, (vec/5).values)
-        assert_allclose(5/values, (5/vec).values)
-        assert_allclose(values/values, (vec/vec).values)
-
-        vec2 = om.Vector(values=2*values, E=E)
-        assert_allclose(2*values/values, (vec2 / vec).values)
-
-        vec3 = om.Vector(values=1+values, E=1e-3*E, units='MeV')
-        assert_allclose((1+values)/values, (vec3/vec).values)
-
-        vec4 = om.Vector(values=2*values, E=2*E)
-        with pytest.raises(ValueError):
-            vec/vec4
-
-        vec5 = om.Vector(values=2*values, E=E, units='MeV')
-        with pytest.raises(ValueError):
-            vec/vec5
-
-        with pytest.raises(ValueError):
-            vec/np.linspace(0, 1)
-
-
-class TestIndex:
-    def test_dimensionless(self):
-        E = np.linspace(-2.1, 9.9, 100)
-        val = np.random.random(size=100)
-        vec = om.Vector(values=val, E=E)
-        for i, e in enumerate(E):
-            assert_equal(i, vec.index(e))
-        assert_equal(0, vec.index(-10))
-        assert_equal(99, vec.index(100))
-
-    def test_with_units(self):
-        E = np.linspace(-2.1, 9.9, 100)
-        val = np.random.random(size=100)
-        vec = om.Vector(values=val, E=E.copy())
-        E *= om.ureg.keV
-        E = E.to('MeV')
-        for i, e in enumerate(E):
-            assert_equal(i, vec.index(e))
-        assert_equal(0, vec.index(-10*om.u.keV))
-        assert_equal(99, vec.index(0.1*om.u.MeV))
-
-
-class TestRebin:
-    def test_mids(self):
-        E = np.linspace(0, 1, 10)
-        values = 3*E
-        v = om.Vector(values, E)
-        newE = np.linspace(0, 1, 5)
-        v.rebin(mids=newE, inplace=True)
-        assert_allclose(v.E, newE)
-        assert_equal(v.values.shape, newE.shape)
-
-        with pytest.raises(ValueError):
-            v.rebin(mids=E, factor=0.5)
-
-        with pytest.raises(ValueError):
-            v.rebin(factor=-0.1)
-
-        with pytest.raises(ValueError):
-            v.rebin(factor=0.0)
-
-    def test_mids_with_unit(self):
-        E = np.linspace(0, 1, 10)
-        values = 3*E
-        v = om.Vector(values, E)
-
-        newE = np.linspace(0, 1, 6) * om.ureg.keV
-        newE = newE.to('MeV')
-
-        v.rebin(mids=newE, inplace=True)
-        assert_allclose(v.E, newE.to('keV').magnitude)
-        assert_equal(v.values.shape, newE.shape)
-
-    def test_binwidth(self):
-        E = np.linspace(0, 10, 100)
-        values = 2*E
-        v = om.Vector(values=values, E=E)
-        v2 = v.rebin(binwidth=0.5)
-        assert_allclose(v2.de, 0.5*np.ones_like(v2.E))
-
-        with pytest.raises(ValueError):
-            v.rebin(binwidth=-0.5)
-
-        with pytest.raises(ValueError):
-            v.rebin(binwidth=0)
-
-    def test_non_equidistant(self):
-        E = np.linspace(0, 1, 10)
-        v = 2*E
-        vec = om.Vector(v, E)
-        vec2 = vec.clone()
-        vec2.E[4] = 2
-        with pytest.raises(RuntimeError):
-            vec.rebin(mids=vec2.E)
-        with pytest.raises(RuntimeError):
-            vec2.rebin(mids=vec.E)
-
-    def test_upsampling(self):
-        E = np.linspace(0, 1, 50)
-        v = 2*E
-        vec = om.Vector(values=v, E=E)
-        with pytest.warns(UserWarning):
-            vec.rebin(factor=0.5)
-        with pytest.warns(UserWarning):
-            E = np.linspace(0, 2, 30)
-            vec.rebin(mids=E)
-
-
-def test_to():
-    E = np.linspace(0, 1)
-    v = 2*E
-    vec = om.Vector(E=E, values=v)
-    vec2 = vec.to('MeV')
-    assert_allclose(vec2.E, 1e-3*E)
-    assert vec2.units == om.ureg('MeV')
-    vec.to('MeV', inplace=True)
-    assert_allclose(vec.E, 1e-3*E)
-    assert vec.units == om.ureg('MeV')
-
-
-def test_rebin_like():
-    E = np.linspace(0, 1, 10)
-    values = 3*E
-    v = om.Vector(values, E)
-
-    E = np.linspace(0, 1, 5)
-    values = E
-    v2 = om.Vector(values, E.copy())
-
-    v.rebin_like(v2, inplace=True)
-    compare_unitful(v.E, E)
-
-    v = om.Vector(values, E, units='MeV')
-    v.rebin_like(v2, inplace=True)
-    assert(v.units == om.ureg.MeV)
-
-
-def test_clone():
-    E = np.linspace(-1, 1)
-    values = 2*E
-    std = 0.5*values
-    vec = om.Vector(E=E, values=values)
-    vec2 = vec.clone()
-    assert_vector(vec, vec2)
-    vec3 = vec.clone(E=values)
-    assert_allclose(vec3.values, vec.values)
-    assert_allclose(vec3.E, values)
-    vec4 = vec.clone(std=std)
-    assert_allclose(vec4.values, vec.values)
-    assert_allclose(vec4.E, vec.E)
-    assert_allclose(vec4.std, std)
-    vec5 = vec4.clone()
-    assert_vector(vec4, vec5)
-    vec6 = vec4.clone(E=values, values=E, std=0.2*E)
-    assert_allclose(vec6.E, values)
-    assert_allclose(vec6.values, E)
-    assert_allclose(vec6.std, 0.2*E)
-
-    with pytest.raises(RuntimeError):
-        vec5.clone(duck=7)
-
-
-def test_len():
-    for N in [1, 2, 5, 100, 1501]:
-        N = 100
-        E = np.linspace(0, 1, N)
-        vals = np.linspace(2, 3.4, N)
-        vec = om.Vector(values=vals, E=E)
-        assert_equal(len(vec), N)
-
-
-def test_calibration():
-    E = [0.3, 0.3+0.9, 0.3+2*0.9]
-    vec = om.Vector(values=E, E=E)
-    calib = vec.calibration()
-    assert_allclose(calib['a0'], 0.3)
-    assert_allclose(calib['a1'], 0.9)
-
-
-def test_save_load_no_std():
-    E = np.linspace(0, 1, 100)
-    vals = np.linspace(2, 3.4, 100)
-    vec = om.Vector(values=vals, E=E)
-
-    formats = ['.npy', '.txt', '.tar', '.m', '.csv']
-    for form in formats:
-        vec.save('/tmp/no_std'+form)
-        vec_from_file = om.Vector(path='/tmp/no_std'+form)
-        assert_equal(vec_from_file.units, vec.units)
-        assert_allclose(vec_from_file.E, vec.E)
-        assert_allclose(vec_from_file.values, vals)
-
+from numpy.testing import assert_allclose
+from ompy import Unit
+import ompy as om
+
+"""
+TODO:
+If meta are equal, clone the meta. 
+"""
+
+
+def test_simple_constructor():
+    x = np.linspace(0.0, 1232, 122)
+    v = 2*x**2
+    V = Vector(X=x, Y=v)
     with pytest.raises(ValueError):
-        vec.save("/tmp/test.npy", filetype='.chicken')
-
-
-def test_save_load():
-    E = np.linspace(0, 1, 100)
-    vals = np.linspace(2, 3.4, 100)
-    std = np.random.randn(100)*0.1
-
-    vec = om.Vector(values=vals, E=E, std=std)
-
-    formats = ['.npy', '.txt', '.tar', '.csv']
-    for fmt in formats:
-        vec.save('/tmp/std'+fmt)
-        vec_from_file = om.Vector(path='/tmp/std'+fmt)
-        assert_equal(vec_from_file.units, vec.units)
-        assert_allclose(vec_from_file.E, vec.E)
-        assert_allclose(vec_from_file.values, vec.values)
-        assert_allclose(vec_from_file.std, vec.std)
-
-
-def test_save_load_tar():
-    E = np.linspace(0, 1, 100)
-    vals = np.random.random((100, 100))
-
-    mat = om.Matrix(values=vals, Ex=E, Eg=E)
-    mat.save('/tmp/mat.tar')
-
+        Vector(X=x, Y=v[:-1])
     with pytest.raises(ValueError):
-        vec = om.Vector(path='/tmp/mat.tar')
+        Vector(X=x[:-1], Y=v)
+    assert_allclose(V.X, x)
+    assert_allclose(V.values, v)
 
+def test_index_constructor():
+    x = np.linspace(0.0, 1232, 122)
+    v = 2*x**2
+    i = LeftUniformIndex.from_array(x)
+    V = Vector(X=i, Y=v)
+    assert_allclose(V.X, x)
+    assert_allclose(V.values, v)
+    assert V._index == i
 
-def test_save_std_warning():
-    E = np.linspace(0, 1, 100)
-    vals = np.linspace(2, 3.4, 100)
-    std = np.random.randn(100)*0.1
+    j = i.update_metadata(alias='Fish')
+    U = Vector(X=j, Y=v)
+    assert U._index == j
+    assert U._index.alias == 'Fish'
 
-    vec = om.Vector(values=vals, E=E, std=std)
-
-    with pytest.warns(UserWarning):
-        vec.save('/tmp/error.m')
-
-
-def test_closest():
-    E = np.array([0., 1., 2., 3., 4.])
-    values = np.array([10., 9., 8., 7., 6.])
-    std = 0.1*values
-
-    E_new = np.array([0.5, 1.5, 3.])
-    values_new = np.array([10., 9., 7.])
-    std_new = 0.1*values_new
-
-    vector = om.Vector(values=values, E=E)
-    vector_res = vector.closest(E_new)
-
-    compare_unitful(vector_res.E, E_new)
-    assert_equal(vector_res.values, values_new)
-
-    vector = om.Vector(values=values, E=E, std=std)
-    vector_res = vector.closest(E_new)
-    compare_unitful(vector_res.E, E_new)
-    assert_equal(vector_res.values, values_new)
-    assert_equal(vector_res.std, std_new)
-
-    # Make sure the change is inplace.
-    assert vector.closest(E_new, inplace=True) is None
-    compare_unitful(vector.E, E_new)
-    assert_equal(vector.values, values_new)
-    assert_equal(vector.std, std_new)
-
-    # Make sure that x-values outside the
-    # range gives zero
-    E_new = [-1.5, 1.5, 3.5]
-    vector_res = vector.closest(E_new)
-
-    assert vector_res.values[0] == 0
-    assert vector_res.std[0] == 0
-
-    E_new = np.array([0.5, 1.5, 3., 6.])
-    vector_res = vector.closest(E_new)
-
-    assert vector_res.values[-1] == 0
-    assert vector_res.std[-1] == 0
-
-    # Make sure that RuntimeError is raised
-    E = np.array([0., 1., 2., 4., 3.])
-    values = np.array([10., 9., 8., 7., 6.])
-    std = 0.1*values
-
-    vector = om.Vector(values=values, E=E, std=std)
-    with pytest.raises(RuntimeError):
-        vector_res = vector.closest(E_new)
-
-
-def test_cumulative():
-    E = np.array([0., 1.5, 3., 4.5, 6., 7.5])
-    values = np.array([0., 0., 1., 2., 3., 4.])
-    std = 0.1*values
-
-    expect = np.cumsum(values)
-    expect_std = np.sqrt(np.cumsum(std**2))
-
-    vec = om.Vector(values=values, E=E, std=std)
-
-    vec_cum = vec.cumulative(inplace=False)
-    compare_unitful(vec_cum.E, E)
-    assert_equal(vec_cum.values, expect)
-    assert_equal(vec_cum.std, expect_std)
-
-    vec_cum = vec.cumulative(factor=2., inplace=False)
-    compare_unitful(vec_cum.E, E)
-    assert_equal(vec_cum.values, 2.*expect)
-    assert_equal(vec_cum.std, 2.*expect_std)
-
-    vec_cum = vec.cumulative(factor='de', inplace=False)
-    compare_unitful(vec_cum.E, E)
-    assert_equal(vec_cum.values, (E[1]-E[0])*expect)
-    assert_equal(vec_cum.std, (E[1]-E[0])*expect_std)
-
-    assert vec.cumulative(inplace=True) is None
-    compare_unitful(vec.E, E)
-    assert_equal(vec.values, expect)
-    assert_equal(vec.std, expect_std)
-
-    with pytest.raises(AssertionError):
-        assert_equal(vec.values, values)
-
+def test_metadata_constructor():
+    x = np.linspace(0.0, 1232, 122)
+    v = 2*x**2
+    V = Vector(X=x, values=v)
+    assert V.unit == Unit('keV')
+    assert V.xlabel == 'Energy'
+    assert V.ylabel == 'Counts'
+    assert V.name == ''
+    assert V.alias == ''
+    assert V.valias == ''
+    V = Vector(X=x, values=v, unit='MeV', xlabel='E', vlabel='C', name='test', xalias='t', valias='c')
+    assert V.unit == Unit('MeV')
+    assert V.xlabel == 'E'
+    assert V.ylabel == 'C'
+    assert V.name == 'test'
+    assert V.alias == 't'
+    assert V.valias == 'c'
+    V = Vector(E=x, values=v)
+    assert V.alias == 'E'
     with pytest.raises(ValueError):
-        vec.cumulative(factor='dx', inplace=True)
+        Vector(X=x, Y=v, E=x)
+    with pytest.raises(ValueError):
+        Vector(X=x, Y=v, values=v)
+    with pytest.raises(ValueError):
+        Vector(E=x, values=v, xalias='I')
+    with pytest.raises(ValueError):
+        Vector(E=x, Y=v, valias='I')
+    V = Vector(X=x, values=v, xalias='E', valias='C')
+    assert V.alias == 'E'
+    assert V.valias == 'C'
+    V = Vector(E=x, C=V)
+    assert V.alias == 'E'
+    assert V.valias == 'C'
 
-    E = np.array([0., 1.5, 3., 4.5, 6., 7.5, 8.5])
-    values = np.array([0., 0., 1., 2., 3., 4., 5.])
+    x = LeftUniformIndex.from_array(x).to_unit('MeV')
+    V = Vector(X=x, values=v)
+    assert V.unit == Unit('MeV')
 
-    vec = om.Vector(values=values, E=E)
+def test_index():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.copy(v)
+    V = Vector(X=x, values=v)
+    for i, (x, v) in enumerate(zip(x, v)):
+        assert V.index(x) == i
+        assert V[i] == v
+    with pytest.raises(IndexError):
+        V.index(-7)
+    with pytest.raises(IndexError):
+        V.index(1243)
+    V[0] = 0
+    assert V[0] == 0
+    V[-1] = 0.242
+    assert V[-1] == 0.242
+    t = np.random.rand(15)
+    V[5:20] = t
+    assert_allclose(V[5:20], t)
 
-    with pytest.raises(RuntimeError):
-        vec.cumulative(factor='de', inplace=True)
+def test_iloc():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.copy(v)
+    V = Vector(X=x, values=v, xlabel="Fish", vlabel="Counts")
+    for i, (xx, vv) in enumerate(zip(x, v)):
+        assert V.iloc[i] == vv
+    W = V.iloc[5:20]
+    assert_allclose(W.X, x[5:20])
+    assert_allclose(W.values, v[5:20])
+    assert W.metadata == V.metadata
+    V.iloc[6:30] += 10
+    assert_allclose(V.values[6:30], w[6:30] + 10)
 
+def test_vloc():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.copy(v)
+    V = Vector(X=x, values=v, xlabel="Fish", vlabel="Counts")
+    for i, (xx, vv) in enumerate(zip(x, v)):
+        assert V.vloc[xx] == vv
 
-class TestCut:
-    def test_unitless(self):
-        E = np.arange(-1, 11, 1)
-        values = np.arange(33, 45, 1)
-        vector = om.Vector(values=values, E=E)
+    start = x[5]
+    stop = x[20]
+    W = V.vloc[start:stop]
+    assert_allclose(W.X, x[5:20])
+    assert_allclose(W.values, v[5:20])
+    assert W.metadata == V.metadata
+    V.vloc[start:stop] += 10
+    assert_allclose(V.values[5:20], w[5:20] + 10)
 
-        vector.cut(Emin=0, Emax=8, inplace=False)
-        compare_unitful(vector.E, E)
-        assert_allclose(vector.values, values)
+def test_loc():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.copy(v)
+    V = Vector(X=x, values=v, xlabel="Fish", vlabel="Counts")
+    for i, (xx, vv) in enumerate(zip(x, v)):
+        assert V.loc[xx] == vv
+        assert V.loc[i] == vv
 
-        vector.cut(Emin=0, Emax=8, inplace=True)
+    s0 = x[5]
+    s1 = x[20]
+    for start, stop in zip((5, s0, 5, s0), (20, s1, s1, 20)):
+        W = V.loc[start:stop]
+        assert_allclose(W.X, x[5:20])
+        assert_allclose(W.values, v[5:20])
+        assert W.metadata == V.metadata
 
-        Ecut = np.arange(0, 9, 1)
-        valcut = np.arange(34, 43)
-        compare_unitful(vector.E, Ecut)
-        assert_allclose(vector.values, valcut)
+    V.loc[5:s1] += 10
+    assert_allclose(V.values[5:20], w[5:20] + 10)
 
-    def test_unit(self):
-        E = np.arange(-1, 11, 1)
-        values = np.arange(33, 45, 1)
-        vector = om.Vector(values=values, E=E)
+def test_copy():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.copy(v)
+    V = Vector(X=x, values=v, copy=False)
+    V.iloc[5:20] += 10
+    assert_allclose(V[5:20], v[5:20])
+    W = Vector(X=x, values=w, copy=True)
+    W.iloc[5:20] += 10
+    assert_allclose(W[5:20], w[5:20] + 10)
 
-        vector = vector.cut(Emin='0.002 MeV', Emax='8000 eV')
+def test_math_add():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.random.rand(len(x))
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    W = Vector(X=x, values=w)
+    Z = 2 + V
+    assert_allclose(Z.values, 2 + v)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
+    Z = V + 2
+    assert_allclose(Z.values, v + 2)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-        Ecut = np.arange(2, 9, 1)
-        valcut = np.arange(36, 43)
-        compare_unitful(vector.E, Ecut)
-        assert_allclose(vector.values, valcut)
+    Z = V + W
+    assert_allclose(Z.values, v + w)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-    def test_std(self):
-        E = np.arange(11)
-        values = np.arange(21, 32)
-        print(E, values)
-        std = 0.1*values
-        vec = om.Vector(values=values, E=E, std=std)
-        cut = vec.cut(Emin=2, Emax=8)
-        compare_unitful(cut.E, np.arange(2, 9))
-        assert_allclose(cut.values, values[2:9])
-        assert_allclose(cut.std, std[2:9])
-        vec.cut(Emin=2, Emax=8, inplace=True)
-        assert_vector(vec, cut)
+    Z = W + V
+    assert_allclose(Z.values, w + v)
+    assert Z.metadata == W.metadata
+    assert Z._index == W._index
 
+    W = Vector(X=x+1, values=w)
+    with pytest.raises(ValueError):
+        V + W
+    with pytest.raises(ValueError):
+        W + V
+    Z = V + w
+    assert_allclose(Z.values, v+w)
+    Z = w + V
+    #assert_allclose(Z.values, w+v)
+    with pytest.raises(ValueError):
+        V + np.random.rand(10)
+    with pytest.raises(ValueError):
+        np.random.rand(10) + v
 
-def test_drop_nan():
-    E = np.arange(10)
-    values = np.arange(20, 30, dtype=float)
-    values[[0, 5, 6]] = np.NaN
-    vec = om.Vector(E=E, values=values)
-    vec2 = vec.drop_nan()
-    compare_unitful(vec2.E, [1, 2, 3, 4, 7, 8, 9])
-    assert_allclose(vec2.values, [21, 22, 23, 24, 27, 28, 29])
-    compare_unitful(vec.E, E)
-    assert_allclose(vec.values, values)
-    vec.drop_nan(inplace=True)
-    assert_vector(vec, vec2)
+def test_math_sub():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.random.rand(len(x))
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    W = Vector(X=x, values=w)
+    Z = 2 - V
+    assert_allclose(Z.values, 2 - v)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
+    Z = V - 2
+    assert_allclose(Z.values, v - 2)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-    E = np.arange(10)
-    values = np.arange(20, 30, dtype=float)
-    std = 0.1*values
-    values[[0, 5, 6]] = np.NaN
-    vec = om.Vector(E=E, values=values, std=std)
-    vec2 = vec.drop_nan()
-    compare_unitful(vec2.E, [1, 2, 3, 4, 7, 8, 9])
-    assert_allclose(vec2.values, [21, 22, 23, 24, 27, 28, 29])
-    assert_allclose(vec2.std, [2.1, 2.2, 2.3, 2.4, 2.7, 2.8, 2.9])
+    Z = V - W
+    assert_allclose(Z.values, v - w)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-    compare_unitful(vec.E, E)
-    assert_allclose(vec.values, values)
-    assert_allclose(vec.std, std)
-    vec.drop_nan(inplace=True)
-    assert_vector(vec, vec2)
+    Z = W - V
+    assert_allclose(Z.values, w - v)
+    assert Z.metadata == W.metadata
+    assert Z._index == W._index
 
+    W = Vector(X=x-1, values=w)
+    with pytest.raises(ValueError):
+        V - W
+    with pytest.raises(ValueError):
+        W - V
+    Z = V - w
+    assert_allclose(Z.values, v - w)
+    Z = w - V
+    #assert_allclose(Z.values, w - v)
+    with pytest.raises(ValueError):
+        V - np.random.rand(10)
+    with pytest.raises(ValueError):
+        np.random.rand(10) - V
 
-class TestHasEqualBinning:
-    def test_vector(self):
-        E = np.linspace(0, 1)
-        values = np.random.random(E.shape)
-        vec1 = om.Vector(E=E, values=values)
-        vec2 = om.Vector(E=E, values=0.5*values)
-        assert vec1.has_equal_binning(vec2, error=False)
-        vec3 = om.Vector(E=0.99*E, values=values)
+def test_math_mul():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.random.rand(len(x))
+    V = Vector(fish=x, values=v, xlabel='Test', vlabel='Count')
+    W = Vector(duck=x, values=w)
+    Z = 2 * V
+    assert_allclose(Z.values, 2 * v)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
+    assert Z._index.meta == V._index.meta
+    Z = V * 2
+    assert_allclose(Z.values, v * 2)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
+    assert Z._index.meta == V._index.meta
 
-        assert not vec1.has_equal_binning(vec3, error=False)
-        vec4 = om.Vector(E=E, values=values)
-        vec4.E[5] *= 2
-        assert not vec1.has_equal_binning(vec4, error=False)
-        vec5 = om.Vector(E=E[:10], values=values[:10])
-        assert not vec1.has_equal_binning(vec5, error=False)
-        assert not vec1.has_equal_binning(E, error=False)
+    Z = V * W
+    assert_allclose(Z.values, v * w)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-    def test_raises(self):
-        E = np.linspace(0, 1)
-        values = np.random.random(E.shape)
-        vec1 = om.Vector(E=E, values=values)
-        vec2 = om.Vector(E=E, values=0.5*values)
-        assert vec1.has_equal_binning(vec2, error=True)
-        vec3 = om.Vector(E=0.99*E, values=values)
+    Z = W * V
+    assert_allclose(Z.values, w * v)
+    assert Z.metadata == W.metadata
+    assert Z._index == W._index
 
-        with pytest.raises(ValueError):
-            vec1.has_equal_binning(vec3, error=True)
+    W = Vector(X=x-1, values=w)
+    with pytest.raises(ValueError):
+        V * W
+    with pytest.raises(ValueError):
+        W * V
+    Z = V * w
+    assert_allclose(Z.values, v*w)
+    Z = w * V
+    #assert_allclose(Z.values, v*w)
+    with pytest.raises(ValueError):
+        V * np.random.rand(10)
+    with pytest.raises(ValueError):
+        np.random.rand(10) * V
 
-        vec4 = om.Vector(E=E, values=values)
-        vec4.E[5] *= 2
-        with pytest.raises(ValueError):
-            vec1.has_equal_binning(vec4, error=True)
+def test_math_div():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    w = np.random.rand(len(x))
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    W = Vector(X=x, values=w)
+    Z = 2 / V
+    assert_allclose(Z.values, 2 / v)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
+    Z = V / 2
+    assert_allclose(Z.values, v / 2)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
-        vec5 = om.Vector(E=E[:10], values=values[:10])
-        with pytest.raises(ValueError):
-            vec1.has_equal_binning(vec5, error=True)
-        with pytest.raises(TypeError):
-            vec1.has_equal_binning(E, error=True)
+    Z = V / W
+    assert_allclose(Z.values, v / w)
+    assert Z.metadata == V.metadata
+    assert Z._index == V._index
 
+    Z = W / V
+    assert_allclose(Z.values, w / v)
+    assert Z.metadata == W.metadata
+    assert Z._index == W._index
 
-def test_sum():
-    E = np.linspace(0, 1)
-    values = np.random.random(E.shape)
-    vec = om.Vector(E=E, values=values)
-    assert_allclose(vec.sum(), values.sum())
+    W = Vector(X=x-1, values=w)
+    with pytest.raises(ValueError):
+        V / W
+    with pytest.raises(ValueError):
+        W / V
+    Z = V / w
+    assert_allclose(Z.values, v/w)
+    Z = v / W
+    #assert_allclose(Z.values, w/v)
+    with pytest.raises(ValueError):
+        V / np.random.rand(10)
+    with pytest.raises(ValueError):
+        np.random.rand(10) / V
 
+import tempfile
+def is_equal(v, w, values: bool = True, index: bool = True,
+             meta: bool = True, unit: bool = True) -> bool:
+    if index:
+        assert v._index == w._index
+    if meta:
+        assert v.metadata == w.metadata
+    if values:
+        assert_allclose(v.values, w.values)
 
-def test_is_equidistant():
-    E = np.linspace(0, 5)
-    V = E
-    vec = om.Vector(V, E)
-    assert_equal(vec.is_equidistant(), True)
-    E[25] += 2
-    vec = om.Vector(V, E)
-    assert_equal(vec.is_equidistant(), False)
+def is_compatible(v, w) -> bool:
+    assert_allclose(v.values, w.values)
+    assert v.is_compatible_with(w)
 
+def test_io_npz():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name)
+        W = Vector.from_path(f.name)
+        is_equal(V, W)
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='npz')
+        W = Vector.from_path(f.name, filetype='npz')
+        is_equal(V, W)
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name)
+        W = Vector.from_path(f.name, filetype='npz')
+        is_equal(V, W)
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='npz')
+        W = Vector.from_path(f.name)
+        is_equal(V, W)
+    V = V.to_mid().to_unit('MeV')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name)
+        W = Vector.from_path(f.name)
+        is_equal(V, W)
 
+def test_io_mama():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2*x**2
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='mama')
+        W = Vector.from_path(f.name, filetype='mama')
+        is_compatible(V, W)
 
-@pytest.mark.filterwarnings('ignore:divide by zero encountered in true_divide:RuntimeWarning')  # noqa
-def test_numericals():
-    E = np.array([0, 1, 2])
-    values1 = np.array([0, 1, -2.])
-    vector1 = om.Vector(values=values1, E=E)
+def test_io_npy():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2 * x ** 2
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='npy')
+        W = Vector.from_path(f.name, filetype='npy')
+        is_compatible(V, W)
+def test_io_txt():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2 * x ** 2
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='txt')
+        W = Vector.from_path(f.name, filetype='txt')
+        is_compatible(V, W)
 
-    values2 = values1+1
-    vector2 = om.Vector(values=values2, E=E)
+def test_io_csv():
+    x = np.linspace(-6.7, 1232, 122)
+    v = 2 * x ** 2
+    V = Vector(X=x, values=v, xlabel='Test', vlabel='Count')
+    with tempfile.NamedTemporaryFile() as f:
+        V.save(f.name, filetype='csv')
+        W = Vector.from_path(f.name, filetype='csv')
+        is_compatible(V, W)
 
-    factor = 5.
+def test_mathmul():
+    x = np.linspace(-4, 4, 100)
+    y = np.random.random(len(x))
+    u = Vector(X=x, values=y)
+    t = np.random.random((len(x)))
+    v = Vector(X=x, values=t, xlabel='Test', vlabel='Count')
+    assert_allclose(u@v, y@t)
 
-    for op in ("/", "*", "+", "-"):
-        eval(f"assert_equal((vector1{op}vector2).values, values1{op}values2)")
-        eval(f"assert_equal((vector2{op}vector1).values, values2{op}values1)")
-        eval(f"assert_equal((vector1{op}factor).values, values1{op}factor)")
-        eval(f"assert_equal((factor{op}vector1).values, factor{op}values1)")
+    y_ = np.linspace(0, 1, 251)
+    u_ = np.random.random((len(x), len(y_)))
+    u = om.Matrix(X=x, Y=y_, values=u_)
+    w = v@u
+    assert_allclose(w.values, t@u_)
+    assert w._index == u.Y_index
 
-    assert_equal((vector2@vector1).values, values2@values1)
-    assert_equal((vector1@vector2).values, values1@values2)
-
-
-# This does not work as of now...
-# def test_mutable():
-#     E = np.array([0, 1, 2])
-#     E_org = E.copy()
-
-#     values = np.array([0, 1, -2.])
-#     vector = om.Vector(values=values, E=E)
-
-#     # chaning the original array shouldn't change the vector array
-#     # (due to the setter)!
-#     E += 1
-#     assert_equal(vector.E, E_org)
+    assert_allclose(v@u_, t@u_)
+    assert_allclose(v@t, t@t)

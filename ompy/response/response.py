@@ -1230,7 +1230,7 @@ def simulate_columns(path: Path, header: list[str], resp):
 def simulate_all_compton(path: Path, paths, vectors):
     for cmp_path, vector in zip(paths, vectors):
         new_path = path / cmp_path.name
-        vec = Vector(E=vector.E, values=np.random.poisson(vector))
+        vec = Vector(E=vector.E_true, values=np.random.poisson(vector))
         vec.save(path=new_path)
 
 

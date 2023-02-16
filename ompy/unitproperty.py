@@ -15,7 +15,7 @@ class Unitful:
 
     def validate(self, value):
         try:
-            value = ureg.Quantity(value).to(self.units)
+            value = ureg.Quantity(value).to_unit(self.units)
         except DimensionalityError:
             value *= self.units
         return value

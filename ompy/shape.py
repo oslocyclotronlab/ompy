@@ -21,8 +21,8 @@ array = np.ndarray
 class Diagonal:
     def __init__(self, diagonal: Matrix, spin: float, parity: int):
         self.matrix = diagonal.copy()
-        self.matrix.Eg.to('MeV', inplace=True)
-        self.matrix.Ex.to('MeV', inplace=True)
+        self.matrix.Eg.to_unit('MeV', inplace=True)
+        self.matrix.Ex.to_unit('MeV', inplace=True)
         self.spin = spin
         self.parity = parity
 
@@ -120,7 +120,7 @@ class Shape:
         # TODO Prettify
         (diagonal_1, Egs_1), (diagonal_2, Egs_2) = gsfs
         # Assumes all have same Ex, diagonal_1.E == diagonal_2.E
-        Ex_dim = len(diagonal_1.E)
+        Ex_dim = len(diagonal_1.E_true)
 
         Eg_final = []
         gsf_final = []

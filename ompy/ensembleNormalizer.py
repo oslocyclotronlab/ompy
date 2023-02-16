@@ -419,10 +419,10 @@ class EnsembleNormalizer(AbstractNormalizer):
 
         # define helper function
         def vec_extend_values(vec, Eunion):  # noqa
-            Eold = vec.E
+            Eold = vec.E_true
             interEunion = np.in1d(Eunion, Eold, assume_unique=True)
             interEold = np.in1d(Eold, Eunion, assume_unique=True)
-            vec.E = Eunion
+            vec.E_true = Eunion
             val_union = np.full_like(Eunion, np.nan)
             val_union[interEunion] = vec.values[interEold]
             vec.values = val_union

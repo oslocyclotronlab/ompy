@@ -7,7 +7,7 @@ import termtables as tt
 from scipy.ndimage import gaussian_filter1d
 from .library import div0, i_from_E
 from . import Matrix
-from .array import MatrixState, rebin_1D
+from .array import rebin_1D
 from . import Bounded, Toggle
 
 
@@ -101,8 +101,6 @@ class Unfolder:
                 calibrations.
         """
         # Ensure that the given matrix is in fact raw
-        if self.raw.state != MatrixState.RAW:
-            warnings.warn("Trying to unfold matrix that is not raw")
 
         assert self.R.shape[0] == self.R.shape[1],\
             "Response R must be a square matrix"

@@ -47,7 +47,7 @@ class Detector(ABC):
     @classmethod
     def resolution_gauss(cls, E: array | Vector, mu: Unitlike, as_array=False) -> array | Vector:
         if isinstance(E, Vector):
-            E = E.to('keV').E
+            E = E.to('keV').E_true
         Eg = from_unit(mu, 'keV')
         sigma = cls._resolution_sigma(Eg)
         gauss = ngaussian(E, Eg, sigma)

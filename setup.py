@@ -20,8 +20,8 @@ except ImportError:
 # python setup.py build_ext --inplace
 
 # Version routine taken from numpy
-MAJOR = 1
-MINOR = 1
+MAJOR = 2
+MINOR = 0
 MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 

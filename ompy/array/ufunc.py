@@ -9,15 +9,21 @@ def zeros_like(array: Vector, **kwargs) -> Vector: ...
 @overload
 def zeros_like(array: Matrix, **kwargs) -> Matrix: ...
 
+
 def zeros_like(array: AbstractArray,
                **kwargs) -> AbstractArray:
-    if isinstance(array, Matrix):
-        return Matrix(Ex=array.Ex, Eg=array.Eg,
-                      values=np.zeros_like(array.values, **kwargs))
-    elif isinstance(array, Vector):
-        return Vector(E=array.E, values=np.zeros_like(array.values, **kwargs))
-    else:
-        raise ValueError(f"Expected Array, not {type(array)}.")
+    match array:
+        case Vector():
+            return array.clone(values=np.zeros_like(array.values), **kwargs)
+        case Matrix():
+            return array.clone(values=np.zeros_like(array.values), **kwargs)
+        case np.ndarray():
+            if array.ndim != 1:
+                raise ValueError("Numpy array must be vector.")
+            return Vector(X=array, values=np.zeros_like(array), **kwargs)
+        case _:
+            raise ValueError(f"Expected Array, not {type(array)}.")
+
 
 @overload
 def empty_like(array: Matrix, **kwargs) -> Matrix: ...
@@ -29,20 +35,24 @@ def empty_like(array: Vector, **kwargs) -> Vector: ...
 
 def empty_like(array: AbstractArray,
                **kwargs) -> AbstractArray:
-    if isinstance(array, Matrix):
-        return Matrix(Ex=array.Ex, Eg=array.Eg,
-                      values=np.empty_like(array.values, **kwargs))
-    elif isinstance(array, Vector):
-        return Vector(E=array.E, values=np.empty_like(array.values, **kwargs))
-    else:
-        raise ValueError(f"Expected Array, not {type(array)}.")
+    match array:
+        case Vector():
+            return array.clone(values=np.empty_like(array.values), **kwargs)
+        case Matrix():
+            return array.clone(values=np.empty_like(array.values), **kwargs)
+        case np.ndarray():
+            if array.ndim != 1:
+                raise ValueError("Numpy array must be vector.")
+            return Vector(X=array, values=np.empty_like(array), **kwargs)
+        case _:
+            raise ValueError(f"Expected Array, not {type(array)}.")
 
 @overload
 def empty(ex: ..., eg: None, **kwargs) -> Vector: ...
 @overload
 def empty(ex: ..., eg: array, **kwargs) -> Matrix: ...
 
-def empty(ex: array, eg: array | None = None, **kwargs):
+def empty(**kwargs):
     if eg is None:
         values = np.empty(len(ex), **kwargs)
         return Vector(E=ex, values=values)
@@ -69,15 +79,3 @@ def zeros(array: array | int | Tuple[int, int],
             raise ValueError("Array must have dimension < 3.")
     else:
         raise ValueError(f"Expected numpy array or iterable, not {type(array)}.")
-
-
-def sum(array: Union[Matrix, Vector, np.ndarray],
-        axis: Union[int, str] | None = None,
-        **kwargs) -> Union[Vector, np.ndarray]:
-    raise NotImplementedError()
-    if isinstance(array, Vector):
-        return array.sum(**kwargs)
-    elif isinstance(array, Matrix):
-        axis = to_plot_axis(axis)
-        val = array.sum(axis=axis, **kwargs)
-        return Vector()

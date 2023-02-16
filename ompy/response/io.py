@@ -2,6 +2,7 @@ from ..stubs import Pathlike
 from typing import Literal, TypeAlias, Iterable, Any
 from pathlib import Path
 from .. import Vector, Matrix, __full_version__
+from .. import Unit
 from collections import Counter
 import numpy as np
 from tqdm.autonotebook import tqdm
@@ -12,9 +13,7 @@ import json
 
 
 ErrorHandling: TypeAlias = Literal['ignore', 'drop', 'raise', 'rebin']
-Format = Literal['mama', 'ompy', 'numpy', 'feather', 'root']
-
-# TODO: the ompy format should save vectors correctly. Per now the metadata is discarded.
+Format = Literal['mama', 'ompy', 'numpy']
 
 def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
     path = verify_path(path)
@@ -25,34 +24,35 @@ def load(path: Pathlike, format: Format = 'mama', **kwargs) -> tuple[tuple[Vecto
             return discrete, compton
         case 'ompy' | 'numpy':
             return load_npy(path, **kwargs)
-        case 'feather':
-            raise NotImplementedError()
-        case 'root':
-            raise NotImplementedError()
         case _:
             raise ValueError(f"Unknown format {format}. Available formats are: {Format}")
 
 
-def load_npy(path: Pathlike, compton_name: str = 'compton.npz', discrete_name: str = 'discrete.npz') -> tuple[tuple[Vector, ...], Matrix]:
-    # TODO Fix compton matrix saving
-    path = Path(path)
-    with np.load(path / compton_name) as comptons:
-        E_observed = comptons['E_observed']
-        E_true = comptons['E_true']
-        values = comptons['values']
+def load_npy(path: Pathlike, **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
+    """ Load discrete and Compton response data from numpy files.
 
+    Args:
+        path: Location.
+
+    Returns:
+        The discrete structures as vectors in the order (FE, SE, DE, AP, Eff, FWHM), and the Compton matrix.
+        FWHM might be None
+
+    """
+    path = Path(path)
+    compton = Matrix.from_path(path / 'compton.npz', **kwargs)
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
-    discrete = [Vector.from_path(path / f'{field}.npz') for field in fields]
+    discrete = [Vector.from_path(path / f'{field}.npz').clone(xalias='E') for field in fields]
     try:
-        fwhm = Vector.from_path(path / 'fwhm.npz')
+        fwhm = Vector.from_path(path / 'fwhm.npz', **kwargs)
+        fwhm = fwhm.clone(alias='E')
     except FileNotFoundError:
         fwhm = None
     discrete.append(fwhm)
     discrete = tuple(discrete)
 
-    compton = Matrix(Ex=E_true, Eg=E_observed, values=values)
-    if not np.allclose(E_true, discrete[0].E):
-        raise RuntimeError("E_true != E. Probably save corruption.")
+    if not np.allclose(compton.true, discrete[0].E):
+        raise RuntimeError("E true != E. Probably save corruption.")
     return discrete, compton
 
 
@@ -90,37 +90,39 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
     # Sort and check for equal calibration
     E, compton = zip(*sorted(zip(Eg_, compton), key=lambda x: x[0]))
     E = list(E)
-    compton = list(compton)
-    calibrations = [(i, tuple(cmp.calibration().values())) for i, cmp in enumerate(compton)]
+    compton: list[Vector] = list(compton)
+    calibrations = [(i, tuple(cmp._index.to_calibration())) for i, cmp in enumerate(compton)]
     counter = Counter([cal for i, cal in calibrations])
     if len(counter) > 1:
-        if handle_error == 'raise':
-            s = ''
-            for elem, count in counter.items():
-                s += f'{count} files with calibration {elem}\n'
-                if count < 5:
-                    s += "-------\n"
-                    for i, cal in calibrations:
-                        if cal == elem:
-                            s += f'File E={E[i]} with calibration {cal}\n'
-                    s += "========\n"
-            raise ValueError(f'Not all files have the same calibration:\n{s}')
-        elif handle_error == 'drop':
-            common = counter.most_common(1)[0][0]
-            to_drop = []
-            for i, cal in calibrations:
-                if cal != common:
-                    to_drop.append(i)
-            compton = [cmp for i, cmp in enumerate(compton) if i not in to_drop]
-            E = [e for i, e in enumerate(E) if i not in to_drop]
-        elif handle_error == 'rebin':
-            # Rebin to largest binsize (rebinning smaller is impossible).
-            largest = max({val for i, val in set(counter)})
-            compton = [cmp.rebin(binwidth=largest) for cmp in tqdm(compton)]
-        elif handle_error == 'ignore':
-            pass
-        else:
-            raise ValueError(f'Unknown error handling {handle_error}')
+        match handle_error:
+            case 'raise':
+                s = ''
+                for elem, count in counter.items():
+                    s += f'{count} files with calibration {elem}\n'
+                    if count < 5:
+                        s += "-------\n"
+                        for i, cal in calibrations:
+                            if cal == elem:
+                                s += f'File E={E[i]} with calibration {cal}\n'
+                        s += "========\n"
+                raise ValueError(f'Not all files have the same calibration:\n{s}')
+            case 'drop':
+                common = counter.most_common(1)[0][0]
+                to_drop = []
+                for i, cal in calibrations:
+                    if cal != common:
+                        to_drop.append(i)
+                compton = [cmp for i, cmp in enumerate(compton) if i not in to_drop]
+                E = [e for i, e in enumerate(E) if i not in to_drop]
+            case 'rebin':
+                # Rebin to largest binsize (rebinning smaller is impossible).
+                largest = max({val for i, val in set(counter)})
+                largest *= Unit('keV')
+                compton = [cmp.rebin(binwidth=largest) for cmp in tqdm(compton)]
+            case 'ignore':
+                pass
+            case _:
+                raise ValueError(f'Unknown error handling {handle_error}')
 
     # Fix the lengths
     i = np.argmax([len(cmp) for cmp in compton])
@@ -128,8 +130,8 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
     mat = np.zeros((len(compton), max_length))
     for i, cmp in enumerate(compton):
         mat[i, :len(cmp)] = cmp.values
-    return Matrix(Ex=E, Eg=compton[i].E, values=mat,
-                  xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+    return Matrix(true=E, observed=compton[i].E, values=mat,
+                  ylabel=r"Observed $\gamma$", xlabel=r"True $\gamma$")
 
 
 
@@ -187,16 +189,23 @@ def save(path: Pathlike, data, format: Format = 'ompy', **kwargs) -> None:
             raise NotImplementedError()
         case 'ompy' | 'numpy':
             return save_npy(path, data, **kwargs)
-        case 'feather':
-            raise NotImplementedError()
-        case 'root':
-            raise NotImplementedError()
         case _:
             raise ValueError(f"Unknown format {format}. Available formats are: {Format}")
 
 
-def save_npy(path: Pathlike, data, exist_ok: bool = False) -> None:
-    warn("Old code. Must be updated.")
+def save_npy(path: Pathlike, data, exist_ok: bool = False, **kwargs) -> None:
+    """ Save data to numpy file.
+
+    Relies on the `save` method of Matrix and Vector. If the aliases
+    are not named as expected, loading will fail.
+
+    Args:
+        path: Location.
+        data: The response data.
+        exist_ok: If `true`, existing files will be overwritten.
+    Returns:
+        None
+    """
     path = Path(path)
     path.mkdir(parents=True, exist_ok=exist_ok)
     meta = {'is_normalized': data.is_normalized, 'is_fwhm_normalized': data.is_fwhm_normalized,
@@ -207,17 +216,13 @@ def save_npy(path: Pathlike, data, exist_ok: bool = False) -> None:
     fname = path / 'compton.npz'
     if fname.exists() and not exist_ok:
         raise FileExistsError(f'File {fname} already exists.')
-
-    # TODO: Use batch save/load
-    mapping = {'values': data.compton.values, 'E_observed': data.E_observed,
-               'E_true': data.E}
-    np.savez(fname, **mapping)
+    data.compton.save(fname, **kwargs)
 
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff', 'FWHM')
     for field in fields:
         vec = getattr(data, field)
         if vec is not None:
-            vec.save(path / f'{field}.npz')
+            vec.save(path / f'{field}.npz', **kwargs)
 
 
 def convert_mama(output: Pathlike, path: Pathlike | None = None, data: Any | None = None, exist_ok: bool = False, **kwargs) -> None:

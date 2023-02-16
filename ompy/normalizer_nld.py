@@ -175,7 +175,7 @@ class NormalizerNLD(AbstractNormalizer):
         limit_low = self.limit_low
         limit_high = self.limit_high
 
-        discrete = self.self_if_none(discrete).to('MeV')
+        discrete = self.self_if_none(discrete).to_unit('MeV')
         nld = self.self_if_none(nld)
 
         self.norm_pars = self.self_if_none(norm_pars)
@@ -188,7 +188,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.res = ResultsNormalized(name="Results NLD")
 
         self.LOG.info(f"\n\n---------\nNormalizing nld #{num}")
-        nld = nld.clone().to('MeV')
+        nld = nld.clone().to_unit('MeV')
         self.LOG.debug("Setting NLD, convert to MeV")
         #nld.to_MeV()
 
@@ -630,10 +630,10 @@ class NormalizerNLD(AbstractNormalizer):
         elif isinstance(value, (str, Path)):
             if self.nld is None:
                 raise ValueError("`nld` must be set before loading levels")
-            nld = self.nld.clone().to('MeV')
+            nld = self.nld.clone().to_unit('MeV')
             self.LOG.debug("Set `discrete` levels from file with FWHM %s",
                            self.smooth_levels_fwhm)
-            self._discrete = load_levels_smooth(value, nld.E,
+            self._discrete = load_levels_smooth(value, nld.E_true,
                                                 self.smooth_levels_fwhm)
             #self._discrete.units = "MeV"
             self._discrete_path = value

@@ -3,9 +3,8 @@ from __future__ import annotations
 import copy
 import logging
 import warnings
-from ctypes import ArgumentError
 from pathlib import Path
-from typing import (Any, Dict, Iterable, Iterator, Sequence, Union, Callable, overload, Literal, Tuple)
+from typing import (Sequence, Union, overload, Literal, TypeAlias)
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
@@ -13,26 +12,55 @@ import numpy as np
 from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
-from .. import ureg
+from .. import ureg, Unit
 from .abstractarray import AbstractArray, to_plot_axis
 from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
-                           save_tar, save_txt_2D)
+                           save_tar, save_txt_2D, Filetype, resolve_filetype, load_npz_2D, save_npz_2D)
 from ..geometry import Line
 from ..library import (diagonal_elements, div0, fill_negative_gauss,
-                      handle_rebin_arguments)
-from .matrixstate import MatrixState
-#from .rebin import rebin_2D_uniform_left_left as rebin_2D
-from .rebin_old import rebin_2D
+                       handle_rebin_arguments, maybe_set)
 from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
                     Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
-from .vector import Vector
-from .index_fn import index_left as index
+from .vector import Vector, maybe_pop_from_kwargs
+from .index import Index, Edge, make_or_update_index
+from .rebin import rebin_2D
+from dataclasses import dataclass, field
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 #TODO mat*vec[:, None[ doesn't work
+AxisEither: TypeAlias = Literal[0, 1]
+AxisBoth: TypeAlias = Literal[0, 1, 2]
+Axis: TypeAlias = AxisEither | AxisBoth
+
+
+@dataclass(frozen=True, slots=True)
+class MatrixMetadata:
+    """Stores metadata for a Matrix.
+
+    """
+    valias: str = ''
+    vlabel: str = 'Counts'
+    name: str = ''
+    misc: dict[str, any] = field(default_factory=dict)
+
+    def clone(self, valias: str | None = None, vlabel: str | None = None,
+              name: str | None = None, misc: dict[str, any] | None = None) -> MatrixMetadata:
+        valias = valias if valias is not None else self.valias
+        vlabel = vlabel if vlabel is not None else self.vlabel
+        name = name if name is not None else self.name
+        misc = misc if misc is not None else self.misc
+        return MatrixMetadata(valias, vlabel, name, misc)
+
+    def update(self, **kwargs) -> MatrixMetadata:
+        return self.clone(**kwargs)
+
+    def add_comment(self, key: str, value: any) -> MatrixMetadata:
+        return self.update(misc=self.misc | {key: value})
+
+
 
 class Matrix(AbstractArray):
     """Stores 2d array with energy axes (a matrix).
@@ -85,142 +113,101 @@ class Matrix(AbstractArray):
         - Make values, Ex and Eg to properties so that
           the integrity of the matrix can be ensured.
     """
-    def __init__(self,
+    def __init__(self, *,
+                 X: arraylike | Index | None = None,
+                 Y: arraylike | Index | None = None,
                  values: np.ndarray | None = None,
-                 Eg: arraylike | None = None,
-                 Ex: arraylike | None = None,
                  std: np.ndarray | None = None,
-                 path: Pathlike | None = None,
-                 state: Union[str, MatrixState] | None = None,
-                 Ex_units: Unitlike = 'keV',
-                 Eg_units: Unitlike = 'keV',
-                 copy: bool = True,
-                 xlabel: str = r"$\gamma$-energy $E_{\gamma}$",
-                 ylabel: str = r"Excitation energy $E_{x}$"):
-        """
-        There is the option to initialize it in an empty state.
-        In that case, all class variables will be None.
-        It can be filled later using the load() method.
+                 unit: Unitlike | None = None,
+                 edge: Edge = 'left',
+                 boundary: bool = False,
+                 metadata: MatrixMetadata = MatrixMetadata(),
+                 order: Literal['C', 'F'] = 'C',
+                 copy: bool = False,
+                 indexkwargs: dict[str, any] | None = None,
+                 **kwargs):
+        #Resolve aliasing
+        kwargs, X, xalias = maybe_pop_from_kwargs(kwargs, X, 'X', 'xalias')
+        kwargs, Y, yalias = maybe_pop_from_kwargs(kwargs, Y, 'Y', 'yalias')
+        kwargs, values, valias = maybe_pop_from_kwargs(kwargs, values, 'values', 'valias')
+        xalias = xalias or kwargs.pop('xalias', None)
+        yalias = yalias or kwargs.pop('yalias', None)
+        if valias is not None:
+            kwargs['valias'] = valias
 
-        For initializing one can give values, [Ex, Eg] arrays,
-        a filename for loading a saved matrix or a shape
-        for initializing it with empty entries.
-
-        Args:
-            values: Set the matrix' values.
-            Eg: The gamma ray energies using midbinning.
-            Ex: The excitation energies using midbinning.
-            std: The standard deviations at each bin of `values`
-            path: Load a Matrix from a given path
-            state: An enum to keep track of what has been done to the matrix.
-                Can also be a str. like in ["raw", "unfolded", ...]
-            copy: Whether to copy the arguments or take them as reference.
-                Defaults to `True`.
-
-        """
         if copy:
             def fetch(x):
-                return np.asarray(x, dtype=float).copy()
+                return np.asarray(x, dtype=float, order=order).copy()
         else:
             def fetch(x):
-                return np.asarray(x, dtype=float)
+                return np.asarray(x, dtype=float, order=order)
 
-        self.std: np.ndarray | None = None
-        if path is not None:
-            if (values is not None or
-                Eg is not None or
-                Ex is not None):
-                LOG.warning(("Loading from path. Other arguments"
-                             "are ignored"))
-            self.load(path)
-        else:
-            if (values is None or
-                Eg is None or
-                Ex is None):
-                raise ValueError("Provide either values and energies, or path.")
-            try:
-                Eg_unit = Eg.units
-                self._Eg: ArrayKeV = np.atleast_1d(fetch(Eg.magnitude))*Eg_unit
-            except AttributeError:
-                #Eg_unit = ureg.Quantity(Eg_units)
-                #Eg_unit = ureg(Eg_units)
-                Eg_unit = ureg.Unit(Eg_units)
-                self._Eg: ArrayKeV = np.atleast_1d(fetch(Eg))*Eg_unit
-
-            try:
-                Ex_unit = Ex.units
-                self._Ex: ArrayKeV = np.atleast_1d(fetch(Ex.magnitude))*Ex_unit
-            except AttributeError:
-                #Ex_unit = ureg(Ex_units)
-                #Ex_unit = ureg.Quantity(Ex_units)
-                Ex_unit = ureg.Unit(Ex_units)
-                self._Ex: ArrayKeV = np.atleast_1d(fetch(Ex)) * Ex_unit
-
-            self.values = np.atleast_2d(fetch(values))
-
-        if std is not None:
-            self.std = np.atleast_2d(fetch(std))
-
-        self.state = state
-        self.xlabel = xlabel
-        self.ylabel = ylabel
-        self.loc = ValueLocator(self)
-        self.iloc = IndexLocator(self)
-
-        self.verify_integrity()
-
-    def verify_integrity(self, check_equidistant: bool = False):
-        """ Runs checks to verify internal structure
-
-        Args:
-            check_equidistant (bool, optional): Check whether energy array
-                are equidistant spaced. Defaults to False.
-
-        Raises:
-            ValueError: If any check fails
-        """
+        self.values = fetch(values)
         if self.values.ndim != 2:
-            raise ValueError(f"Values must be ndim 2, not {self.values.ndim}.")
+            raise ValueError(f"values must be 2D, not {self.values.ndim}")
+        self.std = fetch(std) if std is not None else None
+        if self.std is not None and self.std.shape != self.values.shape:
+            raise ValueError(f"std must have same shape as values, expected {self.values.shape}, got {self.std.shape}.")
 
-        # Check shapes:
-        shape = self.values.shape
-        if self.Ex.ndim == 1:
-            if shape[0] != len(self.Ex):
-                raise ValueError(("Shape mismatch between matrix and Ex:"
-                                  f" (_{shape[0]}_, {shape[1]}) ≠ "
-                                  f"{len(self.Ex)}"))
+        indexkwargs = indexkwargs or {}
+        default_xlabel = 'xlabel' not in kwargs
+        xlabel = kwargs.pop('xlabel', r"Excitation energy")
+        default_ylabel = 'ylabel' not in kwargs
+        ylabel = kwargs.pop('ylabel', r"$\gamma$-energy")
+        default_unit = False if unit is not None else True
+        unit = 'keV' if default_unit else unit
+        self.X_index = make_or_update_index(X, unit=Unit(unit), alias=xalias, label=xlabel,
+                                           default_label=default_xlabel,
+                                           default_unit=default_unit,
+                                           edge=edge, boundary=boundary,
+                                           **indexkwargs)
+        self.Y_index = make_or_update_index(Y, unit=Unit(unit), alias=yalias, label=ylabel,
+                                             default_label=default_ylabel,
+                                             default_unit=default_unit,
+                                             edge=edge, boundary=boundary,
+                                             **indexkwargs)
+        if len(self.X_index) != self.values.shape[0]:
+            _alias = f' ({xalias})' if xalias else ''
+            _valias = f' ({valias})' if valias else ''
+            raise ValueError(f"Length of X_index{_alias} must match first dimension of values{_valias}, expected {self.values.shape[0]}, got {len(self.X_index)}")
+        if len(self.Y_index) != self.values.shape[1]:
+            _alias = f' ({yalias})' if yalias else ''
+            _valias = f' ({valias})' if valias else ''
+            raise ValueError(f"Length of Y_index{_alias} must match second dimension of values{_valias}, expected {self.values.shape[1]}, got {len(self.Y_index)}")
+        wrong_kw = set(kwargs) - set(MatrixMetadata.__slots__)
+        if wrong_kw:
+            raise ValueError(f"Invalid keyword arguments: {', '.join(wrong_kw)}")
+        self.metadata = metadata.update(**kwargs)
+        self.iloc = IndexLocator(self)
+        self.vloc = ValueLocator(self)
+        self.loc = ValueLocator(self, strict=False)
+
+
+    def __getattr__(self, item) -> any:
+        meta: MatrixMetadata = self.__dict__['metadata']
+        xalias: str = self.__dict__['X_index'].alias
+        yalias: str = self.__dict__['Y_index'].alias
+        if item == xalias:
+            x = self.X
+        elif item == yalias:
+            x = self.Y
+        elif item == meta.valias:
+            x = self.__dict__['values']
+        elif item == 'd' + xalias:
+            x = self.dX
+        elif item == 'd' + yalias:
+            x = self.dY
+        elif item == 'index_' + xalias:
+            return self.index_X
+        elif item == 'index_' + yalias:
+            return self.index_Y
         else:
-            raise ValueError(f"Ex array must be ndim 1, not {self.Ex.ndim}")
+            x = super().__getattr__(item)
+        return x
 
-        if self.Eg.ndim == 1:
-            if shape[1] != len(self.Eg):
-                raise ValueError(("Shape mismatch between matrix and Eg:"
-                                  f" ({shape[0]}, _{shape[1]}_) ≠ "
-                                  f"{len(self.Eg)}"))
-        else:
-            raise ValueError(f"Eg array must be ndim 1, not {self.Eg.ndim}")
-
-        if check_equidistant and not self.is_equidistant():
-            raise ValueError("Is not equidistant.")
-
-        if self.std is not None:
-            if shape != self.std.shape:
-                raise ValueError("Shape mismatch between self.values and std.")
-
-    def is_equidistant(self) -> bool:
-        if len(self) <= 1:
-            return True
-
-        diff_Ex = (self.Ex - np.roll(self.Ex, 1))[1:]
-        diff_Eg = (self.Eg - np.roll(self.Eg, 1))[1:]
-        dEx = diff_Ex[0]
-        dEg = diff_Eg[0]
-        return (np.all(np.isclose(diff_Ex, dEx*np.ones_like(diff_Ex))) and
-                np.all(np.isclose(diff_Eg, dEg*np.ones_like(diff_Eg))))
-
-    def load(self, path: Union[str, Path],
-             filetype: str | None = None) -> None:
-        """ Load matrix from specified format
+    @classmethod
+    def from_path(cls, path: Pathlike, filetype: Filetype | None = None, **kwargs ) -> Matrix:
+        """ Load matrix from specified filetype
 
         Args:
             path (str or Path): path to file to load
@@ -230,335 +217,58 @@ class Matrix(AbstractArray):
         Raises:
             ValueError: If filetype is unknown
         """
-        path = Path(path) if isinstance(path, str) else path
-        if filetype is None:
-            filetype = filetype_from_suffix(path)
-        filetype = filetype.lower()
+        path = Path(path)
+        path, filetype = resolve_filetype(path, filetype)
 
-        if filetype == 'npy':
-            self.values, self._Eg, self._Ex = load_numpy_2D(path)
-        elif filetype == 'txt':
-            self.values, self._Eg, self._Ex = load_txt_2D(path)
-        elif filetype == 'tar':
-            self.values, self._Eg, self._Ex = load_tar(path)
-        elif filetype == 'mama':
-            self.values, self._Eg, self._Ex = mama_read(path)
-        else:
-            try:
-                self.values, self._Eg, self._Ex = mama_read(path)
-            except ValueError:  # from within mama_read
-                raise ValueError(f"Unknown filetype {filetype}")
-        self._Eg *= ureg('keV')
-        self._Ex *= ureg('keV')
-        self.verify_integrity()
+        match filetype:
+            case 'npz':
+                return load_npz_2D(path, cls, **kwargs)
+            case 'npy':
+                values, Y, X = load_numpy_2D(path)
+            case 'txt':
+                values, Y, X = load_txt_2D(path)
+            case 'tar':
+                values, Y, X = load_tar(path)
+            case 'mama':
+                values, Y, X = mama_read(path)
+            case _:
+                raise ValueError(f"Unknown filetype: {filetype}")
+        return cls(Ex=X, Eg=Y, values=values)
 
-    def save(self, path: Union[str, Path], filetype: str | None = None,
-             which: str | None = 'values', **kwargs):
+    def save(self, path: Pathlike, filetype: Filetype | None = None,
+             which: str | None = 'values', **kwargs) -> None:
         """Save matrix to file
 
         Args:
             path (str or Path): path to file to save
             filetype (str, optional): Filetype to save. Has an
                 auto-recognition. Options: ["numpy", "tar", "mama", "txt"]
-            which (str, optional): Which attribute to save. Default is
-                'values'. Options: ["values", "std"]
             **kwargs: additional keyword arguments
         Raises:
             ValueError: If filetype is unknown
-            RuntimeError: If `std` attribute not set.
-            NotImplementedError: If which is unknown
         """
-        path = Path(path) if isinstance(path, str) else path
-        if filetype is None:
-            filetype = filetype_from_suffix(path)
-        filetype = filetype.lower()
+        path = Path(path)
+        path, filetype = resolve_filetype(path, filetype)
 
-        values = None
-        if which.lower() == 'values':
-            values = self.values
-            if self.std is not None:
-                warnings.warn(UserWarning("The std attribute of Matrix class has to be saved to file 'manually'. Call with which='std'."))  # noqa
-        elif which.lower() == 'std':
-            if self.std is None:
-                raise RuntimeError(f"Attribute `std` not set.")
-            values = self.std
-        else:
-            raise NotImplementedError(
-                f"{which} is unsupported: Use 'values' or 'std'")
-
-        Eg = self._Eg.to('keV').magnitude
-        Ex = self._Ex.to('keV').magnitude
-        if filetype == 'npy':
-            save_numpy_2D(values, Eg, Ex, path)
-        elif filetype == 'txt':
-            save_txt_2D(values, Eg, Ex, path, **kwargs)
-        elif filetype == 'tar':
-            save_tar([values, Eg, Ex], path)
-        elif filetype == 'mama':
-            if which.lower() == 'std':
-                warnings.warn(UserWarning(
-                    "Cannot write std attrbute to MaMa format."))
-
-            mama_write(self, path, comment="Made by OMpy",
-                       **kwargs)
-        else:
-            raise ValueError(f"Unknown filetype {filetype}")
-
-    def calibration(self) -> Dict[str, np.ndarray]:
-        """ Calculates the calibration coefficients of the energy axes
-
-        Returns:
-            The calibration coefficients in a dictionary.
-        """
-        calibration = {
-            "a0x": self._Ex.to('keV').magnitude[0],
-            "a1x": self._Ex.to('keV').magnitude[1]-self._Ex.to('keV').magnitude[0],
-            "a0y": self._Eg.to('keV').magnitude[0],
-            "a1y": self._Eg.to('keV').magnitude[1]-self._Eg.to('keV').magnitude[0],
-        }
-        return calibration
-
-    def same_shape(self, other: array, error: bool = False) -> bool:
-        """ Check whether `other` has same shape `self.values`.
-
-        Args:
-            other (array-like): Object to compare to.
-
-        Returns:
-            Returns `True` if shapes are equal.
-        Raises:
-            ValueError: if shapes aren't equal and `error` is true.
-            TypeError: if `other` lacks `.shape`
-        """
-        return True  # Bug: Buggy implementation
-        try:
-            same = other.shape == self.shape
-        except AttributeError:
-            if error:
-                raise TypeError("Other needs to be array-like.")
-            else:
-                return False
-
-        if error and not same:
-            raise ValueError(f"Expected {self.shape}, got {other.shape}.")
-        return same
-
-
-    @overload
-    def plot(self, *, ax: Axes | None = None,
-             title: str | None = None,
-             scale: str | None = None,
-             vmin: float | None = None,
-             vmax: float | None = None,
-             midbin_ticks: bool = False,
-             add_cbar: Literal[True] = ...,
-             **kwargs) -> (Axes, (QuadMesh, Colorbar)): ...
-
-    @overload
-    def plot(self, *, ax: Axes | None = None,
-             title: str | None = None,
-             scale: str | None = None,
-             vmin: float | None = None,
-             vmax: float | None = None,
-             midbin_ticks: bool = False,
-             add_cbar: Literal[False] = ...,
-             **kwargs) -> (Axes, (QuadMesh, None)): ...
-
-    def plot(self, *, ax: Axes | None = None,
-             title: str | None = None,
-             scale: str | None = None,
-             vmin: float | None = None,
-             vmax: float | None = None,
-             midbin_ticks: bool = False,
-             add_cbar: bool = True,
-             **kwargs) -> (Axes, (QuadMesh, Colorbar | None)):
-        """ Plots the matrix with the energy along the axis
-
-        Args:
-            ax: A matplotlib axis to plot onto
-            title: Defaults to the current matrix state
-            scale: Scale along the z-axis. Can be either "log"
-                or "linear". Defaults to logarithmic
-                if number of counts > 1000
-            vmin: Minimum value for coloring in scaling
-            vmax Maximum value for coloring in scaling
-            add_cbar: Whether to add a colorbar. Defaults to True.
-            **kwargs: Additional kwargs to plot command.
-
-        Returns:
-            The ax used for plotting
-
-        Raises:
-            ValueError: If scale is unsupported
-        """
-        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
-        assert ax is not None
-        assert isinstance(fig, Figure)
-
-        if len(self.Ex) <= 1 or len(self.Eg) <= 1:
-            raise ValueError("Number of bins must be greater than 1")
-
-        if scale is None:
-            scale = 'log' if self.counts > 1000 else 'linear'
-        if scale == 'log':
-            if vmin is not None and vmin <= 0:
-                raise ValueError("`vmin` must be positive for log-scale")
-            if vmin is None:
-                _max = np.log10(self.max())
-                _min = np.log10(self.values[self.values > 0].min())
-                if _max - _min > 10:
-                    vmin = 10**(int(_max-6))
-            norm = LogNorm(vmin=vmin, vmax=vmax)
-        elif scale == 'symlog':
-            lintresh = kwargs.pop('lintresh', 1e-1)
-            linscale = kwargs.pop('linscale', 1)
-            norm = SymLogNorm(lintresh, linscale, vmin, vmax)
-        elif scale == 'linear':
-            norm = Normalize(vmin=vmin, vmax=vmax)
-        else:
-            raise ValueError("Unsupported zscale ", scale)
-        norm = kwargs.pop('norm', norm)
-        Eg, Ex = self.plot_bins()
-
-        # Set entries of 0 to white
-        current_cmap = copy.copy(cm.get_cmap())
-        current_cmap.set_bad(color='white')
-        kwargs.setdefault('cmap', current_cmap)
-        mask = np.isnan(self.values) | (self.values == 0)
-        masked = np.ma.array(self.values, mask=mask)
-
-        mesh = ax.pcolormesh(Eg, Ex, masked, norm=norm, **kwargs)
-        if midbin_ticks:
-            ax.xaxis.set_major_locator(MeshLocator(self.Eg))
-            ax.tick_params(axis='x', rotation=40)
-            ax.yaxis.set_major_locator(MeshLocator(self.Ex))
-        # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
-
-        ax.set_title(title if title is not None else self.state)
-        ax.set_xlabel(self.xlabel + f" [${self.Eg_units:~L}$]")
-        ax.set_ylabel(self.ylabel + f" [${self.Ex_units:~L}$]")
-
-        # show z-value in status bar
-        # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
-        def format_coord(x, y):
-            xarr = Eg
-            yarr = Ex
-            if ((x > xarr.min()) & (x <= xarr.max())
-               & (y > yarr.min()) & (y <= yarr.max())):
-                col = np.searchsorted(xarr, x)-1
-                row = np.searchsorted(yarr, y)-1
-                z = masked[row, col]
-                return f'x={x:1.2f}, y={y:1.2f}, z={z:1.2E}'
-                # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
-            else:
-                return f'x={x:1.0f}, y={y:1.0f}'
-        # TODO: Takes waaaay to much CPU
-        def nop(x, y):
-            return ''
-        ax.format_coord = nop
-
-        cbar: Colorbar | None = None
-        if add_cbar:
-            if vmin is not None and vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='both')
-            elif vmin is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='min')
-            elif vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='max')
-            else:
-                cbar = fig.colorbar(mesh, ax=ax)
-
-            # cbar.ax.set_ylabel("# counts")
-            # plt.show()
-        return ax, (mesh, cbar)
-
-    def plot_bins(self):
-        # Move all bins down to lower bins
-        self.to_lower_bin()
-        # Must extend it the range to make pcolormesh happy
-        dEg = self.Eg[-1] - self.Eg[-2]
-        dEx = self.Ex[-1] - self.Ex[-2]
-        Eg = np.append(self.Eg, self.Eg[-1] + dEg)
-        Ex = np.append(self.Ex, self.Ex[-1] + dEx)
-        # Move the bins back up
-        self.to_mid_bin()
-        return Eg, Ex
-
-    def cut(self, axis: Union[int, str],
-            Emin: float | None = None,
-            Emax: float | None = None,
-            inplace: bool = False,
-            Emin_inclusive: bool = True,
-            Emax_inclusive: bool = True) -> Matrix | None:
-        """Cuts the matrix to the sub-interval limits along given axis.
-
-        Args:
-            axis: Which axis to apply the cut to.
-                Can be 0, "Eg" or 1, "Ex".
-            Emin: Lowest energy to be included. Defaults to
-                lowest energy. Inclusive by default.
-            Emax: Higest energy to be included. Defaults to
-                highest energy. Inclusive by default.
-            inplace: If True make the cut in place. Otherwise return a new
-                matrix. Defaults to False.
-            Emin_inclusive: whether the bin containing the lower bin
-                should be included (True) or excluded (False).
-                Defaults to True.
-            Emax_inclusive: whether the bin containing the higest bin
-                should be included (True) or excluded (False).
-                Defaults to True.
-
-        Returns:
-            None if inplace == False
-            cut_matrix (Matrix): The cut version of the matrix
-        """
-        warnings.warn("To be deprecated in favor of mat[i:j, n:m]", DeprecationWarning)
-        axis = to_plot_axis(axis)
-        range = self.Eg if axis == 0 else self.Ex
-        index = self.index_Eg if axis == 0 else self.index_Ex
-        magnitude = self.to_same_Eg if axis == 0 else self.to_same_Ex
-        Emin = magnitude(Emin) if Emin is not None else min(range)
-        Emax = magnitude(Emax) if Emax is not None else max(range)
-
-        iEmin = index(Emin)
-        if range[iEmin] < Emin:
-            iEmin += 1
-        if not Emin_inclusive:
-            iEmin += 1
-
-        iEmax = index(Emax)
-        if range[iEmax] > Emax:
-            iEmax -= 1
-        if not Emax_inclusive:
-            iEmax -= 1
-
-        # Fix for boundaries
-        if iEmin >= len(range):
-            iEmin = len(range)-1
-        if iEmax <= 0:
-            iEmax = 0
-        iEmax += 1  # Because of slicing
-        Eslice = slice(iEmin, iEmax)
-        Ecut = range[Eslice]
-
-        if axis == 0:
-            values_cut = self.values[:, Eslice]
-            Eg = Ecut*self.Eg_units
-            Ex = self._Ex
-        elif axis == 1:
-            values_cut = self.values[Eslice, :]
-            Ex = Ecut*self.Eg_units
-            Eg = self._Eg
-        else:
-            raise ValueError("`axis` must be 0 or 1.")
-
-        if inplace:
-            self.values = values_cut
-            self._Ex = Ex
-            self._Eg = Eg
-        else:
-            return self.clone(values=values_cut, Eg=Eg, Ex=Ex)
+        X = self.X_index.to_unit('keV').bins
+        Y = self.Y_index.to_unit('keV').bins
+        match filetype:
+            case 'npz':
+                save_npz_2D(path, self, **kwargs)
+            case 'npy':
+                warnings.warn("Saving as numpy is deprecated, use npz instead")
+                save_numpy_2D(self.values, Y, X, path)
+            case 'txt':
+                warnings.warn("Saving to .txt does not preserve metadata. Use .npz instead.")
+                save_txt_2D(self.values, Y, X, path, **kwargs)
+            case 'tar':
+                warnings.warn("Saving to .tar does not preserve metadata. Use .npz instead.")
+                save_tar([self.values, Y, X], path)
+            case 'mama':
+                warnings.warn("MAMA format does not preserve metadata.")
+                mama_write(self, path, comment="Made by OMpy", **kwargs)
+            case _:
+                raise ValueError(f"Unknown filetype: {filetype}")
 
     def cut_like(self, other: Matrix,
                  inplace: bool = False) -> Matrix | None:
@@ -569,7 +279,7 @@ class Matrix(AbstractArray):
             inplace (bool, optional): If True make the cut in place. Otherwise
                 return a new matrix. Defaults to False.
 
-        Returns:
+nameReurns:
             Matrix | None: If inplace is False, returns the cut matrix
         """
         if inplace:
@@ -629,6 +339,7 @@ class Matrix(AbstractArray):
             -possibility to have inclusive or exclusive cut
             -Remove and move into geometry as Trapezoid
         """
+        raise NotImplementedError()
         matrix = self.clone()
         Ex_min = self.to_same_Ex(Ex_min)
         Ex_max = self.to_same_Ex(Ex_max)
@@ -706,7 +417,7 @@ class Matrix(AbstractArray):
             ValueError if the axis is not a valid axis.
         """
 
-        axis: int = to_plot_axis(axis)
+        axis: AxisBoth = self.axis_to_int(axis, allow_both=True)
         if axis == 2:
             if inplace:
                 self.rebin(axis=0, bins=bins, factor=factor,
@@ -720,47 +431,26 @@ class Matrix(AbstractArray):
                 new = self.rebin(axis=0, bins=bins, factor=factor,
                                  binwidth=binwidth, inplace=False,
                                  numbins=numbins)
-                return new.rebin(axis=1, bins=bins, factor=factor,
-                                 binwidth=binwidth, inplace=False,
-                                 numbins=numbins)
-
-        oldbins = self.Ex if axis else self.Eg
-        transform = self.to_same_Ex if axis else self.to_same_Eg
-        unit = self.Ex_units if axis else self.Eg_units
-
-        newbins = handle_rebin_arguments(bins=oldbins, transform=transform,
-                                         LOG=LOG, factor=factor, newbins=bins,
-                                         binwidth=binwidth, numbins=numbins)
-
-        naxis = (axis + 1) % 2
-        rebinned = rebin_2D(self.values, oldbins, newbins, naxis)
-        #rebinned = rebin_2D(oldbins, newbins, self.values, axis=naxis, preserve=preserve)
-
-
-        if inplace:
-            self.values = rebinned
-            if axis:
-                self._Ex = newbins * unit
+                new.rebin(axis=1, bins=bins, factor=factor,
+                        binwidth=binwidth, inplace=True,
+                        numbins=numbins)
+                return new
+        if axis == 0:
+            bins: Index = self.X_index.handle_rebin_arguments(bins=bins, factor=factor, binwidth=binwidth, numbins=numbins)
+            rebinned = rebin_2D(self.X_index, bins, self.values, axis=0, preserve=preserve)
+            if inplace:
+                self.values = rebinned
+                self.X_index = bins
             else:
-                self._Eg = newbins * unit
-            self.verify_integrity()
+                return self.clone(X=bins, values=rebinned)
         else:
-            if naxis:
-                return self.clone(Eg=newbins*unit, values=rebinned)
+            bins: Index = self.Y_index.handle_rebin_arguments(bins=bins, factor=factor, binwidth=binwidth, numbins=numbins)
+            rebinned = rebin_2D(self.Y_index, bins, self.values, axis=1, preserve=preserve)
+            if inplace:
+                self.values = rebinned
+                self.Y_index = bins
             else:
-                return self.clone(Ex=newbins*unit, values=rebinned)
-
-    def diagonal_elements(self) -> Iterator[(int, int)]:
-        """ Iterates over the last non-zero elements
-        Note:
-            Assumes that the matrix is diagonal, i.e. that there are no
-            entries with `Eg > Ex + dE`.
-        Args:
-            mat: The matrix to iterate over
-            Iterator[(int, int]): Indicies (i, j) over the last
-                non-zero(=diagonal) elements.
-        """
-        return diagonal_elements(self.values)
+                return self.clone(Y=bins, values=rebinned)
 
     @overload
     def fill_negative(self, window: numeric | array, inplace: bool = Literal[False]) -> Matrix: ...
@@ -769,6 +459,7 @@ class Matrix(AbstractArray):
 
     def fill_negative(self, window: numeric | array, inplace: bool = False) -> Matrix | None:
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
+        raise NotImplementedError()
         if not inplace:
             return self.clone(values=fill_negative_gauss(self.values, self.Eg, window))
         self.values = fill_negative_gauss(self.values, self.Eg, window)
@@ -776,6 +467,7 @@ class Matrix(AbstractArray):
     def remove_negative(self, inplace=False) -> Matrix | None:
         """ Entries with negative values are set to 0 """
         raise DeprecationWarning("Use matrix[matrix < 0] = 0 instead")
+        raise NotImplementedError()
         if not inplace:
             return self.clone(values=np.where(self.values > 0, self.values, 0))
         self.values[self.values > 0] = np.where(self.values > 0, self.values, 0)
@@ -803,99 +495,13 @@ class Matrix(AbstractArray):
         self.fill_negative(window=window, inplace=True)
         self.values[self.values < 0] = 0
 
-    def index_Eg(self, E: Unitlike) -> int:
-        """ Returns the closest index corresponding to the Eg value """
-        E = self.to_same_Eg(E)
-        # Almost as fast, but numba is much faster(!?)
-        return index(self.Eg, E) #np.searchsorted(self.Eg, E, side='left')
+    def index_X(self, x: float) -> int:
+        return self.X_index.index(x)
 
-    def index_Ex(self, E: Unitlike) -> int:
-        """ Returns the closest index corresponding to the Ex value """
-        E = self.to_same_Ex(E)
-        return index(self.Ex, E) #np.searchsorted(self.Ex, E, side='left')
+    def index_Y(self, x: float) -> int:
+        return self.Y_index.index(x)
 
-    def index_Eg_extended(self, E: Unitlike) -> float:
-        """ Assumes a continuous mapping R[index] -> R[energy] """
-        E = self.to_same_Eg(E)
-        return (E-self.Eg[0])/self.dEg
-
-    def index_Ex_extended(self, E: Unitlike) -> float:
-        """ Assumes a continuous mapping R[index] -> R[energy] """
-        E = self.to_same_Eg(E)
-        return (E-self.Ex[0])/self.dEx
-
-    def indices_Eg(self, E: Iterable[Unitlike]) -> ArrayInt:
-        """ Returns the closest indices corresponding to the Eg value"""
-        e = [self.to_same_Eg(e_) for e_ in E]
-        return np.searchsorted(self.Eg, e)
-
-    def indices_Ex(self, E: Iterable[Unitlike]) -> ArrayInt:
-        """ Returns the closest indices corresponding to the Ex value"""
-        e = [self.to_same_Ex(e_) for e_ in E]
-        return np.searchsorted(self.Ex, e)
-
-    @property
-    def range_Eg(self) -> np.ndarray:
-        """ Returns all indices of Eg """
-        return np.arange(0, len(self.Eg), dtype=int)
-
-    @property
-    def range_Ex(self) -> np.ndarray:
-        """ Returns all indices of Ex """
-        return np.arange(0, len(self.Ex), dtype=int)
-
-    @property
-    def shape(self) -> (int, int):
-        return self.values.shape
-
-    @property
-    def counts(self) -> float:
-        return self.values.sum()
-
-    @property
-    def state(self) -> MatrixState:
-        return self._state
-
-    @state.setter
-    def state(self, state: Union[str, MatrixState]) -> None:
-        if state is None:
-            self._state = None
-        elif isinstance(state, str):
-            self._state = MatrixState.str_to_state(state)
-        # Buggy. Impossible to compare type of Enum??
-        elif type(state) == type(MatrixState.RAW):
-            self._state = state
-        else:
-            raise ValueError(f"state must be str or MatrixState"
-                             f". Got {type(state)}")
-
-    def to_same_Ex(self, E: Unitlike) -> float:
-        """ Convert the units of E to the unit of `Ex` and return magnitude.
-
-        Args:
-            E: Convert its units to the same units of `Ex`.
-               If `E` is dimensionless, assume to be of the same unit
-               as `Ex`.
-        """
-        E = ureg.Quantity(E)
-        if not E.dimensionless:
-            E = E.to(self.Ex_units)
-        return E.magnitude
-
-    def to_same_Eg(self, E: Unitlike) -> float:
-        """ Convert the units of E to the unit of `Eg` and return magnitude.
-
-        Args:
-            E: Convert its units to the same units of `Eg`.
-               If `E` is dimensionless, assume to be of the same unit
-               as `Eg`.
-        """
-        E = ureg.Quantity(E)
-        if not E.dimensionless:
-            E = E.to(self.Eg_units)
-        return E.magnitude
-
-    def to(self, unit: str, inplace: bool = False) -> Matrix:
+    def to_unit(self, unit: Unitlike, axis: str | int = 'both', inplace: bool = False) -> None | Matrix:
         """ Returns a copy with units set to `unit`.
 
         Args:
@@ -904,80 +510,85 @@ class Matrix(AbstractArray):
             A copy of the matrix with the unit of `Ex` and
             `Eg` set to `unit`.
         """
+        axis: AxisBoth = self.axis_to_int(axis, allow_both=True)
+        xindex = self.X_index
+        yindex = self.Y_index
+        match axis:
+            case 0:
+                xindex = xindex.to_unit(unit)
+            case 1:
+                yindex = yindex.to_unit(unit)
+            case 2:
+                xindex = xindex.to_unit(unit)
+                yindex = yindex.to_unit(unit)
         if inplace:
-            self._Eg = self._Eg.to(unit)
-            self._Ex = self._Ex.to(unit)
-            return self
+            self.X_index = xindex
+            self.Y_index = yindex
+        else:
+            return self.clone(X=xindex, Y=yindex)
 
-        new = self.clone(Ex=self._Ex.to(unit), Eg=self._Eg.to(unit))
-        return new
+    def to_mid(self, axis: int | str = 'both', inplace: bool = False) -> None | Matrix:
+        """ Returns a copy with the bins set to the midpoints of the bins.
 
-    def to_lower_bin(self):
-        """ Transform Eg and Ex from mid bin (=default) to lower bin. """
-        dEx = (self._Ex[1] - self._Ex[0])/2
-        dEg = (self._Eg[1] - self._Eg[0])/2
-        self._Ex -= dEx
-        self._Eg -= dEg
-
-    def to_mid_bin(self) -> Matrix:
-        """ Transform Eg and Ex from lower bin to mid bin (=default). """
-        dEx = (self._Ex[1] - self._Ex[0])/2
-        dEg = (self._Eg[1] - self._Eg[0])/2
-        self._Ex += dEx
-        self._Eg += dEg
-        return self
-
-    def set_order(self, order: str) -> Matrix:
-        self.values = self.values.copy(order=order)
-        self._Ex = self._Ex.copy(order=order)
-        self._Eg = self._Eg.copy(order=order)
-        return self
-
-    def iter(self) -> Iterator[(int, int)]:
-        for row in range(self.shape[0]):
-            for col in range(self.shape[1]):
-                yield row, col
-
-    def has_equal_binning(self, other, **kwargs) -> bool:
-        """ Check whether `other` has equal binning as `self` within precision.
         Args:
-            other (Matrix): Matrix to compare to.
-            **kwargs: Additional kwargs to `np.allclose`.
-
+            axis: The axis to transform. Defaults to both.
+            inplace: Change the matrix inplace or return a copy.
         Returns:
-            bool (bool): Returns `True` if both arrays are equal  .
-
-        Raises:
-            TypeError: If other is not a Matrix
-            ValueError: If any of the bins in any of the arrays are not equal.
-
+            A copy of the matrix with the bins set to the midpoints of the bins.
         """
-        return True  # BUG:  Buggy implementatin down to the root
-        if not isinstance(other, Matrix):
-            raise TypeError("Other must be a Matrix")
-        if np.any(self.shape != other.shape):
-            raise ValueError("Must have equal number of energy bins.")
-        if not np.allclose(self._Ex, other._Ex, **kwargs) \
-           or not np.allclose(self._Eg, other._Eg, **kwargs):
-            raise ValueError("Must have equal energy binning.")
+        return self.to_edge('mid', axis=axis, inplace=inplace)
+
+    def to_left(self, axis: int | str = 'both', inplace: bool = False) -> None | Matrix:
+        """ Returns a copy with the bins set to the left edges of the bins.
+
+        Args:
+            axis: The axis to transform. Defaults to both.
+            inplace: Change the matrix inplace or return a copy.
+        Returns:
+            A copy of the matrix with the bins set to the left edges of the bins.
+        """
+        return self.to_edge('left', axis=axis, inplace=inplace)
+
+    def to_edge(self, edge: Literal['left', 'mid'], axis: int | str = 'both', inplace: bool = False) -> None | Matrix:
+        """ Returns a copy with the bins set to the left or mid edges of the bins.
+
+        Args:
+            edge: The edge to transform to. Either 'left' or 'mid'.
+            axis: The axis to transform. Defaults to both.
+            inplace: Change the matrix inplace or return a copy.
+        Returns:
+            A copy of the matrix with the bins set to the left or mid edges of the bins.
+        """
+        axis: AxisBoth = self.axis_to_int(axis, allow_both=True)
+        xindex = self.X_index
+        yindex = self.Y_index
+        match axis:
+            case 0:
+                xindex = xindex.to_edge(edge)
+            case 1:
+                yindex = yindex.to_edge(edge)
+            case 2:
+                xindex = xindex.to_edge(edge)
+                yindex = yindex.to_edge(edge)
+        if inplace:
+            self.X_index = xindex
+            self.Y_index = yindex
         else:
-            return True
+            return self.clone(X=xindex, Y=yindex)
+
+
+    def set_order(self, order: str) -> None:
+        self.values = self.values.copy(order=order)
+        self.X_index = self.X_index.clone(order=order)
+        self.Y_index = self.Y_index.clone(order=order)
 
     @property
-    def dEx(self) -> float:
-        if True: #self.is_equidistant():
-            return self.Ex[1] - self.Ex[0]
-        else:
-            Ex = self.Ex
-            return (np.roll(Ex, 1) - self.Ex)[1:]
+    def dX(self) -> float | np.ndarray:
+        return self.X_index.steps()
 
     @property
-    def dEg(self) -> float:
-        if True: #self.is_equidistant():
-            return self.Eg[1] - self.Eg[0]
-        else:
-            Eg = self.Eg
-            return (np.roll(Eg, 1) - self.Eg)[1:]
+    def dY(self) -> float | np.ndarray:
+        return self.Y_index.steps()
 
     def from_mask(self, mask: ArrayBool) -> Matrix | Vector:
         """ Returns a copy of the matrix with only the rows and columns  where `mask` is True.
@@ -1001,65 +612,33 @@ class Matrix(AbstractArray):
         values = self.values[rmin:rmax+1, cmin:cmax+1]
         return self.__class__(values, Ex=self.Ex[rmin:rmax+1], Eg=self.Eg[cmin:cmax+1])
 
-    def __matmul__(self, other: Matrix | Vector) -> Matrix | Vector:
-        # cannot use has_equal_binning as we don't need the same
-        # shape for Ex and Eg.
-        # HACK isinstance doesn't work (autoreload?)
-        if str(other.__class__.__name__) == 'Matrix':
-            if not np.allclose(self.Eg, other.Ex):
-                raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
-        elif str(other.__class__.__name__) == 'Vector':
-            if not np.allclose(self.Eg, other.E):
-                raise ValueError("Incompatible shapes {self.shape}, {other.shape}")
-            values = self.values @ other.values
-            return Vector(values=values, E=other.E)
-        else:
-            raise NotImplementedError(f"Matrix@{type(other)} not implemented")
-
-        Ex = self.Ex
-        Eg = other.Eg
-        values = self.values@other.values
-        # TODO how to handle labels??
-        return Matrix(values=values, Ex=Ex, Eg=Eg)
-
-    def __neg__(self):
-        return self.clone(values=-self.values)
-
     @property
-    def T(self) -> 'Matrix':
+    def T(self) -> Matrix:
         values = self.values.T
         assert self.std is None
-        return self.clone(values=values, Eg=self.Ex, Ex=self.Eg,
-                          xlabel=self.ylabel, ylabel=self.xlabel)
+        return self.clone(values=values, X=self.X, Y=self.Y)
 
     @property
     def _summary(self) -> str:
-        if self.is_equidistant():
-            m, n = self.shape
-            s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
-            s += f"{n} bins with dEᵧ: {self.dEg}\n"
-            s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
-            s += f"{m} bins with dEₓ: {self.dEx}\n"
-            s += f"Total counts: {self.sum():,}\n"
-        else:
-            s = f"Eᵧ: {self.Eg[0]} to {self.Eg[-1]} [{self.Eg_units:~}]\n"
-            s += f"Eₓ: {self.Ex[0]} to {self.Ex[-1]} [{self.Ex_units:~}]\n"
-            s += f"Variable bin width.\n"
+        s = f'X index:\n{self.X_index.summary()}\n'
+        s += f'Y index:\n{self.Y_index.summary()}\n'
+        if len(self.metadata.misc) > 0:
+            s += 'Metadata:\n'
+            for key, val in self.metadata.misc.items():
+                s += f'\t{key}: {val}\n'
+        s += f'Total counts: {self.sum():.3g}'
         return s
 
     def summary(self):
         print(self._summary)
 
     def sum(self, axis: int | str = 'both') -> Vector | float:
-        axis = to_plot_axis(axis)
+        axis: AxisBoth = self.axis_to_int(axis, allow_both=True)
         if axis == 2:
             return self.values.sum()
-
-        isEx = axis == 0
-        values = self.values.sum(axis=int(not axis))
-        label = self.ylabel if isEx else self.xlabel
-        E = self.Ex if isEx else self.Eg
-        return Vector(E=E, values=values, xlabel=label)
+        values = self.values.sum(axis=axis)
+        index = self.X_index if axis else self.Y_index
+        return self.meta_into_vector(index=index, values=values)
 
 
     def __str__(self) -> str:
@@ -1071,22 +650,17 @@ class Matrix(AbstractArray):
             return summary+str(self.values)
 
     @property
-    def Ex(self) -> np.ndarray:
-        return self._Ex.magnitude
+    def X(self) -> np.ndarray:
+        return self.X_index.bins
 
     @property
-    def Eg(self) -> np.ndarray:
-        return self._Eg.magnitude
+    def Y(self) -> np.ndarray:
+        return self.Y_index.bins
 
-    @property
-    def Eg_units(self) -> Any:
-        return self._Eg.units
-
-    @property
-    def Ex_units(self) -> Any:
-        return self._Ex.units
-
-    def clone(self, **kwargs) -> Matrix:
+    def clone(self, X: Index | None = None, Y: Index | None = None,
+              values: np.ndarray | None = None, std: np.ndarray | None = None,
+              metadata: MatrixMetadata | None = None, copy: bool = False,
+              **kwargs) -> Matrix:
         """ Copies the object.
 
         Any keyword argument will override the equivalent
@@ -1098,72 +672,291 @@ class Matrix(AbstractArray):
         Returns:
             The copy
         """
-        Eg = kwargs.pop('Eg', self._Eg)
-        Ex = kwargs.pop('Ex', self._Ex)
-        values = kwargs.pop('values', self.values)
-        std = kwargs.pop('std', self.std)
-        order = kwargs.pop('order', None)
-        Ex_units = kwargs.pop('Ex_units', self.Ex_units)
-        Eg_units = kwargs.pop('Eg_units', self.Eg_units)
-        xlabel = kwargs.pop('xlabel', self.xlabel)
-        ylabel = kwargs.pop('ylabel', self.ylabel)
-        for key in kwargs.keys():
-            raise RuntimeError(f"Matrix has no setable attribute {key}.")
+        X = X if X is not None else self.X_index
+        Y = Y if Y is not None else self.Y_index
+        values = values if values is not None else self.values
+        std  = std if std is not None else self.std
+        metadata = metadata if metadata is not None else self.metadata
+        metadata = metadata.update(**kwargs)
+        return Matrix(X=X, Y=Y, values=values, std=std, metadata=metadata, copy=copy)
 
-        matrix = Matrix(Ex=Ex, Eg=Eg, values=values, std=std,
-                        Ex_units=Ex_units, Eg_units=Eg_units,
-                        xlabel=xlabel, ylabel=ylabel)
-        if order is not None:
-            matrix.set_order(order)
-        return matrix
+    def is_compatible_with(self, other: AbstractArray | Index) -> bool:
+        return self.is_compatible_with_X(other) or self.is_compatible_with_Y(other)
 
-    def __lt__(self, other):
+    def is_compatible_with_X(self, other: AbstractArray | Index) -> bool:
         match other:
+            case Index():
+                return self.X_index.is_compatible_with(other)
             case Matrix():
-                raise NotImplementedError("Matrix <= Matrix not implemented")
+                return self.X_index.is_compatible_with(other.X_index)
+            case Vector():
+                return self.X_index.is_compatible_with(other._index)
             case _:
-                return self.values <= other
+                return False
 
-    def normalize(self, axis: str | int, inplace=False) -> Matrix | None:
-        s = self.sum(axis)
-        axis = to_plot_axis(axis)
+    def is_compatible_with_Y(self, other: AbstractArray | Index) -> bool:
+        match other:
+            case Index():
+                return self.Y_index.is_compatible_with(other)
+            case Matrix():
+                return self.Y_index.is_compatible_with(other.Y_index)
+            case Vector():
+                return self.Y_index.is_compatible_with(other._index)
+            case _:
+                return False
+
+    def normalize(self, axis: str | Literal[0, 1, 2], inplace=False) -> Matrix | None:
+        axis: AxisBoth = self.axis_to_int(axis, allow_both=True)
         if not inplace:
-            if axis == 0:
-                values = self.values/s.values[:, np.newaxis]
-            elif axis == 1:
-                values = self.values/s.values[np.newaxis, :]
-            elif axis == 2:
-                values = self.values/s
+            match axis:
+                case 0:
+                    s = self.values.sum(axis=0)
+                    s[s == 0] = 1
+                    values = self.values/s[np.newaxis, :]
+                case 1:
+                    s = self.values.sum(axis=1)
+                    s[s == 0] = 1
+                    values = self.values/s[:, np.newaxis]
+                case 2:
+                    s = sum(self.values)
+                    values = self.values/s
             return self.clone(values=values)
         else:
-            if axis == 0:
-                self.values /= s.values[:, np.newaxis]
-            elif axis == 1:
-                self.values /= s.values[np.newaxis, :]
-            elif axis == 2:
-                self.values /= s
+            match axis:
+                case 0:
+                    s = self.values.sum(axis=0)
+                    s[s == 0] = 1
+                    self.values /= s[np.newaxis, :]
+                case 1:
+                    s = self.values.sum(axis=1)
+                    s[s == 0] = 1
+                    self.values /= s[:, np.newaxis]
+                case 2:
+                    s = sum(self.values)
+                    self.values /= s
 
+    @overload
+    def plot(self, *, ax: Axes | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
+             add_cbar: Literal[True] = ...,
+             **kwargs) -> (Axes, (QuadMesh, Colorbar)): ...
+
+    @overload
+    def plot(self, *, ax: Axes | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
+             add_cbar: Literal[False] = ...,
+             **kwargs) -> (Axes, (QuadMesh, None)): ...
+
+    def plot(self, *, ax: Axes | None = None,
+             scale: str | None = None,
+             vmin: float | None = None,
+             vmax: float | None = None,
+             add_cbar: bool = True,
+             **kwargs) -> (Axes, (QuadMesh, Colorbar | None)):
+        """ Plots the matrix with the energy along the axis
+
+        Args:
+            ax: A matplotlib axis to plot onto
+            title: Defaults to the current matrix state
+            scale: Scale along the z-axis. Can be either "log"
+                or "linear". Defaults to logarithmic
+                if number of counts > 1000
+            vmin: Minimum value for coloring in scaling
+            vmax Maximum value for coloring in scaling
+            add_cbar: Whether to add a colorbar. Defaults to True.
+            **kwargs: Additional kwargs to plot command.
+
+        Returns:
+            The ax used for plotting
+
+        Raises:
+            ValueError: If scale is unsupported
+        """
+        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
+        assert ax is not None
+        assert isinstance(fig, Figure)
+
+        if scale is None:
+            scale = 'log' if self.sum() > 1000 else 'linear'
+        if scale == 'log':
+            if vmin is not None and vmin <= 0:
+                raise ValueError("`vmin` must be positive for log-scale")
+            if vmin is None:
+                _max = np.log10(self.max())
+                _min = np.log10(self.values[self.values > 0].min())
+                if _max - _min > 10:
+                    vmin = 10**(int(_max-6))
+            norm = LogNorm(vmin=vmin, vmax=vmax)
+        elif scale == 'symlog':
+            lintresh = kwargs.pop('lintresh', 1e-1)
+            linscale = kwargs.pop('linscale', 1)
+            norm = SymLogNorm(lintresh, linscale, vmin, vmax)
+        elif scale == 'linear':
+            norm = Normalize(vmin=vmin, vmax=vmax)
+        else:
+            raise ValueError("Unsupported zscale ", scale)
+        norm = kwargs.pop('norm', norm)
+        if self.X_index.is_mid():
+            X = self.X_index.to_left().ticks()
+        else:
+            X = self.X_index.ticks()
+
+        if self.Y_index.is_mid():
+            Y = self.Y_index.to_left().ticks()
+        else:
+            Y = self.Y_index.ticks()
+
+        # Set entries of 0 to white
+        current_cmap = copy.copy(cm.get_cmap())
+        current_cmap.set_bad(color='white')
+        kwargs.setdefault('cmap', current_cmap)
+        mask = np.isnan(self.values) | (self.values == 0)
+        masked = np.ma.array(self.values, mask=mask)
+
+        mesh = ax.pcolormesh(Y, X, masked, norm=norm, **kwargs)
+        if self.Y_index.is_mid():
+            ax.xaxis.set_major_locator(MeshLocator(self.Y))
+            ax.tick_params(axis='x', rotation=40)
+        if self.X_index.is_mid():
+            ax.yaxis.set_major_locator(MeshLocator(self.X))
+        #if midbin_ticks:
+        #    ax.xaxis.set_major_locator(MeshLocator(self.X))
+        #    ax.tick_params(axis='x', rotation=40)
+        #    ax.yaxis.set_major_locator(MeshLocator(self.Y))
+        # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
+        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
+
+        maybe_set(ax, 'title', self.name)
+        maybe_set(ax, 'ylabel', self.xlabel + f" [${self.X_index.unit:~L}$]")
+        maybe_set(ax, 'xlabel', self.ylabel + f" [${self.Y_index.unit:~L}$]")
+
+        # show z-value in status bar
+        # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
+        def format_coord(x, y):
+            xarr = X
+            yarr = Y
+            if ((x > xarr.min()) & (x <= xarr.max())
+                    & (y > yarr.min()) & (y <= yarr.max())):
+                col = np.searchsorted(xarr, x)-1
+                row = np.searchsorted(yarr, y)-1
+                z = masked[row, col]
+                return f'x={x:1.2f}, y={y:1.2f}, z={z:1.2E}'
+                # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
+            else:
+                return f'x={x:1.0f}, y={y:1.0f}'
+        # TODO: Takes waaaay to much CPU
+        def nop(x, y):
+            return ''
+        #ax.format_coord = nop
+
+        cbar: Colorbar | None = None
+        if add_cbar:
+            if vmin is not None and vmax is not None:
+                cbar = fig.colorbar(mesh, ax=ax, extend='both')
+            elif vmin is not None:
+                cbar = fig.colorbar(mesh, ax=ax, extend='min')
+            elif vmax is not None:
+                cbar = fig.colorbar(mesh, ax=ax, extend='max')
+            else:
+                cbar = fig.colorbar(mesh, ax=ax)
+
+            maybe_set(cbar.ax, 'ylabel', self.vlabel)
+        return ax, (mesh, cbar)
+
+    def meta_into_vector(self, index: np.ndarray | Index, values: np.ndarray) -> Vector:
+        return Vector(X=index, values=values, vlabel=self.vlabel, valias=self.valias, name=self.name)
+
+    @overload
+    def axis_to_int(self, axis: int | str, allow_both: bool = Literal[True]) -> AxisEither: ...
+
+    @overload
+    def axis_to_int(self, axis: int | str, allow_both: bool = Literal[False]) -> AxisBoth: ...
+
+    def axis_to_int(self, axis: int | str, allow_both: bool = False) -> Axis:
+        match axis:
+            case 0 | 1:
+                return axis
+            case 2:
+                if allow_both:
+                    return axis
+                raise ValueError("Cannot use axis 2 for matrix")
+            case 'x' | 'X' | self.xalias:
+                return 0
+            case 'y' | 'Y' | self.yalias:
+                return 1
+            case 'both':
+                if allow_both:
+                    return 2
+                raise ValueError("Cannot use axis 2 for matrix")
+            case _:
+                raise ValueError(f"Unknown axis {axis}")
+
+    @property
+    def xalias(self) -> str:
+        return self.X_index.alias
+
+    @property
+    def yalias(self) -> str:
+        return self.Y_index.alias
+
+    @property
+    def xlabel(self) -> str:
+        return self.X_index.label
+
+    @property
+    def ylabel(self) -> str:
+        return self.Y_index.label
+
+    # add type overloads to __matmul__ so that if other is a Matrix, we return a Matrix, etc
+    @overload
+    def __matmul__(self, other: Matrix) -> Matrix: ...
+    @overload
+    def __matmul__(self, other: Vector) -> Vector: ...
+    @overload
+    def __matmul__(self, other: np.ndarray) -> np.ndarray: ...
+
+    def __matmul__(self, other: Matrix | Vector | np.ndarray) -> Matrix | Vector | np.ndarray:
+        match other:
+            case Matrix():
+                if self.shape[1] != other.shape[0]:
+                    raise ValueError(f"Shape mismatch {self.shape} @ {other.shape}")
+                if not self.is_compatible_with_Y(other.X_index):
+                    raise ValueError(f"Y index mismatch {self.Y_index} @ {other.X_index}")
+                return Matrix(X=self.X_index, Y=other.Y_index, values=self.values @ other.values)
+            case Vector():
+                if self.shape[1] != other.shape[0]:
+                    raise ValueError(f"Shape mismatch {self.shape} @ {other.shape}")
+                if not self.is_compatible_with_Y(other._index):
+                    raise ValueError(f"Y index mismatch {self.Y_index} @ {other._index}")
+                return Vector(X=self.X_index, values=self.values @ other.values)
+            case _:
+                return self.values @ other
 
 
 class IndexLocator:
     def __init__(self, matrix: Matrix):
         self.mat = matrix
 
-    def __getitem__(self, key) -> Matrix | Vector:
+    def __getitem__(self, key) -> Matrix | Vector | float:
         if isinstance(key, array):
             return self.linear_index(key)
-        if len(key) != 2:
-            raise ValueError("Expected [mask] or two integers [i, j]")
-
-        ex, eg = key
-        Eg = self.mat.Eg.__getitem__(eg)
-        Ex = self.mat.Ex.__getitem__(ex)
+        xi, yi = key
         values = self.mat.values.__getitem__(key)
-        if isinstance(eg, (int, np.integer)):
-            return Vector(values=values, E=Ex, xlabel=self.mat.ylabel)
-        elif isinstance(ex, (int, np.integer)):
-            return Vector(values=values, E=Eg, xlabel=self.mat.xlabel)
-        return self.mat.clone(Eg=Eg, Ex=Ex, values=values)
+        if isinstance(xi, slice):
+            X = self.mat.X.__getitem__(xi)
+            if isinstance(yi, slice):
+                Y = self.mat.Y.__getitem__(yi)
+                return self.mat.clone(values=values, X=X, Y=Y)
+            return self.mat.into_vector(X, values)
+        elif isinstance(yi, slice):
+            Y = self.mat.Y.__getitem__(yi)
+            return self.mat.into_vector(Y, values)
+        else:
+            return values
 
     def linear_index(self, indices) -> Matrix:
         values = np.where(indices, self.mat.values, 0)
@@ -1171,102 +964,61 @@ class IndexLocator:
 
 
 class ValueLocator:
-    def __init__(self, matrix: Matrix):
+    def __init__(self, matrix: Matrix, strict: bool = True):
         self.mat = matrix
+        self.strict = strict
 
-    @overload
-    def parse_Eg(self, eg: Unitlike) -> int: ...
-
-    @overload
-    def parse_Eg(self, eg: slice) -> slice: ...
-
-    def parse_Eg(self, eg: Unitlike | slice) -> int | slice:
-        if isinstance(eg, Unitlike):
-            return self.mat.index_Eg(eg)
-        elif isinstance(eg, slice):
-            return parse_unit_slice(eg, self.mat.index_Eg, self.mat.dEg, len(self.mat.Eg))
-        else:
-            raise ArgumentError(f"Expected slice or Unitlike, got type: {type(eg)}")
-
-    @overload
-    def parse_Ex(self, ex: Unitlike) -> int: ...
-
-    @overload
-    def parse_Ex(self, ex: slice) -> slice: ...
-
-    def parse_Ex(self, ex: Unitlike | slice) -> int | slice:
-        if isinstance(ex, Unitlike):
-            return self.mat.index_Ex(ex)
-        elif isinstance(ex, slice):
-            return parse_unit_slice(ex, self.mat.index_Ex, self.mat.dEx, len(self.mat.Ex))
-        else:
-            raise ArgumentError(f"Expected slice or Unitlike, got type: {type(ex)}")
-
-    def __getitem__(self, key) -> Matrix | Vector:
-        if len(key) == 2:
-            ex, eg = key
-            iex: int | slice = self.parse_Ex(ex)
-            ieg: int | slice = self.parse_Eg(eg)
-            if isinstance(iex, int) and isinstance(ieg, int):
-                raise ArgumentError("Can not cast scalar to Matrix or Vector")
-
-            Eg = self.mat.Eg.__getitem__(ieg)
-            Ex = self.mat.Ex.__getitem__(iex)
-            values = self.mat.values.__getitem__((iex, ieg))
-            std = None
-            if self.mat.std is not None:
-                std = self.mat.std.__getitem__((iex, ieg))
-            if isinstance(iex, (int, np.integer)):
-                return Vector(values=values, E=Eg, xlabel=self.mat.xlabel)
-            if isinstance(ieg, (int, np.integer)):
-                return Vector(values=values, E=Ex, xlabel=self.mat.ylabel)
-
-            return self.mat.clone(values=values, Ex=Ex, Eg=Eg, std=std)
-        else:
-            raise ValueError("Expect two indices [x, y]")
+    def __getitem__(self, key) -> Matrix | Vector | float:
+        match key:
+            case slice() as x, slice() as y:
+                sx: slice = self.mat.X_index.index_slice(x, strict=self.strict)
+                sy: slice = self.mat.Y_index.index_slice(y, strict=self.strict)
+                xindex = self.mat.X_index[sx]
+                yindex = self.mat.Y_index[sy]
+                values = self.mat.values.__getitem__((sx, sy))
+                std = None
+                if self.mat.std is not None:
+                    std = self.mat.std.__getitem__((sx, sy))
+                return self.mat.clone(values=values, X=xindex, Y=yindex, std=std)
+            case slice() as x, y:
+                sx: slice = self.mat.X_index.index_slice(x, strict=self.strict)
+                xindex = self.mat.X_index[sx]
+                j: int = self.mat.Y_index.index_expression(y, strict=self.strict)
+                values = self.mat.values.__getitem__((sx, j))
+                return self.mat.into_vector(xindex, values)
+            case x, slice() as y:
+                sy: slice = self.mat.Y_index.index_slice(y, strict=self.strict)
+                yindex = self.mat.Y_index[sy]
+                i: int = self.mat.X_index.index_expression(x, strict=self.strict)
+                values = self.mat.values.__getitem__((i, sy))
+                return self.mat.into_vector(yindex, values)
+            case x, y:
+                i: int = self.mat.X_index.index_expression(x, strict=self.strict)
+                j: int = self.mat.Y_index.index_expression(y, strict=self.strict)
+                return self.mat.values.__getitem__((i, j))
 
     def __setitem__(self, key, val):
-        if len(key) == 2:
-            ex, eg = key
-            iex: int | slice = self.parse_Ex(ex)
-            ieg: int | slice = self.parse_Eg(eg)
-
-            self.mat.values[iex, ieg] = val
-        else:
-            raise ValueError("Expect two indices [x, y]")
-
-
-@overload
-def preparse(s: None) -> (Literal[False], None): ...
-@overload
-def preparse(s: Unitlike) -> (bool, Unitlike): ...
-
-def preparse(s: Unitlike | None) -> (bool, Unitlike | None):
-    inclusive = False
-    if isinstance(s, str):
-        s = s.strip()
-        if s[0] == '<':
-            s = s[1:]
-        elif s[0] == '>':
-            inclusive = True
-            s = s[1:]
-
-    return (inclusive, s)
-
-def parse_unit_slice(s: slice, index: Callable[[Unitlike], int],
-                     dx: float, length: int) -> slice:
-    start = None if s.start is None else index(s.start)
-    inclusive, stop_ = preparse(s.stop)
-    stop = None if stop_ is None else index(stop_)
-    if inclusive and stop < length:
-        assert stop is not None
-        stop += 1
-
-    step = None if s.step is None else np.ceil(s.step / dx)
-    return slice(start, stop, step)
+        match key:
+            case slice() as x, slice() as y:
+                sx: slice = self.mat.X_index.index_slice(x, strict=self.strict)
+                sy: slice = self.mat.Y_index.index_slice(y, strict=self.strict)
+                self.mat.values.__setitem__((sx, sy), val)
+            case slice() as x, y:
+                sx: slice = self.mat.X_index.index_slice(x, strict=self.strict)
+                j: int = self.mat.Y_index.index_expression(y, strict=self.strict)
+                self.mat.values.__setitem__((sx, j), val)
+            case x, slice() as y:
+                sy: slice = self.mat.Y_index.index_slice(y, strict=self.strict)
+                i: int = self.mat.X_index.index_expression(x, strict=self.strict)
+                self.mat.values.__setitem__((i, sy), val)
+            case x, y:
+                i: int = self.mat.X_index.index_expression(x, strict=self.strict)
+                j: int = self.mat.Y_index.index_expression(y, strict=self.strict)
+                self.mat.values.__setitem__((i, j), val)
 
 
 class MeshLocator(ticker.Locator):
+    # Unrelated to the other locators. Named from matplotlib.ticker.MeshLocator
     def __init__(self, locs, nbins=10):
         'place ticks on the i-th data points where (i-offset)%base==0'
         self.locs = locs

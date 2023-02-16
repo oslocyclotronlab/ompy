@@ -75,8 +75,8 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
         p = p.normalize()
 
     compton: Matrix = p.compton
-    E_observed: VO = compton.Eg
-    E_true: VT = compton.Ex
+    E_observed: VO = compton.observed
+    E_true: VT = compton.true
     sigma: VO = sigma(E_observed)
 
     if len(E) > len(E_observed):
@@ -100,7 +100,7 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
     if R.ndim == 1:
         return Vector(E=A, values=R)
     elif R.ndim == 2:
-        return Matrix(Eg=E_observed, Ex=A, values=R, xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+        return Matrix(true=A, observed=E_observed, values=R, ylabel=r"Observed $\gamma$", xlabel=r"True $\gamma$")
     else:
         raise RuntimeError("Invalid number of dimensions")
 

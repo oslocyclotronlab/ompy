@@ -210,7 +210,7 @@ class Interpolator(ABC):
 
     @property
     def x(self) -> np.ndarray:
-        return self.points.E
+        return self.points.X
 
     @property
     def y(self) -> np.ndarray:

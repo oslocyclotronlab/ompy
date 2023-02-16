@@ -702,9 +702,9 @@ def from_unit(quantity: Unitlike, default: Unitlike) -> float:
     unit = ureg.Unit(default)
     match quantity:
         case str():
-            return ureg.Quantity(quantity).to(unit).magnitude
+            return ureg.Quantity(quantity).to_unit(unit).magnitude
         case ureg.Quantity():
-            return quantity.to(unit).magnitude
+            return quantity.to_unit(unit).magnitude
         case _:
             return quantity
 

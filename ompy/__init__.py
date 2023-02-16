@@ -49,9 +49,18 @@ else:
             USE_GPU = True
         except ImportError:
             warnings.warn("Numba.CUDA could not be imported. GPU acceleration will not be available")
-    except ImportError:
+    except ImportError or SystemError:
         warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
     from .numbalib import jit, njit, nop_nop, int32, float32, float64, prange
+
+    ROOT_AVAILABLE = False
+    try:
+        # Importing ROOT makes scipy curve_fit fail (!?)
+        raise ImportError
+        import ROOT
+        ROOT_AVAILABLE = True
+    except ImportError:
+        pass
 
     # Simply import all functions and classes from all files to make them
     # available at the package level

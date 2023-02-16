@@ -23,7 +23,7 @@ logging.captureWarnings(True)
 # TODO Always make a high resolution compton to save, rebin and reuse?
 # Is rebinning correct? We want to preserve probability, not counts.
 # The R(e) gives the energy spectrum *at* e, but an experimental vector
-# has a bin [e, e+de]. Should R^(e) be a weighted average over R(e) ... R(e+de)?
+# has a bin [e, e+de]. Should R^(e) be a weighted average over R(e) ... R(e+de)? YES!
 
 
 class Response:
@@ -43,28 +43,25 @@ class Response:
         E = self.best_energy_resolution() if E is None else E
         R: Matrix = self.interpolate_compton(E, **kwargs)
         FE, SE, DE, AP = self.interpolation.structures()
-        emin = R.Eg.min()
-        j511 = R.index_Eg(511)
+        emin = R.observed.min()
+        j511 = R.index_observed(511)
         for i, e in enumerate(E):
             if e > emin:
-                j = R.index_Eg(e)
-                R[i, j] += FE(e)
+                R.loc[i, e] += FE(e)
             if e - 511 > emin:
-                j = R.index_Eg(e - 511)
-                R[i, j] += SE(e)
+                R.loc[i, e - 511.0] += SE(e)
             if e - 2*511 > emin:
-                j = R.index_Eg(e - 511*2)
-                R[i, j] += DE(e)
+                R.loc[i, e - 511.0*2] += DE(e)
             if 511 > emin:
                 R[i, j511] += AP(e)
         if normalize:
-            R.values = R.values / R.values.sum(axis=1)[:, None]
+            R.normalize(axis='observed', inplace=True)
         self.R = R
 
         return R
 
     def best_energy_resolution(self) -> np.ndarray:
-        E_true = self.data.E
+        E_true = self.data.E_true
         E_observed = self.data.E_observed
         E0 = max(E_true[0], E_observed[0])
         E1 = min(E_true[-1], E_observed[-1])
@@ -87,10 +84,8 @@ class Response:
 
     def specialize(self, bins: np.ndarray | None = None, factor: float | None = None,
                    binwidth: float | None = None, numbins: int | None = None, **kwargs) -> Matrix:
-        bins = handle_rebin_arguments(bins=self.R.Eg, transform=self.R.to_same_Eg,
-                                      numbins=numbins,
-                                      factor=factor, binwidth=binwidth,
-                                      newbins=bins, LOG=LOG)
+        bins = self.R.observed_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
+                                                            binwidth=binwidth)
         return self.specialize_(bins, **kwargs)
 
     def specialize_(self, E: np.ndarray, **kwargs) -> Matrix:
@@ -101,15 +96,15 @@ class Response:
         else:
             R = self.R
         R = R.rebin('both', E)
-        R.normalize(axis=0, inplace=True)
+        R.normalize(axis='observed', inplace=True)
         return R
 
     def specialize_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
         match other:
             case Matrix():
-                return self.specialize_(other.Eg, **kwargs)
+                return self.specialize_(other.Y, **kwargs)
             case Vector():
-                return self.specialize_(other.E, **kwargs)
+                return self.specialize_(other.X, **kwargs)
             case _:
                 raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
 
@@ -140,7 +135,7 @@ class Response:
         data = ResponseData.from_path(path / 'data', format='numpy')
         interpolation = DiscreteInterpolation.from_path(path / 'interpolation')
         if (path / 'R.npy').exists():
-            R = Matrix(path = path / 'R.npy')
+            R = Matrix.from_path(path / 'R.npy')
         else:
             R = None
         return cls(data, interpolation, R)

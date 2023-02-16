@@ -43,7 +43,7 @@ class Unitful(Validator):
                 value = value.magnitude
         else:
             try:
-                value = value.to(self.units)
+                value = value.to_unit(self.units)
             except DimensionalityError:
                 raise DimensionalityError(value.units, self.units) from None
         return value
@@ -113,7 +113,7 @@ class UnitfulError(Validator):
                 raise ValueError("`error` must be provided.")
             value = Q_(value)
             error = Q_(value)
-        error = error.to(value.units)
+        error = error.to_unit(value.units)
         self.default = [value, error]
         self.units = self.default[0].units
         if self.dimensionless:
@@ -164,11 +164,11 @@ class UnitfulError(Validator):
                 error = error.magnitude
         else:
             try:
-                value = value.to(self.units)
+                value = value.to_unit(self.units)
             except DimensionalityError:
                 raise DimensionalityError(value.units, self.units) from None
             try:
-                error = error.to(self.units)
+                error = error.to_unit(self.units)
             except DimensionalityError:
                 raise DimensionalityError(error.units, self.units) from None
         return (value, error)
