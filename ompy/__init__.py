@@ -69,7 +69,7 @@ else:
     #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
-    from .array import Vector, Matrix, zeros_like, empty_like, empty
+    from .array import Vector, Matrix, zeros_like, empty_like, empty, to_index, Index
     from .database import Nucleus, get_nucleus, get_nucleus_df
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .unfolder import Unfolder

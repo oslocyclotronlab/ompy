@@ -1,5 +1,5 @@
 from .. import njit, prange
-from .index_fn import _index_left, is_monotone_uniform, are_congruent, is_close
+from .index_fn import _index_left, is_monotone_uniform, are_congruent, is_close, is_monotone
 import numpy as np
 from warnings import warn
 from typing import TypeAlias, Literal
@@ -129,7 +129,7 @@ def __rebin_nonuniform_left_left(rebinned, old, new, values, dOld, dNew) -> None
         else:
             i += 1
 
-@njit
+#@njit
 def __rebin_nonuniform_left_left_encode(old, new, dOld, dNew, flag: bool) -> tuple[np.ndarray, np.ndarray]:
     N = 2*len(old)
     do_move_old_ptr = np.zeros(N, dtype=np.bool8)
@@ -172,7 +172,7 @@ def __rebin_nonuniform_left_left_encode(old, new, dOld, dNew, flag: bool) -> tup
         k += 1
     return do_move_old_ptr[:k+1], C[:k+1]
 
-@njit
+#@njit
 def __rebin_nonuniform_left_left_decode(rebinned, do_move_old_ptr, C, values) -> np.ndarray:
     # About twice as fast as "normal" rebinning
     k = 0
@@ -200,6 +200,14 @@ def rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndar
         raise ValueError("Axis must be 0 or 1.")
     return _rebin_2D_uniform_left_left(old, new, values, axis, preserve)
 
+def rebin_2D_nonuniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
+    if not is_monotone(old):
+        raise ValueError("X is not monotone.")
+    if not is_monotone(new):
+        raise ValueError("Y is not monotone uniform.")
+    if not (axis == 0 or axis == 1):
+        raise ValueError("Axis must be 0 or 1.")
+    return _rebin_2D_nonuniform_left_left(old, new, values, axis, preserve)
 
 def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
     if len(old) == len(new) and np.allclose(old, new):
@@ -268,8 +276,18 @@ def __rebin_2D_left_left(rebinned: np.ndarray, old: np.ndarray, new: np.ndarray,
             __rebin_nonuniform_left_left_decode(rebinned[i, :], ptr, C, values[i, :])
 
 
-def rebin_2D():
-    raise NotImplementedError()
+def rebin_2D(index, bins: np.ndarray, values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
+    print("=====================")
+    print(index)
+    print(bins)
+    print("=====================")
+    if not isinstance(bins, np.ndarray):
+        bins = bins.bins
+
+    if index.is_uniform():
+        return rebin_2D_uniform_left_left(index.bins, bins, values, axis, preserve)
+    else:
+        return rebin_2D_nonuniform_left_left(index.bins, bins, values, axis, preserve)
 
 def rebin_1D():
     raise NotImplementedError()

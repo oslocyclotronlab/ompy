@@ -263,7 +263,7 @@ class Index(ABC):
                                                                  other.boundary) and self.unit == other.unit
 
     def update_metadata(self, **kwargs) -> Index:
-        return self.__class__(self.bins, self.boundary, self.meta.update(**kwargs))
+        return self.__class__(self.bins, self.boundary, metadata=self.meta.update(**kwargs))
 
     def to_unit(self, unit: Unitlike | Index) -> Index:
         if isinstance(unit, Index):
@@ -390,7 +390,7 @@ class Index(ABC):
         if meta is None:
             meta = self.meta
         meta = meta.clone(**kwargs)
-        return self.__class__(bins, boundary, meta)
+        return self.__class__(bins, boundary, metadata=meta)
 
     def update(self, alias: str | None = None, label: str | None = None,
                unit: Unitlike | None = None) -> Index:
@@ -421,6 +421,9 @@ class Index(ABC):
             if binwidth <= 0:
                 raise ValueError("`binwidth` must be positive")
             bins = np.arange(self.bins[0], self.bins[-1], binwidth, dtype=float)
+        if isinstance(bins, Index):
+            warn("Might be buggy")
+            bins = bins.bins
         if len(bins) > len(self.bins):
             raise ValueError("Cannot rebin to a finer binning.")
         if not np.isclose(bins[-1], self.bins[-1]) or not np.isclose(bins[0], self.bins[0]):
@@ -923,6 +926,18 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
                 boundary = bins[-1] + width/2
                 return MidNonUniformIndex(bins, boundary, direction='right', **kwargs)
         raise RuntimeError("Unreachable D:")
+
+    def __getitem__(self, key: int | slice) -> float | Index:
+        match key:
+            case slice():
+                if key.start is None or key.start == 0:
+                    boundary = self.boundary
+                else:
+                    boundary = self.bins[key.start-1] + self.dX[key.start-1]/2
+                return self.from_array(self.bins[key], metadata=self.meta,
+                                       boundary=boundary)
+            case _:
+                return self.bins[key]
 
     def _index(self, x: float64) -> int:
         self.assert_inbounds(x)

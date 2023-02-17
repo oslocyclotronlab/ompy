@@ -349,7 +349,9 @@ def save_txt_1D(values: np.ndarray, E: np.ndarray,
     np.savetxt(path, mat, header=header)
 
 
-def save_npz_1D(path: Pathlike, vector) -> None:
+def save_npz_1D(path: Path, vector, exist_ok: bool = False) -> None:
+    if not exist_ok and path.exists():
+        raise FileExistsError(f"File {path} already exists")
     mapping = {'index': vector._index.to_dict(), 'values': vector.values,
                'meta': asdict(vector.metadata), 'version': __full_version__}
     if vector.std is not None:
@@ -367,11 +369,14 @@ def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
             warn(f"Version mismatch when loading {path}: {version} != {__full_version__}")
     return cls(X=index, values=values, std=std, **meta)
 
-def save_npz_2D(path: Pathlike, matrix) -> None:
+def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
     mapping = {'X index': matrix.X_index.to_dict(),
                'Y index': matrix.Y_index.to_dict(),
                'values': matrix.values, 'meta': asdict(matrix.metadata),
                'version': __full_version__}
+    print(exist_ok)
+    if not exist_ok and path.exists():
+        raise FileExistsError(f"{path} already exists")
     np.savez(path, **mapping)
 
 def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:

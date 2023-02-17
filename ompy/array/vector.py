@@ -190,7 +190,7 @@ class Vector(AbstractArray):
 
     def save(self, path: Pathlike,
              filetype: str | None = None,
-             **kwargs) -> None:
+             exist_ok: bool = True, **kwargs) -> None:
         """Save to a file of specified format
 
         Args:
@@ -212,7 +212,7 @@ class Vector(AbstractArray):
                 warnings.warn("Saving as .npy is deprecated. Use .npz instead.")
                 save_numpy_1D(self.values, E, self.std, path)
             case 'npz':
-                save_npz_1D(path, self)
+                save_npz_1D(path, self, exist_ok=exist_ok)
             case "txt":
                 warnings.warn("Saving to .txt does not preserve metadata. Use .npz instead.")
                 save_txt_1D(self.values, E, self.std, path, **kwargs)

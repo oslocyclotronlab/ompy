@@ -2,7 +2,7 @@ from ..stubs import Pathlike
 from typing import Literal, TypeAlias, Iterable, Any
 from pathlib import Path
 from .. import Vector, Matrix, __full_version__
-from .. import Unit
+from .. import Unit, to_index
 from collections import Counter
 import numpy as np
 from tqdm.autonotebook import tqdm
@@ -130,7 +130,8 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
     mat = np.zeros((len(compton), max_length))
     for i, cmp in enumerate(compton):
         mat[i, :len(cmp)] = cmp.values
-    return Matrix(true=E, observed=compton[i].E, values=mat,
+    x = to_index(E, edge='mid')
+    return Matrix(true=x, observed=compton[i].E, values=mat,
                   ylabel=r"Observed $\gamma$", xlabel=r"True $\gamma$")
 
 
@@ -168,6 +169,7 @@ def load_discrete_mama(path: Pathlike, name: str = 'resp.dat', read_fwhm: bool =
     df['E'] = df['E'].astype(int)
     assert len(df) == number_of_lines, f"Corrupt {path / name}"
     E = df['E'].to_numpy()
+    E = to_index(E, edge='mid')
     FE = Vector(E=E, values=df['FE'].to_numpy(), name='FE')
     SE = Vector(E=E, values=df['SE'].to_numpy(), name='SE')
     DE = Vector(E=E, values=df['DE'].to_numpy(), name='DE')
@@ -188,12 +190,12 @@ def save(path: Pathlike, data, format: Format = 'ompy', **kwargs) -> None:
         case 'mama':
             raise NotImplementedError()
         case 'ompy' | 'numpy':
-            return save_npy(path, data, **kwargs)
+            return save_np(path, data, **kwargs)
         case _:
             raise ValueError(f"Unknown format {format}. Available formats are: {Format}")
 
 
-def save_npy(path: Pathlike, data, exist_ok: bool = False, **kwargs) -> None:
+def save_np(path: Path, data, exist_ok: bool = False, **kwargs) -> None:
     """ Save data to numpy file.
 
     Relies on the `save` method of Matrix and Vector. If the aliases
@@ -206,7 +208,6 @@ def save_npy(path: Pathlike, data, exist_ok: bool = False, **kwargs) -> None:
     Returns:
         None
     """
-    path = Path(path)
     path.mkdir(parents=True, exist_ok=exist_ok)
     meta = {'is_normalized': data.is_normalized, 'is_fwhm_normalized': data.is_fwhm_normalized,
             'version': __full_version__}
@@ -216,13 +217,13 @@ def save_npy(path: Pathlike, data, exist_ok: bool = False, **kwargs) -> None:
     fname = path / 'compton.npz'
     if fname.exists() and not exist_ok:
         raise FileExistsError(f'File {fname} already exists.')
-    data.compton.save(fname, **kwargs)
+    data.compton.save(fname, exist_ok=exist_ok, **kwargs)
 
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff', 'FWHM')
     for field in fields:
         vec = getattr(data, field)
         if vec is not None:
-            vec.save(path / f'{field}.npz', **kwargs)
+            vec.save(path / f'{field}.npz', exist_ok=exist_ok, **kwargs)
 
 
 def convert_mama(output: Pathlike, path: Pathlike | None = None, data: Any | None = None, exist_ok: bool = False, **kwargs) -> None:

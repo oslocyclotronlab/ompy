@@ -201,6 +201,10 @@ class Matrix(AbstractArray):
             return self.index_X
         elif item == 'index_' + yalias:
             return self.index_Y
+        elif item == xalias + '_index':
+            return self.X_index
+        elif item == yalias + '_index':
+            return self.Y_index
         else:
             x = super().__getattr__(item)
         return x
@@ -236,7 +240,7 @@ class Matrix(AbstractArray):
         return cls(Ex=X, Eg=Y, values=values)
 
     def save(self, path: Pathlike, filetype: Filetype | None = None,
-             which: str | None = 'values', **kwargs) -> None:
+             **kwargs) -> None:
         """Save matrix to file
 
         Args:
@@ -252,6 +256,7 @@ class Matrix(AbstractArray):
 
         X = self.X_index.to_unit('keV').bins
         Y = self.Y_index.to_unit('keV').bins
+        # TODO Move this logic to filehandling
         match filetype:
             case 'npz':
                 save_npz_2D(path, self, **kwargs)
@@ -375,7 +380,7 @@ nameReurns:
             return matrix
 
     @overload
-    def rebin(self, axis: int | str,
+    def rebin(self, axis: int | str, *,
               bins: Sequence[float] | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
@@ -383,14 +388,14 @@ nameReurns:
               inplace: Literal[False] = ...) -> Matrix: ...
 
     @overload
-    def rebin(self, axis: int | str,
+    def rebin(self, axis: int | str, *,
               bins: Sequence[float] | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
               inplace: Literal[True] = ...) -> None: ...
 
-    def rebin(self, axis: int | str,
+    def rebin(self, axis: int | str, *,
               bins: Sequence[float] | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
@@ -461,8 +466,8 @@ nameReurns:
         """ Wrapper for :func:`ompy.fill_negative_gauss` """
         raise NotImplementedError()
         if not inplace:
-            return self.clone(values=fill_negative_gauss(self.values, self.Eg, window))
-        self.values = fill_negative_gauss(self.values, self.Eg, window)
+            return self.clone(values=fill_negative_gauss(self.values, self.observed, window))
+        self.values = fill_negative_gauss(self.values, self.observed, window)
 
     def remove_negative(self, inplace=False) -> Matrix | None:
         """ Entries with negative values are set to 0 """
@@ -595,6 +600,7 @@ nameReurns:
 
         A Vector is returned if the matrix is 1D.
         """
+        raise NotImplementedError("This method is not implemented yet.")
         if mask.shape != self.shape:
             raise ValueError("Mask must have same shape as matrix.")
 
@@ -615,8 +621,10 @@ nameReurns:
     @property
     def T(self) -> Matrix:
         values = self.values.T
-        assert self.std is None
-        return self.clone(values=values, X=self.X, Y=self.Y)
+        std = None
+        if self.std is not None:
+            std = self.std.T
+        return self.clone(values=values, std=std, X=self.Y_index, Y=self.X_index)
 
     @property
     def _summary(self) -> str:
@@ -911,7 +919,6 @@ nameReurns:
     def ylabel(self) -> str:
         return self.Y_index.label
 
-    # add type overloads to __matmul__ so that if other is a Matrix, we return a Matrix, etc
     @overload
     def __matmul__(self, other: Matrix) -> Matrix: ...
     @overload
@@ -932,7 +939,7 @@ nameReurns:
                     raise ValueError(f"Shape mismatch {self.shape} @ {other.shape}")
                 if not self.is_compatible_with_Y(other._index):
                     raise ValueError(f"Y index mismatch {self.Y_index} @ {other._index}")
-                return Vector(X=self.X_index, values=self.values @ other.values)
+                return self.meta_into_vector(self.X_index, self.values @ other.values)
             case _:
                 return self.values @ other
 

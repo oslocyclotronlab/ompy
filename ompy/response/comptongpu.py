@@ -75,8 +75,8 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
         p = p.normalize()
 
     compton: Matrix = p.compton
-    E_observed: VO = compton.observed
-    E_true: VT = compton.true
+    E_observed: VO = compton.observed_index
+    E_true: VT = compton.true_index
     sigma: VO = sigma(E_observed)
 
     if len(E) > len(E_observed):
@@ -90,7 +90,7 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
     if E[-1] > E_true[-1]:
         raise ValueError(f"Requested energy above highest true energy, {E[-1]} > {E_true[-1]}")
 
-    R = _interpolate(compton.values, E, E_observed, E_true, sigma, nsigma)
+    R = _interpolate(compton.values, E.bins, E_observed.bins, E_true.bins, sigma, nsigma)
     # These ifs are for debugging
     if R.shape[0] == len(E_true):
         A = E_true

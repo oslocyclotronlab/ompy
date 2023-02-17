@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TypeAlias, Literal
 
 from . import ResponseData, DiscreteInterpolation, interpolate_compton
-from .. import Vector, Matrix, USE_GPU, __full_version__
+from .. import Vector, Matrix, USE_GPU, __full_version__, to_index, Index
 import warnings
 from .numbalib import njit, prange
 import numpy as np
@@ -39,8 +40,7 @@ class Response:
         intp = DiscreteInterpolation.from_data(data.normalize())
         return cls(data, intp)
 
-    def interpolate(self, E: np.ndarray | None = None, normalize: float = True, **kwargs) -> Matrix:
-        E = self.best_energy_resolution() if E is None else E
+    def interpolate(self, E: Index | np.ndarray | None = None, normalize: float = True, **kwargs) -> Matrix:
         R: Matrix = self.interpolate_compton(E, **kwargs)
         FE, SE, DE, AP = self.interpolation.structures()
         emin = R.observed.min()
@@ -61,24 +61,26 @@ class Response:
         return R
 
     def best_energy_resolution(self) -> np.ndarray:
-        E_true = self.data.E_true
-        E_observed = self.data.E_observed
+        E_true = self.data.compton.true_index
+        E_observed = self.data.compton.observed_index
         E0 = max(E_true[0], E_observed[0])
         E1 = min(E_true[-1], E_observed[-1])
-        width = E_observed[1] - E_observed[0]
-        return np.arange(E0, E1, width)
+        assert E_observed.is_uniform()
+        width = E_observed.step(0)
+        x = np.arange(E0, E1, width)
+        return to_index(x, edge='mid')
 
-    def interpolate_compton(self, E: np.ndarray | None = None, GPU: bool = True,
+    def interpolate_compton(self, E: Index | np.ndarray | None = None, GPU: bool = True,
                             sigma: float = 6) -> Matrix:
         if not self.interpolation.is_fwhm_normalized:
             warnings.warn("Interpolating with non-normalized FWHM. Unclear whether this is reasonable.")
         E = self.best_energy_resolution() if E is None else E
+        if not isinstance(E, Index):
+            E = to_index(E, edge='mid')
         sigmafn = self.interpolation.sigma
         if USE_GPU and GPU:
-            print("GPU")
             compton: Matrix = interpolate_gpu(self.data, E, sigmafn, sigma)
         else:
-            print("CPU")
             compton: Matrix = interpolate_compton(self.data, E, sigmafn, sigma)
         return compton
 
@@ -95,7 +97,7 @@ class Response:
             R = self.interpolate(E, **kwargs)
         else:
             R = self.R
-        R = R.rebin('both', E)
+        R = R.rebin('both', bins=E)
         R.normalize(axis='observed', inplace=True)
         return R
 
@@ -114,9 +116,9 @@ class Response:
     def gaussian_like(self, other: Matrix | Vector) -> Matrix:
         match other:
             case Matrix():
-                return self.gaussian(other.Eg)
+                return self.gaussian(other.Y)
             case Vector():
-                return self.gaussian(other.E)
+                return self.gaussian(other.X)
             case _:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
 
@@ -134,8 +136,8 @@ class Response:
             warnings.warn(f"Loading response from version {meta['version']} into version {__full_version__}.")
         data = ResponseData.from_path(path / 'data', format='numpy')
         interpolation = DiscreteInterpolation.from_path(path / 'interpolation')
-        if (path / 'R.npy').exists():
-            R = Matrix.from_path(path / 'R.npy')
+        if (path / 'R.npz').exists():
+            R = Matrix.from_path(path / 'R.npz')
         else:
             R = None
         return cls(data, interpolation, R)
@@ -149,7 +151,7 @@ class Response:
         self.data.save(path / 'data', exist_ok=exist_ok)
         self.interpolation.save(path / 'interpolation', exist_ok=exist_ok)
         if self.R is not None:
-            self.R.save(path / 'R.npy', exist_ok=exist_ok)
+            self.R.save(path / 'R.npz', exist_ok=exist_ok)
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Response | None:
         """ Normalizes the FWHM of the response to the requested value. """
@@ -158,12 +160,28 @@ class Response:
         else:
             return self.clone(interpolation=self.interpolation.normalize_FWHM(energy, fwhm, inplace=inplace))
 
+    @classmethod
+    def from_db(cls, name: ResponseName) -> Response:
+        """ Loads a response from the database. """
+        return cls.from_path(get_response_path(name))
+
+
+ResponseName: TypeAlias = Literal['OSCAR2017', 'OSCAR2020']
+
+
+def get_response_path(name: ResponseName) -> Path:
+    """ Returns the path to the response in the database. """
+    name = name.upper()
+    if name not in ResponseName:
+        raise ValueError(f"Unknown response name {name}. Must be one of {ResponseName}.")
+    return Path(__file__).parent / 'data' / 'responses' / name
 
 def gaussian_matrix(E: np.ndarray, sigmafn) -> Matrix:
     sigma = sigmafn(E)
     values = _gaussian_matrix(E, sigma)
     values = values / values.sum(axis=1)[:, None]
-    return Matrix(Eg=E, Ex=E, values=values, xlabel='E Observed', ylabel='E True')
+    return Matrix(true=E, observed=E, values=values, ylabel='Observed', xlabel='True',
+                  edge='mid')
 
 
 @njit(parallel=True)
