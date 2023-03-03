@@ -261,12 +261,13 @@ def test_parse():
     y = X[81]
     s = slice(f"< {x} keV", f"> {y} keV")
     S = X.index_slice(s, strict=True)
-    assert S == slice(70, 82)
+    assert S == slice(69, 82)
 
     assert X.index_expression(5, strict=False) == 5
     assert X.index_expression(5, strict=True) == X.index(5)
     assert X.index_expression(Quantity(5, 'keV'), strict=True) == X.index(5)
-    assert X.index_expression(f"< {x} keV", strict=True) == 70
+    assert X.index_expression(f"< {x} keV", strict=True) == 69
+    assert X.index_expression(f"{x} keV", strict=True) == 70
     assert X.index_expression(f"> {x} keV", strict=True) == 71
 
 def test_calibration():

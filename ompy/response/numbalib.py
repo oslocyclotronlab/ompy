@@ -7,6 +7,7 @@ try:
     from numba.experimental import jitclass
     from numba.typed import List as NList
     from numba.types import ListType
+    from numba.types.npytypes import Array as NumpyArray
     NUMPY = True
 except ImportError as e:
     NUMPY = False
@@ -15,6 +16,7 @@ except ImportError as e:
     float32 = np.float32
     float64 = np.float64
     prange = range
+    NumpyArray = np.ndarray
 
     def nop_decorator(func, *aargs, **kkwargs):
         def wrapper(*args, **kwargs):

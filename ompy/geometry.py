@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from .library import from_unit
 
 if TYPE_CHECKING:
-    from .matrix import Matrix
+    from .array import Matrix
 
 
 class Geometry(ABC):
@@ -36,9 +36,9 @@ class Geometry(ABC):
 
     @staticmethod
     def resolve(point: PointUnit, matrix: Matrix) -> PointI:
-        ieg = matrix.index_Eg_extended(point[0])
-        iex = matrix.index_Ex_extended(point[1])
-        return ieg, iex
+        ix = matrix.index_X(point[0])
+        iy = matrix.index_Y(point[1])
+        return ix, iy
 
     @staticmethod
     @overload
@@ -70,7 +70,7 @@ class Line(Geometry):
         slope = self.slope
         # Correct for binning
         if slope is not None:
-            slope *= matrix.dEg / matrix.dEx
+            slope *= matrix.dX[0] / matrix.dY[0]
         p: Points = refine_points(p1, p2, slope)
         return p
 
@@ -91,11 +91,11 @@ class Line(Geometry):
 
     def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
         mask = self.at(matrix)
-        Eg, Ex = matrix.plot_bins()
+        X, Y = matrix._plot_mesh()
         # Ugly hack to plot mask
         masked = np.ma.array(mask, mask=~mask)
         palette = plt.cm.gray.with_extremes(over=color)
-        ax.pcolormesh(Eg, Ex, masked, cmap=palette,
+        ax.pcolormesh(Y, X, masked, cmap=palette,
                       norm=colors.Normalize(vmin=-1.0, vmax=0.5))
         return ax
 
@@ -158,12 +158,14 @@ def line_mask(matrix: Matrix, p1: PointI, p2: PointI,
     line = lambda x: a*x + b  # NOQA E731
 
     # Mask all indices below this line to 0
-    i_mesh, j_mesh = np.meshgrid(matrix.range_Eg, matrix.range_Ex)
+    X = np.arange(matrix.shape[1])
+    Y = np.arange(matrix.shape[0])
+    i_mesh, j_mesh = np.meshgrid(X, Y)
     match where:
         case 'above':
-            mask = j_mesh < line(i_mesh)
-        case 'below':
             mask = j_mesh > line(i_mesh)
+        case 'below':
+            mask = j_mesh < line(i_mesh)
         case 'at':
             mask = (j_mesh >= line(i_mesh)) & (j_mesh <= line(i_mesh)+1)
         case _:
@@ -195,11 +197,11 @@ def sort_points(p1: Point, p2: Point) -> Points:
     return p2, p1
 
 def points_from_partial(slope: float, point: Point) -> Points:
-    Eg, Ex = point
-    intercept = Ex - slope*Eg
+    X, Y = point
+    intercept = Y - slope*X
     return points_from_ab(intercept, slope)
 
 def points_from_ab(intercept: float, slope: float) -> Points:
-    Eg0, Eg1 = 0.0, 5000.0
-    Ex0, Ex1 = intercept, slope*Eg1 + intercept
-    return ((Eg0, Ex0), (Eg1, Ex1))
+    X0, X1 = 0.0, 5000.0
+    Y0, Y1 = intercept, slope*X1 + intercept
+    return ((X0, Y0), (X1, Y1))

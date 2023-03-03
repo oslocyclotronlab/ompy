@@ -1,6 +1,6 @@
 from __future__ import annotations
 from . import Response
-from .response import E_compton
+from .response_old import E_compton
 from .. import Vector, zeros_like
 from ..peakselect import fit_gauss, GaussFit
 from ..stubs import Unitlike, ArrayBool, Axes

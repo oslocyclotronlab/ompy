@@ -277,6 +277,7 @@ class Vector(AbstractArray):
             case _:
                 try:
                     values, E = mama_read(path)
+                    return Vector(E=E, values=values, edge='mid')
                 except ValueError:  # from within ValueError
                     raise ValueError(f"Unknown filetype {filetype}")
         return Vector(E=E, values=values, std=std)

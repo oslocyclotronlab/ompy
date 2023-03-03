@@ -57,6 +57,8 @@ class DiscreteInterpolation:
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> DiscreteInterpolation: ...
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
+        fwhm: float = self.FWHM.to_same_unit(fwhm)
+        energy: float = self.FWHM.to_same_unit(energy)
         old = self.FWHM(energy)
         ratio = fwhm / old
         if inplace:
@@ -64,6 +66,10 @@ class DiscreteInterpolation:
             self.is_fwhm_normalized = True
         else:
             return self.clone(FWHM=self.FWHM.scale(ratio), is_fwhm_normalized=True)
+
+    def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
+        sigma = self.FWHM.to_same_unit(sigma)
+        return self.normalize_FWHM(energy, sigma * 2.355, inplace=inplace)
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)

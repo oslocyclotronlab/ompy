@@ -1,7 +1,7 @@
 from __future__ import annotations
 from . import ResponseData
 from .numbalib import index, jit, prange
-from ..stubs import Axes, Pathlike, LineKwargs, ErrorBarKwargs
+from ..stubs import Axes, Pathlike, LineKwargs, ErrorBarKwargs, Unitlike
 from .. import Vector, __full_version__
 from dataclasses import dataclass
 from scipy.interpolate import interp1d
@@ -40,7 +40,7 @@ class Interpolation(ABC):
     def __call__(self, points: float | Vector | np.ndarray) -> float | Vector | np.ndarray:
         match points:
             case Vector():
-                y = self.eval(points.E)
+                y = self.eval(points.X)
                 return points.clone(values=y)
             case _:
                 return self.eval(np.atleast_1d(points))
@@ -115,11 +115,14 @@ class Interpolation(ABC):
 
     @property
     def x(self) -> np.ndarray:
-        return self.points.E
+        return self.points.X
 
     @property
     def y(self) -> np.ndarray:
         return self.points.values
+
+    def to_same_unit(self, unit: Unitlike) -> float:
+        return self.points.X_index.to_same_unit(unit)
 
 
 class PoissonInterpolation(Interpolation):
@@ -164,7 +167,7 @@ class LinearInterpolation(Interpolation):
     @staticmethod
     def from_path(path: Pathlike) -> LinearInterpolation:
         data, meta = Interpolation._load(path)
-        intp = interp1d(data.E, data.values, bounds_error=False, fill_value='extrapolate')
+        intp = interp1d(data.X, data.values, bounds_error=False, fill_value='extrapolate')
         return LinearInterpolation(data, intp)
 
 

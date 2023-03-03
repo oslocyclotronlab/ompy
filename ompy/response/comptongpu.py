@@ -100,7 +100,8 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
     if R.ndim == 1:
         return Vector(E=A, values=R)
     elif R.ndim == 2:
-        return Matrix(true=A, observed=E_observed, values=R, ylabel=r"Observed $\gamma$", xlabel=r"True $\gamma$")
+        return Matrix(true=A, observed=E_observed, values=R, ylabel=r"Observed $\gamma$", xlabel=r"True $\gamma$",
+                      name='Compton')
     else:
         raise RuntimeError("Invalid number of dimensions")
 

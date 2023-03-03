@@ -128,6 +128,10 @@ class AbstractArray(ABC):
     def name(self) -> str:
         return self.metadata.name
 
+    @name.setter
+    def name(self, name: str):
+        self.metadata = self.metadata.update(name=name)
+
 def to_plot_axis(axis: int | str) -> int:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 

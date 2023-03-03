@@ -4,6 +4,13 @@ import numpy as np
 from warnings import warn
 from typing import TypeAlias, Literal
 
+"""
+TODO:
+-[ ] Add tests
+-[ ] Add docstrings
+-[ ] Severe bug in how 2D rebinning handles incongruent arrays, results in a shift.
+"""
+
 @njit()
 def overlap(Astart, Aend, Bstart, Bend):
     start = max(Astart, Bstart)
@@ -129,7 +136,7 @@ def __rebin_nonuniform_left_left(rebinned, old, new, values, dOld, dNew) -> None
         else:
             i += 1
 
-#@njit
+@njit
 def __rebin_nonuniform_left_left_encode(old, new, dOld, dNew, flag: bool) -> tuple[np.ndarray, np.ndarray]:
     N = 2*len(old)
     do_move_old_ptr = np.zeros(N, dtype=np.bool8)
@@ -172,7 +179,7 @@ def __rebin_nonuniform_left_left_encode(old, new, dOld, dNew, flag: bool) -> tup
         k += 1
     return do_move_old_ptr[:k+1], C[:k+1]
 
-#@njit
+@njit
 def __rebin_nonuniform_left_left_decode(rebinned, do_move_old_ptr, C, values) -> np.ndarray:
     # About twice as fast as "normal" rebinning
     k = 0
@@ -260,7 +267,7 @@ def _rebin_2D_nonuniform_left_left(old: np.ndarray, new: np.ndarray, values: np.
     __rebin_2D_left_left(rebinned, old, new, values, dOld, dNew, axis, N, preserve_counts)
     return rebinned
 
-#@njit(parallel=True)
+@njit(parallel=True)
 def __rebin_2D_left_left(rebinned: np.ndarray, old: np.ndarray, new: np.ndarray, values: np.ndarray, dOld: np.ndarray, dNew: np.ndarray, axis: int, N: int, preserve_counts: bool) -> None:
     """
 
@@ -276,11 +283,12 @@ def __rebin_2D_left_left(rebinned: np.ndarray, old: np.ndarray, new: np.ndarray,
             __rebin_nonuniform_left_left_decode(rebinned[i, :], ptr, C, values[i, :])
 
 
+# BUG The index edge is not taken into account. FIX!
 def rebin_2D(index, bins: np.ndarray, values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
-    print("=====================")
-    print(index)
-    print(bins)
-    print("=====================")
+    #print("=====================")
+    #print(index)
+    #print(bins)
+    #print("=====================")
     if not isinstance(bins, np.ndarray):
         bins = bins.bins
 

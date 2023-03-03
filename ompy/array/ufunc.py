@@ -1,6 +1,6 @@
 from . import Matrix, Vector
 from .abstractarray import AbstractArray, to_plot_axis
-from typing import Union, Tuple, Optional, overload, Literal
+from typing import Union, Tuple, Optional, overload, Literal, Callable
 import numpy as np
 from ..stubs import array
 
@@ -79,3 +79,51 @@ def zeros(array: array | int | Tuple[int, int],
             raise ValueError("Array must have dimension < 3.")
     else:
         raise ValueError(f"Expected numpy array or iterable, not {type(array)}.")
+
+
+def linspace(start, stop, num, *, edge = 'left', **kwargs) -> Vector:
+    bins = np.linspace(start, stop, num, **kwargs)
+    return Vector(X=bins, values=np.zeros(len(bins), dtype=float))
+
+@overload
+def fmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...
+@overload
+def fmap(array: Matrix, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Matrix: ...
+
+def fmap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> AbstractArray:
+    """ `functor_map`. Applies a function to the values of an array. Equal to a Haskell fmap <&>"""
+    match array:
+        case Vector():
+            return array.clone(values=func(*args, **kwargs))
+        case Matrix():
+            return array.clone(values=func(*args, **kwargs))
+        case _:
+            raise ValueError(f"Expected Array, not {type(array)}.")
+
+@overload
+def umap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...
+@overload
+def umap(array: Matrix, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Matrix: ...
+
+def umap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> AbstractArray:
+    """ `unwrap_map`. Applies a function to the values of an array. Equal to a Haskell fmap <&>.
+
+    This is the same as fmap, but uses the array as the first argument of the function and
+    unwraps other arguments.
+    """
+    args = [a.values if isinstance(a, AbstractArray) else a for a in args]
+    kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
+    match array:
+        case Vector():
+            return array.clone(values=func(array.values, *args, **kwargs))
+        case Matrix():
+            return array.clone(values=func(array.values, *args, **kwargs))
+        case _:
+            raise ValueError(f"Expected Array, not {type(array)}.")
+
+
+def omap(func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> any:
+    """ `out_of_map`. Applies `func` while unwrapping the arguments. """
+    args = [a.values if isinstance(a, AbstractArray) else a for a in args]
+    kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
+    return func(*args, **kwargs)

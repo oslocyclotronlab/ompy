@@ -69,7 +69,7 @@ else:
     #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
-    from .array import Vector, Matrix, zeros_like, empty_like, empty, to_index, Index
+    from .array import Vector, Matrix, zeros_like, empty_like, empty, to_index, Index, fmap, umap, omap, linspace
     from .database import Nucleus, get_nucleus, get_nucleus_df
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .unfolder import Unfolder
@@ -77,6 +77,7 @@ else:
     from .ensemble import Ensemble
     from . import response
     from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
+    from .unfolding import Guttormsen
     #from .gauss_smoothing import *
     from .firstgeneration import FirstGeneration, normalize_rows
     from .extractor import Extractor

@@ -90,6 +90,8 @@ def mama_write(mat, filename, **kwargs):
 
 
 def mama_write1D(vec, filename, _assert=True):
+    # MAMA is always mid-binned ?? Inconsistent with the channel encoding??
+    #vec = vec.to_mid()
     if _assert:
         assert(vec.shape[0] <= 8192),\
             "Mama cannot handle vectors with dimensions > 8192. "\
@@ -137,6 +139,7 @@ def mama_write2D(mat, filename, comment="", _assert=True):
         assert(mat.shape[0] <= 2048 and mat.shape[1] <= 2048),\
             "Mama cannot handle matrixes with any of the dimensions > 2048. "\
             "Rebin before saving."
+    #mat = mat.to_mid()
 
     # Calculate calibration coefficients.
     x_calibration = mat.X_index.to_unit('keV').to_calibration()
@@ -374,7 +377,6 @@ def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
                'Y index': matrix.Y_index.to_dict(),
                'values': matrix.values, 'meta': asdict(matrix.metadata),
                'version': __full_version__}
-    print(exist_ok)
     if not exist_ok and path.exists():
         raise FileExistsError(f"{path} already exists")
     np.savez(path, **mapping)

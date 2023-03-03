@@ -13,13 +13,11 @@ from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
 from .. import ureg, Unit
-from .abstractarray import AbstractArray, to_plot_axis
-from .filehandling import (filetype_from_suffix, load_numpy_2D, load_tar,
+from .abstractarray import AbstractArray
+from .filehandling import (load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
                            save_tar, save_txt_2D, Filetype, resolve_filetype, load_npz_2D, save_npz_2D)
-from ..geometry import Line
-from ..library import (diagonal_elements, div0, fill_negative_gauss,
-                       handle_rebin_arguments, maybe_set)
+from ..library import fill_negative_gauss, maybe_set
 from ..stubs import (Unitlike, Pathlike, ArrayKeV, Axes, Figure,
                     Colorbar, QuadMesh, ArrayInt, PointUnit, array, arraylike, ArrayBool, numeric)
 from .vector import Vector, maybe_pop_from_kwargs
@@ -235,6 +233,7 @@ class Matrix(AbstractArray):
                 values, Y, X = load_tar(path)
             case 'mama':
                 values, Y, X = mama_read(path)
+                return cls(Ex=X, Eg=Y, values=values)#, edge='mid')
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
         return cls(Ex=X, Eg=Y, values=values)
@@ -275,54 +274,23 @@ class Matrix(AbstractArray):
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
 
-    def cut_like(self, other: Matrix,
+    def reshape_like(self, other: Matrix,
                  inplace: bool = False) -> Matrix | None:
-        """ Cut a matrix like another matrix (according to energy arrays)
+        """ Cut and rebin a matrix like another matrix (according to energy arrays)
 
         Args:
             other (Matrix): The other matrix
             inplace (bool, optional): If True make the cut in place. Otherwise
                 return a new matrix. Defaults to False.
 
-nameReurns:
+        Returns:
             Matrix | None: If inplace is False, returns the cut matrix
         """
         if inplace:
-            self.cut('Ex', other.Ex.min(), other.Ex.max(), inplace=inplace)
-            self.cut('Eg', other.Eg.min(), other.Eg.max(), inplace=inplace)
+            self.rebin(0, bins=other.X_index, inplace=True)
+            self.rebin(1, bins=other.Y_index, inplace=True)
         else:
-            out = self.cut('Ex', other.Ex.min(), other.Ex.max(),
-                           inplace=inplace)
-            if out is not None:
-                out.cut('Eg', other.Eg.min(), other.Eg.max(), inplace=True)
-            return out
-
-    def cut_diagonal(self, p1: PointUnit | None = None, p2: PointUnit | None = None,
-                     slope: float | None = None,
-                     inplace: bool = False) -> Matrix | None:
-        """Cut away counts to the right of a diagonal line defined by indices
-
-        Args:
-            E1: First point of intercept, ordered as (Eg, Ex)
-            E2: Second point of intercept
-            inplace: Whether the operation should be applied to the
-                current matrix, or to a copy which is then returned.
-                Defaults to `False`.
-
-        Returns:
-            The matrix with counts above diagonal removed (if inplace is
-            False).
-        """
-        # TODO Fix by using detector resolution
-        line = Line(p1=p1, p2=p2, slope=slope)
-        mask = line.above(self)
-
-        if inplace:
-            self.values[mask] = 0.0
-        else:
-            matrix = self.clone()
-            matrix.values[mask] = 0.0
-            return matrix
+            return self.rebin(1, bins=other.Y_index).rebin(0, bins=other.X_index)
 
     def trapezoid(self, Ex_min: float, Ex_max: float,
                   Eg_min: float, Eg_max: float | None = None,
@@ -381,7 +349,7 @@ nameReurns:
 
     @overload
     def rebin(self, axis: int | str, *,
-              bins: Sequence[float] | None = None,
+              bins: Sequence[float] | Index | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
@@ -389,14 +357,14 @@ nameReurns:
 
     @overload
     def rebin(self, axis: int | str, *,
-              bins: Sequence[float] | None = None,
+              bins: Sequence[float] | Index | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
               inplace: Literal[True] = ...) -> None: ...
 
     def rebin(self, axis: int | str, *,
-              bins: Sequence[float] | None = None,
+              bins: Sequence[float] | Index | None = None,
               factor: float | None = None,
               binwidth: Unitlike | None = None,
               numbins: int | None = None,
@@ -501,10 +469,10 @@ nameReurns:
         self.values[self.values < 0] = 0
 
     def index_X(self, x: float) -> int:
-        return self.X_index.index(x)
+        return self.X_index.index_expression(x)
 
     def index_Y(self, x: float) -> int:
-        return self.Y_index.index(x)
+        return self.Y_index.index_expression(x)
 
     def to_unit(self, unit: Unitlike, axis: str | int = 'both', inplace: bool = False) -> None | Matrix:
         """ Returns a copy with units set to `unit`.
@@ -600,7 +568,7 @@ nameReurns:
 
         A Vector is returned if the matrix is 1D.
         """
-        raise NotImplementedError("This method is not implemented yet.")
+        raise NotImplementedError()
         if mask.shape != self.shape:
             raise ValueError("Mask must have same shape as matrix.")
 
@@ -612,7 +580,7 @@ nameReurns:
         if rmin == rmax:
             if cmin == cmax:
                 raise ValueError("Mask is a scalar. Use ordinary indexing.")
-            return Vector(values = self.values[rmin, cmin:cmax+1], E=self.Ex[rmin:rmax+1])
+            return Vector(X=self.X[rmin:rmax+1], values = self.values[rmin, cmin:cmax+1] )
         elif cmin == cmax:
             return Vector(values = self.values[rmin:rmax+1, cmin], E=self.Eg[cmin:cmax+1])
         values = self.values[rmin:rmax+1, cmin:cmax+1]
@@ -808,15 +776,7 @@ nameReurns:
         else:
             raise ValueError("Unsupported zscale ", scale)
         norm = kwargs.pop('norm', norm)
-        if self.X_index.is_mid():
-            X = self.X_index.to_left().ticks()
-        else:
-            X = self.X_index.ticks()
-
-        if self.Y_index.is_mid():
-            Y = self.Y_index.to_left().ticks()
-        else:
-            Y = self.Y_index.ticks()
+        X, Y = self._plot_mesh()
 
         # Set entries of 0 to white
         current_cmap = copy.copy(cm.get_cmap())
@@ -826,17 +786,12 @@ nameReurns:
         masked = np.ma.array(self.values, mask=mask)
 
         mesh = ax.pcolormesh(Y, X, masked, norm=norm, **kwargs)
+
         if self.Y_index.is_mid():
             ax.xaxis.set_major_locator(MeshLocator(self.Y))
             ax.tick_params(axis='x', rotation=40)
         if self.X_index.is_mid():
             ax.yaxis.set_major_locator(MeshLocator(self.X))
-        #if midbin_ticks:
-        #    ax.xaxis.set_major_locator(MeshLocator(self.X))
-        #    ax.tick_params(axis='x', rotation=40)
-        #    ax.yaxis.set_major_locator(MeshLocator(self.Y))
-        # ax.xaxis.set_major_locator(ticker.FixedLocator(self.Eg, nbins=10))
-        # fix_pcolormesh_ticks(ax, xvalues=self.Eg, yvalues=self.Ex)
 
         maybe_set(ax, 'title', self.name)
         maybe_set(ax, 'ylabel', self.xlabel + f" [${self.X_index.unit:~L}$]")
@@ -874,6 +829,18 @@ nameReurns:
 
             maybe_set(cbar.ax, 'ylabel', self.vlabel)
         return ax, (mesh, cbar)
+
+    def _plot_mesh(self) -> tuple[np.ndarray, np.ndarray]:
+        if self.X_index.is_mid():
+            X = self.X_index.to_left().ticks()
+        else:
+            X = self.X_index.ticks()
+
+        if self.Y_index.is_mid():
+            Y = self.Y_index.to_left().ticks()
+        else:
+            Y = self.Y_index.ticks()
+        return X, Y
 
     def meta_into_vector(self, index: np.ndarray | Index, values: np.ndarray) -> Vector:
         return Vector(X=index, values=values, vlabel=self.vlabel, valias=self.valias, name=self.name)
@@ -949,21 +916,23 @@ class IndexLocator:
         self.mat = matrix
 
     def __getitem__(self, key) -> Matrix | Vector | float:
-        if isinstance(key, array):
-            return self.linear_index(key)
-        xi, yi = key
-        values = self.mat.values.__getitem__(key)
-        if isinstance(xi, slice):
-            X = self.mat.X.__getitem__(xi)
-            if isinstance(yi, slice):
-                Y = self.mat.Y.__getitem__(yi)
+        if not isinstance(key, np.ndarray):
+            values = self.mat.values.__getitem__(key)
+        match key:
+            case np.ndarray():
+                return self.linear_index(key)
+            case slice() as x, slice() as y:
+                X = self.mat.X_index[x]
+                Y = self.mat.Y_index[y]
                 return self.mat.clone(values=values, X=X, Y=Y)
-            return self.mat.into_vector(X, values)
-        elif isinstance(yi, slice):
-            Y = self.mat.Y.__getitem__(yi)
-            return self.mat.into_vector(Y, values)
-        else:
-            return values
+            case slice() as x, y:
+                X = self.mat.X_index[x]
+                return self.mat.meta_into_vector(X, values)
+            case x, slice() as y:
+                Y = self.mat.Y_index[y]
+                return self.mat.meta_into_vector(Y, values)
+            case x, y:
+                return values
 
     def linear_index(self, indices) -> Matrix:
         values = np.where(indices, self.mat.values, 0)
@@ -992,13 +961,13 @@ class ValueLocator:
                 xindex = self.mat.X_index[sx]
                 j: int = self.mat.Y_index.index_expression(y, strict=self.strict)
                 values = self.mat.values.__getitem__((sx, j))
-                return self.mat.into_vector(xindex, values)
+                return self.mat.meta_into_vector(xindex, values)
             case x, slice() as y:
                 sy: slice = self.mat.Y_index.index_slice(y, strict=self.strict)
                 yindex = self.mat.Y_index[sy]
                 i: int = self.mat.X_index.index_expression(x, strict=self.strict)
                 values = self.mat.values.__getitem__((i, sy))
-                return self.mat.into_vector(yindex, values)
+                return self.mat.meta_into_vector(yindex, values)
             case x, y:
                 i: int = self.mat.X_index.index_expression(x, strict=self.strict)
                 j: int = self.mat.Y_index.index_expression(y, strict=self.strict)

@@ -101,23 +101,19 @@ class Unfolder:
                 calibrations.
         """
         # Ensure that the given matrix is in fact raw
-
+        raise DeprecationWarning()
         assert self.R.shape[0] == self.R.shape[1],\
             "Response R must be a square matrix"
 
         LOG.debug("Comparing calibration of raw against response")
-        if len(self.raw.Eg) != len(self.R.Eg):
-            raise ValueError("Must have equal number of energy bins.")
-        if not np.allclose(self.raw.Eg, self.R.Eg):
-            raise ValueError("Must have equal energy binning.")
-
+        if self.raw.X != self.R.true:
+            raise ValueError("Raw and response must have the same indices")
         LOG.debug("Check for negative counts.")
         if np.any(self.raw.values < 0) or np.any(self.R.values < 0):
             raise ValueError("Raw and response cannot have negative counts."
                              "Consider using fill_negatives and "
                              "remove_negatives on the input matixes.")
 
-        self.r = self.raw.values
 
     def apply(self, raw: Matrix,
               response: Matrix | None = None) -> Matrix:
@@ -142,6 +138,7 @@ class Unfolder:
         self.raw = raw.to('keV')
         # Set up the arrays
         self.update_values()
+        self.r = self.raw
         unfolded_cube = np.zeros((self.num_iter, *self.r.shape))
         chisquare = np.zeros((self.num_iter, self.r.shape[0]))
         fluctuations = np.ones((self.num_iter, self.r.shape[0]))
@@ -180,8 +177,7 @@ class Unfolder:
         if self.use_compton_subtraction:
             unfolded = self.compton_subtraction(unfolded)
 
-        unfolded = raw.clone(values=unfolded)
-        unfolded.state = "unfolded"
+        unfolded: Matrix = raw.clone(values=unfolded)
 
         unfolded[unfolded < 0] = 0
         return unfolded
@@ -208,7 +204,7 @@ class Unfolder:
         if step > 0:  # since the initial guess is the raw spectrum
             unfolded = unfolded + (self.r - folded)
 
-        folded = unfolded@self.R.values
+        folded = self.R.T@unfolded
 
         return unfolded, folded
 
@@ -274,18 +270,6 @@ class Unfolder:
             self.minimum_iterations * np.ones(len(best_iteration), dtype=int),
             best_iteration)
         return best_iteration
-
-    def fold(self, matrix: Matrix) -> Matrix:
-        """ Folds a matrix with the loaded response
-
-        Args:
-            matrix (Matrix): Input matrix
-
-        Returns:
-            folded (Matrix): Folded matrix
-        """
-        folded = matrix.clone(values=matrix.values@self.R.values)
-        return folded
 
     @property
     def R(self) -> Matrix:

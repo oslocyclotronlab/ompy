@@ -1,5 +1,5 @@
 from .numbalib import *
-from .response import *
+from .response_old import *
 from .calibrator import *
 from .io import save, load
 from .responsedata import *
@@ -13,4 +13,4 @@ from .. import USE_GPU
 if USE_GPU:
     from .comptongpu import *
 
-from .response_new import Response as ResponseNew
+from .response import Response as Response
