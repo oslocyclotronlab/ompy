@@ -34,8 +34,8 @@ except ImportError:
 
 @dataclass
 class Interpolation(ABC):
-    def __init__(self, points: Vector):
-        self.points: Vector = points
+    def __init__(self, points: Vector, copy: bool = False):
+        self.points: Vector = points if not copy else points.copy()
 
     def __call__(self, points: float | Vector | np.ndarray) -> float | Vector | np.ndarray:
         match points:
@@ -81,24 +81,33 @@ class Interpolation(ABC):
         return data, meta
 
     def plot(self, ax: Axes = None, skw: LineKwargs | None = None,
-             lkw: LineKwargs | None = None, **kwargs) -> Axes:
+             lkw: LineKwargs | None = None, data: bool = True, intp: bool = True, **kwargs) -> Axes:
         if ax is None:
             fig, ax = plt.subplots()
+        if data:
+            skw = kwargs | (skw or {})
+            self.plot_data(ax, **skw)
+        if intp:
+            lkw = kwargs | (lkw or {})
+            self.plot_intp(ax, **lkw)
+        return ax
+
+    def plot_intp(self, ax: Axes = None, **kwargs) -> Axes:
         x = np.linspace(min(1e-3, self.points.E.min()), max(self.points.E.max(), 3e4), 2000)
         y = self(x)
+        ax.plot(x, y, **kwargs)
+        return ax
+
+    def plot_data(self, ax: Axes = None, **kwargs) -> Axes:
         X, Y = self.points.unpack()
-        skw = skw or {}
+        skw = {}
         skw.setdefault('marker', 'x')
         skw.setdefault('mew', 0.5)
         skw.setdefault('linestyle', '')
         skw = kwargs | skw
-
-        lkw = lkw or {}
-        lkw = kwargs | lkw
-        #self.points.plot(ax=ax, kind='scatter')
         ax.plot(X, Y, **skw)
-        ax.plot(x, y, **lkw)
         return ax
+
 
     def plot_residuals(self, ax: Axes = None, **kwargs) -> Axes:
         if ax is None:
@@ -123,6 +132,12 @@ class Interpolation(ABC):
 
     def to_same_unit(self, unit: Unitlike) -> float:
         return self.points.X_index.to_same_unit(unit)
+
+    def clone(self, points: Vector | None = None, copy: bool = False) -> Interpolation:
+        return self.__class__(points or self.points, copy=copy)
+
+    def copy(self, **kwargs) -> Interpolation:
+        return self.clone(copy=True, **kwargs)
 
 
 class PoissonInterpolation(Interpolation):
@@ -154,8 +169,8 @@ class PoissonInterpolation(Interpolation):
 
 
 class LinearInterpolation(Interpolation):
-    def __init__(self, data: Vector, intp: interp1d):
-        super().__init__(data)
+    def __init__(self, data: Vector, intp: interp1d, copy: bool = False):
+        super().__init__(data, copy=copy)
         self.intp = intp
 
     def eval(self, points: np.ndarray) -> np.ndarray:
@@ -169,6 +184,12 @@ class LinearInterpolation(Interpolation):
         data, meta = Interpolation._load(path)
         intp = interp1d(data.X, data.values, bounds_error=False, fill_value='extrapolate')
         return LinearInterpolation(data, intp)
+
+    def clone(self, points: Vector | None = None, intp: interp1d | None = None,
+              copy: bool = False) -> LinearInterpolation:
+        return LinearInterpolation(points if points is not None else self.points,
+                                   intp if intp is not None else self.intp,
+                                   copy=copy)
 
 
 class CompoundInterpolation(Interpolation):

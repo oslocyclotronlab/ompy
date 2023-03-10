@@ -141,7 +141,7 @@ def gaussian_filter_1d(x, sigma):
 
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass#(frozen=True, slots=True)
 class GuttormsenResult1D(UnfoldedResult1D):
     fluctuations: np.ndarray
 

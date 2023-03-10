@@ -14,3 +14,4 @@ if USE_GPU:
     from .comptongpu import *
 
 from .response import Response as Response
+from .perturb import *

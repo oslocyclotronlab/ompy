@@ -142,7 +142,7 @@ def _interpolate(compton: MTO, E: VE, E_observed: VO, E_true: VT,
     d_edges_T = cuda.to_device(edges_T.astype(NPtype), stream=stream)
     d_stop_T = cuda.to_device(stop_T.astype(NPtype), stream=stream)
 
-    c_weight = 1 / (1 + np.exp(-1 / 100 * (E - 800)))
+    c_weight = 1 / (1 + np.exp(-1 / 200 * (E_observed - 1000)))
     d_weight = cuda.to_device(c_weight.astype(NPtype), stream=stream)
 
     d_angle_E = cuda.device_array((N, M), dtype=Dtype, stream=stream)
@@ -443,4 +443,4 @@ def weight(out: MEO, fan: MEO, lerp: MEO, weight: VE) -> None:
     i, j = cuda.grid(2)
     n, m = fan.shape
     if i < n and j < m:
-        out[i, j] = weight[i] * fan[i, j] + (1 - weight[i]) * lerp[i, j]
+        out[i, j] = weight[j] * fan[i, j] + (nb.float32(1.0) - weight[j]) * lerp[i, j]

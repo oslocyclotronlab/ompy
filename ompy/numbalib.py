@@ -14,7 +14,7 @@ def nop_nop(*aargs, **kkwargs):
     return decorator
 
 try:
-    from numba import jit, njit, int32, float32, float64, prange
+    from numba import jit, njit, int32, float32, float64, prange, objmode
     from numba.experimental import jitclass
     from numba.typed import List as NList
     from numba.types import ListType
@@ -28,6 +28,7 @@ except ImportError as e:
     float64 = np.float64
     prange = range
     NumpyArray = np.ndarray
+    objmode = None
 
     njit = nop_nop #nop_decorator
     jit = nop_nop

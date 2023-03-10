@@ -8,10 +8,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import overload, Literal
 from .io import load, save
+import json
 
 """
-TODO: Remove prefix/suffix and only use a glob pattern.
-TODO: FWHM is useless. Make it "optional" for compatibility.
+TODO Use the db from response
 """
 
 
@@ -20,13 +20,17 @@ RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_re
                       'Oscar2020': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2020/mama_export"}
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Components:
     FE: float = 1.0
     SE: float = 1.0
     DE: float = 1.0
     AP: float = 1.0
     compton: float = 1.0
+
+    def __post_init__(self):
+        if self.FE < 0 or self.SE < 0 or self.DE < 0 or self.AP < 0 or self.compton < 0:
+            raise ValueError("Components must be positive")
 
     def to_dict(self) -> dict[str, float]:
         return {'compton': self.compton, 'FE': self.FE,
@@ -35,6 +39,19 @@ class Components:
 
     def __iter__(self):
         return iter([self.compton, self.FE, self.DE, self.SE, self.AP])
+
+    @classmethod
+    def from_path(cls, path: Pathlike) -> Components:
+        path = Path(path)
+        with path.open('r') as f:
+            return cls(**json.load(f))
+
+    def save(self, path: Pathlike, exist_ok: bool = False) -> None:
+        path = Path(path)
+        if path.exists() and not exist_ok:
+            raise FileExistsError(f"File {path} already exists")
+        with path.open('w') as f:
+            json.dump(self.to_dict(), f, indent=4)
 
 
 @dataclass
@@ -73,6 +90,10 @@ class ResponseData:
         the sum of the probabilities p_i (not counts, c_i) weighted by custom weights w_i is equal to 1.
         In the derivation most normalization factors disappear, and we are left with
                                     p_i = w_i * c_i / sum(w_i * c_i)
+
+        Note that the normalization must happen on the counts before the interpolation, as the normalization itself
+        will correct for the #counts(E) necessary for an interpolation. If you wish to "renormalize" the different
+        component of the response matrix, you should do that using the components of the Response object.
         """
 
         T = compton*self.compton.sum(axis='observed') + FE*self.FE + SE*self.SE + DE*self.DE + AP*self.AP

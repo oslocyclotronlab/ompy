@@ -31,10 +31,10 @@ def loglerp(X, a, b, Y1, Y2):
 
 class EscapeInterpolation(Interpolation):
     def __init__(self, points: Vector, linear: LinearInterpolation, gf3: GF3Interpolation,
-                 linear_to: float):
-        super().__init__(points)
-        self.gf3 = gf3
-        self.linear = linear
+                 linear_to: float, copy: bool = False):
+        super().__init__(points, copy=copy)
+        self.gf3 = gf3.copy() if copy else gf3
+        self.linear = linear.copy() if copy else gf3
         self.linear_to = linear_to
 
     def eval(self, points: np.ndarray) -> np.ndarray:
@@ -68,6 +68,13 @@ class EscapeInterpolation(Interpolation):
         meta = self._metadata()
         self.linear.save(path / meta['lerppath'])
         self.gf3.save(path / meta['gf3path'])
+
+    def clone(self, points: Vector | None = None,
+              gf3: GF3Interpolation | None = None,
+              linear: LinearInterpolation | None = None,
+              linear_to: float | None = None,
+              copy: bool = False) -> EscapeInterpolation:
+        return EscapeInterpolation(self.points, linear or self.linear, gf3 or self.gf3, self.linear_to, copy=copy)
 
     def __str__(self) -> str:
        s = "EscapeInterpolation\n"
@@ -134,8 +141,9 @@ def fwhm_jac(E: np.ndarray, a0: float, a1: float, a2: float) -> np.ndarray:
 
 
 class FWHMInterpolation(Interpolation):
-    def __init__(self, points: Vector, a0: float, a1: float, a2: float, C: float = 1.0, cov: np.ndarray | None = None):
-        super().__init__(points)
+    def __init__(self, points: Vector, a0: float, a1: float, a2: float, C: float = 1.0,
+                 cov: np.ndarray | None = None, copy: bool = False):
+        super().__init__(points, copy=copy)
         self.a0 = a0
         self.a1 = a1
         self.a2 = a2
@@ -193,6 +201,19 @@ class FWHMInterpolation(Interpolation):
             a2 = f"{self.a2: .2e}"
         return f"FWHMInterpolation:\n a0: {a0}\n a1: {a1}\n a2: {a2}\n C: {self.C}"
 
+    def clone(self, points: Vector | None = None, a0: float | None = None,
+              a1: float | None = None, a2: float | None = None, C: float | None = None,
+              cov: np.ndarray | None = None, copy: bool = False) -> FWHMInterpolation:
+        return FWHMInterpolation(
+            points or self.points,
+            a0 or self.a0,
+            a1 or self.a1,
+            a2 or self.a2,
+            C or self.C,
+            cov or self.cov,
+            copy=copy
+        )
+
 
 class FWHMInterpolator(Interpolator):
     def interpolate(self) -> FWHMInterpolation:
@@ -224,11 +245,12 @@ def polylog_jac(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
 
 
 class FEInterpolation(Interpolation):
-    def __init__(self, points: Vector, lerp: LinearInterpolation, p: np.ndarray, cov: np.ndarray | None = None):
-        super().__init__(points)
-        self.lerp = lerp
-        self.p = p
-        self.cov = cov
+    def __init__(self, points: Vector, lerp: LinearInterpolation, p: np.ndarray,
+                 cov: np.ndarray | None = None, copy: bool = False):
+        super().__init__(points, copy=copy)
+        self.lerp = lerp if not copy else lerp.copy()
+        self.p = p if not copy else p.copy()
+        self.cov = cov if not copy else cov.copy()
 
     def eval(self, points: np.ndarray) -> np.ndarray:
         limit = self.lerp.points.E[-1]
@@ -261,6 +283,11 @@ class FEInterpolation(Interpolation):
         np.save(path / meta['coefpath'], self.p)
         if 'covpath' in meta:
             np.save(path / meta['covpath'], self.cov)
+
+    def clone(self, points: Vector | None = None, lerp: LinearInterpolation | None = None,
+              p: np.ndarray | None = None, cov: np.ndarray | None = None, copy: bool = False):
+        return FEInterpolation(points=points or self.points, lerp=lerp or self.lerp,
+                               p=p if p is not None else self.p, cov=cov if cov is not None else self.cov, copy=copy)
 
     def __str__(self) -> str:
         err = np.sqrt(np.diag(self.cov))

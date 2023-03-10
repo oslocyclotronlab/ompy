@@ -19,6 +19,9 @@ class AbstractArray(ABC):
     @abstractmethod
     def clone(self, **kwargs) -> AbstractArray: ...
 
+    def copy(self, **kwargs) -> AbstractArray:
+        return self.clone(copy=True, **kwargs)
+
     def check_or_assert(self, other) -> np.ndarray | float:
         if isinstance(other, AbstractArray):
             if not self.shape == other.shape:

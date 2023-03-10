@@ -95,4 +95,5 @@ else:
                           ascii_plot, plot_projection_rectangle)
     from .detector import Detector, OSCAR
     from .peakselect import fit_gauss
+    from .peakselect import gaussian as pgaussian
     from .introspection import logging, hooks

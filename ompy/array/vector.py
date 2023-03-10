@@ -629,6 +629,9 @@ class Vector(AbstractArray):
         return Vector(X=X, values=values, std=std, order=order,
                       metadata=metadata, copy=copy, **kwargs)
 
+    def copy(self, **kwargs) -> Vector:
+        return self.clone(copy=True, **kwargs)
+
     @property
     def unit(self) -> Any:
         return self._index.unit

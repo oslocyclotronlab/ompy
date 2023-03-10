@@ -53,8 +53,9 @@ class GSF3:
 
 
 class GF3Interpolation(Interpolation):
-    def __init__(self, points: Vector, a: float, b: float, c: float, d: float, e: float, f: float, g: float, C: float):
-        super().__init__(points)
+    def __init__(self, points: Vector, a: float, b: float, c: float, d: float, e: float, f: float, g: float, C: float,
+                 copy: bool = False):
+        super().__init__(points, copy=copy)
         self.gsf3 = GSF3(a, b, c, d, e, f, g, C)
 
     def eval(self, E: np.ndarray) -> np.ndarray:
@@ -77,6 +78,29 @@ class GF3Interpolation(Interpolation):
         a, b, c, d, e, f, g, C = meta["a"], meta["b"], meta["c"], meta["d"], meta["e"], meta["f"], meta["g"], meta['C']
         return GF3Interpolation(points, a,b,c,d,e,f,g, C)
 
+    def clone(self, points: Vector | None = None, a: float | None = None, b: float | None = None,
+              c: float | None = None, d: float | None = None, e: float | None = None, f: float | None = None,
+              g: float | None = None, C: float | None = None, copy: bool = False) -> GF3Interpolation:
+        if points is None:
+            points = self.points
+        if a is None:
+            a = self.gsf3.a
+        if b is None:
+            b = self.gsf3.b
+        if c is None:
+            c = self.gsf3.c
+        if d is None:
+            d = self.gsf3.d
+        if e is None:
+            e = self.gsf3.e
+        if f is None:
+            f = self.gsf3.f
+        if g is None:
+            g = self.gsf3.g
+        if C is None:
+            C = self.gsf3.C
+        return GF3Interpolation(points, a, b, c, d, e, f, g, C, copy=copy)
+
 
     def __str__(self) -> str:
         s = ("GF3Interpolation with parameters:\n"
@@ -89,6 +113,39 @@ class GF3Interpolation(Interpolation):
              f"g = {self.gsf3.g:.3f}\n"
              f"C = {self.gsf3.C:.3f}")
         return s
+
+    @property
+    def a(self) -> float:
+        return self.gsf3.a
+
+    @property
+    def b(self) -> float:
+        return self.gsf3.b
+
+    @property
+    def c(self) -> float:
+        return self.gsf3.c
+
+    @property
+    def d(self) -> float:
+        return self.gsf3.d
+
+    @property
+    def e(self) -> float:
+        return self.gsf3.e
+
+    @property
+    def f(self) -> float:
+        return self.gsf3.f
+
+    @property
+    def g(self) -> float:
+        return self.gsf3.g
+
+    @property
+    def C(self) -> float:
+        return self.gsf3.C
+
 
 
 class GF3Interpolator(Interpolator):

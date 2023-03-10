@@ -1,7 +1,7 @@
 from __future__ import annotations
 from . import Response
 from .response_old import E_compton
-from .. import Vector, zeros_like
+from .. import Vector, zeros_like, Matrix
 from ..peakselect import fit_gauss, GaussFit
 from ..stubs import Unitlike, ArrayBool, Axes
 from dataclasses import dataclass
@@ -62,8 +62,8 @@ class Calibrator:
             ignore = np.zeros_like(self.spectrum, dtype=bool)
 
         def loss(p) -> float:
-            R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, 
-                                   fwhm_peak=self.fwhm_fit.mu, compton=p[0]).T
+            weights = Components(compton=p[0])
+            mats = self.R.component_matrices_like(self.spectrum, weights=weights)
             fe_e, fe_C, fe_fit = self.fit_FE(fe_region, Components(compton=p[0]))
             compton_edge = E_compton(fe_e, np.pi)
             region = ~ignore & (self.spectrum.E < compton_edge)
@@ -125,12 +125,15 @@ class Calibrator:
         Returns:
             fe_fit: The fitted FE component
         """
-        fe: Vector = self.spectrum.iloc[region]
-        emin = fe.E[0]
-        emax = fe.E[-1]
+        spectrum: Vector = self.spectrum
+        fe: Vector = spectrum.from_mask(region)
+        emin = fe.X[0]
+        emax = fe.X[-1]
         fe: np.ndarray = fe.values
-        # Cut the response
-        R = self.R.interpolate(self.spectrum.E, self.fwhm_fit.fwhm, **components.to_dict()).T
+        # Make the response. We want to go delta -> nu, hence folding by resolution
+        G = self.R.gaussian_like(spectrum)
+        matrices: dict[str, Matrix] = self.R.component_matrices_like(spectrum, weights=components)
+        R_fe = G.T@matrices['FE'].T
 
         def loss(p) -> float:
             e, C = p
@@ -138,9 +141,9 @@ class Calibrator:
                 return np.inf
             if C <= 0:
                 return np.inf
-            delta = zeros_like(self.spectrum)
+            delta = zeros_like(spectrum)
             delta.loc[e] = C
-            folded = R@delta
+            folded = R_fe@delta
             #ax = folded.plot()
             #delta.plot(ax=ax)
             #self.spectrum.plot(ax=ax)

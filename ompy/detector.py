@@ -171,6 +171,7 @@ class CompoundDetector:
             matrix.values[mask] = 0.0
             return matrix
 
+
 Oslo = CompoundDetector(ex_detector=SiRi(), eg_detector=OSCAR())
     
 

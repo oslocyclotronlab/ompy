@@ -10,13 +10,17 @@ from .interpolations import (EscapeInterpolator, EscapeInterpolation,
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 from ..stubs import Axes, Pathlike, Unitlike
-from .. import Vector, __full_version__
+from .. import Vector, __full_version__, Index
+from .responsepath import ResponseName, get_response_path
 import numpy as np
 from pathlib import Path
 import json
 from typing import Literal, overload
 import warnings
 
+SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
+
+# TODO The energy is mid, but loaded as left. Gives a small error.
 # TODO Normalization is a bit tricky, as the raw data is noisy, so
 # a normalization there will propagate (?) the noise. An initial counts
 # interpolation would be better, but that requires C=1.0 in the p0 in GF3
@@ -69,7 +73,7 @@ class DiscreteInterpolation:
 
     def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
         sigma = self.FWHM.to_same_unit(sigma)
-        return self.normalize_FWHM(energy, sigma * 2.355, inplace=inplace)
+        return self.normalize_FWHM(energy, sigma * SIGMA_TO_FWHM, inplace=inplace)
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
@@ -100,12 +104,25 @@ class DiscreteInterpolation:
         FWHM = FWHMInterpolation.from_path(path / 'FWHM')
         return cls(FE, SE, DE, AP, Eff, FWHM, **meta)
 
+    @classmethod
+    def from_response_path(cls, path: Pathlike) -> DiscreteInterpolation:
+        path = Path(path) / 'interpolation'
+        return cls.from_path(path)
+
+    @classmethod
+    def from_db(cls, name: ResponseName) -> DiscreteInterpolation:
+        return cls.from_response_path(get_response_path(name))
+
     @property
     def E(self) -> np.ndarray:
         return self.FE.x
 
+    @property
+    def E_index(self) -> Index:
+        return self.FE.points.X_index
+
     def sigma(self, E: np.ndarray) -> np.ndarray:
-        return self.FWHM(E) / 2.355
+        return self.FWHM(E) / SIGMA_TO_FWHM
 
     def clone(self, FE: Interpolation | None = None,
               SE: Interpolation | None = None,

@@ -70,7 +70,7 @@ class Line(Geometry):
         slope = self.slope
         # Correct for binning
         if slope is not None:
-            slope *= matrix.dX[0] / matrix.dY[0]
+            slope *= matrix.dY[0] / matrix.dX[0]
         p: Points = refine_points(p1, p2, slope)
         return p
 

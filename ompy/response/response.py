@@ -7,10 +7,11 @@ from typing import TypeAlias, Literal
 
 import numpy as np
 
-from . import ResponseData, DiscreteInterpolation, interpolate_compton
+from . import ResponseData, DiscreteInterpolation, interpolate_compton, Components
 from .numbalib import njit, prange
-from .. import Vector, Matrix, USE_GPU, __full_version__, to_index, Index
+from .. import Vector, Matrix, USE_GPU, __full_version__, to_index, Index, zeros_like
 from ..stubs import Pathlike, Unitlike
+from .responsepath import ResponseName, get_response_path
 
 if USE_GPU:
     from . import interpolate_gpu
@@ -19,59 +20,32 @@ import logging
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
-
-# TODO Always make a high resolution compton to save, rebin and reuse?
-# Is rebinning correct? We want to preserve probability, not counts.
-# The R(e) gives the energy spectrum *at* e, but an experimental vector
-# has a bin [e, e+de]. Should R^(e) be a weighted average over R(e) ... R(e+de)? YES!
-# TODO Save only compton, not entire response. Recreate respons upon loading.
+#TODO
+# [x] Save and load components
+# [ ] Interpolate compton down to 0
+# [x] Is the response specialized correctly? We *know* the components at all E
+# [ ] Refactor the specialization
+# Note! The gaussian matrix will not be equal to "manual" gaussians, as the mus are taken from
+# the midbin-value, ensuring perfect symmetric distributions.
 
 
 class Response:
     def __init__(self, data: ResponseData,
                  interpolation: DiscreteInterpolation,
                  R: Matrix | None = None,
-                 compton: Matrix | None = None):
-        self.data: ResponseData = data
-        self.interpolation: DiscreteInterpolation = interpolation
-        self.R: Matrix | None = R
-        self.compton: Matrix | None = compton
+                 compton: Matrix | None = None,
+                 components: Components = Components(),
+                 copy: bool = False):
+        self.data: ResponseData = data if not copy else data.copy()
+        self.interpolation: DiscreteInterpolation = interpolation if not copy else interpolation.copy()
+        self.compton: Matrix | None = compton if not copy else compton.copy() if compton is not None else None
         self.compton_special: Matrix | None = None
+        self.components = components
 
     @classmethod
     def from_data(cls, data: ResponseData) -> Response:
         intp = DiscreteInterpolation.from_data(data.normalize())
         return cls(data, intp)
-
-    def interpolate(self, E: Index | np.ndarray | None = None, normalize: float = True,
-                    force: bool = False, **kwargs) -> Matrix:
-        if self.compton is None or force:
-            self.compton = self.interpolate_compton(E, **kwargs)
-        if self.R is None or force:
-            self.R = self.add_structures(self.compton, normalize=normalize)
-        return self.R
-
-    def add_structures(self, C: Matrix | None = None, normalize: bool = True) -> Matrix:
-        if C is None:
-            if self.compton is None:
-                raise ValueError("Compton matrix must be set or given as argument before adding structures")
-            C = self.compton
-        R: Matrix = C.clone(copy=True, name='Response')
-        FE, SE, DE, AP = self.interpolation.structures()
-        emin = R.observed.min()
-        j511 = R.index_observed(511)
-        for i, e in enumerate(R.true):
-            if e > emin:
-                R.loc[i, e] += FE(e)
-            if e - 511 > emin:
-                R.loc[i, e - 511.0] += SE(e)
-            if e - 2 * 511 > emin:
-                R.loc[i, e - 511.0 * 2] += DE(e)
-            if e > 1022:
-                R[i, j511] += AP(e)
-        if normalize:
-            R.normalize(axis='observed', inplace=True)
-        return R
 
     def best_energy_resolution(self) -> np.ndarray:
         E_true = self.data.compton.true_index
@@ -95,42 +69,73 @@ class Response:
             compton: Matrix = interpolate_gpu(self.data, E, sigmafn, sigma)
         else:
             compton: Matrix = interpolate_compton(self.data, E, sigmafn, sigma)
+        self.compton = compton
         return compton
 
     def specialize(self, bins: np.ndarray | None = None, factor: float | None = None,
                    width: float | None = None, numbins: int | None = None, **kwargs) -> Matrix:
-        bins = self.R.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
+        bins = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
                                                         binwidth=width)
         return self.specialize_(bins, **kwargs)
 
-    def specialize_(self, E: Index, **kwargs) -> Matrix:
+    def specialize_(self, *, E: Index | None = None, compton: Matrix | None = None, weights: Components | None = None, normalize: bool = True) -> Matrix:
         """ Rebins the response matrix to the requested energy grid. """
-        if self.R is None:
-            raise ValueError("Response matrix not yet interpolated. Use `.interpolate()` first.")
-        if self.R.true_index.leftmost > E.leftmost:
-            t = self.R.true_index
+        if compton is None:
+            if self.compton is None:
+                raise ValueError("Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first")
+            compton = self.compton
+        if self.compton.true_index.leftmost > E.leftmost:
+            t = self.compton.true_index
             raise ValueError(("Requested energy grid is too low. "
                               f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                               f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
                               f"The energy grid must be truncated at index {E.index(t.leftmost)+1}."))
-        R = self.R.rebin('true', bins=E).to_left()  # TODO Left?? Should the E edge be preserved?
-        R = R.rebin('observed', bins=E)
+        if weights is None:
+            weights = self.components
 
-        c = self.compton.rebin('true', bins=E).to_left()
-        c = c.rebin('observed', bins=c.true)
-        c.values /= R.sum(axis='observed')
-        self.compton_special = c
+        # We preserve area as we want a mean value, not the sum
+        R = compton.rebin('true', bins=E, preserve='area').to_left()
+        R.rebin('observed', bins=R.true, inplace=True)
+        R = R.to_left()
+        R *= weights.compton
+        R.name = "Response"
 
-        R.normalize(axis='observed', inplace=True)
+        # The functions need to be evaluated over the values within the bin
+        # to account for their behaviour across the bin. The resolution
+        # is the same as that of the raw structure data (go finer?)
+        if E is not None:
+            dE_intp = np.max(R.true_index.steps())
+            dE = np.min(self.interpolation.E_index.steps())
+            N = int(np.ceil(dE_intp / dE))
 
+            def mean(fn, e):
+                return np.mean(fn(np.linspace(e, e + dE_intp, N)))
+        else:
+            def mean(fn, e):
+                return fn(e)
+
+        FE, SE, DE, AP = self.interpolation.structures()
+        emin = R.observed_index.leftmost
+        j511 = R.index_observed(511)
+        for i, e in enumerate(R.true):
+            #if e > emin:
+            R.loc[i, e] += mean(FE, e) * weights.FE
+            if e - 511 > emin:
+                R.loc[i, e - 511.0] += mean(SE, e) * weights.SE
+            if e - 2 * 511 > emin:
+                R.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
+            if e > 1022:
+                R[i, j511] += mean(AP, e) * weights.AP
+        if normalize:
+            R.normalize(axis='observed', inplace=True)
         return R
 
     def specialize_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
         match other:
             case Matrix():
-                return self.specialize_(other.Y_index, **kwargs)
+                return self.specialize_(E=other.Y_index, **kwargs)
             case Vector():
-                return self.specialize_(other.X_index, **kwargs)
+                return self.specialize_(E=other.X_index, **kwargs)
             case _:
                 raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
 
@@ -161,9 +166,14 @@ class Response:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
-              R: Matrix | None = None, compton: Matrix | None = None) -> Response:
+              compton: Matrix | None = None, components: Components | None = None,
+              copy: bool = False) -> Response:
         return Response(data=data or self.data, interpolation=interpolation or self.interpolation,
-                        R=R or self.R, compton=compton or self.compton)
+                        compton=compton or self.compton, components=components or self.components,
+                        copy=copy)
+
+    def copy(self, **kwargs):
+        return self.clone(copy=True, **kwargs)
 
     @classmethod
     def from_path(cls, path: Pathlike) -> Response:
@@ -177,10 +187,10 @@ class Response:
         compton = None
         if (path / 'compton.npz').exists():
             compton = Matrix.from_path(path / 'compton.npz')
-        R = None
-        if (path / 'R.npz').exists():
-            R = Matrix.from_path(path / 'R.npz')
-        return cls(data, interpolation, R=R, compton=compton)
+        components = Components()
+        if (path / 'components').exists():
+            components = Components.from_path(path / 'components')
+        return cls(data, interpolation, compton=compton, components=components)
 
     def save(self, path: Pathlike, exist_ok: bool = False, save_R: bool = False) -> None:
         path = Path(path)
@@ -190,12 +200,85 @@ class Response:
             json.dump(meta, f)
         self.data.save(path / 'data', exist_ok=exist_ok)
         self.interpolation.save(path / 'interpolation', exist_ok=exist_ok)
+        self.components.save(path / 'components', exist_ok=exist_ok)
         if self.compton is not None:
             self.compton.save(path / 'compton.npz', exist_ok=exist_ok)
-        if save_R:
-            if self.R is None:
-                raise ValueError("Response matrix not yet interpolated. Use `.interpolate()` first.")
-            self.R.save(path / 'R.npz', exist_ok=exist_ok)
+
+    def component_matrices(self, *, E: Index | None, compton: Matrix | None = None, weights: Components | None = None,
+                           normalize: bool = True) -> dict[str, Matrix]:
+        if weights is None:
+            weights = self.components
+        if self.compton is None and compton is None:
+            raise ValueError("Compton matrix must be set before adding structures")
+        if compton is None:
+            compton = self.compton.copy()
+        if E is not None:
+            if self.compton.true_index.leftmost > E.leftmost:
+                t = self.compton.true_index
+                raise ValueError(("Requested energy grid is too low. "
+                                  f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
+                                  f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
+                                  f"The energy grid must be truncated at index {E.index(t.leftmost) + 1}."))
+
+            compton = compton.rebin('true', bins=E, preserve='area').to_left()
+            compton.rebin('observed', bins=compton.true, inplace=True)
+        compton = compton.to_left()
+        compton *= weights.compton
+        FE, SE, DE, AP = self.interpolation.structures()
+        FEm = zeros_like(compton, name='FE')
+        SEm = zeros_like(compton, name='SE')
+        DEm = zeros_like(compton, name='DE')
+        APm = zeros_like(compton, name='AP')
+
+        # The functions need to be evaluated over the values within the bin
+        # to account for their behaviour across the bin. The resolution
+        # is the same as that of the raw structure data (go finer?)
+        if E is not None:
+            dE_intp = np.max(compton.true_index.steps())
+            dE = np.min(self.interpolation.E_index.steps())
+            N = int(np.ceil(dE_intp/dE))
+            def mean(fn, e):
+                return np.mean(fn(np.linspace(e, e+dE_intp, N)))
+        else:
+            def mean(fn, e):
+                return fn(e)
+
+        emin = compton.observed_index.leftmost
+        j511 = APm.index_observed(511.0)
+        for i, e in enumerate(compton.true):
+            #if e > emin:
+            FEm.loc[i, e] += mean(FE, e) * weights.FE
+            if e - 511 > emin:
+                SEm.loc[i, e - 511.0] += mean(SE, e) * weights.SE
+            if e - 2 * 511 > emin:
+                DEm.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
+            if e > 1022:
+                APm[i, j511] += mean(AP, e) * weights.AP
+
+        total = compton + FEm + SEm + DEm + APm
+        total.name = 'total'
+        if normalize:
+            T = total.sum(axis=1)
+            T[T == 0] = 1
+            def norm(x):
+                x.values /= T[:, np.newaxis]
+            [norm(x) for x in [total, compton, FEm, SEm, DEm, APm]]
+        return {'total': total, 'compton': compton, 'FE': FEm, 'SE': SEm, 'DE': DEm, 'AP': APm}
+
+    def component_matrices_like(self, other: Matrix | Vector | Index,
+                                weights: Components | None = None) -> dict[str, Matrix]:
+        match other:
+            case Matrix():
+                return self.component_matrices(E=other.Y_index, weights=weights)
+            case Vector():
+                return self.component_matrices(E=other.X_index, weights=weights)
+            case _:
+                raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
+
+    def fold_componentwise(self, other: Matrix | Vector,
+                           weights: Components | None = None) -> dict[str, Matrix] | dict[str, Vector]:
+        components = self.component_matrices_like(other, weights=weights)
+        return {k: comp.T @ other for k, comp in components.items()}
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Response | None:
         """ Normalizes the FWHM of the response to the requested value. """
@@ -215,23 +298,12 @@ class Response:
     def from_db(cls, name: ResponseName) -> Response:
         """ Loads a response from the database. """
         obj = cls.from_path(get_response_path(name))
-        obj.interpolate()
         return obj
 
 
-ResponseName: TypeAlias = Literal['OSCAR2017', 'OSCAR2020']
-
-
-def get_response_path(name: ResponseName) -> Path:
-    """ Returns the path to the response in the database. """
-    name = name.upper()
-    if name not in ResponseName.__args__:
-        raise ValueError(f"Unknown response name {name}. Must be one of {ResponseName}.")
-    return Path(__file__).parent.parent.parent / 'data' / 'response' / name
-
-
 def gaussian_matrix(E: np.ndarray, sigmafn) -> Matrix:
-    sigma = sigmafn(E)
+    # TODO HACK Add 2 bins to account for the interpolation error.
+    sigma = sigmafn(E + 2*(E[1] - E[0]))
     values = _gaussian_matrix(E, sigma)
     values = values / values.sum(axis=1)[:, None]
     return Matrix(true=E, observed=E, values=values, ylabel='Observed', xlabel='True',
