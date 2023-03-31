@@ -127,3 +127,25 @@ def omap(func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> any:
     args = [a.values if isinstance(a, AbstractArray) else a for a in args]
     kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
     return func(*args, **kwargs)
+
+
+@overload
+def xmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...
+@overload
+def xmap(array: Matrix, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Matrix: ...
+
+def xmap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> AbstractArray:
+    """ `x unwrap_map`. Applies a function to the index of an array. Equal to a Haskell fmap <&>.
+
+    This is the same as fmap, but uses the index of the array as the first argument of the function and
+    unwraps other arguments.
+    """
+    args = [a.values if isinstance(a, AbstractArray) else a for a in args]
+    kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
+    match array:
+        case Vector():
+            return array.clone(values=func(array.X, *args, **kwargs))
+        case Matrix():
+            return array.clone(values=func(array.X, *args, **kwargs))
+        case _:
+            raise ValueError(f"Expected Array, not {type(array)}.")

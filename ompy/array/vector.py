@@ -19,7 +19,7 @@ from .filehandling import (load_csv_1D, load_numpy_1D,
 from .index import Index, make_or_update_index, compress
 # from .rebin import rebin_uniform_left_left as rebin_1D
 from .rebin_old import rebin_1D
-from .. import Unit
+from .. import Unit, make_axes
 from ..library import div0, handle_rebin_arguments, maybe_set
 from ..stubs import Unitlike, arraylike, Axes, Pathlike
 
@@ -107,6 +107,7 @@ class Vector(AbstractArray):
                  boundary: bool = False,
                  metadata: VectorMetadata = VectorMetadata(),
                  indexkwargs: dict[str, Any] | None = None,
+                 dtype: type = float,
                  **kwargs):
         """
         If no `std` is given, it will default to None
@@ -136,12 +137,12 @@ class Vector(AbstractArray):
 
         if copy:
             def fetch(x):
-                return np.asarray(x, dtype=float, order=order).copy()
+                return np.asarray(x, dtype=dtype, order=order).copy()
         else:
             def fetch(x):
-                return np.asarray(x, dtype=float, order=order)
+                return np.asarray(x, dtype=dtype, order=order)
 
-        self.values = fetch(values)
+        super().__init__(fetch(values))
         self.std = fetch(std) if std is not None else None
 
         # Create an index from array or update existing index
@@ -703,7 +704,8 @@ class Vector(AbstractArray):
         """ Converts the index to the middle """
         return self.to_edge('mid', inplace=inplace)
 
-    def plot(self, ax: Axes | None = None,
+    @make_axes
+    def plot(self, ax: Axes,
              kind: str = 'step',
              **kwargs) -> Axes:
         """ Plots the vector
@@ -721,9 +723,6 @@ class Vector(AbstractArray):
         Returns:
             The figure and axis used.
         """
-        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
-        assert ax is not None
-
         match kind:
             case "plot" | "line":
                 if self._index.is_left():

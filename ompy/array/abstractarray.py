@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import numpy as np
-from ..stubs import arraylike
 from abc import ABC, abstractmethod
 from .index import Index
 from .. import Unit
@@ -10,9 +9,16 @@ from .. import Unit
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
+#TODO Implement all of the i-methods and logical methods
+# [ ] __imatmul__
+
 
 class AbstractArray(ABC):
     __default_unit: Unit = Unit('keV')
+
+    def __init__(self, values: np.ndarray):
+        self.values: np.ndarray = values
+
     @abstractmethod
     def is_compatible_with(self, other: AbstractArray | Index) -> bool: ...
 
@@ -46,9 +52,7 @@ class AbstractArray(ABC):
         return self.clone(values = self.values + other)
 
     def __radd__(self, other) -> AbstractArray:
-        print(type(other))
         x = self.__add__(other)
-        print("X!!", type(x))
         return x
 
     def __mul__(self, other) -> AbstractArray:
@@ -69,6 +73,74 @@ class AbstractArray(ABC):
 
     def __pow__(self, val: float) -> AbstractArray:
         return self.clone(values = self.values ** val)
+
+    def __iand__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values &= other
+        return self
+
+    def __and__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values & other)
+
+    def __or__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values | other)
+
+    def __ior__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values |= other
+        return self
+
+    def __ixor__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values ^= other
+        return self
+
+    def __xor__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        return self.clone(values = self.values ^ other)
+
+    def __lshift__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        return self.clone(values=self.values << other)
+
+    def __rshift__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        return self.clone(values=self.values >> other)
+
+    def __ilshift__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values <<= other
+        return self
+
+    def __irshift__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values >>= other
+        return self
+
+    def __iadd__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values += other
+        return self
+
+    def __isub__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values -= other
+        return self
+
+    def __imul__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values *= other
+        return self
+
+    def __itruediv__(self, other) -> AbstractArray:
+        other = self.check_or_assert(other)
+        self.values /= other
+        return self
+
+    def __invert__(self):
+        return self.clone(values=~self.values)
 
     @abstractmethod
     def __matmul__(self, other) -> AbstractArray: ...

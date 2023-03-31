@@ -1,9 +1,13 @@
 from __future__ import annotations
 import numpy as np
-from ..numbalib import njit, prange, NumpyArray
+from ..numbalib import njit, prange
 from .. import Vector, Matrix, Response, zeros_like
-from .unfolder import Unfolder, UnfoldedResult1D
+from .unfolder import Unfolder, UnfoldedResult1DAll, ResultMeta, mask_511
 from dataclasses import dataclass
+import time
+
+#TODO
+# -[] Make compton sub work on unfolded result
 
 
 class Guttormsen(Unfolder):
@@ -31,19 +35,30 @@ class Guttormsen(Unfolder):
         self.iterations = iterations
         self.weight = weight
 
-    def _unfold_vector(self, R: Matrix, data: Vector, iterations: int, **kwargs) -> GuttormsenResult1D:
-        return unfold_vector(R.values, data.values, iterations, self.weight, **kwargs)
+    def _unfold_vector(self, R: Matrix, data: Vector, background: Vector | None, initial: Vector,
+                       mask: Vector, **kwargs) -> GuttormsenResult1D:
+        iterations = kwargs.pop("iterations", self.iterations)
+        weight = kwargs.pop("weight", self.weight)
+        mask_ = mask.values
 
-    def _unfold_matrix(self, data: Matrix, iterations: int, **kwargs) -> Matrix:
-        raise NotImplementedError("Guttormsen does not support unfolding matrices yet")
+        start = time.time()  # Njit does not support time.time()
+        uall, cost, fluctuations = _unfold_vector(R.values, data.values, initial.values,
+                                                  iterations, mask_)
+        elapsed = time.time() - start
+        return GuttormsenResult1D(meta=ResultMeta(time=elapsed),
+                                  R=R, raw=data, background=background,
+                                  initial=initial, uall=uall, cost=cost,
+                                  fluctuations=fluctuations,
+                                  mask=mask)
+
+    def supports_background() -> bool:
+        return False
 
 
-def unfold_vector(R, G, raw, iterations, initial) -> GuttormsenResult1D:
-    uall, cost, fluctuations = _unfold_vector(R, G, raw, iterations, initial)
-    return GuttormsenResult1D(raw, uall, cost, fluctuations)
 
 @njit
-def _unfold_vector(R, raw, iterations, initial: np.ndarray):
+def _unfold_vector(R: np.ndarray, raw: np.ndarray, initial: np.ndarray, iterations: int,
+                   mask: np.ndarray):
     u = initial
     u_all = np.empty((iterations, len(u)))
     cost = np.empty(iterations)
@@ -53,8 +68,8 @@ def _unfold_vector(R, raw, iterations, initial: np.ndarray):
         u += raw - f
         f = R@u
         u_all[i] = u
-        cost[i] = chi2(f, raw)
-        fluctuations[i] = fluctuation_cost(u, 20)
+        cost[i] = chi2(f[mask], raw[mask])
+        fluctuations[i] = fluctuation_cost(u, 20, mask)
     return u_all, cost, fluctuations
 
 
@@ -64,9 +79,9 @@ def chi2(a, b):
 
 
 @njit
-def fluctuation_cost(x, sigma: float):
+def fluctuation_cost(x, sigma: float, mask: np.ndarray):
     smoothed = gaussian_filter_1d(x, sigma)
-    diff = np.abs((smoothed - x) / smoothed)
+    diff = np.abs(((smoothed - x) / smoothed)[mask])
     return diff.sum()
 
 
@@ -141,8 +156,8 @@ def gaussian_filter_1d(x, sigma):
 
 
 
-@dataclass#(frozen=True, slots=True)
-class GuttormsenResult1D(UnfoldedResult1D):
+@dataclass(kw_only=True)#(frozen=True, slots=True)
+class GuttormsenResult1D(UnfoldedResult1DAll):
     fluctuations: np.ndarray
 
     def best(self, w: float = 0.2, min: int = 0) -> Vector:

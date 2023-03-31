@@ -155,7 +155,7 @@ class FWHMInterpolation(Interpolation):
 
     def scale(self, C: float, inplace=False) -> FWHMInterpolation | None:
         if inplace:
-            self.C = C
+            self.C = self.C * C
             return self
         return FWHMInterpolation(self.points, self.a0, self.a1, self.a2, C=C, cov=self.cov)
 

@@ -12,7 +12,7 @@ import numpy as np
 from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 
-from .. import ureg, Unit
+from .. import ureg, Unit, make_axes
 from .abstractarray import AbstractArray
 from .filehandling import (load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_numpy_2D,
@@ -140,6 +140,7 @@ class Matrix(AbstractArray):
             def fetch(x):
                 return np.asarray(x, dtype=float, order=order)
 
+        super().__init__(fetch(values))
         self.values = fetch(values)
         if self.values.ndim != 2:
             raise ValueError(f"values must be 2D, not {self.values.ndim}")
@@ -712,27 +713,29 @@ class Matrix(AbstractArray):
                     self.values /= s
 
     @overload
-    def plot(self, *, ax: Axes | None = None,
+    def plot(self, ax: Axes, *, 
              scale: str | None = None,
              vmin: float | None = None,
              vmax: float | None = None,
              add_cbar: Literal[True] = ...,
-             **kwargs) -> (Axes, (QuadMesh, Colorbar)): ...
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar]]: ...
 
     @overload
-    def plot(self, *, ax: Axes | None = None,
+    def plot(self, ax: Axes, *,
              scale: str | None = None,
              vmin: float | None = None,
              vmax: float | None = None,
              add_cbar: Literal[False] = ...,
-             **kwargs) -> (Axes, (QuadMesh, None)): ...
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, None]]: ...
 
-    def plot(self, *, ax: Axes | None = None,
+    @make_axes
+    def plot(self, ax: Axes, *,
              scale: str | None = None,
              vmin: float | None = None,
              vmax: float | None = None,
              add_cbar: bool = True,
-             **kwargs) -> (Axes, (QuadMesh, Colorbar | None)):
+             cbarkwargs: dict[str, any] | None = None,
+             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
         """ Plots the matrix with the energy along the axis
 
         Args:
@@ -752,9 +755,7 @@ class Matrix(AbstractArray):
         Raises:
             ValueError: If scale is unsupported
         """
-        fig, ax = plt.subplots() if ax is None else (ax.figure, ax)
-        assert ax is not None
-        assert isinstance(fig, Figure)
+        fig: Figure = ax.figure
 
         if scale is None:
             scale = 'log' if self.sum() > 1000 else 'linear'
@@ -818,14 +819,16 @@ class Matrix(AbstractArray):
 
         cbar: Colorbar | None = None
         if add_cbar:
+            if cbarkwargs is None:
+                cbarkwargs = {}
             if vmin is not None and vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='both')
+                cbar = fig.colorbar(mesh, ax=ax, extend='both', **cbarkwargs)
             elif vmin is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='min')
+                cbar = fig.colorbar(mesh, ax=ax, extend='min', **cbarkwargs)
             elif vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='max')
+                cbar = fig.colorbar(mesh, ax=ax, extend='max', **cbarkwargs)
             else:
-                cbar = fig.colorbar(mesh, ax=ax)
+                cbar = fig.colorbar(mesh, ax=ax, **cbarkwargs)
 
             maybe_set(cbar.ax, 'ylabel', self.vlabel)
         return ax, (mesh, cbar)

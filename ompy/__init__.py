@@ -62,6 +62,15 @@ else:
     except ImportError:
         pass
 
+    MINUIT_AVAILABLE = False
+    try:
+        import iminuit
+        MINUIT_AVAILABLE = True
+    except ImportError:
+        pass
+
+    from .stubs import Axes
+    from .helpers import make_axes
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .validator import Unitful, Bounded, Choice, Toggle

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, overload, Literal
 from .stubs import Axes, Point, PointUnit, Points, Unitlike, ArrayBool, PointI
+from .helpers import make_axes
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
@@ -25,9 +26,8 @@ class Geometry(ABC):
     def apply(self, matrix: Matrix, inplace: bool = False) -> Matrix | None:
         ...
 
-    def plot(self, matrix: Matrix, ax: Axes | None = None, **kwargs) -> Axes:
-        if ax is None:
-            ax: Axes = plt.subplots()[1]
+    @make_axes
+    def plot(self, matrix: Matrix, ax: Axes, **kwargs) -> Axes:
         return self.draw(matrix, ax, **kwargs)
 
     @abstractmethod
@@ -71,7 +71,9 @@ class Line(Geometry):
         # Correct for binning
         if slope is not None:
             slope *= matrix.dY[0] / matrix.dX[0]
+        print(p1, p2)
         p: Points = refine_points(p1, p2, slope)
+        print(p)
         return p
 
     def above(self, matrix: Matrix) -> ArrayBool:
@@ -198,7 +200,8 @@ def sort_points(p1: Point, p2: Point) -> Points:
 
 def points_from_partial(slope: float, point: Point) -> Points:
     X, Y = point
-    intercept = Y - slope*X
+    intercept = X - slope*Y
+    #print(f"X: {X}, Y: {Y}, slope: {slope}, intercept: {intercept}")
     return points_from_ab(intercept, slope)
 
 def points_from_ab(intercept: float, slope: float) -> Points:

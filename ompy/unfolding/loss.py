@@ -1,11 +1,19 @@
-from numba import njit, types
+from numba import njit, types, prange
 from typing import Callable, Union, Literal
 import numpy as np
 #from headers import arraylike, array
 from scipy.signal import savgol_filter
 from typing import TypeAlias
+from .. import Vector, Matrix
 arraylike: TypeAlias = np.ndarray
 array: TypeAlias = np.ndarray
+
+"""
+TODO:
+ - [ ] Add a cost for count difference (is this a good idea?)
+ - [ ] Generalize L_n_p
+ - [ ] Add KL divergence
+"""
 
 
 readonly = types.Array(types.float64, 1, 'C', readonly=True)
@@ -50,11 +58,11 @@ def get_loglike(name: LogLike) -> LogLikeFn:
         return name
     match name:
         case 'll':
-            return neglog
-        case 'll2':
-            return neglog2
-        case 'll3':
             return loglike
+        case 'll2':
+            return neglog
+        case 'll3':
+            return neglog2
         case 'mse':
             return mse
         case _:
@@ -73,67 +81,162 @@ LossStr = Literal['loglike', 'smooth', 'derivative',
 'derivative2', 'discrete']
 LossFn = Callable[[array], float]
 Loss = Union[LossStr, LossFn]
+MapFn: TypeAlias = Callable[[array], array]
+@njit
+def idmap(x):
+    return x
 
 
-def loss_factory(name: Loss, R: array, n: array,
+def loss_factory(name: Loss, R: Matrix, n: Vector,
                  loglike: LogLike,
                  mask: array | None = None,
+                 mapfn: MapFn = idmap,
+                 imapfn: MapFn = idmap,
+                 G: Matrix | None = None,
                  **kwargs) -> LossFn:
 
     ll = get_loglike(loglike)
     if not isinstance(name, str):
         return name(ll)
 
+    X = n.X
+    n = n.values
+    R = R.values
+
     if mask is None:
-        mask = np.ones_like(n, dtype=bool)
-
-    if name == 'loglike':
-        @njit
-        def lossfn(mu: arraylike) -> float:
-            nu = R @ mu
-            loglikelihood: array = ll(nu, n)[mask]
-            return np.sum(loglikelihood)
-        return lossfn
-    elif name == 'smooth':
-        alpha = kwargs.get('alpha', 2.0)
-        def lossfn_reg(mu: arraylike) -> float:
-            nu = R @ mu
-            loglikelihood: array = ll(nu, n)[mask]
-            smooth: array = savgol_filter(mu, 5, 3, mode='nearest')
-            logprior: array = ll(mu, smooth)[mask]
-            return np.sum(loglikelihood) + alpha*np.sum(logprior)
-        return lossfn_reg
-    elif name == 'derivative':
-        alpha = kwargs.get('alpha', 2.0)
-        def lossfn(mu: arraylike) -> float:
-            nu = R @ mu
-            loglikelihood: array = ll(nu, n)[mask]
-            derivative: float = diff_sum(n, mu)[mask]
-            return np.sum(loglikelihood) + alpha*derivative
-        return lossfn
-    elif name == 'derivative2':
-        alpha = kwargs.get('alpha', 2.0)
-        def lossfn(mu: arraylike) -> float:
-            nu = R @ mu
-            loglikelihood: array = ll(nu, n)[mask]
-            derivative2: float = second_diff_sum(n, mu)[mask]
-            return np.sum(loglikelihood) + alpha*derivative2
-        return lossfn
-    elif name == 'discrete':
-        alpha = kwargs.get('alpha', 2.0)
-        def lossfn(mu: arraylike) -> float:
-            nu = R @ mu
-            loglikelihood: array = ll(nu, n)[mask]
-            cost: float = discrete_bin_cost(mu)[mask]
-            return np.sum(loglikelihood) + alpha*cost
-        return lossfn
+        mask_ = np.ones_like(n, dtype=bool)
     else:
-        raise ValueError(f"Loss function {name} is not supported.")
+        mask_ = mask
 
 
-def loss_factory_bg(name: Loss, R: array, n: array, bg: array,
+    match name:
+        case 'loglike':
+            if mask is not None:
+                @njit
+                def lossfn(mu: arraylike) -> float:
+                    mu = imapfn(mu)
+                    nu = R @ mu
+                    loglikelihood: array = ll(nu, n)[mask_]
+                    return np.sum(loglikelihood)
+                return lossfn
+            else:
+                @njit
+                def lossfn(mu: arraylike) -> float:
+                    mu = imapfn(mu)
+                    nu = R @ mu
+                    loglikelihood: array = ll(nu, n)
+                    return np.sum(loglikelihood)
+                return lossfn
+        case 'smooth':
+            alpha = kwargs.get('alpha', 2.0)
+            def lossfn_reg(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                smooth: array = savgol_filter(nu, 9, 3, mode='nearest')
+                #logprior: array = ll(smooth, n)[mask_]
+                return np.sum(loglikelihood) + alpha*np.sum((smooth - nu)**2)
+            return lossfn_reg
+        case 'dx':
+            alpha = kwargs.get('alpha', 0.1)
+            dx = X[1] - X[0]
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                #derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
+                derivative: array = np.sum((diff(mu, dx)[mask_])**2)
+                return np.sum(loglikelihood) + alpha*derivative
+            return lossfn
+        case 'd2x':
+            alpha = kwargs.get('alpha', 0.1)
+            dx = X[1] - X[0]
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                #derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
+                derivative: array = np.sum((diff(mu, dx)[mask_])**2)
+                return np.sum(loglikelihood) + alpha*derivative
+            return lossfn
+        case 'derivative2':
+            alpha = kwargs.get('alpha', 2.0)
+            def lossfn(mu: arraylike) -> float:
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                derivative2: float = second_diff_sum(n, mu)[mask_]
+                return np.sum(loglikelihood) + alpha*derivative2
+            return lossfn
+        case 'discrete':
+            alpha = kwargs.get('alpha', 2.0)
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                cost: float = discrete_bin_cost(mu)
+                return np.sum(loglikelihood) + alpha*cost
+            return lossfn
+        case 'TV':
+            alpha = kwargs.get('alpha', 1.0)
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                cost: float = TV(mu)
+                return np.sum(loglikelihood) + alpha * cost
+            return lossfn
+        case 'eta':
+            if G is not None:
+                G: np.ndarray  = G.values
+            else:
+                raise ValueError("G matrix must be provided for eta loss.")
+            R: np.ndarray = R@G
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                return np.sum(loglikelihood)
+            return lossfn
+        case _:
+            raise ValueError(f"Loss function {name} is not supported.")
+
+def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
+    if not isinstance(name, str):
+        return name[0], name[1]
+    match name:
+        case 'log':
+            @njit
+            def exp(x):
+                return np.exp(x/1e2)
+            @njit
+            def log(x):
+                return np.log(x)*1e2
+            return exp, log
+        case 'id':
+            return idmap, idmap
+        case 'sqrt':
+            @njit
+            def sqrt(x):
+                return np.sqrt(x)
+            @njit
+            def isqrt(x):
+                return x**2
+            return sqrt, isqrt
+        case _:
+            raise ValueError(f"Transform {name} is not supported.")
+
+
+
+def loss_factory_bg(name: Loss, R: Matrix, n: Vector, bg: Vector,
                     loglike: LogLikeBg,
                     mask: array | None = None,
+                    mapfn: MapFn = idmap,
+                    imapfn: MapFn = idmap,
                     **kwargs) -> LossFn:
 
     ll = get_loglike_bg(loglike)
@@ -143,15 +246,56 @@ def loss_factory_bg(name: Loss, R: array, n: array, bg: array,
     if mask is None:
         mask = np.ones_like(n, dtype=bool)
 
+    X = n.X
+    R: np.ndarray = R.values
+    n: np.ndarray = n.values
+    bg: np.ndarray = bg.values
+
     match name:
         case 'loglike':
+            @njit
             def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n, bg)[mask]
                 return np.sum(loglikelihood)
             return lossfn
+        case 'dx':
+            alpha = kwargs.get('alpha', 2.0)
+
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n, bg)[mask]
+                derivative: float = diff_sum(X, mu)[mask]
+                return np.sum(loglikelihood) + alpha*derivative
+            return lossfn
         case _:
             raise ValueError(f"Loss function {name} is not supported.")
+
+@njit(inline='always')
+def TV(x: array) -> float:
+    """ Total variation """
+    return np.sum(np.abs(np.diff(x)))
+
+@njit
+def diff(x: array, dx: float) -> array:
+    D = np.empty_like(x)
+    D[-1] = 0
+    for i in range(len(x)-1):
+        D[i] = (x[i+1] - x[i])
+    D /= dx
+    return D
+
+@njit(parallel=True)
+def ddiff(x: array, dx: float) -> array:
+    D = np.empty_like(x)
+    D[0] = 0
+    D[-1] = 0
+    for i in prange(1, len(x)-1):
+        D[i] = (x[i+1] - 2*x[i] + x[i-1])
+    D /= dx**2
+    return D
 
 @njit
 def diff_sum(x, y):
@@ -175,3 +319,36 @@ def second_diff_sum(x, y):
 @njit
 def discrete_bin_cost(y):
     return np.sum(y > 0.0)
+
+
+def strc(s: str, color: str | int):
+    if isinstance(color, str):
+        if color in {'g', 'green'}:
+            c = 32
+        elif color in {'r', 'red'}:
+            c = 31
+        else:
+            raise ValueError(f"Color {color} not supported")
+    elif not isinstance(color, int):
+        raise ValueError(f"Color {color} not supported")
+    return f'\033[{c}m{s}\x1b[0m'
+
+
+def print_minuit_convergence(m):
+    def printres(what, expected: bool):
+        value = getattr(m.fmin, what)
+        if value == expected:
+            s = f'{what:<25} is ' + strc(f'{value} (Expected {expected})', 'green')
+        else:
+            s = f'{what:<25} is ' + strc(str(value) + f" (Expected {expected})", 'red')
+        print(s)
+    if m.valid:
+        print('Valid: ' + strc('True', 'green'))
+    else:
+        print('Valid: ' + strc('False', 'red'))
+    print(f"{m.valid=}")
+    printres('has_covariance', True)
+    printres('has_accurate_covar', True)
+    printres('has_posdef_covar', True)
+    printres('has_made_posdef_covar', False)
+    printres('hesse_failed', False)

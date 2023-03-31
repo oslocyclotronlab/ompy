@@ -531,6 +531,10 @@ class Edge(ABC):
         if x >= self.rightmost:
             raise IndexError(f"{x} is beyond the rightmost edge {self.rightmost}")
 
+    def is_inbounds(self, x) -> bool:
+        return self.leftmost <= x < self.rightmost
+
+
     @staticmethod
     @abstractmethod
     def extrapolate_boundary(bins: np.ndarray) -> float:

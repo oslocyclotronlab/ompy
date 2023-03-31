@@ -3,7 +3,7 @@ import numpy as np
 from ..numbalib import njit, prange, NumpyArray, objmode
 from .. import Vector, Matrix, Response, zeros_like
 from .. import USE_GPU
-from .unfolder import Unfolder, UnfoldedResult1D, UnfoldedResult2DCost
+from .unfolder import Unfolder, UnfoldedResult1DAll, UnfoldedResult2DCost
 from dataclasses import dataclass
 from .loss import loss_factory
 from typing import TypeAlias, Literal
@@ -14,7 +14,7 @@ if USE_GPU:
     from numpy import float32
 
 @dataclass#(frozen=True, slots=True)
-class EMResult1D(UnfoldedResult1D):
+class EMResult1D(UnfoldedResult1DAll):
     def best(self) -> Vector:
         return self.unfolded(len(self)-1)
 
@@ -43,7 +43,7 @@ class EM(Unfolder):
     def _unfold_vector(self, R: Matrix, data: Vector, initial: Vector, **kwargs) -> EMResult1D:
         it = kwargs.get('iterations', self.iterations)
         gpu = kwargs.get('use_gpu', self.use_gpu)
-        convergence_criterion = kwargs.get('convergence_criterion', 'iterations')
+        convergence_criterion: str = kwargs.get('convergence_criterion', 'iterations')
         convergence_fn = criterion_factory(convergence_criterion, R, data, **kwargs)
         if gpu:
             if not USE_GPU:

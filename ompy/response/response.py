@@ -74,22 +74,70 @@ class Response:
 
     def specialize(self, bins: np.ndarray | None = None, factor: float | None = None,
                    width: float | None = None, numbins: int | None = None, **kwargs) -> Matrix:
+        """
+        Rebins the response matrix to the requested energy grid.
+
+        Parameters:
+        -----------
+        bins : np.ndarray or None, default None
+            The bin edges or centers for the new energy grid. If None, the function will try to deduce
+            the new grid from the other parameters.
+        factor : float or None, default None
+            The factor by which to reduce the number of bins in the new grid. If specified, `numbins`
+            and `width` will be ignored.
+        width : float or None, default None
+            The width of each bin in the new energy grid. If specified, `numbins` and `factor` will be
+            ignored.
+        numbins : int or None, default None
+            The number of bins in the new energy grid. If specified, `factor` and `width` will be ignored.
+        **kwargs : dict
+            Additional keyword arguments to be passed to `self.specialize_()`.
+
+        Returns:
+        --------
+        Matrix
+            The rebinned response matrix.
+        """
         bins = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
                                                         binwidth=width)
         return self.specialize_(bins, **kwargs)
 
-    def specialize_(self, *, E: Index | None = None, compton: Matrix | None = None, weights: Components | None = None, normalize: bool = True) -> Matrix:
-        """ Rebins the response matrix to the requested energy grid. """
+    def specialize_(self, *, E: Index, compton: Matrix | None = None, weights: Components | None = None,
+                    normalize: bool = True, pad: bool = False) -> Matrix:
+        """
+        Rebins the response matrix to the requested energy grid.
+
+        Parameters:
+        -----------
+        E : Index
+            The energy grid to rebin to.
+        compton : Matrix | None
+            The Compton matrix to use for rebinning. If None, the function will try to use self.compton instead.
+        weights : Components | None
+            The weights to use for rebinning. If None, the function will use self.components instead.
+        normalize : bool, default True
+            Whether to normalize the rebinned response matrix.
+        pad : bool, default False
+            Whether to pad the rebinned response matrix.
+
+        Returns:
+        --------
+        Matrix
+            The rebinned response matrix.
+        """
         if compton is None:
             if self.compton is None:
                 raise ValueError("Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first")
             compton = self.compton
-        if self.compton.true_index.leftmost > E.leftmost:
+        if self.compton.true_index.leftmost > E.leftmost and not pad:
             t = self.compton.true_index
             raise ValueError(("Requested energy grid is too low. "
                               f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                               f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
                               f"The energy grid must be truncated at index {E.index(t.leftmost)+1}."))
+        if pad:
+            E_all = E.copy()
+            E = E_all[E_all >= compton.true_index.leftmost]
         if weights is None:
             weights = self.components
 
@@ -106,7 +154,7 @@ class Response:
         if E is not None:
             dE_intp = np.max(R.true_index.steps())
             dE = np.min(self.interpolation.E_index.steps())
-            N = int(np.ceil(dE_intp / dE))
+            N = int(np.ceil(dE_intp / dE)) # Number of steps per bin
 
             def mean(fn, e):
                 return np.mean(fn(np.linspace(e, e + dE_intp, N)))
@@ -126,11 +174,40 @@ class Response:
                 R.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
             if e > 1022:
                 R[i, j511] += mean(AP, e) * weights.AP
+
         if normalize:
             R.normalize(axis='observed', inplace=True)
+        if pad:
+            N = len(E_all)
+            M = len(E)
+            R0 = np.empty((N, N))
+            R0[:E, :E] = 0
+            R0[E:, :E] = R.values
+            R = Matrix(true=E_all, observed=E_all, values=R0, name='Response',
+                       xlabel='True energy', ylabel='Observed energy')
         return R
 
     def specialize_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
+        """
+        Specialize the response matrix to have axes compatible with given matrix or vector.
+
+        Parameters
+        ----------
+        other : Matrix | Vector
+            The matrix or vector to specialize to.
+        **kwargs : dict
+            Optional keyword arguments to pass to the `specialize_` method.
+
+        Returns
+        -------
+        Matrix
+            The specialized matrix.
+
+        Raises
+        ------
+        ValueError
+            If the input `other` is not a Matrix or a Vector.
+        """
         match other:
             case Matrix():
                 return self.specialize_(E=other.Y_index, **kwargs)
@@ -177,6 +254,18 @@ class Response:
 
     @classmethod
     def from_path(cls, path: Pathlike) -> Response:
+        """
+        Load a Response object from the given file path.
+
+        Args:
+            path (Pathlike): The path to load the Response object from.
+
+        Returns:
+            Response: A Response object loaded from the given file path.
+
+        Raises:
+            FileNotFoundError: If the file path does not exist.
+        """
         path = Path(path)
         with (path / 'meta.json').open() as f:
             meta = json.load(f)
@@ -192,7 +281,20 @@ class Response:
             components = Components.from_path(path / 'components')
         return cls(data, interpolation, compton=compton, components=components)
 
-    def save(self, path: Pathlike, exist_ok: bool = False, save_R: bool = False) -> None:
+    def save(self, path: Pathlike, exist_ok: bool = False) -> None:
+        """
+        Save the Response object to the given file path.
+
+        Args:
+            path (Pathlike): The path to save the Response object to.
+            exist_ok (bool): Whether to raise an error if the file already exists.
+
+        Returns:
+            None
+
+        Raises:
+            FileExistsError: If the file already exists and exist_ok is False.
+        """
         path = Path(path)
         path.mkdir(parents=True, exist_ok=exist_ok)
         meta = {'version': __full_version__}
@@ -211,7 +313,7 @@ class Response:
         if self.compton is None and compton is None:
             raise ValueError("Compton matrix must be set before adding structures")
         if compton is None:
-            compton = self.compton.copy()
+            compton: Matrix = self.compton.copy()
         if E is not None:
             if self.compton.true_index.leftmost > E.leftmost:
                 t = self.compton.true_index
