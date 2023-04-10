@@ -37,7 +37,7 @@ else:
     from .version import FULLVERSION as __full_version__
 
     import warnings
-    #warnings.simplefilter('always', DeprecationWarning)
+    # warnings.simplefilter('always', DeprecationWarning)
 
     USE_JIT = False
     USE_GPU = True
@@ -48,9 +48,11 @@ else:
             from numba import cuda
             USE_GPU = True
         except ImportError:
-            warnings.warn("Numba.CUDA could not be imported. GPU acceleration will not be available")
+            warnings.warn(
+                "Numba.CUDA could not be imported. GPU acceleration will not be available")
     except ImportError or SystemError:
-        warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
+        warnings.warn(
+            "Numba could not be imported. Falling back to non-jiting which will be much slower")
     from .numbalib import jit, njit, nop_nop, int32, float32, float64, prange
 
     ROOT_AVAILABLE = False
@@ -74,7 +76,7 @@ else:
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .validator import Unitful, Bounded, Choice, Toggle
-    #from .spinfunctions import (SpinFunction, Const, EB05, EB09CT, EB09Emp,
+    # from .spinfunctions import (SpinFunction, Const, EB05, EB09CT, EB09Emp,
     #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
@@ -87,11 +89,11 @@ else:
     from . import response
     from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
     from .unfolding import Guttormsen
-    #from .gauss_smoothing import *
-    from .firstgeneration import FirstGeneration, normalize_rows
-    from .extractor import Extractor
+    # from .gauss_smoothing import *
     from .action import Action
-    #from .decomposition import nld_T_product, index, index_2
+    from .firstgeneration import FirstGeneration
+    from .extractor import Extractor
+    # from .decomposition import nld_T_product, index, index_2
     from .normalizer_nld import (NormalizerNLD, load_levels_discrete,
                                  load_levels_smooth)
     from .normalizer_gsf import NormalizerGSF
@@ -106,3 +108,4 @@ else:
     from .peakselect import fit_gauss
     from .peakselect import gaussian as pgaussian
     from .introspection import logging, hooks
+    from .clicker import Clicker

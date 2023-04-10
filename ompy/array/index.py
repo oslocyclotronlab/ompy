@@ -181,13 +181,15 @@ class Index(ABC):
         self.__content_hash = None
 
     def rebin(self, other: Index | np.ndarray, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[
-        Index, np.ndarray]:
+            Index, np.ndarray]:
         if not isinstance(other, Index):
             other = self.from_array(values)
         if self.leftmost > other.rightmost:
-            raise ValueError(f"Bins do not overlap. {self.leftmost} < {other.rightmost}")
+            raise ValueError(
+                f"Bins do not overlap. {self.leftmost} < {other.rightmost}")
         if self.rightmost < other.leftmost:
-            raise ValueError(f"Bins do not overlap. {self.rightmost} > {other.leftmost}")
+            raise ValueError(
+                f"Bins do not overlap. {self.rightmost} > {other.leftmost}")
         return self._rebin(other, values, preserve=preserve)
 
     @abstractmethod
@@ -224,7 +226,8 @@ class Index(ABC):
     def from_extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto',
                          extrapolate_boundary: bool = True, **kwargs) -> Index:
         bins = cls.extrapolate(bins, n=n, direction=direction)
-        boundary = cls.extrapolate_boundary(bins, extrapolate_boundary=extrapolate_boundary)
+        boundary = cls.extrapolate_boundary(
+            bins, extrapolate_boundary=extrapolate_boundary)
         return cls(bins, boundary=boundary, **kwargs)
 
     @classmethod
@@ -364,7 +367,8 @@ class Index(ABC):
     @classmethod
     def _from_dict(cls, d: dict[str, any]) -> Index:
         if cls.__name__ != d['class_name']:
-            raise ValueError(f"Cannot deserialize {d['class_name']} to {cls.__name__}")
+            raise ValueError(
+                f"Cannot deserialize {d['class_name']} to {cls.__name__}")
         meta = d['meta']
         return cls(d['bins'], boundary=d['boundary'], **meta)
 
@@ -384,7 +388,8 @@ class Index(ABC):
         if self.is_uniform():
             if not other.is_uniform():
                 return False
-            factor = 1 / self.meta.unit.from_(Quantity(1, other.unit)).magnitude
+            factor = 1 / \
+                self.meta.unit.from_(Quantity(1, other.unit)).magnitude
             if not np.isclose(self.step(0) * factor, other.step(0), rtol=rtol, **kwargs):
                 return False
             if not np.isclose(self.leftmost * factor, other.leftmost, rtol=rtol, **kwargs):
@@ -435,11 +440,13 @@ class Index(ABC):
         if numbins is not None:
             if numbins <= 0:
                 raise ValueError("`numbins` must be positive")
-            bins, step = np.linspace(self.bins[0], self.bins[-1], num=numbins, retstep=True)
+            bins, step = np.linspace(
+                self.bins[0], self.bins[-1], num=numbins, retstep=True)
         if binwidth is not None:
             if binwidth <= 0:
                 raise ValueError("`binwidth` must be positive")
-            bins = np.arange(self.bins[0], self.bins[-1], binwidth, dtype=float)
+            bins = np.arange(
+                self.bins[0], self.bins[-1], binwidth, dtype=float)
         if isinstance(bins, Index):
             warn("Might be buggy")
             return bins.__clone(meta=self.meta)
@@ -492,9 +499,10 @@ class Edge(ABC):
         """ Right edge of the rightmost bin """
         return self.right_edge(-1)
 
-    def is_inbounds(self, x: float64) -> bool:
+    def is_inbounds(self, x) -> bool:
         """ Check if index is in bounds """
-        return self.leftmost <= x <= self.rightmost
+        y = self.to_same_unit(x)
+        return self.leftmost <= y <= self.rightmost
 
     @abstractmethod
     def is_left(self) -> bool:
@@ -527,13 +535,14 @@ class Edge(ABC):
     def assert_inbounds(self, x: float64):
         """ Assert that x is in bounds """
         if x < self.leftmost:
-            raise IndexError(f"{x} is beyond the leftmost edge {self.leftmost}")
+            raise IndexError(
+                f"{x} is beyond the leftmost edge {self.leftmost}")
         if x >= self.rightmost:
-            raise IndexError(f"{x} is beyond the rightmost edge {self.rightmost}")
+            raise IndexError(
+                f"{x} is beyond the rightmost edge {self.rightmost}")
 
-    def is_inbounds(self, x) -> bool:
-        return self.leftmost <= x < self.rightmost
-
+    # def is_inbounds(self, x) -> bool:
+    #    return self.leftmost <= x < self.rightmost
 
     @staticmethod
     @abstractmethod
@@ -646,7 +655,8 @@ class Layout(ABC):
     @classmethod
     def extrapolate(cls, bins: np.ndarray, direction: Literal['left', 'right'], n: int = 1) -> np.ndarray:
         if direction not in ('left', 'right'):
-            raise ValueError(f"Direction must be 'left' or 'right', not '{direction}'.")
+            raise ValueError(
+                f"Direction must be 'left' or 'right', not '{direction}'.")
         if n < 1:
             if n == 0:
                 return bins
@@ -676,7 +686,8 @@ class Layout(ABC):
             Extrapolated bins
         """
         dx = bins[1] - bins[0]
-        extrapolated = np.linspace(bins[0] - n * dx, bins[0], n, endpoint=False)
+        extrapolated = np.linspace(
+            bins[0] - n * dx, bins[0], n, endpoint=False)
         return np.concatenate((extrapolated, bins))
 
     @classmethod
@@ -691,7 +702,8 @@ class Layout(ABC):
             Extrapolated bins
         """
         dx = bins[-1] - bins[-2]
-        extrapolated = np.linspace(bins[-1] + dx, bins[-1] + n * dx, n, endpoint=True)
+        extrapolated = np.linspace(
+            bins[-1] + dx, bins[-1] + n * dx, n, endpoint=True)
         return np.concatenate((bins, extrapolated))
 
     @classmethod
@@ -734,7 +746,8 @@ class Uniform(Layout):
 
     def __hash__(self):
         if self.__hash is None:
-            self.__hash = hash((self.bins[0], self.dX, len(self), self.boundary, self.unit))
+            self.__hash = hash(
+                (self.bins[0], self.dX, len(self), self.boundary, self.unit))
         return self.__hash
 
     def to_calibration(self) -> Calibration:
@@ -770,9 +783,11 @@ class LeftUniformIndex(Left, Uniform, Index):
             raise NotImplementedError()
         if not other.is_left():
             other_ = other.to_left()
-            new = _rebin_uniform_left_left(self.bins, other_.bins, values, preserve=preserve)
+            new = _rebin_uniform_left_left(
+                self.bins, other_.bins, values, preserve=preserve)
         else:
-            new = _rebin_uniform_left_left(self.bins, other.bins, values, preserve=preserve)
+            new = _rebin_uniform_left_left(
+                self.bins, other.bins, values, preserve=preserve)
         return other, new
 
     def other_edge_cls(self) -> Type[Index]:
@@ -847,17 +862,20 @@ class LeftNonUniformIndex(Left, NonUniform, Index):
 @njit
 def widths_from_mid_left(mid, left):
     if left > mid[0]:
-        raise ValueError("Unsolvable constraints: left boundary is smaller than first mid-point.")
+        raise ValueError(
+            "Unsolvable constraints: left boundary is smaller than first mid-point.")
     steps = np.empty(len(mid))
     steps[0] = abs(2 * (mid[0] - left))
     if steps[0] == 0:
-        raise ValueError("Unsolvable constraints: first mid-point is equal to left boundary.")
+        raise ValueError(
+            "Unsolvable constraints: first mid-point is equal to left boundary.")
     for i in range(1, len(mid)):
         delta = abs(mid[i] - left)
         left += steps[i - 1]
         steps[i] = abs(2 * (delta - steps[i - 1]))
         if steps[i] == 0:
-            raise ValueError("Unsolvable constraints: mid-point equal to left edge.")
+            raise ValueError(
+                "Unsolvable constraints: mid-point equal to left edge.")
     return steps
 
 
@@ -865,17 +883,20 @@ def widths_from_mid_left(mid, left):
 def widths_from_mid_right(mid, right):
     """ Bin widths from mid-binned bins and the right edge of the final bin"""
     if right < mid[-1]:
-        raise ValueError("Unsolvable constraints: right boundary is smaller than last mid-point.")
+        raise ValueError(
+            "Unsolvable constraints: right boundary is smaller than last mid-point.")
     steps = np.empty_like(mid)
     steps[-1] = 2 * (right - mid[-1])
     if steps[-1] == 0:
-        raise ValueError("Unsolvable constraints: last mid-point is equal to right boundary.")
+        raise ValueError(
+            "Unsolvable constraints: last mid-point is equal to right boundary.")
     i = len(mid) - 2
     while i >= 0:
         eta = mid[i + 1] - mid[i]
         steps[i] = 2 * eta - steps[i + 1]
         if steps[i] == 0:
-            raise ValueError("Unsolvable constraints: mid-point equal to right edge.")
+            raise ValueError(
+                "Unsolvable constraints: mid-point equal to right edge.")
         i -= 1
     return steps
 
@@ -891,7 +912,8 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
                 self.dX = widths_from_mid_right(bins, boundary)
                 boundary = bins[0] - self.dX[0] / 2
             case d:
-                raise ValueError(f"direction must be 'left' or 'right', not {d}")
+                raise ValueError(
+                    f"direction must be 'left' or 'right', not {d}")
         Index.__init__(self, bins, boundary, *args, **kwargs)
 
     def other_edge_cls(self) -> Type[Index]:
@@ -913,11 +935,13 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
             case 'right':
                 return bins[-1] + (bins[-1] - bins[-2]) / 2
             case d:
-                raise ValueError(f"direction must be 'left' or 'right', not {d}")
+                raise ValueError(
+                    f"direction must be 'left' or 'right', not {d}")
 
     @staticmethod
     def split_bins_boundary(bins: np.ndarray) -> tuple[float, np.ndarray]:
-        raise NotImplementedError("Extrapolation poorly defined for non-uniform mid-binning and is not supported.")
+        raise NotImplementedError(
+            "Extrapolation poorly defined for non-uniform mid-binning and is not supported.")
 
     @classmethod
     def from_array(cls, bins: np.ndarray, *,
@@ -936,16 +960,20 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
         """
         if extrapolate_boundary:
             if boundary is not None or width is not None:
-                raise ValueError("Cannot specify `extrapolate_boundary` along with `boundary` or `width`.")
+                raise ValueError(
+                    "Cannot specify `extrapolate_boundary` along with `boundary` or `width`.")
             boundary = cls.extrapolate_boundary(bins, direction=direction)
             return cls(bins, boundary, direction=direction, **kwargs)
         match boundary, width, direction:
             case None, None, _:
-                raise ValueError("Either `boundary` or `width` must be specified")
+                raise ValueError(
+                    "Either `boundary` or `width` must be specified")
             case [a, b, _] if a is not None and b is not None:
-                raise ValueError("Only one of `boundary` or `width` can be specified")
+                raise ValueError(
+                    "Only one of `boundary` or `width` can be specified")
             case [_, _, c] if c not in {'left', 'right'}:
-                raise ValueError(f"Direction must be `left` or `right`, not `{c}`")
+                raise ValueError(
+                    f"Direction must be `left` or `right`, not `{c}`")
             case bound, _, dir if bound is not None:
                 return cls(bins, bound, direction=dir, **kwargs)
             case _, width, 'left':
@@ -962,7 +990,8 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
                 if key.start is None or key.start == 0:
                     boundary = self.boundary
                 else:
-                    boundary = self.bins[key.start - 1] + self.dX[key.start - 1] / 2
+                    boundary = self.bins[key.start - 1] + \
+                        self.dX[key.start - 1] / 2
                 return self.from_array(self.bins[key], metadata=self.meta,
                                        boundary=boundary)
             case _:

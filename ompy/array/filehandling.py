@@ -45,7 +45,7 @@ def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray
                 "a0x": float(calibration_line[1]),
                 "a1x": float(calibration_line[2]),
                 "a2x": float(calibration_line[3]),
-                }
+            }
         elif len(calibration_line) == 7:
             ndim = 2
             cal = {
@@ -55,7 +55,7 @@ def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray
                 "a0y": float(calibration_line[4]),
                 "a1y": float(calibration_line[5]),
                 "a2y": float(calibration_line[6])
-                }
+            }
         else:
             raise ValueError("File format must be wrong or not implemented.\n"
                              "Check calibration line of the Mama file")
@@ -91,9 +91,9 @@ def mama_write(mat, filename, **kwargs):
 
 def mama_write1D(vec, filename, _assert=True):
     # MAMA is always mid-binned ?? Inconsistent with the channel encoding??
-    #vec = vec.to_mid()
+    # vec = vec.to_mid()
     if _assert:
-        assert(vec.shape[0] <= 8192),\
+        assert (vec.shape[0] <= 8192),\
             "Mama cannot handle vectors with dimensions > 8192. "\
             "Rebin before saving."
 
@@ -107,7 +107,7 @@ def mama_write1D(vec, filename, _assert=True):
     header_string += f'!COMMENT={vec.metadata.misc} \n'
     header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
                                                    time.localtime()) + '   \n'
-    #header_string += '!OMPYVERSION=' + __full_version__ + '   \n'
+    # header_string += '!OMPYVERSION=' + __full_version__ + '   \n'
     calibration = vec._index.to_unit('keV').to_calibration()
     header_string += (
         '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E \n'
@@ -136,10 +136,10 @@ def mama_write1D(vec, filename, _assert=True):
 
 def mama_write2D(mat, filename, comment="", _assert=True):
     if _assert:
-        assert(mat.shape[0] <= 2048 and mat.shape[1] <= 2048),\
+        assert (mat.shape[0] <= 2048 and mat.shape[1] <= 2048),\
             "Mama cannot handle matrixes with any of the dimensions > 2048. "\
             "Rebin before saving."
-    #mat = mat.to_mid()
+    # mat = mat.to_mid()
 
     # Calculate calibration coefficients.
     x_calibration = mat.X_index.to_unit('keV').to_calibration()
@@ -154,15 +154,15 @@ def mama_write2D(mat, filename, comment="", _assert=True):
     header_string += '!TIME=DATE:' + time.strftime("%d-%b-%y %H:%M:%S",
                                                    time.localtime()) + '   \n'
     header_string += (
-      '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
-       % (
-        y_calibration.a0,
-        y_calibration.a1,
-        y_calibration.a2,
-        x_calibration.a0,
-        x_calibration.a1,
-        x_calibration.a2
-          ))
+        '!CALIBRATION EkeV=6, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E, %12.6E \n'
+        % (
+            y_calibration.a0,
+            y_calibration.a1,
+            y_calibration.a2,
+            x_calibration.a0,
+            x_calibration.a1,
+            x_calibration.a2
+        ))
     header_string += '!PRECISION=16 \n'
     header_string += "!DIMENSION=2,0:{:4d},0:{:4d} \n".format(
         mat.shape[1] - 1, mat.shape[0] - 1)
@@ -361,6 +361,7 @@ def save_npz_1D(path: Path, vector, exist_ok: bool = False) -> None:
         mapping['std'] = vector.std
     np.savez(path, **mapping)
 
+
 def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
     with np.load(path, allow_pickle=True, **kwargs) as data:
         meta = data['meta'][()]
@@ -369,8 +370,10 @@ def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
         std = None if 'std' not in data else data['std']
         version = data['version']
         if version != __full_version__:
-            warn(f"Version mismatch when loading {path}: {version} != {__full_version__}")
+            warn(
+                f"Version mismatch when loading {path}: {version} != {__full_version__}")
     return cls(X=index, values=values, std=std, **meta)
+
 
 def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
     mapping = {'X index': matrix.X_index.to_dict(),
@@ -381,15 +384,19 @@ def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
         raise FileExistsError(f"{path} already exists")
     np.savez(path, **mapping)
 
+
 def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:
     with np.load(path, allow_pickle=True, **kwargs) as data:
+        version = data['version']
+        if version != __full_version__:
+            print(
+                f"Version mismatch when loading {path}: {version} != {__full_version__}")
+            warn(
+                f"Version mismatch when loading {path}: {version} != {__full_version__}")
         meta = data['meta'][()]
         X_index = Index.from_dict(data['X index'][()])
         Y_index = Index.from_dict(data['Y index'][()])
         values = data['values']
-        version = data['version']
-        if version != __full_version__:
-            warn(f"Version mismatch when loading {path}: {version} != {__full_version__}")
     return cls(X=X_index, Y=Y_index, values=values, **meta)
 
 
@@ -413,11 +420,13 @@ def filetype_from_suffix(path: Path) -> str | None:
         case _:
             return None
 
+
 def resolve_filetype(path: Path, filetype: str | None) -> tuple[Path, Filetype]:
     if filetype is None:
         filetype = filetype_from_suffix(path)
         if filetype is None:
-            raise ValueError("Filetype could not be determined from suffix: {path}")
+            raise ValueError(
+                "Filetype could not be determined from suffix: {path}")
         # Fallback case
         if filetype == '':
             filetype = 'npz'

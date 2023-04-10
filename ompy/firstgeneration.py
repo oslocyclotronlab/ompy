@@ -6,7 +6,7 @@ from typing import Tuple, Optional
 from .array import Matrix, Vector, rebin_2D
 from .library import div0
 from .action import Action
-#from . import ureg, Q_, DimensionalityError
+# from . import ureg, Q_, DimensionalityError
 from . import Unitful, Bounded, Choice
 
 LOG = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ class FirstGeneration:
         Returns:
             The first generation matrix
         """
-        matrix = unfolded.clone().to('keV')
+        matrix = unfolded.clone()
         self.action.act_on(matrix)
         if np.any(matrix.Ex < 0):
             raise ValueError("input matrix has to have positive Ex entries"
@@ -177,7 +177,7 @@ class FirstGeneration:
         LOG.debug("Multiplicites:\n%s", tt.to_string(
             np.vstack([matrix.Ex, multiplicities.round(2)]).T,
             header=('Ex', 'Multiplicities')
-            ))
+        ))
         assert (multiplicities >= 0).all(), "Bug. Contact developers"
         sum_counts = matrix.projection('Ex').values
 
@@ -306,7 +306,8 @@ class FirstGeneration:
                               inplace=True)
         assert np.allclose(valley_correction.E, matrix.Ex)
         if np.any(valley_correction.values < 0):
-            raise ValueError("valley correction has to have positive entries only.")
+            raise ValueError(
+                "valley correction has to have positive entries only.")
 
         return valley_correction.values
 
@@ -346,7 +347,6 @@ class FirstGeneration:
         for i in range(w.shape[0]):  # Loop over Ex rows
             w[i, :i+1] = fg[i, i::-1]
         w.values = normalize_rows(w.values)
-
 
         for i, Ex in enumerate(fg.Ex):
             # 1 fg per population

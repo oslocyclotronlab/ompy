@@ -1,3 +1,5 @@
+# from .geometry import Line, ThickLine
+from scipy.optimize import curve_fit
 import inspect
 import re
 from itertools import product
@@ -13,6 +15,7 @@ from scipy.stats import truncnorm
 
 from .stubs import ArrayFloat, arraylike, Unitlike, ArrayKeV, Axes
 from . import ureg
+
 
 def div0(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
@@ -49,8 +52,10 @@ def make_mask(Ex_array, Eg_array, Ex1, Eg1, Ex2, Eg2):
     # Define cut   x1    y1    x2    y2
     cut_points = [i_from_E(Eg1, Eg_array), i_from_E(Ex1, Ex_array),
                   i_from_E(Eg2, Eg_array), i_from_E(Ex2, Ex_array)]
-    i_array = np.linspace(0, len(Ex_array) - 1, len(Ex_array)).astype(int)  # Ex axis
-    j_array = np.linspace(0, len(Eg_array) - 1, len(Eg_array)).astype(int)  # Eg axis
+    i_array = np.linspace(0, len(Ex_array) - 1,
+                          len(Ex_array)).astype(int)  # Ex axis
+    j_array = np.linspace(0, len(Eg_array) - 1,
+                          len(Eg_array)).astype(int)  # Eg axis
     i_mesh, j_mesh = np.meshgrid(i_array, j_array, indexing='ij')
     return np.where(i_mesh > line(j_mesh, cut_points), 1, 0)
 
@@ -302,7 +307,7 @@ def log_interp1d(xx, yy, **kwargs):
     """ Interpolate a 1-D function.logarithmically """
     logy = np.log(yy)
     lin_interp = interp1d(xx, logy, kind='linear', **kwargs)
-    log_interp = lambda zz: np.exp(lin_interp(zz))  # noqa
+    def log_interp(zz): return np.exp(lin_interp(zz))  # noqa
     return log_interp
 
 
@@ -396,7 +401,8 @@ def annotate_heatmap(im, matrix, valfmt="{x:.2f}",
     for j, i in product(*map(range, matrix.shape)):
         x = matrix.Eg[i]
         y = matrix.Ex[j]
-        kw.update(color=textcolors[int(im.norm(matrix.values[i, j]) > threshold)])
+        kw.update(color=textcolors[int(
+            im.norm(matrix.values[i, j]) > threshold)])
         text = im.axes.text(y, x, valfmt(matrix.values[i, j], None), **kw)
         texts.append(text)
 
@@ -698,22 +704,23 @@ def handle_rebin_arguments(*, bins: ArrayKeV, transform, LOG,
 
     return newbins_
 
+
 def from_unit(quantity: Unitlike, default: Unitlike) -> float:
     unit = ureg.Unit(default)
     match quantity:
         case str():
-            return ureg.Quantity(quantity).to_unit(unit).magnitude
+            return ureg.Quantity(quantity).to(unit).magnitude
         case ureg.Quantity():
-            return quantity.to_unit(unit).magnitude
+            return quantity.to(unit).magnitude
         case _:
             return quantity
+
 
 def into_unit(quantity: Unitlike, default: Unitlike) -> Unitlike:
     value = from_unit(quantity, default)
     return value * ureg.Unit(default)
 
 
-from scipy.optimize import curve_fit
 def fit_resolution(mat: 'Matrix'):
     def OSCAR(e):
         a0 = 60.6473
@@ -725,7 +732,7 @@ def fit_resolution(mat: 'Matrix'):
     Eg = mat.Eg
     for ex_i in range(mat.shape[0]):
         e_diagonal = mat.Ex[ex_i]
-        #if e_diagonal < 800:
+        # if e_diagonal < 800:
         #    continue
         eg_i = mat.index_Eg(e_diagonal)
         if eg_i > mat.shape[1] - 1:
@@ -754,15 +761,15 @@ def fit_resolution(mat: 'Matrix'):
             ax.plot(E, y)
             ax.set_title(f"Ex = {e_diagonal:.2f}")
         ps.append([e_diagonal, *popt])
-        #if e_diagonal > 2000:
+        # if e_diagonal > 2000:
         #    break
     return np.vstack(ps)
 
 
 def ngaussian(x, A: float, mu: float, sigma: float):
-    return A* np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
+    return A * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
 
-from .geometry import Line, ThickLine
+
 def diagonal_sum(mat: 'Matrix', slope=1, thickness=1):
     N_Ex = mat.shape[0]
     I = np.array(range(-N_Ex+1, N_Ex))
@@ -772,11 +779,12 @@ def diagonal_sum(mat: 'Matrix', slope=1, thickness=1):
         line = Line(p1=(0, ex), slope=slope)
         tline = ThickLine(line, thickness=thickness)
         mask = tline.within(mat)
-        #print(ex_i, mask.sum())
+        # print(ex_i, mask.sum())
         S.append(mat[mask])
     summed = np.array([sum(s) for s in S])
     average = np.array([np.mean(s) for s in S])
     return I, Ex, summed, average, S
+
 
 def diagonal_sum_2(mat: 'Matrix', slope=1, thickness=1):
     N_Ex = mat.shape[0]
@@ -791,7 +799,7 @@ def diagonal_sum_2(mat: 'Matrix', slope=1, thickness=1):
         line = Line(p1=(0, ex), slope=slope)
         tline = ThickLine(line, thickness=thickness)
         mask = tline.within(mat)
-        #print(ex_i, mask.sum())
+        # print(ex_i, mask.sum())
         S.append(mat[mask])
         ex += offset
     summed = np.array([sum(s) for s in S])

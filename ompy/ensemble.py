@@ -13,11 +13,8 @@ from numpy import ndarray
 from .array import Matrix, rebin_2D
 from .action import Action
 from .stubs import Unitlike
+from tqdm.autonotebook import tqdm
 
-if 'JPY_PARENT_PID' in os.environ:
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -74,6 +71,7 @@ class Ensemble:
         - (Re)generation with book keeping is a recurring pattern.
           Try to abstract it away.
     """
+
     def __init__(self, raw: Matrix | None = None,
                  bg: Matrix | None = None,
                  bg_ratio: float = 1,
@@ -195,12 +193,12 @@ class Ensemble:
         # LOG.info(f"Start normalization with {self.nprocesses} cpus")
         # pool = ProcessPool(nodes=self.nprocesses)
         ss = np.random.SeedSequence(self.seed)
-        #iterator = pool.imap(self.step, range(number), ss.spawn(number),
+        # iterator = pool.imap(self.step, range(number), ss.spawn(number),
         #                     repeat(method))
-        #ensembles = np.array(list(tqdm(iterator, total=number)))
-        #pool.close()
-        #pool.join()
-        #pool.clear()
+        # ensembles = np.array(list(tqdm(iterator, total=number)))
+        # pool.close()
+        # pool.join()
+        # pool.clear()
 
         ensembles = []
         sses = ss.spawn(number)
@@ -271,7 +269,7 @@ class Ensemble:
         if step == 0:  # workaround
             firstgen.save(self.path / 'firstgen.npy')
 
-        assert(raw.shape == unfolded.shape and raw.shape == firstgen.shape), \
+        assert (raw.shape == unfolded.shape and raw.shape == firstgen.shape), \
             ("For now, all matrices have to have the same shape. Currently, "
              f"shapes: raw: {raw.shape}, unfolded: {unfolded.shape} and "
              f"firstgen: {firstgen.shape}")
@@ -433,7 +431,7 @@ class Ensemble:
         self.std_firstgen = firstgen_std
 
     def generate_gaussian(self, state: str,
-                          rstate: np.random.Generator | None = np.random.default_rng) -> np.ndarray: # noqa
+                          rstate: np.random.Generator | None = np.random.default_rng) -> np.ndarray:  # noqa
         """Generates an array with Gaussian perturbations of a matrix.
         Note that entries are truncated at 0 (only positive).
 
@@ -618,7 +616,7 @@ class Ensemble:
             fig, ax = plt.subplots(ncols=3, sharey=True,
                                    constrained_layout=True)
 
-        extrema = lambda x: (np.min(x), np.max(x)) # noqa
+        def extrema(x): return (np.min(x), np.max(x))  # noqa
         choices = {"raw": extrema(self.std_raw.values),
                    "unfolded": extrema(self.std_unfolded.values),
                    "firstgen": extrema(self.std_firstgen.values)}

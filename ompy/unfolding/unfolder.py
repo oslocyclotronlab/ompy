@@ -11,7 +11,6 @@ from typing import Literal, TypeAlias, overload
 from tqdm.autonotebook import tqdm
 
 
-
 class Unfolder(ABC):
     """ Abstract base class for unfolding algorithms
 
@@ -25,11 +24,13 @@ class Unfolder(ABC):
 
     def __init__(self, R: Matrix, G: Matrix):
         if R.shape != G.shape:
-            raise ValueError(f"R and G must have the same shape, got {R.shape} and {G.shape}")
+            raise ValueError(
+                f"R and G must have the same shape, got {R.shape} and {G.shape}")
         if not R.X_index.is_compatible_with(R.Y_index):
             raise ValueError("R must be square")
         if not R.X_index.is_compatible_with(G.X_index):
-            raise ValueError(f"R and G must have the same axes.\n{R.X_index.summary()}\n{G.X_index.summary()}")
+            raise ValueError(
+                f"R and G must have the same axes.\n{R.X_index.summary()}\n{G.X_index.summary()}")
         self.R: Matrix = R
         self.G: Matrix = G
 
@@ -57,14 +58,16 @@ class Unfolder(ABC):
             case Vector():
                 return self.unfold_vector(data, background, **kwargs)
             case _:
-                raise ValueError(f"Expected Matrix or Vector, got {type(data)}")
+                raise ValueError(
+                    f"Expected Matrix or Vector, got {type(data)}")
 
     def unfold_vector(self, data: Vector, background: Vector | None = None, initial: InitialVector = 'raw', R: str | Matrix = 'R', ignore_511: bool = False, **kwargs) -> UnfoldedResult1D:
         R = self._resolve_response(R)
         if not R.is_compatible_with(data.X_index):
             raise ValueError("R and data must have the same axes")
         if background is not None and not R.is_compatible_with(background.X_index):
-            raise ValueError("The background has different index from the data.")
+            raise ValueError(
+                "The background has different index from the data.")
         R = R.T
 
         initial: Vector = initial_vector(data, initial)
@@ -74,7 +77,8 @@ class Unfolder(ABC):
         return self._unfold_vector(R, data, background, initial, mask, **kwargs)
 
     @abstractmethod
-    def _unfold_vector(self, R: Matrix, data: Vector, background: Vector, initial: np.ndarray, mask: Vector, **kwargs) -> UnfoldedResult1D: ...
+    def _unfold_vector(self, R: Matrix, data: Vector, background: Vector,
+                       initial: np.ndarray, mask: Vector, **kwargs) -> UnfoldedResult1D: ...
 
     def unfold_matrix(self, data: Matrix, background: Matrix | None = None, initial: InitialMatrix = 'raw', R: str | Matrix = 'R', **kwargs) -> UnfoldedResult2D:
         R = self._resolve_response(R)
@@ -83,7 +87,8 @@ class Unfolder(ABC):
                              f"\n\nThe index of R:\n{R.X_index.summary()}"
                              f"\n\nThe index of data:\n{data.Y_index.summary()}")
         if background is not None and not background.is_compatible_with(data):
-            raise ValueError("The background has different indices from the data.")
+            raise ValueError(
+                "The background has different indices from the data.")
         R = R.T
         use_previous, initial = initial_matrix(data, initial)
         return self._unfold_matrix(R, data, background, initial, use_previous, **kwargs)
@@ -122,7 +127,9 @@ class Unfolder(ABC):
             masks[i, :j] = mask
             time[i] = res.meta.time
             bins[i] = j
-        return UnfoldedResult2DSimple(ResultMeta2D(time=time, bins=bins), R=R, raw=data, background=background, initial=initial, uall=best, mask=mask)
+        return UnfoldedResult2DSimple(meta=ResultMeta2D(time=time, bins=bins), R=R,
+                                      raw=data, background=background,
+                                      initial=initial, uall=best, mask=mask)
 
     def _resolve_response(self, R: str | Matrix) -> Matrix:
         match R:
@@ -140,8 +147,10 @@ class Unfolder(ABC):
                 raise ValueError(f"Invalid R {R}")
 
 
-InitialVector: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Vector
-InitialMatrix: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Matrix
+InitialVector: TypeAlias = Literal['raw',
+                                   'random'] | float | np.ndarray | Vector
+InitialMatrix: TypeAlias = Literal['raw',
+                                   'random'] | float | np.ndarray | Matrix
 
 
 def initial_vector(data: Vector, initial: InitialVector) -> Vector:
@@ -194,6 +203,7 @@ def mask_511(data: Vector) -> np.ndarray:
     mask[start:stop] = False
     return mask
 
+
 def make_mask(data: Vector, mask) -> Vector:
     match mask:
         case np.ndarray():
@@ -234,7 +244,7 @@ class UnfoldedResult1D(ABC):
     def best_fold(self) -> Vector:
         return self.R@self.best()
 
-    #@make_axes
+    # @make_axes
     def plot_comparison(self, ax: Axes, mask: bool = True,
                         unfolded: bool = True, folded: bool = True,
                         raw: bool = True, error: bool = False,
@@ -255,6 +265,7 @@ class UnfoldedResult1D(ABC):
 
         return ax
 
+
 @dataclass(kw_only=True)
 class UnfoldedResult1DSimple(UnfoldedResult1D):
     u: Vector
@@ -274,7 +285,7 @@ class Errors1DABC(UnfoldedResult1D):
     def folded_error(self) -> np.ndarray | None:
         return None
 
-    #@make_axes
+    # @make_axes
     def plot_comparison(self, ax: Axes, fill: bool = False,
                         raw: bool = True, background: bool = True,
                         unfolded: bool = True, folded: bool = True,
@@ -298,7 +309,8 @@ class Errors1DABC(UnfoldedResult1D):
                 ax.fill_between(x, y-yerr, y+yerr, alpha=0.2, color=color,
                                 step='mid', edgecolor=None)
             else:
-                kwargs = {'capsize': 2, 'fmt': 'none', 'capthick': 0.5, 'ms': 1} | kwargs
+                kwargs = {'capsize': 2, 'fmt': 'none',
+                          'capthick': 0.5, 'ms': 1} | kwargs
                 ax.errorbar(x, self.best(), yerr=self.error(),
                             color=color, **kwargs)
         if folded:
@@ -323,15 +335,19 @@ class Errors1DABC(UnfoldedResult1D):
             ax.fill_between(self.raw.X[~self.mask.values], *ylim, **maskkw)
         return ax
 
+
 @dataclass(kw_only=True)
 class Errors1DSimple(Errors1DABC):
     err: np.ndarray
+
     def error(self) -> np.ndarray:
         return self.err
+
 
 @dataclass(kw_only=True)
 class Errors1DCovariance(Errors1DABC):
     cov: np.ndarray
+
     def error(self) -> np.ndarray | None:
         if self.cov is None:
             return None
@@ -358,15 +374,13 @@ class Errors1DCovariance(Errors1DABC):
         return mat
 
 
-
-@dataclass#(frozen=True, slots=True)
+@dataclass  # (frozen=True, slots=True)
 class UnfoldedResult1DAll(UnfoldedResult1D):
     uall: np.ndarray
     cost: np.ndarray
 
     def unfolded(self, index: int) -> Vector:
         return Vector(X=self.raw.X_index, values=self.uall[index])
-
 
     @make_axes
     def plot_uall(self, ax: Axes, N: int | None = None, **kwargs) -> Axes:
@@ -378,13 +392,15 @@ class UnfoldedResult1DAll(UnfoldedResult1D):
         cmap = cm.get_cmap('Blues')
         vmin = 0.1
         vmax = 0.9
-        cmap = cmap(np.linspace(vmin, vmax, M))  # Extract the colormap values within the range
+        # Extract the colormap values within the range
+        cmap = cmap(np.linspace(vmin, vmax, M))
         cmap = cm.colors.ListedColormap(cmap)
         for i in range(0, N, step):
             j = i // step
             self.unfolded(i).plot(ax=ax, color=cmap(j), **kwargs)
         self.initial.plot(ax=ax, color='k', label='Initial', **kwargs)
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm._A = []  # Create empty array to avoid warning
         plt.subplots_adjust(bottom=0.1, right=0.85, top=0.9)
         cax = plt.axes([0.85, 0.1, 0.02, 0.8])
@@ -394,7 +410,7 @@ class UnfoldedResult1DAll(UnfoldedResult1D):
         tick_labels = np.linspace(0, N, 10)
         cbar.set_ticks(ticks)
         cbar.set_ticklabels([f'{int(t)}' for t in tick_labels])
-        #cbar.set_tick_labels(np.linspace(0, N, 10))
+        # cbar.set_tick_labels(np.linspace(0, N, 10))
         ax.figure.suptitle('Unfolded')
         return ax
 
@@ -408,14 +424,16 @@ class UnfoldedResult1DAll(UnfoldedResult1D):
         cmap = cm.get_cmap('Blues')
         vmin = 0.1
         vmax = 0.9
-        cmap = cmap(np.linspace(vmin, vmax, M))  # Extract the colormap values within the range
+        # Extract the colormap values within the range
+        cmap = cmap(np.linspace(vmin, vmax, M))
         cmap = cm.colors.ListedColormap(cmap)
         for i in range(0, N, step):
             (self.R@self.unfolded(i)).plot(ax=ax, color=cmap(i//step), **kwargs)
         (self.R@self.initial).plot(ax=ax, ls='-.', label='Initial', color='g')
         self.raw.plot(ax=ax, ls='--', label='Raw', color='r')
         ax.figure.suptitle('Refolded')
-        sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+        sm = plt.cm.ScalarMappable(
+            cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
         sm._A = []  # Create empty array to avoid warning
 
         plt.subplots_adjust(bottom=0.1, right=0.85, top=0.9)
@@ -427,9 +445,8 @@ class UnfoldedResult1DAll(UnfoldedResult1D):
         cbar.set_ticks(ticks)
         cbar.set_ticklabels([f'{int(t)}' for t in tick_labels])
         ax.set_title('')
-        #cbar.set_tick_labels(np.linspace(0, N, 10))
+        # cbar.set_tick_labels(np.linspace(0, N, 10))
         return ax
-
 
     @make_axes
     def plot_cost(self, ax: Axes, **kwargs) -> Axes:
@@ -466,7 +483,8 @@ class UnfoldedResult2D(ABC):
         return self.R@self.best()
 
     @abstractmethod
-    def unfolded(self, Ex: Unitlike | slice | None = None) -> Matrix | Vector: ...
+    def unfolded(self, Ex: Unitlike | slice |
+                 None = None) -> Matrix | Vector: ...
 
     @abstractmethod
     def folded(self, Ex: Unitlike | slice | None = None) -> Vector: ...
@@ -492,7 +510,7 @@ class UnfoldedResult2D(ABC):
         return self.uall.shape[0]
 
 
-@dataclass#(frozen=True, slots=True)
+@dataclass  # (frozen=True, slots=True)
 class UnfoldedResult2DCost(UnfoldedResult2D):
     cost: np.ndarray
 
@@ -514,7 +532,7 @@ class UnfoldedResult2DCost(UnfoldedResult2D):
         return ax
 
 
-@dataclass#(frozen=True, slots=True)
+@dataclass  # (frozen=True, slots=True)
 class UnfoldedResult2DSimple(UnfoldedResult2D):
     def best(self) -> Matrix:
         return self.unfolded()

@@ -1,89 +1,96 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from .stubs import Unitlike, Axes, array
 from .library import from_unit, into_unit
-from . import u, Vector, Matrix, empty_like, empty
+from . import u, Vector, Matrix, empty
+from .response import DiscreteInterpolation, Response
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import overload, Literal
+from typing import overload, Literal, Callable
 import warnings
 
 FWHM_TO_SIGMA = 1 / (2 * np.sqrt(2 * np.log(2)))
 
+"""
+TODO:
+    - [ ] Make point-and-click calibrator
+    - [ ] Fix the _, __ naming
+"""
+
 
 class Detector(ABC):
-    @classmethod
-    def resolution_sigma(cls, energy: Unitlike) -> Unitlike:
-        fwhm = cls.FWHM(energy)
+    def resolution_sigma(self, energy: Unitlike) -> Unitlike:
+        fwhm = self.FWHM(energy)
         return fwhm * FWHM_TO_SIGMA
 
-    @classmethod
-    def _resolution_sigma(cls, energy: float) -> float:
-        fwhm = cls.__FWHM(energy)
+    def _resolution_sigma(self, energy: float) -> float:
+        fwhm = self._FWHM(energy)
         return fwhm * FWHM_TO_SIGMA
 
-    @classmethod
-    def FWHM(cls, energy: Unitlike) -> Unitlike:
+    def __resolution_sigma(self, energy: float) -> float:
+        fwhm = self.__FWHM(energy)
+        return fwhm * FWHM_TO_SIGMA
+
+    def sigma(self, energy: Unitlike) -> Unitlike:
+        return self.resolution_sigma(energy)
+
+    def _sigma(self, energy: float) -> float:
+        return self._resolution_sigma(energy)
+
+    def FWHM(self, energy: Unitlike) -> Unitlike:
         e = from_unit(energy, 'keV')
-        fwhm = cls._FWHM(e)
+        fwhm = self._FWHM(e)
         return fwhm*u('keV')
 
-    @classmethod
+    @np.vectorize
+    def __FWHM(self, energy: float) -> float:
+        return self._FWHM(energy)
+
     @abstractmethod
-    def _FWHM(cls, energy: float) -> float:
+    def _FWHM(self, energy: float) -> float:
         ...
 
-    @classmethod
-    @np.vectorize
-    def __FWHM(cls, energy: float) -> float:
-        return cls._FWHM(energy)
-
-    @classmethod
-    def resolution_e(cls, e: Unitlike, sigma: float = 2) -> Unitlike:
+    def resolution_e(self, e: Unitlike, sigma: float = 2) -> Unitlike:
         """ Find the index of the diagonal + resolution of sigma"""
-        res = cls.resolution_sigma(e)
+        res = self.resolution_sigma(e)
         Ex = into_unit(e, 'keV') + sigma*res
         return Ex
 
-    @classmethod
-    def resolution_gauss(cls, E: array | Vector, mu: Unitlike, as_array=False) -> array | Vector:
+    def resolution_gauss(self, E: array | Vector, mu: Unitlike, as_array=False) -> array | Vector:
         if isinstance(E, Vector):
             E = E.to('keV').E_true
         Eg = from_unit(mu, 'keV')
-        sigma = cls._resolution_sigma(Eg)
+        sigma = self.__resolution_sigma(Eg)
         gauss = ngaussian(E, Eg, sigma)
         normalized = gauss / gauss.sum()
         if as_array:
             return normalized
         return Vector(E=E, values=normalized)
 
-    @classmethod
     @abstractmethod
-    def resolution_matrix(cls, mat: Matrix, *, as_array=False) -> Matrix | array:
+    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
         ...
 
-
-    @classmethod
-    def plot_FWHM(cls, ax: Axes | None = None, start=0, stop='10MeV', n=100, **kwargs) -> Axes:
+    def plot_FWHM(self, ax: Axes | None = None, start=0, stop='10MeV', n=100, **kwargs) -> Axes:
         if ax is None:
             ax = plt.subplots()[1]
         assert ax is not None
         start = from_unit(start, 'keV')
         stop = from_unit(stop, 'keV')
         e = np.linspace(start, stop, n)
-        ax.plot(e, cls.__FWHM(e), **kwargs)
+        ax.plot(e, self.__FWHM(e), **kwargs)
         ax.set_xlabel('Gamma energy [keV]')
         ax.set_ylabel('FWHM [keV]')
-        ax.set_title('FWHM of {}'.format(cls.__name__))
+        ax.set_title('FWHM of {}'.format(self.__name__))
         ax2 = ax.twinx()
         ax2.set_ylabel(r'$\sigma$ [keV]')
-        ax2.plot(e, cls._resolution_sigma(e), **kwargs)
+        ax2.plot(e, self._resolution_sigma(e), **kwargs)
 
         return ax
 
 
 class EgDetector(Detector):
-    @classmethod
-    def resolution_matrix(cls, mat: Matrix, *, as_array=False) -> Matrix | array:
+    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
         """ Return a matrix with the resolution of sigma
 
         R := resolution
@@ -93,16 +100,16 @@ class EgDetector(Detector):
         E = mat.Eg
         R: Matrix = empty(E, E)
         for (i, e) in enumerate(E):
-            R[i, :] = cls.resolution_gauss(E, e, as_array=True)
+            R[i, :] = self.resolution_gauss(E, e, as_array=True)
         if as_array:
             return R.values
         R.xlabel = r"Measured $E_\gamma$"
         R.ylabel = r"True $E_\gamma$"
         return R
 
+
 class ExDetector(Detector):
-    @classmethod
-    def resolution_matrix(cls, mat: Matrix, *, as_array=False) -> Matrix | array:
+    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
         """ Return a matrix with the resolution of sigma
 
         R := resolution
@@ -113,12 +120,21 @@ class ExDetector(Detector):
         E = mat.Ex
         R: Matrix = empty(E, E)
         for (i, e) in enumerate(E):
-            R[:, i] = cls.resolution_gauss(E, e, as_array=True)
+            R[:, i] = self.resolution_gauss(E, e, as_array=True)
         if as_array:
             return R.values
         R.ylabel = r"Measured $E_x$"
         R.xlabel = r"True $E_x$"
         return R
+
+
+class LambdaEgDetector(EgDetector):
+    def __init__(self, func: Callable[[float], float]):
+        self.func = func
+
+    def _FWHM(self, e: float) -> float:
+        return self.func(e)
+
 
 class OSCAR(EgDetector):
     # From https://doi.org/10.1016/j.nima.2020.164678
@@ -126,9 +142,8 @@ class OSCAR(EgDetector):
     a1 = 0.45802
     a2 = 2.655517e-4
 
-    @classmethod
-    def _FWHM(cls, e: float) -> float:
-        return np.sqrt(cls.a0 + cls.a1 * e + cls.a2 * e ** 2)
+    def _FWHM(self, e: float) -> float:
+        return np.sqrt(self.a0 + self.a1 * e + self.a2 * e ** 2)
 
 
 class SiRi(ExDetector):
@@ -136,9 +151,8 @@ class SiRi(ExDetector):
     # says ~= 100 keV
     a0 = 100.0
 
-    @classmethod
-    def _FWHM(cls, e: float) -> float:
-        return cls.a0
+    def _FWHM(self, e: float) -> float:
+        return self.a0
 
 
 class CompoundDetector:
@@ -147,20 +161,25 @@ class CompoundDetector:
         self.exdetector = ex_detector
 
     @overload
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ..., ex_sigma: ..., inplace: Literal[False]) -> Matrix: ...
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+                          ex_sigma: ..., inplace: Literal[False]) -> Matrix: ...
 
     @overload
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ..., ex_sigma: ..., inplace: Literal[True]) -> None: ...
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+                          ex_sigma: ..., inplace: Literal[True]) -> None: ...
 
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: float = 3, ex_sigma: float = 3,
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: float = 3,
+                          ex_sigma: float = 3,
                           inplace: bool = False) -> Matrix | None:
         """ Return a matrix with the resolution of sigma"""
         mask = np.zeros_like(mat.values, dtype=bool)
         for i in range(mat.shape[0]):
-            e_diagonal = mat.Ex[i]
+            e_diagonal = mat.Ex[i] * mat.Ex_index.unit
             ex = self.exdetector.resolution_e(e_diagonal, sigma=-ex_sigma)
-            ex_i = mat.index_Ex(ex) if ex >= 0 else 0
             eg = self.egdetector.resolution_e(e_diagonal, sigma=eg_sigma)
+            if not mat.Ex_index.is_inbounds(ex) or not mat.Eg_index.is_inbounds(eg):
+                continue
+            ex_i = mat.index_Ex(ex)
             eg_i = mat.index_Eg(eg)
             mask[ex_i, eg_i:] = True
 
@@ -172,9 +191,20 @@ class CompoundDetector:
             return matrix
 
 
-Oslo = CompoundDetector(ex_detector=SiRi(), eg_detector=OSCAR())
-    
+class Oslo(CompoundDetector):
+    def __init__(self, eg_detector: EgDetector = OSCAR(),
+                 ex_detector: ExDetector = SiRi()):
+        super().__init__(eg_detector=eg_detector, ex_detector=ex_detector)
 
-#@njit
+    @classmethod
+    def from_response(cls, response: DiscreteInterpolation | Response) -> Oslo:
+        if isinstance(response, Response):
+            fwhm = response.interpolation.FWHM
+        else:
+            fwhm = response.FWHM
+        return Oslo(eg_detector=LambdaEgDetector(fwhm))
+
+
+# @njit
 def ngaussian(x: array, mu: float, sigma: float):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))

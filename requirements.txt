@@ -12,3 +12,5 @@
  pathos>=0.2.5
  pybind11>=2.6.0
  pint
+ mechanicalsoup
+ nptyping

@@ -1,7 +1,7 @@
 from numba import njit, types, prange
 from typing import Callable, Union, Literal
 import numpy as np
-#from headers import arraylike, array
+# from headers import arraylike, array
 from scipy.signal import savgol_filter
 from typing import TypeAlias
 from .. import Vector, Matrix
@@ -17,6 +17,8 @@ TODO:
 
 
 readonly = types.Array(types.float64, 1, 'C', readonly=True)
+
+
 @njit((readonly, readonly))
 def neglog(nu: arraylike, n: arraylike) -> array:
     prod = np.where(n == 0, 0, n*np.log(nu / n))
@@ -29,14 +31,17 @@ def neglog2(nu: arraylike, n: arraylike) -> array:
     V = np.diag(n)
     return (n - nu).T @ np.linalg.pinv(V) @ (n - nu)
 
+
 @njit((readonly, readonly))
 def loglike(nu: arraylike, n: arraylike):
     err = np.maximum(3.0**2, n)
-    return (n - nu)**2 / err # *-0.5?
+    return (n - nu)**2 / err  # *-0.5?
+
 
 @njit((readonly, readonly))
 def mse(nu: arraylike, n: arraylike) -> array:
     return np.sqrt((nu - n)**2)
+
 
 @njit((readonly, readonly, readonly))
 def loglike_bg(nu: array, raw: array, bg: array):
@@ -53,6 +58,7 @@ LogLikeBgStr = Literal['ll']
 LogLikeBgFn = Callable[[array, array, array], array]
 LogLikeBg = LogLikeBgStr | LogLikeBgFn
 
+
 def get_loglike(name: LogLike) -> LogLikeFn:
     if not isinstance(name, str):
         return name
@@ -68,6 +74,7 @@ def get_loglike(name: LogLike) -> LogLikeFn:
         case _:
             raise ValueError(f"Loglikelihood {name} not supported")
 
+
 def get_loglike_bg(name: LogLikeBg) -> LogLikeBgFn:
     if not isinstance(name, str):
         return name
@@ -77,11 +84,14 @@ def get_loglike_bg(name: LogLikeBg) -> LogLikeBgFn:
         case _:
             raise ValueError(f"Loglikelihood {name} not supported")
 
+
 LossStr = Literal['loglike', 'smooth', 'derivative',
-'derivative2', 'discrete']
+                  'derivative2', 'discrete']
 LossFn = Callable[[array], float]
 Loss = Union[LossStr, LossFn]
 MapFn: TypeAlias = Callable[[array], array]
+
+
 @njit
 def idmap(x):
     return x
@@ -108,7 +118,6 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
     else:
         mask_ = mask
 
-
     match name:
         case 'loglike':
             if mask is not None:
@@ -129,40 +138,44 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
                 return lossfn
         case 'smooth':
             alpha = kwargs.get('alpha', 2.0)
+
             def lossfn_reg(mu: arraylike) -> float:
                 mu = imapfn(mu)
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n)[mask_]
                 smooth: array = savgol_filter(nu, 9, 3, mode='nearest')
-                #logprior: array = ll(smooth, n)[mask_]
+                # logprior: array = ll(smooth, n)[mask_]
                 return np.sum(loglikelihood) + alpha*np.sum((smooth - nu)**2)
             return lossfn_reg
         case 'dx':
             alpha = kwargs.get('alpha', 0.1)
             dx = X[1] - X[0]
+
             @njit
             def lossfn(mu: arraylike) -> float:
                 mu = imapfn(mu)
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n)[mask_]
-                #derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
+                # derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
                 derivative: array = np.sum((diff(mu, dx)[mask_])**2)
                 return np.sum(loglikelihood) + alpha*derivative
             return lossfn
         case 'd2x':
             alpha = kwargs.get('alpha', 0.1)
             dx = X[1] - X[0]
+
             @njit
             def lossfn(mu: arraylike) -> float:
                 mu = imapfn(mu)
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n)[mask_]
-                #derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
+                # derivative: array = np.sum(np.abs(diff(mu, dx)[mask_]))
                 derivative: array = np.sum((diff(mu, dx)[mask_])**2)
                 return np.sum(loglikelihood) + alpha*derivative
             return lossfn
         case 'derivative2':
             alpha = kwargs.get('alpha', 2.0)
+
             def lossfn(mu: arraylike) -> float:
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n)[mask_]
@@ -171,6 +184,7 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
             return lossfn
         case 'discrete':
             alpha = kwargs.get('alpha', 2.0)
+
             @njit
             def lossfn(mu: arraylike) -> float:
                 mu = imapfn(mu)
@@ -181,6 +195,7 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
             return lossfn
         case 'TV':
             alpha = kwargs.get('alpha', 1.0)
+
             @njit
             def lossfn(mu: arraylike) -> float:
                 mu = imapfn(mu)
@@ -189,21 +204,32 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
                 cost: float = TV(mu)
                 return np.sum(loglikelihood) + alpha * cost
             return lossfn
-        case 'eta':
-            if G is not None:
-                G: np.ndarray  = G.values
-            else:
-                raise ValueError("G matrix must be provided for eta loss.")
-            R: np.ndarray = R@G
+        case 'zero':
+            alpha = kwargs.get('alpha', 1.0)
+
             @njit
             def lossfn(mu: arraylike) -> float:
                 mu = imapfn(mu)
                 nu = R @ mu
                 loglikelihood: array = ll(nu, n)[mask_]
-                return np.sum(loglikelihood)
+                zerocost = np.where(mu < 0, alpha*np.abs(mu), 0)
+                return np.sum(loglikelihood) + np.sum(zerocost)
             return lossfn
+        case 'I':
+            alpha = kwargs.get('alpha', 1.0)
+
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                loglikelihood: array = ll(nu, n)[mask_]
+                Icost = (np.sum(nu) - np.sum(n))**2
+                return np.sum(loglikelihood) + alpha*Icost
+            return lossfn
+
         case _:
             raise ValueError(f"Loss function {name} is not supported.")
+
 
 def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
     if not isinstance(name, str):
@@ -213,23 +239,24 @@ def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
             @njit
             def exp(x):
                 return np.exp(x/1e2)
+
             @njit
             def log(x):
                 return np.log(x)*1e2
-            return exp, log
+            return log, exp
         case 'id':
             return idmap, idmap
         case 'sqrt':
             @njit
             def sqrt(x):
                 return np.sqrt(x)
+
             @njit
             def isqrt(x):
                 return x**2
             return sqrt, isqrt
         case _:
             raise ValueError(f"Transform {name} is not supported.")
-
 
 
 def loss_factory_bg(name: Loss, R: Matrix, n: Vector, bg: Vector,
@@ -273,10 +300,12 @@ def loss_factory_bg(name: Loss, R: Matrix, n: Vector, bg: Vector,
         case _:
             raise ValueError(f"Loss function {name} is not supported.")
 
+
 @njit(inline='always')
 def TV(x: array) -> float:
     """ Total variation """
     return np.sum(np.abs(np.diff(x)))
+
 
 @njit
 def diff(x: array, dx: float) -> array:
@@ -287,6 +316,7 @@ def diff(x: array, dx: float) -> array:
     D /= dx
     return D
 
+
 @njit(parallel=True)
 def ddiff(x: array, dx: float) -> array:
     D = np.empty_like(x)
@@ -296,6 +326,7 @@ def ddiff(x: array, dx: float) -> array:
         D[i] = (x[i+1] - 2*x[i] + x[i-1])
     D /= dx**2
     return D
+
 
 @njit
 def diff_sum(x, y):
@@ -338,9 +369,11 @@ def print_minuit_convergence(m):
     def printres(what, expected: bool):
         value = getattr(m.fmin, what)
         if value == expected:
-            s = f'{what:<25} is ' + strc(f'{value} (Expected {expected})', 'green')
+            s = f'{what:<25} is ' + \
+                strc(f'{value} (Expected {expected})', 'green')
         else:
-            s = f'{what:<25} is ' + strc(str(value) + f" (Expected {expected})", 'red')
+            s = f'{what:<25} is ' + \
+                strc(str(value) + f" (Expected {expected})", 'red')
         print(s)
     if m.valid:
         print('Valid: ' + strc('True', 'green'))

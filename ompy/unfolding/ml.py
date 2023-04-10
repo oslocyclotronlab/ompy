@@ -1,14 +1,11 @@
 import numpy as np
 from .unfolder import Unfolder, UnfoldedResult1DSimple, Errors1DCovariance, ResultMeta
 from .. import Matrix, Vector
-from ..stubs import Axes
-from ..numbalib import njit, prange, objmode
 import time
 from iminuit import Minuit
 from .loss import loss_factory_bg, loss_factory, LogLike, LossFn, print_minuit_convergence, get_transform
-from dataclasses import dataclass, field
-import matplotlib.pyplot as plt
-from scipy.optimize import OptimizeResult
+from dataclasses import dataclass
+
 
 @dataclass
 class MLResult1D(Errors1DCovariance, UnfoldedResult1DSimple):
@@ -35,7 +32,7 @@ class ML(Unfolder):
                                 ll, mapfn=tmap, imapfn=imap, mask=mask_, **kwargs)
         else:
             loss = loss_factory_bg(loss, R, data, background,
-                                ll, mapfn=tmap, imapfn=imap, mask=mask_, **kwargs)
+                                   ll, mapfn=tmap, imapfn=imap, mask=mask_, **kwargs)
         mu0: np.ndarray = tmap(initial.values)
         m = Minuit(loss, mu0)
         m.tol = 1e-3
@@ -52,7 +49,6 @@ class ML(Unfolder):
                           mask=mask,
                           u=u, cov=np.asarray(m.covariance), loss=loss,
                           res=ret, minuit=m)
-
 
     def supports_background(self) -> bool:
         return True
