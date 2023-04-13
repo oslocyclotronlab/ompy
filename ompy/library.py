@@ -293,8 +293,9 @@ def interpolate_matrix_2D(matrix_in, E0_array_in, E1_array_in,
 
 def log_interp1d(xx, yy, **kwargs):
     """ Interpolate a 1-D function.logarithmically """
+    kwargs.setdefault('kind', 'linear')
     logy = np.log(yy)
-    lin_interp = interp1d(xx, logy, kind='linear', **kwargs)
+    lin_interp = interp1d(xx, logy, **kwargs)
     log_interp = lambda zz: np.exp(lin_interp(zz))  # noqa
     return log_interp
 
