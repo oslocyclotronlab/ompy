@@ -759,6 +759,15 @@ class Vector(AbstractArray):
                     bins = self.X
                 kwargs.setdefault("marker", ".")
                 ax.scatter(bins, self.values, **kwargs)
+            case "poisson":
+                if self._index.is_left():
+                    bins = self.X + self.dX/2
+                else:
+                    bins = self.X
+                kw = dict(marker = 'o', ls='none', capsize=2, capthick=0.5, ms=3, lw=1)
+                kw |= kwargs
+                print(kw)
+                ax.errorbar(bins, self.values, yerr=np.sqrt(self.values), **kw)
             case _:
                 raise ValueError(f"Invalid kind: {kind}")
         maybe_set(ax, 'xlabel', self.xlabel + f" [${self.unit:~L}$]")

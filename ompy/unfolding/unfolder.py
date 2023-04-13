@@ -309,7 +309,7 @@ class Errors1DABC(UnfoldedResult1D):
                 ax.fill_between(x, y-yerr, y+yerr, alpha=0.2, color=color,
                                 step='mid', edgecolor=None)
             else:
-                kwargs = {'capsize': 2, 'fmt': 'none',
+                kwargs = {'capsize': 2, 'ls': 'none',
                           'capthick': 0.5, 'ms': 1} | kwargs
                 ax.errorbar(x, self.best(), yerr=self.error(),
                             color=color, **kwargs)

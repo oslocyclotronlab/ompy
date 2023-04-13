@@ -35,7 +35,7 @@ class ML(Unfolder):
                                    ll, mapfn=tmap, imapfn=imap, mask=mask_, **kwargs)
         mu0: np.ndarray = tmap(initial.values)
         m = Minuit(loss, mu0)
-        m.tol = 1e-3
+        m.tol = 1e-2
         m.errordef = Minuit.LIKELIHOOD
         start = time.time()
         ret: Minuit = m.migrad(iterate=100)

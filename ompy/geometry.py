@@ -11,6 +11,10 @@ from .library import from_unit
 if TYPE_CHECKING:
     from .array import Matrix
 
+def extrapolate_index(index):
+    dx = index[1] - index[0]
+    return lambda x: (x - index[0])/dx
+
 
 class Geometry(ABC):
 
@@ -38,6 +42,8 @@ class Geometry(ABC):
     def resolve(point: PointUnit, matrix: Matrix) -> PointI:
         ix = matrix.index_X(point[0])
         iy = matrix.index_Y(point[1])
+        #ix = extrapolate_index(matrix.X)(point[0])
+        #iy = extrapolate_index(matrix.Y)(point[1])
         return ix, iy
 
     @staticmethod
@@ -58,65 +64,146 @@ class Geometry(ABC):
 class Line(Geometry):
     def __init__(self, *, p1: PointUnit | None = None,
                  p2: PointUnit | None = None,
-                 slope: float | None = None):
+                 slope: float | None = None,
+                 intercept: float | None = None):
         super().__init__()
         self.p1 = p1
         self.p2 = p2
         self.slope = slope
-
-    def resolve_self(self, matrix: Matrix) -> (PointI, PointI):
-        p1: Point | None = Geometry.maybe_resolve(self.p1, matrix)
-        p2: Point | None = Geometry.maybe_resolve(self.p2, matrix)
-        slope = self.slope
-        # Correct for binning
-        if slope is not None:
-            slope *= matrix.dY[0] / matrix.dX[0]
-        print(p1, p2)
-        p: Points = refine_points(p1, p2, slope)
-        print(p)
-        return p
+        self.intercept = intercept
 
     def above(self, matrix: Matrix) -> ArrayBool:
-        p1, p2 = self.resolve_self(matrix)
-        mask = line_mask(matrix, p1, p2)
-        return mask
+        return self.line_mask(matrix, 'above')
 
-    def at(self, matrix: Matrix) -> ArrayBool:
-        p1, p2 = self.resolve_self(matrix)
-        mask = line_mask(matrix, p1, p2, 'at')
-        return mask
+    def at(self, matrix: Matrix, tol=1e-2) -> ArrayBool:
+        return self.line_mask(matrix, 'at', tol)
 
     def below(self, matrix: Matrix) -> ArrayBool:
-        p1, p2 = self.resolve_self(matrix)
-        mask = line_mask(matrix, p1, p2, 'below')
-        return mask
+        return self.line_mask(matrix, 'below')
 
-    def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
-        mask = self.at(matrix)
+    def draw_mask(self, matrix: Matrix, ax: Axes, **kwargs) -> Axes:
+        mask = self.at(matrix, tol=kwargs.pop('tol', 40))
         X, Y = matrix._plot_mesh()
         # Ugly hack to plot mask
         masked = np.ma.array(mask, mask=~mask)
-        palette = plt.cm.gray.with_extremes(over=color)
+        palette = plt.cm.gray.with_extremes(over=kwargs.pop('color', 'r'))
         ax.pcolormesh(Y, X, masked, cmap=palette,
                       norm=colors.Normalize(vmin=-1.0, vmax=0.5))
         return ax
 
-    def parallel_shift(self, delta: Unitlike) -> Line:
-        p1_ = from_unit(self.p1, 'keV')
-        p2_ = from_unit(self.p2, 'keV')
-        d = from_unit(delta, 'keV')
-        p1, p2 = refine_points(p1_, p2_, self.slope)
-        p1 = np.array(p1)
-        p2 = np.array(p2)
-        # Normal to the line
-        n = (p2 - p1) / np.linalg.norm(p2 - p1)
-        # 90 degrees to the line
-        v = np.array([-n[1], n[0]])
-        # Shift the line by thickness
-        p3 = p1 + v * d
-        p4 = p2 + v * d
-        return Line(p1=p3, p2=p4)
+    def draw(self, matrix: Matrix, ax: Axes, **kwargs) -> Axes:
+        slope, intercept = get_line_parameters(p0=self.p1, p1=self.p2,
+                                               slope=self.slope, intercept=self.intercept)
+        line = slope * matrix.Y + intercept
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        ax.plot(matrix.Y, line, **kwargs)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        return ax
 
+    def parallel_shift(self, delta: Unitlike) -> Line:
+        p1, p2 = parallel_shift(delta, self.p1, self.p2, self.slope, self.intercept)
+        return Line(p1=p1, p2=p2)
+
+    def line_mask(self, matrix: Matrix,
+                  where: str = 'above',
+                  tol: float = 1e-2) -> ArrayBool:
+        """Create a mask for above (True) and below (False) a line
+
+        Args:
+
+        Returns:
+            The boolean array with counts below the line set to False
+
+        NOTE:
+            This method and Jørgen's original method give 2 pixels difference
+            Probably because of how the interpolated line is drawn
+        """    
+        # Create meshgrid for X and Y
+        X_grid, Y_grid = np.meshgrid(matrix.Y, matrix.X)
+
+        # Calculate the slope and intercept of the line
+        
+        slope, intercept = get_line_parameters(p0=self.p1, p1=self.p2,
+                                               slope=self.slope, intercept=self.intercept)
+
+        # Calculate the line passing through the points
+        line = X_grid * slope + intercept
+
+        match where:
+            case 'above':
+                mask = Y_grid > line
+            case 'below':
+                mask = Y_grid < line
+            case 'at':
+                mask = np.abs(Y_grid - line) < tol
+            case _:
+                raise ValueError("'where' must be 'above', 'below' or 'at'")
+        return mask
+
+def get_line_parameters(p0: None | Point = None,
+                        p1: None | Point = None, 
+                        slope: float | Point = None, 
+                        intercept: float | None = None) -> tuple[float, float]:
+    if (p0 is not None) and (p1 is not None):
+        # Calculate the slope and intercept using the two points
+        slope = (p1[1] - p0[1]) / (p1[0] - p0[0])
+        intercept = p0[1] - slope * p0[0]
+    elif (slope is not None) and (intercept is not None):
+        # Both slope and intercept are given, no need to calculate anything
+        pass
+    elif (p0 is not None) and (slope is not None):
+        # Calculate the intercept using the point and slope
+        intercept = p0[1] - slope * p0[0]
+    elif (p0 is not None) and (intercept is not None):
+        # Calculate the slope using the point and intercept
+        slope = (p0[1] - intercept) / p0[0]
+    else:
+        raise ValueError("Insufficient information to define a line.")
+    assert slope is not None
+    assert intercept is not None
+
+    return slope, intercept
+
+def parallel_shift(delta: float,
+                   p0: Point | None = None,
+                   p1: Point | None = None,
+                   slope: float | None = None, intercept: float | None = None) -> Points:
+    """
+    Shifts a line defined by two points or slope and intercept, in parallel by a distance delta.
+
+    :param p0: The first point on the line, as a tuple of (x, y) coordinates.
+    :param p1: The second point on the line, as a tuple of (x, y) coordinates.
+    :param slope: The slope of the line.
+    :param intercept: The intercept of the line.
+    :param delta: The distance to parallel shift the line.
+    :return: Two new points (p3, p4) that define the shifted line.
+    """
+    # Get the slope and intercept of the line
+    slope, intercept = get_line_parameters(p0, p1, slope, intercept)
+
+    if p0 is None:
+        # Use an arbitrary point on the line if p0 is not provided
+        p0 = (0, intercept)
+
+    if p1 is None:
+        # Use another arbitrary point on the line if p1 is not provided
+        p1 = (1, slope + intercept)
+
+    p0, p1 = np.array(p0), np.array(p1)
+
+    # Normal to the line
+    n = (p1 - p0) / np.linalg.norm(p1 - p0)
+
+    # 90 degrees to the line
+    v = np.array([-n[1], n[0]])
+
+    # Shift the line by delta
+    p3 = p0 + v * delta
+    p4 = p1 + v * delta
+
+    return p3, p4
 
 class ThickLine(Geometry):
     def __init__(self, line: Line, thickness: Unitlike):
@@ -130,81 +217,12 @@ class ThickLine(Geometry):
         mask = self.upper.above(matrix) & self.lower.below(matrix)
         return mask
 
-    def draw(self, matrix: Matrix, ax: Axes, color='r') -> Axes:
-        self.line.draw(matrix, ax, color)
-        self.upper.draw(matrix, ax, color='y')
-        return self.lower.draw(matrix, ax, color='y')
+    def draw(self, matrix: Matrix, ax: Axes, **kwargs) -> Axes:
+        kw = {'color': 'r'} | kwargs
+        self.line.draw(matrix, ax, **kw)
+        self.upper.draw(matrix, ax, ls='--', **kw)
+        return self.lower.draw(matrix, ax, ls='--', **kw)
 
-
-
-def line_mask(matrix: Matrix, p1: PointI, p2: PointI,
-              where: str = 'above') -> ArrayBool:
-    """Create a mask for above (True) and below (False) a line
-
-    Args:
-
-    Returns:
-        The boolean array with counts below the line set to False
-
-    NOTE:
-        This method and Jørgen's original method give 2 pixels difference
-        Probably because of how the interpolated line is drawn
-    """
-    Ix = p1[0], p2[0]
-    Iy = p1[1], p2[1]
-
-    # Interpolate between the two points
-    assert(Ix[1] != Ix[0])
-    a = (Iy[1]-Iy[0])/(Ix[1]-Ix[0])
-    b = Iy[0] - a*Ix[0]
-    line = lambda x: a*x + b  # NOQA E731
-
-    # Mask all indices below this line to 0
-    X = np.arange(matrix.shape[1])
-    Y = np.arange(matrix.shape[0])
-    i_mesh, j_mesh = np.meshgrid(X, Y)
-    match where:
-        case 'above':
-            mask = j_mesh > line(i_mesh)
-        case 'below':
-            mask = j_mesh < line(i_mesh)
-        case 'at':
-            mask = (j_mesh >= line(i_mesh)) & (j_mesh <= line(i_mesh)+1)
-        case _:
-            raise ValueError("'where' must be 'above', 'below' or 'at'")
-    return mask
-
-
-def refine_points(p1: Point | None = None, p2: Point | None = None,
-                    slope: float | None = None) -> Points:
-    if p1 is None and p2 is None:
-        raise ValueError("Must provide at least 1 point")
-    if p1 is not None and p2 is not None:
-        return sort_points(p1, p2)
-    if slope is None:
-        raise ValueError("Provide both 1 point and a slope")
-
-    p = p1 if p2 is None else p2
-    assert p is not None
-
-    return points_from_partial(slope, p)
-
-def sort_points(p1: Point, p2: Point) -> Points:
-    if p1[0] < p2[0]:
-        return p1, p2
-    if p1[0] > p2[0]:
-        return p2, p1
-    if p1[1] < p2[1]:
-        return p1, p2
-    return p2, p1
-
-def points_from_partial(slope: float, point: Point) -> Points:
-    X, Y = point
-    intercept = X - slope*Y
-    #print(f"X: {X}, Y: {Y}, slope: {slope}, intercept: {intercept}")
-    return points_from_ab(intercept, slope)
-
-def points_from_ab(intercept: float, slope: float) -> Points:
-    X0, X1 = 0.0, 5000.0
-    Y0, Y1 = intercept, slope*X1 + intercept
-    return ((X0, Y0), (X1, Y1))
+    def within(self, matrix: Matrix) -> ArrayBool:
+        mask = self.upper.above(matrix) & self.lower.below(matrix)
+        return mask
