@@ -212,7 +212,7 @@ class NormalizerNLD(AbstractNormalizer):
         # Use DE to get an inital guess before optimizing
         args, guess = self.initial_guess(limit_low, limit_high)
         # Optimize using multinest
-        popt, samples = self.optimize(num, args, guess)
+        popt, samples, evidence = self.optimize(num, args, guess)
 
         transformed = nld.transform(popt['A'][0], popt['alpha'][0],
                                     inplace=False)
@@ -223,6 +223,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.res.nld = transformed
         self.res.pars = popt
         self.res.samples = samples
+        self.res.evidence = evidence
         ext_model = lambda E: self.model(E, T=popt['T'][0],
                                          Eshift=popt['Eshift'][0])
         self.res.nld_model = ext_model
@@ -377,6 +378,7 @@ class NormalizerNLD(AbstractNormalizer):
                                         outputfiles_basename=str(path))
 
         stats = analyzer.get_stats()
+        evidence = (stats['global evidence'], stats['global evidence error'])
 
         samples = analyzer.get_equal_weighted_posterior()[:, :-1]
         samples = dict(zip(names, samples.T))
@@ -397,7 +399,7 @@ class NormalizerNLD(AbstractNormalizer):
         self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
-        return popt, samples
+        return popt, samples, evidence
 
     def plot(self, *, ax: Any = None,
              add_label: bool = True,

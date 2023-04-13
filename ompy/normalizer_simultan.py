@@ -155,10 +155,11 @@ class NormalizerSimultan(AbstractNormalizer):
         # Use DE to get an inital guess before optimizing
         args_nld, guess = self.initial_guess()
         # Optimize using multinest
-        popt, samples = self.optimize(num, args_nld, guess)
+        popt, samples, evidence = self.optimize(num, args_nld, guess)
 
         self.res.pars = popt
         self.res.samples = samples
+        self.res.evidence = evidence
 
         # reset
         if self.std_fake_nld is True:
@@ -318,6 +319,7 @@ class NormalizerSimultan(AbstractNormalizer):
                                         outputfiles_basename=str(path))
 
         stats = analyzer.get_stats()
+        evidence = (stats['global evidence'], stats['global evidence error'])
 
         samples = analyzer.get_equal_weighted_posterior()[:, :-1]
         samples = dict(zip(names, samples.T))
@@ -342,7 +344,7 @@ class NormalizerSimultan(AbstractNormalizer):
         # reset state
         self.normalizer_gsf.norm_pars = norm_pars_org
 
-        return popt, samples
+        return popt, samples, evidence
 
     def lnlike(self, x: Tuple[float, float, float, float, float],
                args_nld: Iterable) -> float:
