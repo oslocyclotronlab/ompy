@@ -6,6 +6,7 @@ Added:
 - `fill` attribute for `Matrix`, to easily fill counts in a given bin containing (Ex, Eg).
 - When saving and loading `Vector` from `csv` files one can now pass keyword arguments to the pandas `read_csv()` and `to_csv()` functions.
 - Added a keyword (`units`) to select the energy units when saving a `Vector` to file.
+- Added a new module, `ompy.rhosigchi` which contains a C++ implementation of the iterative method used in rhosigchi. Rest of the functionality required for `ompy` to use the `rhosigchi` algorithm is implemented in `pyrhosigchi`. The user can choose to what algorithm to use in `Extractor` with the `algorithm` argument when calling the `Extractor.extract_from()` method.
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.

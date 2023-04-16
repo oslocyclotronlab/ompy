@@ -165,7 +165,12 @@ ext_modules = [
 ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
                           ["ompy/stats/stats.cpp"],
-                          extra_compile_args=["-std=c++11", "-O3"])
+                          cxx_std=20,
+                          extra_compile_args=["-O3"]),
+        Pybind11Extension("ompy.rhosigchi",
+                          ["ompy/rhosigchi.cpp"],
+                          cxx_std=20,
+                          extra_compile_args=["-O3"]),
 ]
 
 install_requires = [
