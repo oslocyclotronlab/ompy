@@ -180,7 +180,7 @@ class SpinFunctions:
         sigma2_Sn = self.gEB05(mass, NLDa, Eshift, Ex=Sn)
         sigma2_EB05 = lambda Ex: self.gEB05(mass, NLDa, Eshift, Ex=Ex)  # noqa
         x = [sigma2_disc[0], Sn]
-        y = [sigma2_disc[1], sigma2_EB05(Sn)]
+        y = [sigma2_disc[1], float(sigma2_EB05(Sn))]
         sigma2 = interp1d(x, y,
                           bounds_error=False,
                           fill_value=(sigma2_disc[1], sigma2_Sn))

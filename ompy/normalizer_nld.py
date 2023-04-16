@@ -3,7 +3,7 @@ import copy
 import logging
 import termtables as tt
 import json
-import pymultinest
+import ultranest
 import matplotlib.pyplot as plt
 import warnings
 from contextlib import redirect_stdout
@@ -12,7 +12,7 @@ from scipy.optimize import differential_evolution
 from typing import Optional, Tuple, Any, Union, Callable, Dict
 from pathlib import Path
 
-from .stats import truncnorm_ppf
+from .stats import truncnorm_ppf, truncnorm_ppf_vec
 from .vector import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
@@ -118,8 +118,9 @@ class NormalizerNLD(AbstractNormalizer):
         self.model: Optional[Callable[..., ndarray]] = self.const_temperature
         # self.curried_model = lambda *arg: None
         self.de_kwargs = {"seed": 65424}
-        self.multinest_path = Path('multinest')
-        self.multinest_kwargs: dict = {"seed": 65498, "resume": False}
+        self.ultranest_path: Optional[Path] = Path('ultranest')
+        self.ultranest_kwargs: dict = \
+            {'region_class': ultranest.mlfriends.MLFriends}
 
         # Handle the method parameters
         self.smooth_levels_fwhm = 0.1
@@ -287,7 +288,8 @@ class NormalizerNLD(AbstractNormalizer):
         return args, p0
 
     def optimize(self, num: int, args,
-                 guess: Dict[str, float]) -> Tuple[Dict[str, float], Dict[str, float]]:
+                 guess: Dict[str, float]) -> Tuple[Dict[str, float],
+                                                   Dict[str, float]]:
         """Find parameters given model constraints and an initial guess
 
         Employs Multinest
@@ -336,10 +338,11 @@ class NormalizerNLD(AbstractNormalizer):
         a_Eshift = (lower_Eshift - mu_Eshift) / sigma_Eshift
         b_Eshift = (upper_Eshift - mu_Eshift) / sigma_Eshift
 
-        def prior(cube, ndim, nparams):
+        def prior(cube):
+            cube = cube.copy().T
             # NOTE: You may want to adjust this for your case!
             # truncated normal prior
-            cube[0] = truncnorm_ppf(cube[0], a_A, b_A)*sigma_A+mu_A
+            cube[0] = truncnorm_ppf_vec(cube[0], a_A, b_A)*sigma_A+mu_A
             # log-uniform prior
             # if alpha = 1e2, it's between 1e1 and 1e3
             cube[1] = 10**(cube[1]*2 + (alpha_exponent-1))
@@ -347,44 +350,47 @@ class NormalizerNLD(AbstractNormalizer):
             # if T = 1e2, it's between 1e1 and 1e3
             cube[2] = 10**(cube[2]*2 + (T_exponent-1))
             # truncated normal prior
-            cube[3] = truncnorm_ppf(cube[3], a_Eshift,
-                                    b_Eshift)*sigma_Eshift + mu_Eshift
+            cube[3] = truncnorm_ppf_vec(cube[3], a_Eshift,
+                                        b_Eshift)*sigma_Eshift + mu_Eshift
 
-            if np.isinf(cube[3]):
+            if np.any(np.isinf(cube[3])):
                 self.LOG.debug("Encountered inf in cube[3]:\n%s", cube[3])
+            return cube.T
 
-        def loglike(cube, ndim, nparams):
+        def loglike(cube):
             return self.lnlike(cube, *args)
 
-        self.multinest_path.mkdir(exist_ok=True)
-        path = self.multinest_path / f"nld_norm_{num}_"
+        self.ultranest_path.mkdir(exist_ok=True)
+        path = self.ultranest_path / f"nld_norm_{num}"
         assert len(str(path)) < 60, "Total path length too long for multinest"
 
-        self.LOG.info("Starting multinest")
-        self.LOG.debug("with following keywords %s:", self.multinest_kwargs)
-        #  Hack where stdout from Multinest is redirected as info messages
-        self.LOG.write = lambda msg: (self.LOG.info(msg) if msg != '\n'
-                                      else None)
-        with redirect_stdout(self.LOG):
-            pymultinest.run(loglike, prior, len(guess),
-                            outputfiles_basename=str(path),
-                            **self.multinest_kwargs)
-
-        # Save parameters for analyzer
         names = list(guess.keys())
-        json.dump(names, open(str(path) + 'params.json', 'w'))
-        analyzer = pymultinest.Analyzer(len(guess),
-                                        outputfiles_basename=str(path))
 
-        stats = analyzer.get_stats()
+        self.LOG.info("Starting Ultranest")
+        self.LOG.debug("with following keywords %s:", self.ultranest_kwargs)
+        sampler = ultranest.ReactiveNestedSampler(names, loglike,
+                                                  transform=prior,
+                                                  log_dir=path,
+                                                  vectorized=True,
+                                                  resume="overwrite",
+                                                  storage_backend="csv")
 
-        samples = analyzer.get_equal_weighted_posterior()[:, :-1]
+        result = sampler.run(**self.ultranest_kwargs)
+
+        stats = []
+        for i in range(len(result['posterior']['mean'])):
+            stats.append({'mean': result['posterior']['mean'][i],
+                          'median': result['posterior']['median'][i],
+                          '1sigma': (result['posterior']['errlo'][i],
+                                     result['posterior']['errup'][i])})
+
+        samples = result['samples']
         samples = dict(zip(names, samples.T))
 
         # Format the output
         popt = dict()
         vals = []
-        for name, m in zip(names, stats['marginals']):
+        for name, m in zip(names, stats):
             lo, hi = m['1sigma']
             med = m['median']
             sigma = (hi - lo) / 2
@@ -394,7 +400,7 @@ class NormalizerNLD(AbstractNormalizer):
             fmts = '\t'.join([fmt + " ± " + fmt])
             vals.append(fmts % (med, sigma))
 
-        self.LOG.info("Multinest results:\n%s", tt.to_string([vals],
+        self.LOG.info("Ultranest results:\n%s", tt.to_string([vals],
                       header=['A', 'α [MeV⁻¹]', 'T [MeV]', 'Eshift [MeV]']))
 
         return popt, samples
@@ -482,10 +488,10 @@ class NormalizerNLD(AbstractNormalizer):
         return fig, ax
 
     @staticmethod
-    def lnlike(x: Tuple[float, float, float, float], nld_low: Vector,
+    def lnlike(x: ndarray, nld_low: Vector,
                nld_high: Vector, discrete: Vector,
-               model: Callable[..., ndarray],
-               Sn, nldSn) -> float:
+               model: Callable[..., ndarray], Sn: float,
+               nldSn: float) -> Union[float, ndarray]:
         """ Compute log likelihood of the normalization fitting
 
         This is the result up a, which is irrelevant for the maximization
@@ -503,23 +509,35 @@ class NormalizerNLD(AbstractNormalizer):
 
         Returns:
             lnlike: log likelihood
-        """
-        A, alpha, T, Eshift = x[:4]  # slicing needed for multinest?
-        transformed_low = nld_low.transform(A, alpha, inplace=False)
-        transformed_high = nld_high.transform(A, alpha, inplace=False)
 
-        err_low = transformed_low.error(discrete)
-        expected = Vector(E=transformed_high.E,
-                          values=model(E=transformed_high.E,
-                                       T=T, Eshift=Eshift))
-        err_high = transformed_high.error(expected)
+        TODO: The changes from the previous version is significantly quicker
+        and can take arbitrary sized parameters, given that the second
+        axis of x has size 4. However, the code is more complex than the
+        original code, and might not be as easy to read. One might consider
+        improving the readability. Question is if that might affect the
+        performance.
+        """
+
+        A, alpha, T, Eshift = x.T
+
+        transformed_low = A*nld_low.values[np.newaxis].T * \
+            np.exp(alpha*nld_low.E[np.newaxis].T)
+        std_low = A*nld_low.std[np.newaxis].T * \
+            np.exp(alpha*nld_low.E[np.newaxis].T)
+        err_low = np.sum(((transformed_low.T - discrete.values)/std_low.T)**2,
+                         axis=1)
+
+        transformed_high = A*nld_high.values[np.newaxis].T * \
+            np.exp(alpha*nld_high.E[np.newaxis].T)
+        std_high = A*nld_high.std[np.newaxis].T * \
+            np.exp(alpha*nld_high.E[np.newaxis].T)
+        expected = model(E=nld_high.E[np.newaxis].T, T=T, Eshift=Eshift)
+        err_high = np.sum(((transformed_high - expected)/std_high)**2, axis=0)
 
         nldSn_model = model(E=Sn, T=T, Eshift=Eshift)
         err_nldSn = ((nldSn[0] - nldSn_model)/nldSn[1])**2
 
-        ln_stds = (np.log(transformed_low.std).sum()
-                   + np.log(transformed_high.std).sum())
-
+        ln_stds = np.log(std_low).sum(axis=0) + np.log(std_high).sum(axis=0)
         return -0.5*(err_low + err_high + err_nldSn + ln_stds)
 
     @staticmethod
