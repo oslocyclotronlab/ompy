@@ -1,12 +1,13 @@
 import os
 from typing import Tuple, List
-from .matrix import Matrix
+from ..matrix import Matrix
 import numpy as np
 
-EXAMPLES = {'dy164': {'raw': "../../example_data/Dy164_raw.m",
+
+EXAMPLES = {'dy164': {'raw': "../Dy164_raw.m",
                       # 'response': "../../data/Dy164_response_matrix.m"
                       },
-            'si28': {'raw': "../../example_data/Si28_raw_matrix_compressed.m"}
+            'si28': {'raw': "../Si28_raw_matrix_compressed.m"}
             }
 DATAPATH = os.path.abspath(__file__)
 

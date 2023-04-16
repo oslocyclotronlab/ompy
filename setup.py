@@ -10,6 +10,11 @@ from ctypes.util import find_library
 from pybind11.setup_helpers import Pybind11Extension
 
 try:
+    import wheel.bdist_wheel
+except ImportError:
+    wheel = None
+
+try:
     from Cython.Build import cythonize
     from Cython.Distutils import build_ext
 except ImportError:
@@ -108,10 +113,15 @@ git_revision = '%(git_revision)s'
                        'git_revision': GIT_REVISION})
     finally:
         a.close()
-write_version_py()
+try:
+    write_version_py()
+except:
+    pass
 
 # If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
 openmp = os.getenv("ompy_OpenMP")
+if wheel is not None:  # We do not build with OpenMP if wheel
+    openmp = False
 if openmp is None and platform.system() == 'Darwin':  # Check if macOS
     if find_library("omp") != None:
         openmp = True
@@ -131,7 +141,7 @@ fname = "ompy/decomposition.c"  # otherwise it may not recompile
 if os.path.exists(fname):
     os.remove(fname)
 
-extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
+extra_compile_args = ["-O3"]
 extra_link_args = []
 if openmp and platform.system() == 'Darwin':
     extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
@@ -144,8 +154,8 @@ ext_modules = [
         Extension("ompy.decomposition",
                   ["ompy/decomposition.pyx"],
                   # on MacOS the clang compiler pretends not to support OpenMP, but in fact it does so
-                  extra_compile_args=extra_compile_args,
-                  extra_link_args=extra_link_args,
+                  #extra_compile_args=extra_compile_args,
+                  #extra_link_args=extra_link_args,
                   include_dirs=[numpy.get_include()]
                   ),
         Extension("ompy.rebin", ["ompy/rebin.pyx"], include_dirs=[numpy.get_include()]),
@@ -154,7 +164,7 @@ ext_modules = [
 
 ext_modules_pybind11 = [
         Pybind11Extension("ompy.stats",
-                          ["src/stats.cpp"],
+                          ["ompy/stats/stats.cpp"],
                           cxx_std=20,
                           extra_compile_args=["-O3"]),
         Pybind11Extension("ompy.rhosigchi",
@@ -177,20 +187,42 @@ install_requires = [
  "pybind11>=2.6.0"
 ]
 
-setup(name='OMpy',
-      version=get_version_info()[0],
+def read_version():
+    try:
+        with open("ompy/version_setup.py") as f:
+            ns = {}
+            exec(f.read(), ns)
+            version = ns["full_version"]
+        return version
+    except FileNotFoundError:
+        return VERSION
+
+try:
+    version = get_version_info()[0]
+except:
+    version = read_version()
+
+
+setup(name='ompy',
+      version=version,
       author="Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima",
       author_email=("jorgenem@gmail.com, "
                     "fabio.zeiser@fys.uio.no, "
                     "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
-      packages=find_packages(),
+      python_requires=">= 3.8",
+      packages=['ompy', 'ompy.examples', 'ompy.stats', 'ompy.introspection'],
+      package_data={
+          "ompy": ["decomposition.pyx", "rebin.pyx", "gauss_smoothing.pyx"],
+          "ompy.stats": ['*.hpp'],
+          "ompy.examples": ['*.m']
+      },
       ext_modules=cythonize(ext_modules,
                             compiler_directives={'language_level': "3",
                                                  'embedsignature': True},
                             compile_time_env={"OPENMP": openmp}
                             )+ext_modules_pybind11,
       zip_safe=False,
-      install_requires=install_requires
+      setup_requires=["cython", "numpy>=1.20.0", "pybind11>=2.6.0"]
       )
 

@@ -1,0 +1,9 @@
+include LICENSE.md
+include README.md
+include ompy/decomposition.pyx
+include ompy/rebin.pyx
+include ompy/gauss_smoothing.pyx
+include ompy/stats/stats.cpp
+include ompy/stats/erfinv.hpp
+include ompy/examples/Dy164_raw.m
+include ompy/examples/Si28_raw_matrix_compressed.m

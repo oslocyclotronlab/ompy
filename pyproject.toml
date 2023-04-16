@@ -1,8 +1,71 @@
 [build-system]
-requires = [
-"setuptools",
-"numpy>=1.20.0",
-"cython",
-"pybind11>=2.6.0",
-"wheel"]
+requires = ["setuptools", "numpy>=1.20.0", "cython", "pybind11>=2.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "OMpy"
+version = "1.1.0"
+authors = [
+    {name="Jørgen Eriksson Midtbø", email="jorgenem@gmail.com"},
+    {name="Fabio Zeiser", email="fabio.zeiser@fys.uio.no"},
+    {name="Erlend Lima", email="erlenlim@fys.uio.no"}
+]
+maintainers = [
+    {name="Erlend Lima", email="erlenlim@fys.uio.no"},
+    {name="Vetle Wegner Ingeberg", email="vetlewi@fys.uio.no"}
+]
+
+dependencies = [
+"cython", "numpy>=1.20.0", "pandas", "matplotlib", "termtables",
+"pymultinest", "scipy", "uncertainties>=3.0.3", "tqdm", "pathos", "pybind11>=2.6.0"]
+
+description = "A python implementation of the Oslo method"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    ]
+
+[project.urls]
+"Homepage" = "https://github.com/oslocyclotronlab/ompy"
+"Bug Tracker" = "https://github.com/oslocyclotronlab/ompy/issues"
+
+[tool.cibuildwheel]
+build = ["cp310-manylinux_x86_64",
+         "cp311-manylinux_x86_64",
+         "cp310-macosx_x86_64",
+         "cp311-macosx_x86_64",
+         "cp310-macosx_arm64",
+         "cp311-macosx_arm64"]
+         
+skip = ["cp36-*", "cp37-*", "cp38-*", "cp39-*", "*-musllinux-*", "pp*"]
+test-requires = "pytest"
+test-command = "pytest {project}/tests"
+test-skip = ["*-macosx_arm64, *-macosx_universal2:arm64", "*-*linux_{aarch64,ppc64le,s390x}"]
+
+[tool.cibuildwheel.macos]
+before-all = [
+    "git clone https://github.com/JohannesBuchner/MultiNest",
+    "cd MultiNest/build",
+    "cmake ..",
+    "make"
+]
+environment = {LD_LIBRARY_PATH="/home/runner/work/ompy/ompy/MultiNest/lib", MACOSX_DEPLOYMENT_TARGET="10.14", FC="/usr/local/bin/gfortran-11"}
+
+[tool.cibuildwheel.linux]
+before-all = [
+    "yum -y install blas-devel lapack-devel",
+    "git clone https://github.com/JohannesBuchner/MultiNest",
+    "cd MultiNest/build",
+    "cmake ..",
+    "make install"
+]
+environment = {LD_LIBRARY_PATH="/usr/local/lib"}
