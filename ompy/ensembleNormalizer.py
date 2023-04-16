@@ -120,14 +120,24 @@ class EnsembleNormalizer(AbstractNormalizer):
         gsfs = self.extractor.gsf
         nlds = self.extractor.nld
 
-        self.LOG.info(f"Start normalization with {self.nprocesses} cpus")
-        pool = ProcessPool(nodes=self.nprocesses)
-        N = len(nlds)
-        iterator = pool.imap(self.step, range(N), nlds, gsfs)
-        self.res = list(tqdm(iterator, total=N))
-        pool.close()
-        pool.join()
-        pool.clear()
+        try:
+            self.LOG.info(f"Start normalization with {self.nprocesses} cpus")
+            pool = ProcessPool(nodes=self.nprocesses)
+            N = len(nlds)
+            iterator = pool.imap(self.step, range(N), nlds, gsfs)
+            self.res = list(tqdm(iterator, total=N))
+            pool.close()
+            pool.join()
+            pool.clear()
+        except Exception as e:
+            import traceback
+            self.LOG.error(
+                f"Multiprocessing failed, running with single thread")
+            self.LOG.debug(
+                f"Multiprocessing error:\n{traceback.format_exc()}")
+            self.res = []
+            for i in tqdm(range(len(nlds)), total=len(nlds)):
+                self.res.append(self.step(i, nlds[i], gsfs[i]))
 
         self.save()
 
