@@ -7,16 +7,20 @@ import pandas as pd
 from numpy import ndarray
 from scipy.ndimage import gaussian_filter1d
 from dataclasses import asdict
-from .. import __full_version__
+from .. import __full_version__, H5PY_AVAILABLE
 from .index import Index
 from warnings import warn
+from ..helpers import ensure_path
 
 from ompy.stubs import Pathlike, array
+from numpy.typing import NDArray
 
-Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz']
+Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz', 'hdf5', 'csv', 'npy']
 
+Farray: TypeAlias = NDArray[np.float64]
 
-def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray, ndarray]:
+@ensure_path
+def mama_read(filename: Path) -> tuple[Farray, Farray] | tuple[Farray, Farray, Farray]:
     """Read 1d and 2d mama spectra/matrices
 
     Args:
@@ -77,6 +81,10 @@ def mama_read(filename: str) -> Tuple[ndarray, ndarray] | Tuple[ndarray, ndarray
         y_array = cal["a0y"] + cal["a1y"] * y_array + cal["a2y"] * y_array**2
         # counts, Eg array, Ex array
         return counts, x_array, y_array
+
+    else:
+        raise ValueError("File format must be wrong or not implemented.\n"
+                         "Check calibration line of the Mama file")
 
 
 def mama_write(mat, filename, **kwargs):
@@ -251,14 +259,13 @@ def save_numpy_2D(matrix: np.ndarray, Eg: np.ndarray,
     np.save(path, mat)
 
 
-def load_numpy_2D(path: Union[str, Path]
-                  ) -> (np.ndarray, np.ndarray, np.ndarray):
+def load_numpy_2D(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     mat = np.load(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
 def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
-                Ex: np.ndarray, path: Union[str, Path],
+                Ex: np.ndarray, path: Path,
                 header=None):
     if header is None:
         header = ("Format:\n"
@@ -277,78 +284,54 @@ def save_txt_2D(matrix: np.ndarray, Eg: np.ndarray,
     np.savetxt(path, mat, header=header)
 
 
-def load_txt_2D(path: Pathlike
-                ) -> (np.ndarray, np.ndarray, np.ndarray):
+def load_txt_2D(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     mat = np.loadtxt(path)
     return mat[1:, 1:], mat[0, 1:], mat[1:, 0]
 
 
-def load_numpy_1D(path: Pathlike
-                  ) -> (np.ndarray, np.ndarray, np.ndarray):
+def load_numpy_1D(path: Pathlike) -> tuple[np.ndarray, np.ndarray]:
     vec = np.load(path)
     E = vec[:, 0]
     values = vec[:, 1]
-    std = None
     _, col = vec.shape
     if col >= 3:
-        std = vec[:, 2]
-    return values, E, std
+        raise ValueError(f"The file {path} contains more than 2 columns")
+    return values, E
 
 
 def save_numpy_1D(values: np.ndarray, E: np.ndarray,
-                  std: array | None,
-                  path: Pathlike) -> None:
+                  path: Path) -> None:
     mat = None
-    if std is None:
-        mat = np.column_stack((E, values))
-    else:
-        mat = np.column_stack((E, values, std))
+    mat = np.column_stack((E, values))
     np.save(path, mat)
 
 
 def save_csv_1D(values: np.ndarray, E: np.ndarray,
-                std: Union[np.ndarray, None],
-                path: Union[str, Path]) -> None:
+                path: Path) -> None:
     df = {'E': E, 'values': values}
-    if std is not None:
-        df['std'] = std
     df = pd.DataFrame(df)
     df.to_csv(path, index=False)
 
 
-def load_csv_1D(path: Union[str, Path]) -> Tuple[np.ndarray,
-                                                 np.ndarray,
-                                                 Union[np.ndarray, None]]:
+def load_csv_1D(path: Path) -> tuple[np.ndarray, np.ndarray]:
     df = pd.read_csv(path)
     E = df['E'].to_numpy(copy=True)
     values = df['values'].to_numpy(copy=True)
-    std = None
-    if 'std' in df.columns:
-        std = df['std'].to_numpy(copy=True)
-    return values, E, std
+    return values, E
 
 
-def load_txt_1D(path: Union[str, Path]
-                ) -> (np.ndarray, np.ndarray, Union[np.ndarray, None]):
+def load_txt_1D(path: Path) -> tuple[np.ndarray, np.ndarray]:
     vec = np.loadtxt(path)
     E = vec[:, 0]
     values = vec[:, 1]
-    std = None
-    _, col = vec.shape
-    if col >= 3:
-        std = vec[:, 2]
-    return values, E, std
+    return values, E
 
 
 def save_txt_1D(values: np.ndarray, E: np.ndarray,
-                std: Union[np.ndarray, None],
-                path: Union[str, Path], header='E[keV] values') -> None:
+                path: Path, header='E[keV] values') -> None:
     """ E default in keV """
     mat = None
-    if std is None:
-        mat = np.column_stack((E, values))
-    else:
-        mat = np.column_stack((E, values, std))
+    mat = np.column_stack((E, values))
     np.savetxt(path, mat, header=header)
 
 
@@ -372,7 +355,7 @@ def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
         if version != __full_version__:
             warn(
                 f"Version mismatch when loading {path}: {version} != {__full_version__}")
-    return cls(X=index, values=values, std=std, **meta)
+    return cls(X=index, values=values, **meta)
 
 
 def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
@@ -399,8 +382,37 @@ def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:
         values = data['values']
     return cls(X=X_index, Y=Y_index, values=values, **meta)
 
+if H5PY_AVAILABLE:
+    import h5py
+    def save_hdf5_2D(path: Path, matrix, exist_ok: bool = False) -> None:
+        if not exist_ok and path.exists():
+            raise FileExistsError(f"{path} already exists")
 
-def filetype_from_suffix(path: Path) -> str | None:
+        with h5py.File(path, 'w') as f:
+            f.create_dataset('X index', data=np.array(list(matrix.X_index.to_dict().items())))
+            f.create_dataset('Y index', data=np.array(list(matrix.Y_index.to_dict().items())))
+            f.create_dataset('values', data=matrix.values)
+            for key, value in asdict(matrix.metadata).items():
+                f.attrs[key] = value
+            f.attrs['version'] = __full_version__
+
+    def load_hdf5_2D(path: Path, cls, **kwargs) -> Any:
+        with h5py.File(path, 'r') as f:
+            version = f.attrs['version']
+            if version != __full_version__:
+                print(
+                    f"Version mismatch when loading {path}: {version} != {__full_version__}")
+                warn(
+                    f"Version mismatch when loading {path}: {version} != {__full_version__}")
+            meta = {key: f.attrs[key] for key in f.attrs.keys() if key != 'version'}
+            X_index = Index.from_dict(dict(f['X index']))
+            Y_index = Index.from_dict(dict(f['Y index']))
+            values = np.array(f['values'])
+        return cls(X=X_index, Y=Y_index, values=values, **meta)
+
+
+
+def filetype_from_suffix(path: Path) -> Filetype | None:
     suffix = path.suffix
     match suffix:
         case '.npy':
@@ -415,6 +427,8 @@ def filetype_from_suffix(path: Path) -> str | None:
             return 'mama'
         case '.npz':
             return 'npz'
+        case '.h5':
+            return 'hdf5'
         case '':
             return ''
         case _:
@@ -438,38 +452,3 @@ def resolve_filetype(path: Path, filetype: str | None) -> tuple[Path, Filetype]:
     if filetype == 'npz' and not path.suffix:
         path = path.with_suffix('.npz')
     return path, filetype
-
-
-def load_discrete(path: Union[str, Path], energy: ndarray,
-                  resolution: float = 0.1) -> (ndarray, ndarray):
-    """Load discrete levels and apply smoothing
-
-    Assumes linear equdistant binning
-
-    Args:
-        path (Union[str, Path]): The file to load
-        energy (ndarray): The binning to use
-        resolution (float, optional): The resolution (FWHM) to apply to the
-            gaussian smoothing. Defaults to 0.1.
-
-    Returns:
-        (ndarray, ndarray)
-    """
-    energies = np.loadtxt(path)
-    energies /= 1e3  # convert to MeV
-    if len(energies) > 1:
-        assert energies.mean() < 20, "Probably energies are not in keV"
-
-    binsize = energy[1] - energy[0]
-    bin_edges = np.append(energy, energy[-1] + binsize)
-    bin_edges -= binsize / 2
-
-    hist, _ = np.histogram(energies, bins=bin_edges)
-    hist = hist.astype(float) / binsize  # convert to levels/MeV
-
-    if resolution > 0:
-        resolution /= 2.3548
-        smoothed = gaussian_filter1d(hist, sigma=resolution / binsize)
-    else:
-        smoothed = None
-    return hist, smoothed

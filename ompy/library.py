@@ -807,7 +807,3 @@ def diagonal_sum_2(mat: 'Matrix', slope=1, thickness=1):
     return np.array(Ex), summed, average, S
 
 
-def maybe_set(ax: Axes, attr: str, value: Any) -> Any:
-    old = getattr(ax, 'get_' + attr)()
-    if not old:
-        return getattr(ax, 'set_'+attr)(value)

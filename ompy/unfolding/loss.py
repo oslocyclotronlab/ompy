@@ -5,7 +5,8 @@ import numpy as np
 from scipy.signal import savgol_filter
 from typing import TypeAlias
 from .. import Vector, Matrix
-arraylike: TypeAlias = np.ndarray
+from numpy.typing import ArrayLike, NDArray
+arraylike: TypeAlias = NDArray
 array: TypeAlias = np.ndarray
 
 """
@@ -49,6 +50,10 @@ def loglike_bg(nu: array, raw: array, bg: array):
     err_bg = np.maximum(3.0**2, bg)
     return (raw - nu - bg)**2 / (err_fg + err_bg)
 
+@njit((readonly, readonly))
+def kl(nu , n) -> array:
+    return np.where(nu <= 1e-3, 0.0, (nu - n) + n*(np.log(n) - np.log(nu)))
+
 
 LogLikeStr = Literal['ll', 'll2', 'll3', 'mse']
 LogLikeFn = Callable[[array, array], array]
@@ -71,6 +76,8 @@ def get_loglike(name: LogLike) -> LogLikeFn:
             return neglog2
         case 'mse':
             return mse
+        case 'kl':
+            return kl
         case _:
             raise ValueError(f"Loglikelihood {name} not supported")
 
@@ -110,8 +117,8 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
         return name(ll)
 
     X = n.X
-    n = n.values
-    R = R.values
+    n: np.ndarray = n.values
+    R: np.ndarray = R.values
 
     if mask is None:
         mask_ = np.ones_like(n, dtype=bool)
@@ -227,11 +234,33 @@ def loss_factory(name: Loss, R: Matrix, n: Vector,
                 return np.sum(loglikelihood) + alpha*Icost
             return lossfn
 
+        case 'entropy':
+            alpha = kwargs.get('alpha', 1.0)
+            beta = kwargs.get('beta', 1.0)
+            gamma = kwargs.get('gamma', 0.1)
+            eta = kwargs.get('eta', 1.0)
+            dx = X[1] - X[0]
+            if np.any(mask_ == False):
+                raise ValueError("Entropy loss function does not support masking")
+            @njit
+            def lossfn(mu: arraylike) -> float:
+                mu = imapfn(mu)
+                nu = R @ mu
+                #loglikelihood: array = n * np.log(nu) - nu #ll(nu, n)
+                loglikelihood: array = ll(nu, n)
+                entropy = -np.sum(np.where(mu <= 1e-3, 0.0, mu*np.log(mu)))
+                #zerocost = np.sum(np.where(mu < 0, np.abs(mu), 0))
+                derivative: float = np.sum((diff(mu, dx))**2)
+                #Icost = (np.sum(nu) - np.sum(n))**2
+                total: float = np.sum(loglikelihood) + alpha*entropy + beta * derivative
+                return total
+            return lossfn
         case _:
             raise ValueError(f"Loss function {name} is not supported.")
 
 
-def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
+JacobianFunction: TypeAlias = Callable[[np.ndarray], np.ndarray]
+def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn, JacobianFunction]:
     if not isinstance(name, str):
         return name[0], name[1]
     match name:
@@ -245,7 +274,7 @@ def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
                 return np.log(x)*1e2
             return log, exp
         case 'id':
-            return idmap, idmap
+            return idmap, idmap, lambda mu: np.eye(len(mu))
         case 'sqrt':
             @njit
             def sqrt(x):
@@ -254,7 +283,9 @@ def get_transform(name: str | tuple[MapFn, MapFn]) -> tuple[MapFn, MapFn]:
             @njit
             def isqrt(x):
                 return x**2
-            return sqrt, isqrt
+            def jacobian(mu):
+                return np.diag(2*mu)
+            return sqrt, isqrt, jacobian
         case _:
             raise ValueError(f"Transform {name} is not supported.")
 

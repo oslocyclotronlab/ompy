@@ -5,6 +5,10 @@ import numpy as np
 from abc import ABC, abstractmethod
 from .index import Index
 from .. import Unit
+from .abstractarrayprotocol import AbstractArrayProtocol
+from nptyping import NDArray, Shape, Floating
+from typing import Self, Literal
+
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -13,19 +17,49 @@ logging.captureWarnings(True)
 # [ ] __imatmul__
 
 
-class AbstractArray(ABC):
+class AbstractArray(AbstractArrayProtocol, ABC):
     __default_unit: Unit = Unit('keV')
 
     def __init__(self, values: np.ndarray):
-        self.values: np.ndarray = values
+        self.values: NDArray[Shape['*', ...], Floating] = values
+
+    @property
+    def __array_interface__(self):
+        return self.values.__array_interface__
+
+    def __array__(self, dtype=None) -> np.ndarray:
+        return np.asarray(self.values, dtype=dtype)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        # TODO Untested. Might summon demons.
+        cls = type(self)
+        # Replace ArrayWrapper instances with their .values attribute
+        inputs = tuple(i.values if isinstance(i, AbstractArray) else i for i in inputs)
+
+        # Perform the operation on the underlying numpy arrays
+        result = getattr(ufunc, method)(*inputs, **kwargs)
+
+        # Wrap the result back in an ArrayWrapper (or handle other result types as needed)
+        if method == 'at':
+            # In-place method, no return value
+            return None
+        elif isinstance(result, tuple):
+            # Multiple return values
+            return tuple(self.clone(values=x) for x in result)
+        elif method == 'reduceat':
+            # reduceat returns a single array
+            return self.clone(values=result)
+        else:
+            # Standard ufunc, single return value
+            return self.clone(values=result)
 
     @abstractmethod
     def is_compatible_with(self, other: AbstractArray | Index) -> bool: ...
 
     @abstractmethod
-    def clone(self, **kwargs) -> AbstractArray: ...
+    def clone(self, **kwargs) -> Self: ...
 
-    def copy(self, **kwargs) -> AbstractArray:
+    def copy(self, **kwargs) -> Self:
         return self.clone(copy=True, **kwargs)
 
     def check_or_assert(self, other) -> np.ndarray | float:
@@ -34,107 +68,105 @@ class AbstractArray(ABC):
                 raise ValueError(f"Incompatible shapes. {self.shape} != {other.shape}")
             if not self.is_compatible_with(other):
                 raise ValueError("Incompatible binning.")
-            if self.std is not None or other.std is not None:
-                raise NotImplementedError("Cannot handle arrays with uncertainties")
             other = other.values
         return other
 
-    def __sub__(self, other) -> AbstractArray:
+    def __sub__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values - other)
 
-    def __rsub__(self, other) -> AbstractArray:
+    def __rsub__(self, other) -> Self:
         result = self.clone(values = other - self.values)
         return result
 
-    def __add__(self, other) -> AbstractArray:
+    def __add__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values + other)
 
-    def __radd__(self, other) -> AbstractArray:
+    def __radd__(self, other) -> Self:
         x = self.__add__(other)
         return x
 
-    def __mul__(self, other) -> AbstractArray:
+    def __mul__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values * other)
 
-    def __rmul__(self, other) -> AbstractArray:
+    def __rmul__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = other * self.values)
 
-    def __truediv__(self, other) -> AbstractArray:
+    def __truediv__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values / other)
 
-    def __rtruediv__(self, other) -> AbstractArray:
+    def __rtruediv__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = other / self.values)
 
-    def __pow__(self, val: float) -> AbstractArray:
+    def __pow__(self, val: float) -> Self:
         return self.clone(values = self.values ** val)
 
-    def __iand__(self, other) -> AbstractArray:
+    def __iand__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values &= other
         return self
 
-    def __and__(self, other) -> AbstractArray:
+    def __and__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values & other)
 
-    def __or__(self, other) -> AbstractArray:
+    def __or__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values | other)
 
-    def __ior__(self, other) -> AbstractArray:
+    def __ior__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values |= other
         return self
 
-    def __ixor__(self, other) -> AbstractArray:
+    def __ixor__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values ^= other
         return self
 
-    def __xor__(self, other) -> AbstractArray:
+    def __xor__(self, other: AbstractArrayProtocol | np.ndarray) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values ^ other)
 
-    def __lshift__(self, other) -> AbstractArray:
+    def __lshift__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values=self.values << other)
 
-    def __rshift__(self, other) -> AbstractArray:
+    def __rshift__(self, other) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values=self.values >> other)
 
-    def __ilshift__(self, other) -> AbstractArray:
+    def __ilshift__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values <<= other
         return self
 
-    def __irshift__(self, other) -> AbstractArray:
+    def __irshift__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values >>= other
         return self
 
-    def __iadd__(self, other) -> AbstractArray:
+    def __iadd__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values += other
         return self
 
-    def __isub__(self, other) -> AbstractArray:
+    def __isub__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values -= other
         return self
 
-    def __imul__(self, other) -> AbstractArray:
+    def __imul__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values *= other
         return self
 
-    def __itruediv__(self, other) -> AbstractArray:
+    def __itruediv__(self, other) -> Self:
         other = self.check_or_assert(other)
         self.values /= other
         return self
@@ -207,7 +239,7 @@ class AbstractArray(ABC):
     def name(self, name: str):
         self.metadata = self.metadata.update(name=name)
 
-def to_plot_axis(axis: int | str) -> int:
+def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
     Args:

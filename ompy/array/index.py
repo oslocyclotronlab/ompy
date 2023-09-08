@@ -3,19 +3,27 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from itertools import groupby
-from typing import TypeAlias, Literal, Type, overload, Any
+from typing import NotRequired, TypeAlias, Literal, Type, overload, TypeVar 
 from warnings import warn
+from typing_extensions import TypedDict
 
 import numpy as np
 
-from .index_fn import _index_left, _index_mid_uniform, is_monotone, is_uniform, is_length_congruent
+from .index_fn import _index_left, _index_mid_uniform, is_monotone, is_length_congruent
+from .index_fn import is_uniform as is_uniform_fn
 from .index_fn import _index_mid_nonuniform
 from .rebin import _rebin_uniform_left_left, Preserve
-from .. import float64, Unit, Quantity, DimensionalityError, njit
+from .. import Unit, Quantity, DimensionalityError, njit
 from ..library import only_one_not_none
-from ..stubs import Unitlike
+from ..stubs import Unitlike, arraylike, QuantityLike, array1D
+from typing import Self, TypeGuard, Never
+from typing_extensions import TypedDict
 
 """
+Note: Due to Python's lack of support for static types, the Mixins must
+be typed used a Protocol. This is not ideal, but it is the best we can do.
+The code gets a bit messy.
+
 TODO Mixin architecture is not quite right. Read up.
 -[ ] Implement binary search
 -[x] Implement conversion methods
@@ -47,12 +55,14 @@ represents the leftmost edge, not leftmost bin.
 """
 
 Direction: TypeAlias = Literal['left', 'right', 'auto']
+DirectionLR: TypeAlias = Literal['left', 'right']
 Edges: TypeAlias = Literal['left', 'mid']
+
 
 
 @dataclass(frozen=True, slots=True)
 class Calibration:
-    coefficients: np.ndarray
+    coefficients: array1D
 
     def __post_init__(self):
         if len(self.coefficients) < 2:
@@ -118,7 +128,7 @@ class Calibration:
         return Calibration(np.array([index[0], index.step]))
 
     @classmethod
-    def from_dict(cls, d: dict) -> Calibration:
+    def from_dict(cls, d: dict[str, float | int]) -> Calibration:
         if 'start' in d:
             return Calibration(np.array([d['start'], d['step']]))
         if 'a0' in d:
@@ -130,7 +140,7 @@ class Calibration:
             return Calibration(np.array(vals))
         raise ValueError("Invalid dictionary.")
 
-    def linspace(self, n: int, **kwargs) -> np.ndarray:
+    def linspace(self, n: int, **kwargs) -> array1D:
         if self.order != 1:
             raise ValueError("Only linear polynomials supported.")
         return np.linspace(self.start, self.start + self.step * (n - 1), n, **kwargs)
@@ -138,8 +148,14 @@ class Calibration:
     def __len__(self) -> int:
         return len(self.coefficients)
 
-    def __getitem__(self, key: int | slice) -> float:
+    def __getitem__(self, key: int | slice) -> np.number | array1D:
         return self.coefficients[key]
+
+
+class IndexMetaDict(TypedDict):
+    alias: str
+    label: str
+    unit: Unit
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,25 +168,26 @@ class IndexMetadata:
         object.__setattr__(self, 'unit', Unit(self.unit))
 
     def clone(self, alias: str | None = None, label: str | None = None,
-              unit: Unit | None = None) -> IndexMetadata:
+              unit: Unitlike | None = None) -> IndexMetadata:
         alias = alias if alias is not None else self.alias
         label = label if label is not None else self.label
-        unit = unit if unit is not None else self.unit
+        unit = Unit(unit) if unit is not None else self.unit
         return IndexMetadata(alias, label, unit)
 
     def update(self, **kwargs) -> IndexMetadata:
         return self.clone(**kwargs)
 
-    def to_dict(self) -> dict[str, str | Unit]:
-        return dict(alias=self.alias, label=self.label, unit=self.unit)
+    def to_dict(self) -> IndexMetaDict:
+        return IndexMetaDict(alias=self.alias, label=self.label, unit=self.unit)
 
+TI = TypeVar('TI', bound='Index')
 
 class Index(ABC):
     """ Abstract base class for indexers """
 
-    def __init__(self, bins: np.ndarray, boundary: float,
+    def __init__(self, bins: array1D, boundary: float,
                  metadata: IndexMetadata = IndexMetadata(),
-                 dtype: np.dtype = np.float64, **kwargs):
+                 dtype: type = np.float64, **kwargs):
         if len(bins) <= 0:
             raise ValueError("Bins must have at least one element.")
         if not is_monotone(bins):
@@ -180,20 +197,27 @@ class Index(ABC):
         self.meta = metadata.update(**kwargs)
         self.__content_hash = None
 
-    def rebin(self, other: Index | np.ndarray, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[
-            Index, np.ndarray]:
+    @property
+    @abstractmethod
+    def dX(self) -> float | array1D: ...
+
+    def rebin(self, other: Index | array1D, values: array1D, preserve: Preserve = 'counts') -> tuple[
+            Index, array1D]:
         if not isinstance(other, Index):
-            other = self.from_array(values)
-        if self.leftmost > other.rightmost:
+            other_: Index = self.from_array(values)
+        else:
+            other_: Index = other
+
+        if self.leftmost > other_.rightmost:
             raise ValueError(
-                f"Bins do not overlap. {self.leftmost} < {other.rightmost}")
-        if self.rightmost < other.leftmost:
+                f"Bins do not overlap. {self.leftmost} < {other_.rightmost}")
+        if self.rightmost < other_.leftmost:
             raise ValueError(
-                f"Bins do not overlap. {self.rightmost} > {other.leftmost}")
-        return self._rebin(other, values, preserve=preserve)
+                f"Bins do not overlap. {self.rightmost} > {other_.leftmost}")
+        return self._rebin(other_, values, preserve=preserve)
 
     @abstractmethod
-    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+    def _rebin(self, other: Index, values: array1D, preserve: Preserve = 'counts') -> tuple[Index, array1D]:
         pass
 
     def to_same(self, other: Index) -> Index:
@@ -208,13 +232,13 @@ class Index(ABC):
             return self.to_mid()
         return self.to_left()
 
-    def to_same_unit(self, x: Unitlike) -> float:
-        x = Quantity(x)
-        if not x.dimensionless:
-            x = x.to(self.meta.unit)
-        return x.magnitude
+    def to_same_unit(self, x: QuantityLike) -> float:
+        y: Quantity = Quantity(x)
+        if not y.dimensionless:
+            y = y.to(self.meta.unit)
+        return y.magnitude
 
-    def index(self, x: Unitlike) -> int:
+    def index(self, x: QuantityLike) -> int:
         """ Index of the bin containing x """
         return self._index(self.to_same_unit(x))
 
@@ -223,20 +247,25 @@ class Index(ABC):
         ...
 
     @classmethod
-    def from_extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto',
+    def from_extrapolate(cls: type[Index], bins: array1D, n: int = 1, direction: Direction = 'auto',
                          extrapolate_boundary: bool = True, **kwargs) -> Index:
+        # Note: extrapolate is overloaded. Not all support 'auto'
         bins = cls.extrapolate(bins, n=n, direction=direction)
-        boundary = cls.extrapolate_boundary(
-            bins, extrapolate_boundary=extrapolate_boundary)
+        boundary = cls.extrapolate_boundary(bins)
         return cls(bins, boundary=boundary, **kwargs)
 
     @classmethod
-    def from_array(cls, bins: np.ndarray, extrapolate_boundary: bool = True, **kwargs) -> Index:
+    def from_array(cls, bins: array1D, extrapolate_boundary: bool = True, **kwargs) -> Self:
         if extrapolate_boundary:
             boundary = cls.extrapolate_boundary(bins)
         else:
             boundary, bins = cls.split_bins_boundary(bins)
         return cls(bins, boundary=boundary, **kwargs)
+
+
+    @staticmethod
+    @abstractmethod
+    def split_bins_boundary(bins: array1D) -> tuple[float, array1D]: ...
 
     @overload
     def __getitem__(self, key: int) -> float:
@@ -276,14 +305,17 @@ class Index(ABC):
     def __str__(self) -> str:
         return self.summary() + f'\n{self.bins}'
 
-    def __eq__(self, other) -> bool:
-        return np.allclose(self.bins, other.bins) and np.isclose(self.boundary,
+    def __eq__(self, other: Index) -> bool:
+        good = np.allclose(self.bins, other.bins) and np.isclose(self.boundary,
                                                                  other.boundary) and self.unit == other.unit
+        if good:
+            return True
+        return False
 
-    def update_metadata(self, **kwargs) -> Index:
+    def update_metadata(self, **kwargs) -> Self:
         return self.__class__(self.bins, self.boundary, metadata=self.meta.update(**kwargs))
 
-    def to_unit(self, unit: Unitlike | Index) -> Index:
+    def to_unit(self, unit: Unitlike | Index) -> Self:
         if isinstance(unit, Index):
             unit = unit.unit
         unit = Unit(unit)
@@ -302,16 +334,17 @@ class Index(ABC):
         return self.meta.unit
 
     @overload
-    def index_expression(self, expr: Unitlike | str, strict: bool) -> int:
+    def index_expression(self, expr: QuantityLike | str, strict: bool = True) -> int:
         ...
 
     @overload
-    def index_expression(self, expr: None, strict: bool) -> None:
+    def index_expression(self, expr: None, strict: bool = True) -> None:
         ...
 
-    def index_expression(self, expr: Unitlike | str | None, strict: bool = True) -> int | None:
+    def index_expression(self, expr: QuantityLike | str | None, strict: bool = True) -> int | None:
         if expr is None:
             return None
+        assert expr is not None
         lesser, greater, value = preparse(expr)
         if strict or not isinstance(value, int):
             index = self.index(value)
@@ -342,7 +375,7 @@ class Index(ABC):
         return slice(start, stop)
 
     @classmethod
-    def from_calibration(cls, calibration: Calibration, n: int, **kwargs) -> Index:
+    def from_calibration(cls, calibration: Calibration, n: int, **kwargs) -> Self:
         """ Create an index from a calibration
 
         Args:
@@ -356,21 +389,23 @@ class Index(ABC):
         bins = calibration.linspace(n)
         return cls.from_array(bins, **kwargs)
 
-    def to_dict(self) -> dict[str, any]:
-        return dict(bins=self.bins, boundary=self.boundary, meta=self.meta.to_dict(),
+    def to_dict(self) -> IndexDict:
+        return IndexDict(bins=self.bins, boundary=self.boundary, meta=self.meta.to_dict(),
                     class_name=self.__class__.__name__, length=len(self))
 
     @classmethod
-    def from_dict(cls, d: dict[str, any]) -> Index:
+    @abstractmethod
+    def _from_dict(cls, d: IndexDict) -> Self: ...
+
+    @classmethod
+    def from_dict(cls, d: IndexDict) -> Self:
         return _from_dict(d)
 
     @classmethod
-    def _from_dict(cls, d: dict[str, any]) -> Index:
+    def _assert_cls(cls, d: IndexDict):
         if cls.__name__ != d['class_name']:
             raise ValueError(
                 f"Cannot deserialize {d['class_name']} to {cls.__name__}")
-        meta = d['meta']
-        return cls(d['bins'], boundary=d['boundary'], **meta)
 
     @property
     def label(self) -> str:
@@ -401,30 +436,47 @@ class Index(ABC):
                 return False
             return True
 
-    def __clone(self, bins: np.ndarray | None = None,
-                boundary: np.ndarray | None = None,
-                meta: IndexMetadata | None = None, order: str | None = None,
-                **kwargs) -> Index:
+    def __clone(self, bins: array1D | None = None,
+                boundary: float | None = None,
+                meta: IndexMetadata | None = None,
+                order: np._OrderKACF | None = None,
+                copy: bool = False,
+                **kwargs) -> Self:
         if bins is None:
-            bins = self.bins
+            if copy:
+                bins = self.bins.copy()
+            else:
+                bins = self.bins
         if order is not None:
             bins = np.asarray(bins, order=order)
         if boundary is None:
             boundary = self.boundary
+        assert boundary is not None
         if meta is None:
             meta = self.meta
         meta = meta.clone(**kwargs)
         return self.__class__(bins, boundary, metadata=meta)
 
     def update(self, alias: str | None = None, label: str | None = None,
-               unit: Unitlike | None = None) -> Index:
+               unit: Unitlike | None = None) -> Self:
         meta = self.meta.clone(alias=alias, label=label, unit=unit)
         return self.__clone(meta=meta)
 
-    def handle_rebin_arguments(self, *, bins: np.ndarray | Index | None = None,
+    def copy(self, bins: array1D | None = None,
+             boundary: float | None = None,
+             meta: IndexMetadata | None = None,
+             order: np._OrderKACF | None = None,
+             **kwargs) -> Self:
+        if 'copy' in kwargs:
+            raise ValueError("Cannot specify `copy` as a keyword argument.")
+        return self.__clone(bins=bins, boundary=boundary, meta=meta, order=order, copy=True, **kwargs)
+
+
+    def handle_rebin_arguments(self, *,
+                               bins: arraylike | Index | None = None,
                                factor: float | None = None,
-                               binwidth: Unitlike | None = None,
-                               numbins: int | None = None) -> Index:
+                               binwidth: QuantityLike | None = None,
+                               numbins: int | None = None) -> Self:
         # TODO This is so ugly
         if not only_one_not_none(bins, factor, binwidth, numbins):
             raise ValueError("Either 'bins', 'factor', `numbins` or 'binwidth' must be"
@@ -450,11 +502,14 @@ class Index(ABC):
         if isinstance(bins, Index):
             warn("Might be buggy")
             return bins.__clone(meta=self.meta)
+        else:
+            bins = np.asarray(bins)
+        assert bins is not None
         if len(bins) > len(self.bins):
             raise ValueError("Cannot rebin to a finer binning.")
         if not np.isclose(bins[-1], self.bins[-1]) or not np.isclose(bins[0], self.bins[0]):
             warn("The rebinning resizes the index.")
-        if not self.is_uniform() and is_uniform(bins):
+        if not self.is_uniform() and is_uniform_fn(bins):
             warn("Rebinning non-uniform index to uniform index.")
             cls = self.uniform_cls()
             new = cls.from_array(bins=bins)
@@ -472,30 +527,86 @@ class Index(ABC):
     def is_metadata_equal(self, other: Index) -> bool:
         return self.meta == other.meta
 
-
-class Edge(ABC):
     @abstractmethod
-    def left_edge(self, i: int) -> float64:
+    def is_uniform(self) -> bool: ...
+
+    @abstractmethod
+    def step(self, i: int) -> float:
+        pass
+
+    @abstractmethod
+    def steps(self) -> array1D:
+        pass
+
+    @abstractmethod
+    def uniform_cls(self) -> type[Index]:
+        pass
+
+    @property
+    @abstractmethod
+    def leftmost(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
+    def rightmost(self) -> float:
+        pass
+
+    @abstractmethod
+    def is_left(self) -> bool:
+        pass
+
+    def is_mid(self) -> bool:
+        return not self.is_left()
+
+    @abstractmethod
+    def to_mid(self) -> Mid:
+        pass
+
+    @abstractmethod
+    def to_left(self) -> Left:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def extrapolate(cls, bins: array1D, direction: Direction, n: int = 1) -> array1D:
+        pass
+
+
+    @staticmethod
+    @abstractmethod
+    def extrapolate_boundary(bins: array1D, direction: DirectionLR = 'left') -> float:
+        pass
+
+    @abstractmethod
+    def to_edge(self, edge: Edges) -> Index: ...
+
+    def ticks(self) -> array1D: ...
+
+
+class Edge(Index, ABC):
+    @abstractmethod
+    def left_edge(self, i: int) -> float:
         """ Left edge of the bin """
         pass
 
     @abstractmethod
-    def right_edge(self, i: int) -> float64:
+    def right_edge(self, i: int) -> float:
         """ Right edge of the bin """
         pass
 
     @abstractmethod
-    def mid(self, i: int) -> float64:
+    def mid(self, i: int) -> float:
         """ Mid point of the bin """
         pass
 
     @property
-    def leftmost(self) -> float64:
+    def leftmost(self) -> float:
         """ Left edge of the leftmost bin """
         return self.left_edge(0)
 
     @property
-    def rightmost(self) -> float64:
+    def rightmost(self) -> float:
         """ Right edge of the rightmost bin """
         return self.right_edge(-1)
 
@@ -504,22 +615,7 @@ class Edge(ABC):
         y = self.to_same_unit(x)
         return self.leftmost <= y <= self.rightmost
 
-    @abstractmethod
-    def is_left(self) -> bool:
-        ...
-
-    @abstractmethod
-    def to_left(self) -> Edge:
-        ...
-
-    @abstractmethod
-    def to_mid(self) -> Edge:
-        ...
-
-    def is_mid(self) -> bool:
-        return not self.is_left()
-
-    def to_edge(self, edge: Edges) -> Edge:
+    def to_edge(self, edge: Edges) -> Index:
         match edge.lower():
             case 'left' | 'l':
                 return self.to_left()
@@ -529,10 +625,10 @@ class Edge(ABC):
                 raise ValueError(f"Unknown edge {edge}")
 
     @abstractmethod
-    def other_edge_cls(self) -> Type[Index]:
+    def other_edge_cls(self) -> Type[Left] | Type[Mid]:
         ...
 
-    def assert_inbounds(self, x: float64):
+    def assert_inbounds(self, x: float):
         """ Assert that x is in bounds """
         if x < self.leftmost:
             raise IndexError(
@@ -546,38 +642,42 @@ class Edge(ABC):
 
     @staticmethod
     @abstractmethod
-    def extrapolate_boundary(bins: np.ndarray) -> float:
+    def extrapolate_boundary(bins: array1D) -> float:
         ...
 
     @staticmethod
     @abstractmethod
-    def split_bins_boundary(bins: np.ndarray) -> tuple[float, np.ndarray]:
+    def split_bins_boundary(bins: array1D) -> tuple[float, array1D]:
         ...
 
     @abstractmethod
-    def ticks(self) -> np.ndarray:
+    def ticks(self) -> array1D:
         ...
 
 
-class Left(Edge):
-    def left_edge(self, i: int) -> float64:
+class Left(Edge, ABC):
+    def left_edge(self, i: int) -> float:
         return self.bins[i]
 
-    def right_edge(self, i: int) -> float64:
+    def right_edge(self, i: int) -> float:
         return self.bins[i] + self.step(i)
 
-    def mid(self, i: int) -> float64:
+    def mid(self, i: int) -> float:
         return self.bins[i] + self.step(i) / 2
 
-    def to_left(self) -> Index:
+    def to_left(self) -> Self:
         return self
 
-    def to_mid(self) -> Index:
+    def to_mid(self) -> Mid:
         cls = self.other_edge_cls()
         bins = self.bins + self.steps() / 2
         return cls(bins, boundary=self.bins[0], metadata=self.meta)
 
-    def _index(self, x: float64) -> int:
+    @abstractmethod
+    def other_edge_cls(self) -> Type[Mid]:
+        pass
+
+    def _index(self, x: float) -> int:
         self.assert_inbounds(x)
         return _index_left(self.bins, x)
 
@@ -585,41 +685,46 @@ class Left(Edge):
         return True
 
     @staticmethod
-    def extrapolate_boundary(bins: np.ndarray) -> float:
+    def extrapolate_boundary(bins: array1D) -> float:
         return bins[-1] + (bins[-1] - bins[-2])
 
     @staticmethod
-    def split_bins_boundary(bins: np.ndarray) -> tuple[float, np.ndarray]:
+    def split_bins_boundary(bins: array1D) -> tuple[float, array1D]:
         return bins[-1], bins[:-1]
 
-    def ticks(self) -> np.ndarray:
+    def ticks(self) -> array1D:
         return np.append(self.bins, self.rightmost)
 
 
-class Mid(Edge):
+class Mid(Edge, ABC):
     @property
-    def leftmost(self) -> float64:
+    def leftmost(self) -> float:
         return self.boundary
 
-    def left_edge(self, i: int) -> float64:
+    def left_edge(self, i: int) -> float:
         return self.bins[i] - self.step(i) / 2
 
-    def right_edge(self, i: int) -> float64:
+    def right_edge(self, i: int) -> float:
         return self.bins[i] + self.step(i) / 2
 
-    def mid(self, i: int) -> float64:
+    def mid(self, i: int) -> float:
         return self.bins[i]
 
-    def to_mid(self) -> Index:
+
+    @abstractmethod
+    def other_edge_cls(self) -> Type[Left]:
+        pass
+
+    def to_mid(self) -> Self:
         return self
 
-    def to_left(self) -> Index:
+    def to_left(self) -> Left:
         cls = self.other_edge_cls()
         bins = self.bins - self.steps() / 2
         boundary = bins[-1] + self.step(-1)
         return cls(bins, boundary=boundary, metadata=self.meta)
 
-    def _index(self, x: float64) -> int:
+    def _index(self, x: float) -> int:
         self.assert_inbounds(x)
         return _index_mid_uniform(self.bins, x)
 
@@ -627,25 +732,25 @@ class Mid(Edge):
         return False
 
     @staticmethod
-    def extrapolate_boundary(bins: np.ndarray) -> float:
+    def extrapolate_boundary(bins: array1D) -> float:
         return bins[0] - (bins[1] - bins[0]) / 2
 
     @staticmethod
-    def split_bins_boundary(bins: np.ndarray) -> tuple[float, np.ndarray]:
+    def split_bins_boundary(bins: array1D) -> tuple[float, array1D]:
         # Mid boundary is the leftmost *edge*, not bin, hence the shift.
         return bins[0] + (bins[1] - bins[0]) / 2, bins[1:]
 
-    def ticks(self) -> np.ndarray:
+    def ticks(self) -> array1D:
         return np.append(np.append(self.leftmost, self.bins), self.rightmost)
 
 
-class Layout(ABC):
+class Layout(Index):
     @abstractmethod
-    def steps(self) -> np.ndarray:
+    def steps(self) -> array1D:
         ...
 
     @abstractmethod
-    def step(self, i: int) -> float64:
+    def step(self, i: int) -> float:
         ...
 
     @abstractmethod
@@ -653,8 +758,8 @@ class Layout(ABC):
         ...
 
     @classmethod
-    def extrapolate(cls, bins: np.ndarray, direction: Literal['left', 'right'], n: int = 1) -> np.ndarray:
-        if direction not in ('left', 'right'):
+    def extrapolate(cls, bins: array1D, direction: DirectionLR, n: int = 1) -> array1D:
+        if direction not in {'left', 'right'}:
             raise ValueError(
                 f"Direction must be 'left' or 'right', not '{direction}'.")
         if n < 1:
@@ -675,7 +780,7 @@ class Layout(ABC):
                 return cls.extrapolate_right(bins, n)
 
     @classmethod
-    def extrapolate_left(cls, bins: np.ndarray, n: int = 1) -> np.ndarray:
+    def extrapolate_left(cls, bins: array1D, n: int = 1) -> array1D:
         """ Linear extrapolation to the left.
 
         Args:
@@ -691,7 +796,7 @@ class Layout(ABC):
         return np.concatenate((extrapolated, bins))
 
     @classmethod
-    def extrapolate_right(cls, bins: np.ndarray, n: int = 1) -> np.ndarray:
+    def extrapolate_right(cls, bins: array1D, n: int = 1) -> array1D:
         """ Linear extrapolation to the right.
 
         Args:
@@ -712,32 +817,47 @@ class Layout(ABC):
         ...
 
 
-class Uniform(Layout):
+def is_uniform(x) -> TypeGuard[Uniform]:
+    return x.is_uniform()
+
+
+class Uniform(Layout, ABC):
     """ Index for equidistant binning """
 
-    def __init__(self, bins: np.ndarray, *args, **kwargs):
+    def __init__(self, bins: array1D, *args, **kwargs):
         if len(bins) < 1:
             raise ValueError("Bins must be at least length 1.")
-        if not is_uniform(bins):
+        if not is_uniform_fn(bins):
             raise ValueError("Bins must be uniform.")
-        self.dX = bins[1] - bins[0]
+        self._dX = bins[1] - bins[0]
         self.__hash = None
         super().__init__(bins, *args, **kwargs)
 
-    def step(self, i: int) -> float64:
+    @property
+    def dX(self) -> float:
+        return self._dX
+
+    def step(self, i: int) -> float:
         return self.dX
 
-    def steps(self) -> np.ndarray:
+    def steps(self) -> array1D:
         return np.repeat(self.dX, len(self))
 
     def is_uniform(self) -> bool:
         return True
 
-    def is_congruent(self, other) -> bool:
-        if not is_length_congruent(self.bins, other.X):
+    @overload
+    def is_congruent(self, other: NonUniform) -> Literal[False]: ...
+
+    @overload
+    def is_congruent(self, other: Uniform) -> bool: ...
+
+    def is_congruent(self, other: Index) -> bool:
+        if not is_length_congruent(self.bins, other.bins):
             return False
-        if not other.uniform():
+        if not other.is_uniform():
             return False
+        assert is_uniform(other)
         dx = self.dX
         dy = other.dX
         if np.isclose(dx, dy) and np.isclose(self[0] % dx, other[0] % dy):
@@ -751,21 +871,14 @@ class Uniform(Layout):
         return self.__hash
 
     def to_calibration(self) -> Calibration:
-        return Calibration([self.bins[0], self.dX])
+        x0: float = self.bins[0]
+        return Calibration(np.array([x0, self.dX]))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> IndexDict:
         d = super().to_dict()
         d.pop('bins')
         d['calibration'] = self.to_calibration().coefficients
         return d
-
-    @classmethod
-    def from_dict(cls, d: dict[str, any]) -> Uniform:
-        d = d.copy()
-        calibration = d.pop('calibration')
-        length = d['length']
-        d['bins'] = Calibration(calibration).linspace(length)
-        return cls._from_dict(d)
 
     def __eq__(self, other) -> bool:
         return hash(self) == hash(other)
@@ -774,11 +887,21 @@ class Uniform(Layout):
     def uniform_cls(cls) -> Type[Uniform]:
         return cls
 
+    @classmethod
+    def _from_dict(cls, d: IndexDict) -> Self:
+        assert 'calibration' in d, "Calibration not found."
+        calibration = np.asarray(d['calibration'])
+        length = d['length']
+        bins = np.asarray(Calibration(calibration).linspace(length))
+        meta = d['meta']
+        return cls(bins, boundary=d['boundary'], **meta)
 
-class LeftUniformIndex(Left, Uniform, Index):
+
+
+class LeftUniformIndex(Left, Uniform):
     """ Index for left-binning """
 
-    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+    def _rebin(self, other: Index, values: array1D, preserve: Preserve = 'counts') -> tuple[Index, array1D]:
         if not other.is_uniform():
             raise NotImplementedError()
         if not other.is_left():
@@ -790,34 +913,41 @@ class LeftUniformIndex(Left, Uniform, Index):
                 self.bins, other.bins, values, preserve=preserve)
         return other, new
 
-    def other_edge_cls(self) -> Type[Index]:
+    def other_edge_cls(self) -> Type[Mid]:
         return MidUniformIndex
 
     @classmethod
-    def extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto') -> np.ndarray:
+    def extrapolate(cls, bins: array1D, n: int = 1, direction: Direction = 'auto') -> array1D:
         if direction == 'auto':
             direction = 'right'
         return super().extrapolate(bins, n=n, direction=direction)
 
 
-class MidUniformIndex(Mid, Uniform, Index):
+class MidUniformIndex(Mid, Uniform):
     """ Index for uniform mid-binning """
 
-    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+    def _rebin(self, other: Index, values: array1D, preserve: Preserve = 'counts') -> tuple[Index, array1D]:
         return self.to_left()._rebin(other, values, preserve=preserve)
 
     def other_edge_cls(self) -> Type[Index]:
         return LeftUniformIndex
 
     @classmethod
-    def extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto') -> np.ndarray:
+    def extrapolate(cls, bins: array1D, n: int = 1, direction: Direction = 'auto') -> array1D:
         if direction == 'auto':
             direction = 'left'
         return super().extrapolate(bins, n=n, direction=direction)
 
 
-class NonUniform(Layout):
+class NonUniform(Layout, ABC):
     """ Index for non-equidistant binning """
+    def __init__(self, bins: array1D, dX: array1D, *args, **kwargs):
+        Index.__init__(self, bins, *args, **kwargs)
+        self._dX: array1D = dX
+
+    @property
+    def dX(self) -> array1D:
+        return self._dX
 
     def is_uniform(self) -> bool:
         return False
@@ -825,23 +955,26 @@ class NonUniform(Layout):
     def step(self, i: int) -> np.float64:
         return self.dX[i]
 
-    def steps(self) -> np.ndarray:
+    def steps(self) -> array1D:
         return self.dX
 
-    def _rebin(self, other: Index, values: np.ndarray, preserve: Preserve = 'counts') -> tuple[Index, np.ndarray]:
+    def _rebin(self, other: Index, values: array1D, preserve: Preserve = 'counts') -> Never:
         raise NotImplementedError()
 
     @classmethod
-    def from_dict(cls, d: dict[str, any]) -> Uniform:
-        return cls._from_dict(d)
+    def _from_dict(cls, d: IndexDict) -> Self:
+        assert 'bins' in d, "Bins not found."
+        bins = np.asarray(d['bins'])
+        meta = d['meta']
+        return cls(bins, boundary=d['boundary'], **meta)  # I think the warning is safe to ignore
 
 
-class LeftNonUniformIndex(Left, NonUniform, Index):
-    def __init__(self, bins: np.ndarray, boundary: float, *args, **kwargs):
-        Index.__init__(self, bins, boundary, *args, **kwargs)
-        self.dX = np.append(np.diff(bins), boundary - bins[-1])
+class LeftNonUniformIndex(Left, NonUniform):
+    def __init__(self, bins: array1D, boundary: float, *args, **kwargs):
+        dX = np.append(np.diff(bins), boundary - bins[-1])
+        NonUniform.__init__(self, bins, dX, boundary, *args, **kwargs)
 
-    def _index(self, x: float64) -> int:
+    def _index(self, x: float) -> int:
         self.assert_inbounds(x)
         return _index_left(self.bins, x)
 
@@ -853,7 +986,7 @@ class LeftNonUniformIndex(Left, NonUniform, Index):
         return LeftUniformIndex
 
     @classmethod
-    def extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto') -> np.ndarray:
+    def extrapolate(cls, bins: array1D, n: int = 1, direction: Direction = 'auto') -> array1D:
         if direction == 'auto':
             direction = 'right'
         return super().extrapolate(bins, n=n, direction=direction)
@@ -901,22 +1034,22 @@ def widths_from_mid_right(mid, right):
     return steps
 
 
-class MidNonUniformIndex(Mid, NonUniform, Index):
-    def __init__(self, bins: np.ndarray, boundary: float,
-                 direction: Literal['left', 'right'] = 'left',
+class MidNonUniformIndex(Mid, NonUniform):
+    def __init__(self, bins: array1D, boundary: float,
+                 direction: DirectionLR = 'left',
                  *args, **kwargs):
         match direction:
             case 'left':
-                self.dX = widths_from_mid_left(bins, boundary)
+                dX = widths_from_mid_left(bins, boundary)
             case 'right':
-                self.dX = widths_from_mid_right(bins, boundary)
-                boundary = bins[0] - self.dX[0] / 2
+                dX = widths_from_mid_right(bins, boundary)
+                boundary = bins[0] - dX[0] / 2
             case d:
                 raise ValueError(
                     f"direction must be 'left' or 'right', not {d}")
-        Index.__init__(self, bins, boundary, *args, **kwargs)
+        NonUniform.__init__(self, bins, dX, boundary, *args, **kwargs)
 
-    def other_edge_cls(self) -> Type[Index]:
+    def other_edge_cls(self) -> Type[Left]:
         return LeftNonUniformIndex
 
     @classmethod
@@ -924,11 +1057,11 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
         return MidUniformIndex
 
     # @classmethod
-    # def extrapolate(cls, bins: np.ndarray, n: int = 1, direction: Direction = 'auto') -> np.ndarray:
+    # def extrapolate(cls, bins: array1D, n: int = 1, direction: Direction = 'auto') -> array1D:
     #    raise NotImplementedError("Extrapolation poorly defined for non-uniform mid-binning and is not supported.")
 
     @staticmethod
-    def extrapolate_boundary(bins: np.ndarray, direction: Literal['left', 'right'] = 'left') -> float:
+    def extrapolate_boundary(bins: array1D, direction: DirectionLR = 'left') -> float:
         match direction:
             case 'left':
                 return bins[0] - (bins[1] - bins[0]) / 2
@@ -939,16 +1072,15 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
                     f"direction must be 'left' or 'right', not {d}")
 
     @staticmethod
-    def split_bins_boundary(bins: np.ndarray) -> tuple[float, np.ndarray]:
-        raise NotImplementedError(
-            "Extrapolation poorly defined for non-uniform mid-binning and is not supported.")
+    def split_bins_boundary(bins: array1D) -> Never:
+            raise NotImplementedError("Extrapolation poorly defined for non-uniform mid-binning and is not supported.")
 
     @classmethod
-    def from_array(cls, bins: np.ndarray, *,
+    def from_array(cls, bins: array1D, *,
                    extrapolate_boundary: bool = False,
                    boundary: float | None = None,
                    width: float | None = None,
-                   direction: Literal['left', 'right'] = 'left', **kwargs) -> MidNonUniformIndex:
+                   direction: DirectionLR = 'left', **kwargs) -> MidNonUniformIndex:
         """ Construct a MidNonUniformIndex from an array of bin edges.
 
         Mid bins lack a degree of freedom which must be specified. This can be done in three ways:
@@ -977,10 +1109,14 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
             case bound, _, dir if bound is not None:
                 return cls(bins, bound, direction=dir, **kwargs)
             case _, width, 'left':
+                assert width is not None
                 boundary = bins[0] - width / 2
+                assert boundary is not None
                 return MidNonUniformIndex(bins, boundary, direction='left', **kwargs)
             case _, width, 'right':
+                assert width is not None
                 boundary = bins[-1] + width / 2
+                assert boundary is not None
                 return MidNonUniformIndex(bins, boundary, direction='right', **kwargs)
         raise RuntimeError("Unreachable D:")
 
@@ -988,28 +1124,30 @@ class MidNonUniformIndex(Mid, NonUniform, Index):
         match key:
             case slice():
                 if key.start is None or key.start == 0:
-                    boundary = self.boundary
+                    boundary: float = self.boundary
                 else:
-                    boundary = self.bins[key.start - 1] + \
-                        self.dX[key.start - 1] / 2
+                    i: int = key.start - 1  # To make mypy happy
+                    boundary: float = self.bins[i] + \
+                        self.dX[i] / 2
                 return self.from_array(self.bins[key], metadata=self.meta,
                                        boundary=boundary)
             case _:
                 return self.bins[key]
 
-    def _index(self, x: float64) -> int:
+    def _index(self, x: float) -> int:
         self.assert_inbounds(x)
         return _index_mid_nonuniform(self.bins, self.steps(), x)
 
 
-def to_index(X: np.ndarray, edge: Edges = 'left',
+
+def to_index(X: arraylike, edge: Edges = 'left',
              boundary: bool = False, **kwargs) -> Index:
     X = np.asarray(X)
     if edge not in {'left', 'mid'}:
-        raise ValueError(f"`edge` must be on of {Edges} not {edge}")
+        raise ValueError(f"`edge` must be one of {Edges} not {edge}")
     if not is_monotone(X):
         raise ValueError("Indices must be monotone")
-    if is_uniform(X):
+    if is_uniform_fn(X):
         if edge == 'left':
             return LeftUniformIndex.from_array(X, extrapolate_boundary=not boundary, **kwargs)
         else:
@@ -1021,26 +1159,48 @@ def to_index(X: np.ndarray, edge: Edges = 'left',
             return MidNonUniformIndex.from_array(X, extrapolate_boundary=not boundary, **kwargs)
 
 
-def make_or_update_index(X: Index | np.ndarray, unit: Unit, alias: str, label: str,
+def make_or_update_index(X: Index | arraylike, unit: Unitlike | None, alias: str, label: str,
                          default_label: bool,
                          default_unit: bool,
                          edge: Edges = 'left',
                          boundary: bool = False, **kwargs) -> Index:
     if isinstance(X, Index):
         # Preserve the label if it exists, but overwrite if a new label is specified
+        label_ = label
         if X.meta.label and default_label:
-            label = None
+            label_ = None
         if default_unit:
             unit = X.meta.unit
+        elif unit is None:
+            raise ValueError("Must specify a unit, or use the default")
+        else:
+            unit = Unit(unit)
         if alias is None or alias == '':
             alias = X.meta.alias
-        return X.update_metadata(unit=unit, alias=alias, label=label)
-    else:
+        return X.update_metadata(unit=unit, alias=alias, label=label_)
+    elif isinstance(X, (np.ndarray, list, tuple)):
         return to_index(X, edge=edge, boundary=boundary, label=label,
                         unit=unit, alias=alias, **kwargs)
+    else:
+        raise ValueError(f"Cannot make index from {type(X)}: {X}")
 
 
-def preparse(s: Unitlike | None) -> (bool, bool, Unitlike | None):
+TQ = TypeVar('TQ', bound=Quantity | int | float | array1D)
+
+
+@overload
+def preparse(s: str) -> tuple[bool, bool, str]: ...
+
+
+@overload
+def preparse(s: None) -> tuple[Literal[False], Literal[False], None]: ...
+
+
+@overload
+def preparse(s: TQ) -> tuple[Literal[False], Literal[False], TQ]: ...
+
+
+def preparse(s: QuantityLike | None | array1D) -> tuple[bool, bool, QuantityLike | None | array1D]:
     lesser = greater = False
     if isinstance(s, str):
         s = s.strip()
@@ -1051,19 +1211,30 @@ def preparse(s: Unitlike | None) -> (bool, bool, Unitlike | None):
             greater = True
             s = s[1:]
 
-    return (lesser, greater, s)
+    return lesser, greater, s
+
+IndexClasses: TypeAlias = Literal['LeftUniformIndex', 'MidUniformIndex',
+                                  'LeftNonUniformIndex', 'MidNonUniformIndex']
+
+class IndexDict(TypedDict):
+    class_name: IndexClasses
+    bins: NotRequired[list[float] | array1D]
+    boundary: float
+    calibration: NotRequired[list[float] | array1D]
+    meta: IndexMetaDict
+    length: int
 
 
-def _from_dict(d: dict[str, any]) -> Index:
+def _from_dict(d: IndexDict) -> Index:
     match d['class_name']:
         case 'LeftUniformIndex':
-            return LeftUniformIndex.from_dict(d)
+            return LeftUniformIndex._from_dict(d)
         case 'MidUniformIndex':
-            return MidUniformIndex.from_dict(d)
+            return MidUniformIndex._from_dict(d)
         case 'LeftNonUniformIndex':
-            return LeftNonUniformIndex.from_dict(d)
+            return LeftNonUniformIndex._from_dict(d)
         case 'MidNonUniformIndex':
-            return MidNonUniformIndex.from_dict(d)
+            return MidNonUniformIndex._from_dict(d)
         case _:
             raise ValueError(f"Unknown class name {d['class_name']}")
 

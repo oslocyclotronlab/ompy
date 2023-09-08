@@ -1,10 +1,11 @@
 from __future__ import annotations
 from . import ResponseData
-from .. import Vector, Matrix
+from .. import Vector, Matrix, Index
 from .numbalib import NVector, index, index_mid, lerp
 import numpy as np
 from collections import OrderedDict
 import warnings
+from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
 
 """
 TODO: Find a good weighting of the backscattering and compton interpolations
@@ -145,14 +146,14 @@ class ComptonVector:
         return len(self.vector)
 
 
-def interpolate_compton(p: ResponseData, E: np.ndarray, sigma , nsigma: int = 6) -> Matrix:
+def interpolate_compton(p: ResponseData, E: Index, sigma , nsigma: float = 6) -> ComptonMatrix:
     """Interpolate Compton probabilities.
 
     Args:
         p (ResponseData): ResponseData normalized to probabilities
         E (np.ndarray): Energies to interpolate at
         sigma (np.ndarray): The detector resolution at each energy
-        nsigma (int, optional): Number of sigmas to interpolate. Defaults to 6.
+        nsigma (float, optional): Number of sigmas to interpolate. Defaults to 6.
 
     Returns:
         Matrix: Interpolated Compton probabilities
@@ -166,14 +167,16 @@ def interpolate_compton(p: ResponseData, E: np.ndarray, sigma , nsigma: int = 6)
     E_observed = p.E_observed
     sigma_ = NVector(E=E_observed, values=sigma(E_observed))
     assert np.allclose(compton.compton_E, sigma.E), "Compton and sigma must be parameterised at the same energies"
-    R = _interpolate_compton(compton, E, sigma_, nsigma)
+    R = _interpolate_compton(compton, E.bins, sigma_, nsigma)
     Eg = np.asarray(compton.compton_E)
-    return Matrix(Eg=Eg, Ex=E, values=R, xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+    m = Matrix(true=Eg, observed=E, values=R, xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
+    assert is_compton_matrix(m)
+    return m
 
 
 # Parallel fails by some reason
 @njit(fastmath=True)
-def _interpolate_compton(compton: ComptonList, E: np.ndarray, sigma: NVector, nsigma: int) -> np.ndarray:
+def _interpolate_compton(compton: ComptonList, E: np.ndarray, sigma: NVector, nsigma: float) -> np.ndarray:
     """Interpolate Compton probabilities.
 
     The squares visible at low E are due to numerical precision of the mama format. TODO: Fix?
@@ -289,7 +292,7 @@ def fan_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector):
 
 @njit(parallel=True, fastmath=True)
 def lerp_from_edge_mut(mid: ComptonVector, low: ComptonVector, high: ComptonVector,
-                       sigma: NVector, nsigma: int) -> None:
+                       sigma: NVector, nsigma: float) -> None:
     """ Interpolate the probabilities for a given energy at equal angle. Mutates R in place. """
     edge_low = low.edge()
     edge_mid = mid.edge()

@@ -53,7 +53,9 @@ class GaussFit:
         return f"{param_str}"
 
 
-def fit_gauss(vec: Vector, mask: ArrayBool) -> GaussFit:
+def fit_gauss(vec: Vector, mask: ArrayBool | None = None) -> GaussFit:
+    if mask is None:
+        mask = np.ones(len(vec), dtype=bool)
     E = vec.to_mid().X[mask]
     region = vec[mask]
 

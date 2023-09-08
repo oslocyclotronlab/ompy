@@ -39,14 +39,17 @@ else:
     import warnings
     # warnings.simplefilter('always', DeprecationWarning)
 
-    USE_JIT = False
-    USE_GPU = True
+    NUMBA_AVAILABLE = False
+    GPU_AVAILABLE = False
+    NUMBA_CUDA_AVAILABLE = False
+    NUMBA_CUDA_WORKING = [False]
     try:
         import numba
-        USE_JIT = True
+        NUMBA_AVAILABLE = True
         try:
             from numba import cuda
-            USE_GPU = True
+            GPU_AVAILABLE = True
+            NUMBA_CUDA_AVAILABLE = True
         except ImportError:
             warnings.warn(
                 "Numba.CUDA could not be imported. GPU acceleration will not be available")
@@ -71,8 +74,28 @@ else:
     except ImportError:
         pass
 
+    JAX_AVAILABLE = False
+    JAX_WORKING = False
+    try:
+        import jax
+        JAX_AVAILABLE = True
+        devices = jax.devices()
+        JAX_WORKING = any("gpu" in device.platform.lower() for device in devices)
+    except ImportError:
+        pass
+
+    H5PY_AVAILABLE = False
+    try:
+        import h5py
+        H5PY_AVAILABLE = True
+    except ImportError:
+        pass
+
+    from .status import print_status
+
+
     from .stubs import Axes
-    from .helpers import make_axes
+    from .helpers import make_axes, make_combined_legend
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .validator import Unitful, Bounded, Choice, Toggle
@@ -80,7 +103,10 @@ else:
     #                            DiscAndEB05, SpinModel)
     from .spinfunctions import SpinFunctions
     from .geometry import Geometry, Line
-    from .array import Vector, Matrix, zeros_like, empty_like, empty, to_index, Index, fmap, umap, omap, linspace
+    from .array import AbstractArrayProtocol, MatrixProtocol
+    from .array import Vector, Matrix, zeros_like, empty_like, empty
+    from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
+    from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector
     from .database import Nucleus, get_nucleus, get_nucleus_df
     from .models import Model, NormalizationParameters, ResultsNormalized
     from .unfolder import Unfolder

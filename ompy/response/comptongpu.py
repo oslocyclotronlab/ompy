@@ -5,18 +5,20 @@ from typing import TypeAlias, Callable
 
 import numba as nb
 import numpy as np
-from nptyping import NDArray, Shape
+from nptyping import NDArray, Shape, Float32, Int32
 from numba import cuda
 from numba import njit, prange, types
+from typing import TypeGuard, TypeVar
 
-from ompy.response.compton import dEdtheta
+from .comptonmatrixprotocol import ComptonMatrix
+#from ompy.response.compton import dEdtheta
 from . import ResponseData
-from .. import Vector, Matrix
+from .. import Vector, Matrix, Index
 
 DEBUG = False
 # There are a lot of shapes to get right. These are an attempt
 # to make it harder to get lost in the code
-DTYPE: TypeAlias = np.float32
+DTYPE: TypeAlias = Float32
 # 'Observed' is the dimension of the observed Eg in the raw compton spectra
 VO: TypeAlias = NDArray[Shape['Observed'], DTYPE]
 # 'True' is the dimension of the true Eg in the raw compton spectra
@@ -33,7 +35,9 @@ VEC: TypeAlias = NDArray
 D: TypeAlias = DTYPE
 S: TypeAlias = Shape
 
-Elementwise = Callable[[float], float] | Callable[[vector], vector]
+CT = TypeVar('CT')
+#Elementwise = Callable[[float], float] | Callable[[vector], vector] | Callable[[np.ndarray], np.ndarray]
+Elementwise = Callable[[CT], CT]
 
 """
 TODO:
@@ -58,9 +62,19 @@ Algorithm:
       - fan lerped NxM
 """
 
+def is_VO(vo: VO, x) -> TypeGuard[VO]:
+    return len(vo) == len(x)
 
-def interpolate_gpu(p: ResponseData, E: np.ndarray,
-                    sigma: Elementwise, nsigma: int = 6) -> Matrix:
+def is_VE(ve: VE, x) -> TypeGuard[VE]:
+    return len(ve) == len(x)
+
+IndexVO: TypeAlias = Index
+IndexVE: TypeAlias = Index
+IndexVT: TypeAlias = Index
+
+
+def interpolate_gpu(p: ResponseData, E: Index,
+                    sigma: Elementwise, nsigma: float = 6) -> ComptonMatrix:
     """Interpolate Compton probabilities.
 
     Args:
@@ -72,12 +86,12 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
         Matrix: Interpolated Compton probabilities
     """
     if not p.is_normalized:
-        p = p.normalize()
+        p = p.normalize(inplace=False)
 
     compton: Matrix = p.compton
-    E_observed: VO = compton.observed_index
-    E_true: VT = compton.true_index
-    sigma: VO = sigma(E_observed)
+    E_observed: IndexVO = compton.observed_index
+    E_true: IndexVT = compton.true_index
+    sigma_: VO = sigma(E_observed.bins)
 
     if len(E) > len(E_observed):
         raise ValueError("Requested energy resolution too fine for interpolation.\n"
@@ -90,7 +104,7 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
     if E[-1] > E_true[-1]:
         raise ValueError(f"Requested energy above highest true energy, {E[-1]} > {E_true[-1]}")
 
-    R = _interpolate(compton.values, E.bins, E_observed.bins, E_true.bins, sigma, nsigma)
+    R = _interpolate(compton.values, E.bins, E_observed.bins, E_true.bins, sigma_, nsigma)
     # These ifs are for debugging
     if R.shape[0] == len(E_true):
         A = E_true
@@ -107,7 +121,7 @@ def interpolate_gpu(p: ResponseData, E: np.ndarray,
 
 
 def _interpolate(compton: MTO, E: VE, E_observed: VO, E_true: VT,
-                 sigma: VO, nsigma: int) -> np.ndarray:
+                 sigma: VO, nsigma: float) -> np.ndarray:
     N = len(E)
     M = len(E_observed)
     Dtype = np.float32
@@ -251,7 +265,7 @@ def lerp(out: MEO, E: VE, Et: VT, E_to_T: VE, compton: MTO):
 
 
 @njit
-def find_closest(X: VEC[S['M'], DTYPE], Y: VEC[S['N'], DTYPE]) -> VEC[S['M'], int]:
+def find_closest(X: NDArray[S['M'], DTYPE], Y: NDArray[S['N'], DTYPE]) -> NDArray[S['M'], Int32]:
     """ Find the closest value in Y for each value in X
 
     Assumes that X and Y are sorted in ascending order and

@@ -71,16 +71,20 @@ class ResponseData:
     @overload
     def normalize_components(self, components: Components, inplace: Literal[False] = ...) -> ResponseData: ...
 
-    def normalize_components(self, components: Components, inplace: Literal[True] | Literal[False] = False) -> ResponseData | None:
+    def normalize_components(self, components: Components, inplace: bool = False) -> ResponseData | None:
         return self.normalize(**components.to_dict(), inplace=inplace)
 
     @overload
     def normalize(self, compton: float = 1.0, FE: float = 1.0, SE: float = 1.0,
-                  DE: float = 1.0, AP: float = 1.0, inplace: Literal[True] = ...) -> None: ...
+                  DE: float = 1.0, AP: float = 1.0, inplace: Literal[True] = True)-> None: ...
 
     @overload
     def normalize(self, compton: float = 1.0, FE: float = 1.0, SE: float = 1.0,
-                  DE: float = 1.0, AP: float = 1.0, inplace: Literal[False] = ...) -> ResponseData: ...
+                  DE: float = 1.0, AP: float = 1.0, inplace: Literal[False] = False) -> ResponseData: ...
+
+    @overload  # Necessary to avoid mypy bug
+    def normalize(self, compton: float = 1.0, FE: float = 1.0, SE: float = 1.0,
+                  DE: float = 1.0, AP: float = 1.0, inplace: bool = False) -> ResponseData: ...
 
     def normalize(self, compton: float = 1.0, FE: float = 1.0, SE: float = 1.0,
                   DE: float = 1.0, AP: float = 1.0, inplace: bool = False) -> ResponseData | None:

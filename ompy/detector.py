@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import overload, Literal, Callable
 import warnings
+from functools import partial
 
 FWHM_TO_SIGMA = 1 / (2 * np.sqrt(2 * np.log(2)))
 
@@ -42,9 +43,8 @@ class Detector(ABC):
         fwhm = self._FWHM(e)
         return fwhm*u('keV')
 
-    @np.vectorize
-    def __FWHM(self, energy: float) -> float:
-        return self._FWHM(energy)
+    def __FWHM(self, energy: np.ndarray) -> np.ndarray:
+        return np.asarray([self._FWHM(e) for e in energy])
 
     @abstractmethod
     def _FWHM(self, energy: float) -> float:
@@ -60,7 +60,7 @@ class Detector(ABC):
         if isinstance(E, Vector):
             E = E.to('keV').E_true
         Eg = from_unit(mu, 'keV')
-        sigma = self.__resolution_sigma(Eg)
+        sigma = self._resolution_sigma(Eg)
         gauss = ngaussian(E, Eg, sigma)
         normalized = gauss / gauss.sum()
         if as_array:
@@ -81,10 +81,10 @@ class Detector(ABC):
         ax.plot(e, self.__FWHM(e), **kwargs)
         ax.set_xlabel('Gamma energy [keV]')
         ax.set_ylabel('FWHM [keV]')
-        ax.set_title('FWHM of {}'.format(self.__name__))
+        ax.set_title('FWHM of {}'.format(self.__class__.__name__))
         ax2 = ax.twinx()
         ax2.set_ylabel(r'$\sigma$ [keV]')
-        ax2.plot(e, self._resolution_sigma(e), **kwargs)
+        ax2.plot(e, self.__resolution_sigma(e), **kwargs)
 
         return ax
 
@@ -97,7 +97,7 @@ class EgDetector(Detector):
         U := unfolded
         F = U@R
         """
-        E = mat.Eg
+        E = mat.Y
         R: Matrix = empty(E, E)
         for (i, e) in enumerate(E):
             R[i, :] = self.resolution_gauss(E, e, as_array=True)
@@ -117,7 +117,7 @@ class ExDetector(Detector):
         F = R@U
         """
         warnings.warn("Written while sleepy. Might be buggy")
-        E = mat.Ex
+        E = mat.X
         R: Matrix = empty(E, E)
         for (i, e) in enumerate(E):
             R[:, i] = self.resolution_gauss(E, e, as_array=True)
@@ -149,6 +149,9 @@ class OSCAR(EgDetector):
 class SiRi(ExDetector):
     # From https://doi.org/10.1016/j.nima.2011.05.055
     # says ~= 100 keV
+    # TODO Must be wrong? Way too smeared matrices
+    # EX gauss matrix is wrong
+    #a0 = 100.0
     a0 = 100.0
 
     def _FWHM(self, e: float) -> float:

@@ -1,17 +1,15 @@
-from . import Matrix, Vector
+from . import Matrix, Vector, MatrixProtocol
 from .abstractarray import AbstractArray, to_plot_axis
-from typing import Union, Tuple, Optional, overload, Literal, Callable
+from .abstractarrayprotocol import AbstractArrayProtocol
+from typing import Union, Tuple, Optional, overload, Literal, Callable, TypeVar
 import numpy as np
 from ..stubs import array
 
-@overload
-def zeros_like(array: Vector, **kwargs) -> Vector: ...
-@overload
-def zeros_like(array: Matrix, **kwargs) -> Matrix: ...
+M = TypeVar('M', bound=MatrixProtocol)
+#V = TypeVar('V', bound=VectorProtocol)
+A = TypeVar('A', bound=AbstractArrayProtocol)
 
-
-def zeros_like(array: AbstractArray,
-               **kwargs) -> AbstractArray:
+def zeros_like(array: A, **kwargs) -> A:
     match array:
         case Vector():
             return array.clone(values=np.zeros_like(array.values), **kwargs)
@@ -25,16 +23,7 @@ def zeros_like(array: AbstractArray,
             raise ValueError(f"Expected Array, not {type(array)}.")
 
 
-@overload
-def empty_like(array: Matrix, **kwargs) -> Matrix: ...
-
-
-@overload
-def empty_like(array: Vector, **kwargs) -> Vector: ...
-
-
-def empty_like(array: AbstractArray,
-               **kwargs) -> AbstractArray:
+def empty_like(array: A, **kwargs) -> A:
     match array:
         case Vector():
             return array.clone(values=np.empty_like(array.values), **kwargs)
@@ -52,7 +41,7 @@ def empty(ex: ..., eg: None, **kwargs) -> Vector: ...
 @overload
 def empty(ex: ..., eg: array, **kwargs) -> Matrix: ...
 
-def empty(**kwargs):
+def empty(ex: ..., eg: array | None, **kwargs) -> Vector | Matrix:
     if eg is None:
         values = np.empty(len(ex), **kwargs)
         return Vector(E=ex, values=values)
@@ -149,3 +138,14 @@ def xmap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, 
             return array.clone(values=func(array.X, *args, **kwargs))
         case _:
             raise ValueError(f"Expected Array, not {type(array)}.")
+
+
+def unpack_to_vectors(A: Matrix, ax: int | str = 0) -> list[Vector]:
+    """ Unpacks a matrix into a list of vectors. """
+    ax_: Literal[0, 1] = A.axis_to_int(ax, False)
+    if ax_ == 0:
+        return [A.iloc[i, :] for i in range(A.shape[0])]
+    elif ax_ == 1:
+        return [A.iloc[:, i] for i in range(A.shape[1])]
+    else:
+        raise ValueError(f"Axis must be 0 or 1, not {ax}.")

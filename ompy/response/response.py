@@ -3,17 +3,19 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import TypeAlias, Literal
+from typing import Protocol, TypeGuard, TypeVar, overload
 
 import numpy as np
 
 from . import ResponseData, DiscreteInterpolation, interpolate_compton, Components
 from .numbalib import njit, prange
-from .. import Vector, Matrix, USE_GPU, __full_version__, to_index, Index, zeros_like
+from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
 from ..stubs import Pathlike, Unitlike
 from .responsepath import ResponseName, get_response_path
+from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
+from typing_extensions import TypedDict
 
-if USE_GPU:
+if NUMBA_CUDA_WORKING:
     from . import interpolate_gpu
 import logging
 
@@ -28,26 +30,40 @@ logging.captureWarnings(True)
 # Note! The gaussian matrix will not be equal to "manual" gaussians, as the mus are taken from
 # the midbin-value, ensuring perfect symmetric distributions.
 
+CMatrix = TypeVar('CMatrix', bound='ComptonMatrix')
+
+def is_all_vector(x) -> TypeGuard[dict[str, Vector]]:
+    return isinstance(x, dict) and all(isinstance(v, Vector) for v in x.values())
+
+def is_all_matrix(x) -> TypeGuard[dict[str, Matrix]]:
+    return isinstance(x, dict) and all(isinstance(v, Matrix) for v in x.values())
+
+def is_all_matrix_or_vector(x) -> TypeGuard[dict[str, Matrix] | dict[str, Vector]]:
+    return is_all_vector(x) or is_all_matrix(x)
+
+T = TypeVar('T', bound=Matrix | Vector)
+t = TypedDict('t', {'total': T, 'compton': T, 'FE': T, 'SE': T, 'DE': T, 'AP': T})
+
 
 class Response:
     def __init__(self, data: ResponseData,
                  interpolation: DiscreteInterpolation,
                  R: Matrix | None = None,
-                 compton: Matrix | None = None,
+                 compton: ComptonMatrix | None = None,
                  components: Components = Components(),
                  copy: bool = False):
-        self.data: ResponseData = data if not copy else data.copy()
-        self.interpolation: DiscreteInterpolation = interpolation if not copy else interpolation.copy()
-        self.compton: Matrix | None = compton if not copy else compton.copy() if compton is not None else None
+        self.data: ResponseData = data if not copy else data.clone()  # Copy instead?
+        self.interpolation: DiscreteInterpolation = interpolation if not copy else interpolation.clone()
+        self.compton: ComptonMatrix | None = compton if not copy else compton.copy() if compton is not None else None
         self.compton_special: Matrix | None = None
         self.components = components
 
     @classmethod
     def from_data(cls, data: ResponseData) -> Response:
-        intp = DiscreteInterpolation.from_data(data.normalize())
+        intp = DiscreteInterpolation.from_data(data.normalize(inplace=False))
         return cls(data, intp)
 
-    def best_energy_resolution(self) -> np.ndarray:
+    def best_energy_resolution(self) -> Index:
         E_true = self.data.compton.true_index
         E_observed = self.data.compton.observed_index
         E0 = max(E_true[0], E_observed[0])
@@ -58,17 +74,18 @@ class Response:
         return to_index(x, edge='mid')
 
     def interpolate_compton(self, E: Index | np.ndarray | None = None, GPU: bool = True,
-                            sigma: float = 6) -> Matrix:
+                            sigma: float = 6) -> ComptonMatrix:
         if not self.interpolation.is_fwhm_normalized:
             warnings.warn("Interpolating with non-normalized FWHM. Unclear whether this is reasonable.")
         E = self.best_energy_resolution() if E is None else E
         if not isinstance(E, Index):
             E = to_index(E, edge='mid')
+        assert isinstance(E, Index)
         sigmafn = self.interpolation.sigma
         if USE_GPU and GPU:
-            compton: Matrix = interpolate_gpu(self.data, E, sigmafn, sigma)
+            compton: ComptonMatrix = interpolate_gpu(self.data, E, sigmafn, sigma)
         else:
-            compton: Matrix = interpolate_compton(self.data, E, sigmafn, sigma)
+            compton: ComptonMatrix = interpolate_compton(self.data, E, sigmafn, sigma)
         self.compton = compton
         return compton
 
@@ -98,11 +115,12 @@ class Response:
         Matrix
             The rebinned response matrix.
         """
-        bins = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
+        assert self.compton is not None, "Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first"
+        bins_ = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
                                                         binwidth=width)
-        return self.specialize_(bins, **kwargs)
+        return self.specialize_(E=bins_, **kwargs)
 
-    def specialize_(self, *, E: Index, compton: Matrix | None = None, weights: Components | None = None,
+    def specialize_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
                     normalize: bool = True, pad: bool = False) -> Matrix:
         """
         Rebins the response matrix to the requested energy grid.
@@ -129,6 +147,11 @@ class Response:
             if self.compton is None:
                 raise ValueError("Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first")
             compton = self.compton
+
+        # For mypy 'cause its too stupid to figure out that compton is not None
+        assert is_compton_matrix(compton)
+        assert self.compton is not None
+
         if self.compton.true_index.leftmost > E.leftmost and not pad:
             t = self.compton.true_index
             raise ValueError(("Requested energy grid is too low. "
@@ -137,12 +160,12 @@ class Response:
                               f"The energy grid must be truncated at index {E.index(t.leftmost)+1}."))
         if pad:
             E_all = E.copy()
-            E = E_all[E_all >= compton.true_index.leftmost]
+            E: Index = E_all[E_all >= compton.true_index.leftmost]
         if weights is None:
             weights = self.components
 
         # We preserve area as we want a mean value, not the sum
-        R = compton.rebin('true', bins=E, preserve='area').to_left()
+        R = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
         R.rebin('observed', bins=R.true, inplace=True)
         R = R.to_left()
         R *= weights.compton
@@ -164,7 +187,10 @@ class Response:
 
         FE, SE, DE, AP = self.interpolation.structures()
         emin = R.observed_index.leftmost
-        j511 = R.index_observed(511)
+        has_511 = 511 >= emin
+        has_511 = False
+        if has_511:
+            j511 = R.index_observed(511)
         for i, e in enumerate(R.true):
             #if e > emin:
             R.loc[i, e] += mean(FE, e) * weights.FE
@@ -172,18 +198,18 @@ class Response:
                 R.loc[i, e - 511.0] += mean(SE, e) * weights.SE
             if e - 2 * 511 > emin:
                 R.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
-            if e > 1022:
-                R[i, j511] += mean(AP, e) * weights.AP
+            if has_511 and e > 1022:
+                R[i, j511] += mean(AP, e) * weights.AP  # type: ignore
 
         if normalize:
             R.normalize(axis='observed', inplace=True)
         if pad:
-            N = len(E_all)
+            N = len(E_all)  # type: ignore
             M = len(E)
             R0 = np.empty((N, N))
             R0[:E, :E] = 0
             R0[E:, :E] = R.values
-            R = Matrix(true=E_all, observed=E_all, values=R0, name='Response',
+            R = Matrix(true=E_all, observed=E_all, values=R0, name='Response',  # type: ignore
                        xlabel='True energy', ylabel='Observed energy')
         return R
 
@@ -243,7 +269,7 @@ class Response:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
-              compton: Matrix | None = None, components: Components | None = None,
+              compton: ComptonMatrix | None = None, components: Components | None = None,
               copy: bool = False) -> Response:
         return Response(data=data or self.data, interpolation=interpolation or self.interpolation,
                         compton=compton or self.compton, components=components or self.components,
@@ -306,14 +332,16 @@ class Response:
         if self.compton is not None:
             self.compton.save(path / 'compton.npz', exist_ok=exist_ok)
 
-    def component_matrices(self, *, E: Index | None, compton: Matrix | None = None, weights: Components | None = None,
+    def component_matrices(self, *, E: Index | None, compton: ComptonMatrix | None = None, weights: Components | None = None,
                            normalize: bool = True) -> dict[str, Matrix]:
         if weights is None:
             weights = self.components
         if self.compton is None and compton is None:
             raise ValueError("Compton matrix must be set before adding structures")
+        assert self.compton is not None
         if compton is None:
-            compton: Matrix = self.compton.copy()
+            compton: ComptonMatrix = self.compton.copy()
+        assert is_compton_matrix(compton)
         if E is not None:
             if self.compton.true_index.leftmost > E.leftmost:
                 t = self.compton.true_index
@@ -322,7 +350,7 @@ class Response:
                                   f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
                                   f"The energy grid must be truncated at index {E.index(t.leftmost) + 1}."))
 
-            compton = compton.rebin('true', bins=E, preserve='area').to_left()
+            compton = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
             compton.rebin('observed', bins=compton.true, inplace=True)
         compton = compton.to_left()
         compton *= weights.compton
@@ -346,7 +374,9 @@ class Response:
                 return fn(e)
 
         emin = compton.observed_index.leftmost
-        j511 = APm.index_observed(511.0)
+        has_511 = 511 > emin
+        if has_511:
+            j511 = APm.index_observed(511.0)
         for i, e in enumerate(compton.true):
             #if e > emin:
             FEm.loc[i, e] += mean(FE, e) * weights.FE
@@ -354,8 +384,8 @@ class Response:
                 SEm.loc[i, e - 511.0] += mean(SE, e) * weights.SE
             if e - 2 * 511 > emin:
                 DEm.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
-            if e > 1022:
-                APm[i, j511] += mean(AP, e) * weights.AP
+            if has_511 and e > 1022:
+                APm[i, j511] += mean(AP, e) * weights.AP  # type: ignore
 
         total = compton + FEm + SEm + DEm + APm
         total.name = 'total'
@@ -377,10 +407,19 @@ class Response:
             case _:
                 raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
 
+    @overload
+    def fold_componentwise(self, other: Vector,
+                           weights: Components | None = ...) -> dict[str, Vector]: ...
+    @overload
+    def fold_componentwise(self, other: Matrix,
+                           weights: Components | None = ...) -> dict[str, Matrix]: ...
+
     def fold_componentwise(self, other: Matrix | Vector,
                            weights: Components | None = None) -> dict[str, Matrix] | dict[str, Vector]:
         components = self.component_matrices_like(other, weights=weights)
-        return {k: comp.T @ other for k, comp in components.items()}
+        x = {k: comp.T @ other for k, comp in components.items()}
+        #assert is_all_matrix_or_vector(x)  # For Mypy. Is obviously true by construction
+        return x
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Response | None:
         """ Normalizes the FWHM of the response to the requested value. """

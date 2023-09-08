@@ -2,7 +2,9 @@ from __future__ import annotations
 import numpy as np
 from ..numbalib import njit, prange
 from .. import Vector, Matrix, Response, zeros_like
-from .unfolder import Unfolder, UnfoldedResult1DAll, ResultMeta, mask_511
+from .unfolder import Unfolder
+from .result1d import Cost1D, UnfoldedResult1DMultiple, ResultMeta1D, Parameters1D
+from .stubs import Space
 from dataclasses import dataclass
 import time
 
@@ -36,29 +38,29 @@ class Guttormsen(Unfolder):
         self.weight = weight
 
     def _unfold_vector(self, R: Matrix, data: Vector, background: Vector | None, initial: Vector,
-                       mask: Vector, **kwargs) -> GuttormsenResult1D:
+                       space: Space, G: Matrix | None = None, **kwargs) -> GuttormsenResult1D:
         iterations = kwargs.pop("iterations", self.iterations)
         weight = kwargs.pop("weight", self.weight)
-        mask_ = mask.values
 
         start = time.time()  # Njit does not support time.time()
         uall, cost, fluctuations = _unfold_vector(R.values, data.values, initial.values,
-                                                  iterations, mask_)
+                                                  iterations)
         elapsed = time.time() - start
-        return GuttormsenResult1D(meta=ResultMeta(time=elapsed),
-                                  R=R, raw=data, background=background,
-                                  initial=initial, uall=uall, cost=cost,
-                                  fluctuations=fluctuations,
-                                  mask=mask)
+        parameters = Parameters1D(raw=data, background=background, initial=initial,
+                                  G=G, R=R, kwargs={"iterations": iterations,
+                                                    "weight": weight})
 
-    def supports_background() -> bool:
+        meta = ResultMeta1D(time=elapsed, space=space, parameters=parameters,
+                            method=self.__class__)
+        return GuttormsenResult1D(meta=meta, u=uall, cost=cost, fluctuations=fluctuations)
+
+    def supports_background(self) -> bool:
         return False
 
 
 
 @njit
-def _unfold_vector(R: np.ndarray, raw: np.ndarray, initial: np.ndarray, iterations: int,
-                   mask: np.ndarray):
+def _unfold_vector(R: np.ndarray, raw: np.ndarray, initial: np.ndarray, iterations: int):
     u = initial
     u_all = np.empty((iterations, len(u)))
     cost = np.empty(iterations)
@@ -68,8 +70,8 @@ def _unfold_vector(R: np.ndarray, raw: np.ndarray, initial: np.ndarray, iteratio
         u += raw - f
         f = R@u
         u_all[i] = u
-        cost[i] = chi2(f[mask], raw[mask])
-        fluctuations[i] = fluctuation_cost(u, 20, mask)
+        cost[i] = chi2(f, raw)
+        fluctuations[i] = fluctuation_cost(u, 20)
     return u_all, cost, fluctuations
 
 
@@ -79,9 +81,9 @@ def chi2(a, b):
 
 
 @njit
-def fluctuation_cost(x, sigma: float, mask: np.ndarray):
+def fluctuation_cost(x, sigma: float):
     smoothed = gaussian_filter_1d(x, sigma)
-    diff = np.abs(((smoothed - x) / smoothed)[mask])
+    diff = np.abs(((smoothed - x) / smoothed))
     return diff.sum()
 
 
@@ -157,10 +159,13 @@ def gaussian_filter_1d(x, sigma):
 
 
 @dataclass(kw_only=True)#(frozen=True, slots=True)
-class GuttormsenResult1D(UnfoldedResult1DAll):
+class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
     fluctuations: np.ndarray
 
-    def best(self, w: float = 0.2, min: int = 0) -> Vector:
+    def best(self, min: int = 0, w: float | None = None) -> Vector:
+        if w is None:
+            w = self.get_param("weight")
+        assert w is not None
         cost = (1 - w)*self.cost + w * self.fluctuations
         i = max(min, np.argmin(cost))
         return self.unfolded(i)

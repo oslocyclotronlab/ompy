@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import logging
 import warnings
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Literal, overload, TypeAlias
+from typing import Any, Iterable, Literal, overload, TypeAlias, Self
 from typing import TYPE_CHECKING
 
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 
@@ -16,12 +14,18 @@ from .filehandling import (load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
                            save_csv_1D, save_numpy_1D, save_tar, save_txt_1D,
                            save_npz_1D, load_npz_1D, resolve_filetype)
-from .index import Index, make_or_update_index, compress
-# from .rebin import rebin_uniform_left_left as rebin_1D
-from .rebin_old import rebin_1D
-from .. import Unit, make_axes
-from ..library import div0, handle_rebin_arguments, maybe_set
-from ..stubs import Unitlike, arraylike, Axes, Pathlike
+from .index import Index, make_or_update_index, Edges, Index, is_uniform
+from ..library import div0
+from ..helpers import maybe_set, ensure_path
+from ..stubs import Unitlike, arraylike, Axes, Pathlike, Plot1D, QuantityLike, array1D, VectorPlot, Line2D, is_lines
+from ..stubs import Plot1D, PlotError1D, PlotScatter1D, PlotBar1D
+from typing import TypeVar
+from .vectormetadata import VectorMetadata
+from .rebin import Preserve
+from .vectorprotocol import VectorProtocol
+import matplotlib.pyplot as plt
+from matplotlib.container import ErrorbarContainer, BarContainer
+from matplotlib.collections import PathCollection
 
 if TYPE_CHECKING:
     from .matrix import Matrix
@@ -30,7 +34,7 @@ LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
 """
--[x] Constructor 
+-[x] Constructor
 -[x] __getitem__
 -[x] __setitem__
 -[x] index
@@ -43,33 +47,19 @@ logging.captureWarnings(True)
 -[ ] Batch rebinning
 """
 
-Edge: TypeAlias = Literal['left', 'mid']
+VectorPlotKind: TypeAlias = Literal['step', 'plot', 'line', 'bar', 'dot', 'scatter', 'poisson']
 
+KwargsDict: TypeAlias = dict[str, Any]
+T = TypeVar('T')
 
-@dataclass(frozen=True, slots=True)
-class VectorMetadata:
-    valias: str = ''
-    vlabel: str = 'Counts'
-    name: str = ''
-    misc: dict[str, any] = field(default_factory=dict)
+@overload
+def maybe_pop_from_kwargs(kwargs: KwargsDict, item: T, name: str, alias: str) -> tuple[KwargsDict, T, None]: ...
 
-    def clone(self, valias: str | None = None, vlabel: str | None = None,
-              name: str | None = None, misc: dict[str, any] | None = None) -> VectorMetadata:
-        valias = valias if valias is not None else self.valias
-        vlabel = vlabel if vlabel is not None else self.vlabel
-        name = name if name is not None else self.name
-        misc = misc if misc is not None else self.misc
-        return VectorMetadata(valias, vlabel, name, misc)
+@overload
+def maybe_pop_from_kwargs(kwargs: KwargsDict, item: None, name: str, alias: str) -> tuple[KwargsDict, Any, str]: ...
 
-    def update(self, **kwargs) -> VectorMetadata:
-        return self.clone(**kwargs)
-
-    def add_comment(self, key: str, value: any) -> VectorMetadata:
-        return self.update(misc=self.misc | {key: value})
-
-
-def maybe_pop_from_kwargs(kwargs, item: np.ndarray | Index | None, name: str, alias: str) -> tuple[dict[str, any], np.ndarray | Index, str]:
-    alias_value = None
+def maybe_pop_from_kwargs(kwargs: KwargsDict, item: T | None, name: str, alias: str) -> tuple[KwargsDict, T, str | None]:
+    alias_value: None | str = None
     iter = kwargs.items().__iter__()
     if item is None:
         try:
@@ -81,29 +71,25 @@ def maybe_pop_from_kwargs(kwargs, item: np.ndarray | Index | None, name: str, al
         if item is None:
             raise ValueError(f"Missing argument {name}")
     kwargs = dict(iter)
-
     return kwargs, item, alias_value
 
-class Vector(AbstractArray):
+class Vector(AbstractArray, VectorProtocol):
     """ Stores 1d array with energy axes (a vector)
 
     Attributes:
         values (np.ndarray): The values at each bin.
-        X (np.ndarray): The energy of each bin. (mid-bin calibration)
-        std (np.ndarray): The standard deviation of the counts
     """
 
     # HACK: Descriptors really don't work well with %autoreload.
     # comment / uncomment this to silence the errors when developing
     # __slots__ = ('_X', 'values', 'std', 'loc', 'iloc', 'metadata')
 
-    def __init__(self, *, X: Iterable[float] | Index | None = None,
-                 values: Iterable[float] | None = None,
-                 std: Iterable[float] | None = None,
+    def __init__(self, *, X: arraylike | Index | None = None,
+                 values: arraylike | None = None,
                  copy: bool = False,
                  unit: Unitlike | None = None,
-                 order: Literal['C', 'F'] = 'C',
-                 edge: Edge = 'left',
+                 order: np._OrderKACF = 'C',
+                 edge: Edges = 'left',
                  boundary: bool = False,
                  metadata: VectorMetadata = VectorMetadata(),
                  indexkwargs: dict[str, Any] | None = None,
@@ -143,7 +129,6 @@ class Vector(AbstractArray):
                 return np.asarray(x, dtype=dtype, order=order)
 
         super().__init__(fetch(values))
-        self.std = fetch(std) if std is not None else None
 
         # Create an index from array or update existing index
         default_label = 'xlabel' not in kwargs
@@ -152,7 +137,8 @@ class Vector(AbstractArray):
         indexkwargs = indexkwargs or {}
         default_unit = False if unit is not None else True
         unit = 'keV' if default_unit else unit  # Not elegant. Index will overwrite anyway.
-        self._index = make_or_update_index(X, unit=Unit(unit), alias=xalias, label=xlabel,
+        assert X is not None
+        self._index = make_or_update_index(X, unit=unit, alias=xalias, label=xlabel,
                                            default_label=default_label,
                                            default_unit=default_unit,
                                            edge=edge, boundary=boundary,
@@ -162,10 +148,6 @@ class Vector(AbstractArray):
         if len(self._index) != len(self.values):
             raise ValueError(
                 f"Length of index{_xalias} and values{_valias} must be the same. Got {len(self._index)} and {len(self.values)}")
-        if self.std is not None and len(self.std) != len(self.values):
-            raise ValueError(
-                f"Length of values `{valias}` and `std` must be the same. Got {len(self.values)} and {len(self.std)}")
-
         wrong_kw = set(kwargs) - set(VectorMetadata.__slots__)
         if wrong_kw:
             raise ValueError(f"Invalid keyword arguments: {', '.join(wrong_kw)}")
@@ -175,7 +157,7 @@ class Vector(AbstractArray):
         self.vloc: ValueLocator = ValueLocator(self, strict=True)
         self.iloc: IndexLocator = IndexLocator(self)
 
-    def __getattr__(self, item) -> any:
+    def __getattr__(self, item) -> Any:
         meta: VectorMetadata = self.__dict__['metadata']
         alias: str = self.__dict__['_index'].alias
         if item == alias:
@@ -189,7 +171,8 @@ class Vector(AbstractArray):
         return x
 
 
-    def save(self, path: Pathlike,
+    @ensure_path
+    def save(self, path: Path,
              filetype: str | None = None,
              exist_ok: bool = True, **kwargs) -> None:
         """Save to a file of specified format
@@ -211,27 +194,21 @@ class Vector(AbstractArray):
         match filetype:
             case "npy":
                 warnings.warn("Saving as .npy is deprecated. Use .npz instead.")
-                save_numpy_1D(self.values, E, self.std, path)
+                save_numpy_1D(self.values, E, path)
             case 'npz':
                 save_npz_1D(path, self, exist_ok=exist_ok)
             case "txt":
                 warnings.warn("Saving to .txt does not preserve metadata. Use .npz instead.")
-                save_txt_1D(self.values, E, self.std, path, **kwargs)
+                save_txt_1D(self.values, E, path, **kwargs)
             case 'tar':
                 warnings.warn("Saving to .tar does not preserve metadata. Use .npz instead.")
-                if self.std is not None:
-                    save_tar([self.values, E, self.std], path)
-                else:
-                    save_tar([self.values, E], path)
+                save_tar([self.values, E], path)
             case 'mama':
                 warnings.warn("MAMA format does not preserve metadata.")
                 mama_write(self, path, **kwargs)
-                if self.std is not None:
-                    warnings.warn("MaMa cannot store std. "
-                                  "Consider using another format")
             case 'csv':
                 warnings.warn("CSV format does not preserve metadata.")
-                save_csv_1D(self.values, E, self.std, path)
+                save_csv_1D(self.values, E, path)
             case _:
                 raise ValueError(f"Unknown filetype {filetype}")
 
@@ -255,15 +232,15 @@ class Vector(AbstractArray):
 
         match filetype:
             case 'npy':
-                values, E, std = load_numpy_1D(path)
+                values, E = load_numpy_1D(path)
             case 'npz':
                 return load_npz_1D(path, Vector)
             case 'txt':
-                values, E, std = load_txt_1D(path)
+                values, E = load_txt_1D(path)
             case 'tar':
                 from_file = load_tar(path)
                 if len(from_file) == 3:
-                    values, E, std = from_file
+                    values, E = from_file
                 elif len(from_file) == 2:
                     values, E = from_file
                     std = None
@@ -271,17 +248,25 @@ class Vector(AbstractArray):
                     raise ValueError(f"Expected two or three columns\
                      in file '{path}', got {len(from_file)}")
             case 'mama':
-                values, E = mama_read(path)
+                ret = mama_read(str(path))
+                if len(ret) == 2:
+                    values, E = ret
+                else:
+                    raise ValueError(f"Expected two columns in mama, got {len(ret)}")
                 std = None
             case 'csv':
-                values, E, std = load_csv_1D(path)
+                values, E = load_csv_1D(path)
             case _:
                 try:
-                    values, E = mama_read(path)
+                    ret = mama_read(str(path))
+                    if len(ret) == 2:
+                        values, E = ret
+                    else:
+                        raise ValueError(f"Expected two columns in mama, got {len(ret)}")
                     return Vector(E=E, values=values, edge='mid')
                 except ValueError:  # from within ValueError
                     raise ValueError(f"Unknown filetype {filetype}")
-        return Vector(E=E, values=values, std=std)
+        return Vector(E=E, values=values)
 
     def transform(self, const: float = 1,
                   alpha: float = 0, inplace: bool = True) -> Vector | None:
@@ -378,26 +363,28 @@ class Vector(AbstractArray):
             return self.clone(values=values, X=E, std=std)
 
     @overload
-    def rebin(self, bins: arraylike | None = None,
+    def rebin(self, bins: arraylike | Index | None = None,
               factor: float | None = None,
-              binwidth: Unitlike | None = None,
+              binwidth: QuantityLike | None = None,
               numbins: int | None = None,
+              preserve: Preserve = 'counts',
               inplace: Literal[False] = ...) -> Vector:
         ...
 
     @overload
-    def rebin(self, bins: arraylike | None = None,
+    def rebin(self, bins: arraylike | Index | None = None,
               factor: float | None = None,
-              binwidth: Unitlike | None = None,
+              binwidth: QuantityLike | None = None,
               numbins: int | None = None,
+              preserve: Preserve = 'counts',
               inplace: Literal[True] = ...) -> None:
         ...
 
-    def rebin(self, bins: arraylike | None = None,
+    def rebin(self, bins: arraylike | Index | None = None,
               factor: float | None = None,
-              binwidth: Unitlike | None = None,
+              binwidth: QuantityLike | None = None,
               numbins: int | None = None,
-              preserve: str = 'counts',
+              preserve: Preserve = 'counts',
               inplace: bool = False) -> Vector | None:
         """ Rebins vector, assuming equidistant binning
 
@@ -416,14 +403,14 @@ class Vector(AbstractArray):
         Returns:
             The rebinned vector if inplace is 'False'.
         """
-        bins: Index = self._index.handle_rebin_arguments(bins=bins, factor=factor, binwidth=binwidth, numbins=numbins)
-        _, rebinned = self._index.rebin(bins, self.values, preserve=preserve)
+        bins_: Index = self._index.handle_rebin_arguments(bins=bins, factor=factor, binwidth=binwidth, numbins=numbins)
+        _, rebinned = self._index.rebin(bins_, self.values, preserve=preserve)
 
         if inplace:
             self.values = rebinned
-            self._index = bins
+            self._index = bins_
         else:
-            return self.clone(X=bins, values=rebinned)
+            return self.clone(X=bins_, values=rebinned)
 
     @overload
     def rebin_like(self, other: Vector, inplace: Literal[False] = ...) -> Vector:
@@ -433,7 +420,7 @@ class Vector(AbstractArray):
     def rebin_like(self, other: Vector, inplace: Literal[True] = ...) -> None:
         ...
 
-    def rebin_like(self, other: Vector | Index, inplace: bool = False, preserve: str = 'counts') -> Vector | None:
+    def rebin_like(self, other: Vector | Index, inplace: bool = False, preserve: Preserve = 'counts') -> Vector | None:
         """ Rebin to match the binning of `other`.
 
         Args:
@@ -450,14 +437,14 @@ class Vector(AbstractArray):
                 raise TypeError(f"Can not rebin like {type(other)}")
         index = index.to_unit(self.unit)
         _, rebinned = self._index.rebin(index, self.values, preserve=preserve)
-        index = index.clone(meta=self._index.meta)
+        index = index.copy(meta=self._index.meta)
         if inplace:
             self.values = rebinned
             self._index = index
         else:
             return self.clone(X=index, values=rebinned)
 
-    def closest(self, E: ndarray, side: str | None = 'right',
+    def closest(self, E: ndarray, side: np._SortSide = 'right',
                 inplace=False) -> Vector | None:
         """ Re-bin the vector without merging bins.
 
@@ -535,6 +522,7 @@ class Vector(AbstractArray):
             factor = self.de
 
         cumsum = factor * self.values.cumsum()
+        assert isinstance(cumsum, np.ndarray)
         cumerr = None
         if self.std is not None:
             cumerr = np.sqrt(np.cumsum(self.std ** 2)) * factor
@@ -545,14 +533,14 @@ class Vector(AbstractArray):
         else:
             return self.clone(values=cumsum, std=cumerr)
 
-    def set_order(self, order: str) -> None:
+    def set_order(self, order: np._OrderKACF) -> None:
         """ Wrapper around numpy to set the alignment """
         self.values = self.values.copy(order=order)
-        self._index = self._index.clone(order=order)
+        self._index = self._index.copy(order=order)
 
     @property
     def dX(self) -> float | np.ndarray:
-        if self._index.is_uniform:
+        if is_uniform(self._index):
             return self._index.dX
         return self._index.steps()
 
@@ -564,8 +552,11 @@ class Vector(AbstractArray):
                 break
         return j
 
+    def cut_at_last_nonzero(self) -> Self:
+        return self.iloc[:self.last_nonzero() + 1]
+
     def update(self, xlabel: str | None = None, vlabel: str | None = None,
-               name: str | None = None, misc: dict[str, any] | None = None,
+               name: str | None = None, misc: dict[str, Any] | None = None,
                inplace: bool = False) -> None | Vector:
         index = self._index.update(label=xlabel)
         meta = self.metadata.update(vlabel=vlabel, name=name, misc=misc)
@@ -575,7 +566,7 @@ class Vector(AbstractArray):
         else:
             return self.clone(X=index, metadata=meta)
 
-    def add_comment(self, key: str, comment: any, inplace: bool = False) -> None | Vector:
+    def add_comment(self, key: str, comment: Any, inplace: bool = False) -> None | Vector:
         meta = self.metadata.add_comment(key, comment)
         if inplace:
             self.metadata = meta
@@ -600,13 +591,10 @@ class Vector(AbstractArray):
     def __str__(self) -> str:
         summary = self._summary
         summary += "\nValues:\n"
-        if self.std is not None:
-            return summary + str(self.values) + '\n' + str(self.std)
-        else:
-            return summary + str(self.values)
+        return summary + str(self.values)
 
-    def clone(self, X=None, values=None, std=None, order: Literal['C', 'F'] ='C',
-              metadata=None, copy=False, **kwargs) -> Vector:
+    def clone(self, X=None, values=None, order: Literal['C', 'F'] ='C',
+              metadata=None, copy=False, **kwargs) -> Self:
         """ Copies the object.
 
         Any keyword argument will override the equivalent
@@ -620,17 +608,16 @@ class Vector(AbstractArray):
         """
         X = X if X is not None else self._index
         values = values if values is not None else self.values
-        std = std if std is not None else self.std
         metadata = metadata if metadata is not None else self.metadata
         metakwargs = VectorMetadata.__slots__
         # Extract all keyword argumetns that are in metakwargs from kwargs
         for key in metakwargs:
             if key in kwargs:
                 metadata = metadata.update(key=kwargs.pop(key))
-        return Vector(X=X, values=values, std=std, order=order,
+        return Vector(X=X, values=values, order=order,
                       metadata=metadata, copy=copy, **kwargs)
 
-    def copy(self, **kwargs) -> Vector:
+    def copy(self, **kwargs) -> Self:
         return self.clone(copy=True, **kwargs)
 
     @property
@@ -688,7 +675,7 @@ class Vector(AbstractArray):
         else:
             return self.clone(X=index)
 
-    def to_edge(self, edge: Edge, inplace: bool = False) -> None | Vector:
+    def to_edge(self, edge: Edges, inplace: bool = False) -> None | Vector:
         """ Converts the index to the given edge """
         index = self._index.to_edge(edge)
         if inplace:
@@ -704,10 +691,29 @@ class Vector(AbstractArray):
         """ Converts the index to the middle """
         return self.to_edge('mid', inplace=inplace)
 
-    @make_axes
-    def plot(self, ax: Axes,
-             kind: str = 'step',
-             **kwargs) -> Axes:
+    @overload
+    def plot(self, ax: Axes | None = None,
+             kind: Literal['step', 'plot', 'line'] = ...,
+             **kwargs) -> Plot1D : ...
+
+    @overload
+    def plot(self, ax: Axes | None = None,
+             kind: Literal['dot', 'scatter'] = ...,
+             **kwargs) -> PlotScatter1D : ...
+
+    @overload
+    def plot(self, ax: Axes | None = None,
+             kind: Literal['bar'] = ...,
+             **kwargs) -> PlotBar1D: ...
+
+    @overload
+    def plot(self, ax: Axes | None = None,
+             kind: Literal['poisson'] = ...,
+             **kwargs) -> PlotError1D: ...
+
+    def plot(self, ax: Axes | None = None,
+             kind: VectorPlotKind = 'step',
+             **kwargs) -> VectorPlot:
         """ Plots the vector
 
         Args:
@@ -723,6 +729,11 @@ class Vector(AbstractArray):
         Returns:
             The figure and axis used.
         """
+        if ax is None:
+            _, _ax = plt.subplots()
+            assert isinstance(_ax, Axes)
+            ax = _ax
+
         match kind:
             case "plot" | "line":
                 if self._index.is_left():
@@ -732,11 +743,11 @@ class Vector(AbstractArray):
                 kwargs.setdefault("markersize", 3)
                 kwargs.setdefault("marker", ".")
                 kwargs.setdefault("linestyle", "-")
-                if self.std is not None:
-                    ax.errorbar(bins, self.values, yerr=self.std,
-                                **kwargs)
-                else:
-                    ax.plot(bins, self.values, **kwargs)
+                line = ax.plot(bins, self.values, **kwargs)
+                assert isinstance(line, Line2D)
+                maybe_set(ax, xlabel=self.xlabel + f" [${self.unit:~L}$]",
+                        ylabel=self.ylabel, title=self.name)
+                return ax, line
             case "step":
                 step = 'post' if self._index.is_left() else 'mid'
                 bins = self._index.ticks()
@@ -745,20 +756,31 @@ class Vector(AbstractArray):
                 else:
                     values = np.append(np.append(self.values[0], self.values), self.values[-1])
                 kwargs.setdefault("where", step)
-                ax.step(bins, values, **kwargs)
+                line = ax.step(bins, values, **kwargs)
+                assert is_lines(line)
+                maybe_set(ax, xlabel=self.xlabel + f" [${self.unit:~L}$]",
+                        ylabel=self.ylabel, title=self.name)
+                return ax, line
             case "bar":
                 align = 'center' if self._index.is_mid() else 'edge'
                 kwargs.setdefault("align", align)
                 kwargs.setdefault('width', self.dX)
-                kwargs.setdefault('yerr', self.std)
-                ax.bar(self.X, self.values, **kwargs)
+                line = ax.bar(self.X, self.values, **kwargs)
+                assert isinstance(line, BarContainer)
+                maybe_set(ax, xlabel=self.xlabel + f" [${self.unit:~L}$]",
+                        ylabel=self.ylabel, title=self.name)
+                return ax, line
             case "dot" | "scatter":
                 if self._index.is_left():
                     bins = self.X + self.dX/2
                 else:
                     bins = self.X
                 kwargs.setdefault("marker", ".")
-                ax.scatter(bins, self.values, **kwargs)
+                line = ax.scatter(bins, self.values, **kwargs)
+                assert isinstance(line, PathCollection)
+                maybe_set(ax, xlabel=self.xlabel + f" [${self.unit:~L}$]",
+                        ylabel=self.ylabel, title=self.name)
+                return ax, line
             case "poisson":
                 if self._index.is_left():
                     bins = self.X + self.dX/2
@@ -766,18 +788,19 @@ class Vector(AbstractArray):
                     bins = self.X
                 kw = dict(marker = 'o', ls='none', capsize=2, capthick=0.5, ms=3, lw=1)
                 kw |= kwargs
-                print(kw)
-                ax.errorbar(bins, self.values, yerr=np.sqrt(self.values), **kw)
+                line = ax.errorbar(bins, self.values, yerr=np.sqrt(self.values), **kw)  # type: ignore
+                assert isinstance(line, ErrorbarContainer)
+                maybe_set(ax, xlabel=self.xlabel + f" [${self.unit:~L}$]",
+                        ylabel=self.ylabel, title=self.name)
+                return ax, line
             case _:
                 raise ValueError(f"Invalid kind: {kind}")
-        maybe_set(ax, 'xlabel', self.xlabel + f" [${self.unit:~L}$]")
-        maybe_set(ax, 'ylabel', self.ylabel)
-        maybe_set(ax, 'title', self.name)
-        return ax
 
-    def integrate(self) -> float:
+    def integrate(self) -> np.float_:
         """ Returns the integral of the vector """
-        return np.sum(self.values * self.dX)
+        x: array1D = self.values
+        y: array1D | float = self.dX
+        return np.sum(x*y)
 
     @overload
     def __matmul__(self, other: Matrix) -> Vector: ...
@@ -812,17 +835,24 @@ class ValueLocator:
         self.vec = vector
         self.strict = strict
 
-    def __getitem__(self, key) -> Vector | float:
+    @overload
+    def __getitem__(self, key: int) -> float: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> Vector: ...
+
+    @overload
+    def __getitem__(self, key: np.ndarray) -> np.ndarray: ...
+
+    def __getitem__(self, key: int | slice | np.ndarray) -> Vector | float | np.ndarray:
         match key:
             case slice():
                 s: slice = self.vec._index.index_slice(key, strict=self.strict)
                 index: Index = self.vec._index[s]
                 values = self.vec.values.__getitem__((s,))
-                std = None
-                if self.vec.std is not None:
-                    std = self.vec.std.__getitem__((s,))
-                return self.vec.clone(values=values, X=index, std=std)
+                return self.vec.clone(values=values, X=index)
             case _:
+                # TODO What happens with key: np.ndarray?
                 i: int = self.vec._index.index_expression(key, strict=self.strict)
                 return self.vec.values.__getitem__((i,))
 
@@ -840,13 +870,21 @@ class IndexLocator:
     def __init__(self, vector: Vector):
         self.vector = vector
 
-    def __getitem__(self, key: int | slice) -> Vector | float | np.ndarray:
+    @overload
+    def __getitem__(self, key: int) -> float: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> Vector: ...
+
+    @overload
+    def __getitem__(self, key: np.ndarray) -> np.ndarray: ...
+
+    def __getitem__(self, key: int | slice | np.ndarray) -> Vector | float | np.ndarray:
         values = self.vector.values.__getitem__(key)
         match key:
             case slice():
-                std = None if self.vector.std is None else self.vector.std.__getitem__(key)
                 index: Index = self.vector._index.__getitem__(key)
-                return self.vector.clone(values=values, X=index, std=std)
+                return self.vector.clone(values=values, X=index)
             case _:
                 return values
 

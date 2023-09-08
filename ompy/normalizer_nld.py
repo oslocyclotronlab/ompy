@@ -16,7 +16,7 @@ from scipy.stats import truncnorm
 from . import Vector
 from .library import self_if_none
 from .spinfunctions import SpinFunctions
-from .array import load_discrete
+#from .array import load_discrete
 from .models import ResultsNormalized, NormalizationParameters
 from .abstract_normalizer import AbstractNormalizer
 
