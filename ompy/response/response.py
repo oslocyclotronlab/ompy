@@ -15,8 +15,8 @@ from .responsepath import ResponseName, get_response_path
 from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
 from typing_extensions import TypedDict
 
-if NUMBA_CUDA_WORKING:
-    from . import interpolate_gpu
+if NUMBA_CUDA_WORKING[0]:
+    from .comptongpu import interpolate_gpu
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ class Response:
 
         # We preserve area as we want a mean value, not the sum
         R = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
-        R.rebin('observed', bins=R.true, inplace=True)
+        R.rebin('observed', bins=R.true_index, inplace=True)
         R = R.to_left()
         R *= weights.compton
         R.name = "Response"
@@ -192,7 +192,8 @@ class Response:
         if has_511:
             j511 = R.index_observed(511)
         for i, e in enumerate(R.true):
-            #if e > emin:
+            #if e < emin:
+            #    continue
             R.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
                 R.loc[i, e - 511.0] += mean(SE, e) * weights.SE

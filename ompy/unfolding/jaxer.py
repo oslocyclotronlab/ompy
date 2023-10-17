@@ -51,22 +51,35 @@ def kl(nu, n):
 def entropy(mu):
     #mask = mu <= 1e-5
     #return jnp.where(mask, 0.0, mu * jnp.log(mu))
-    return mu * jnp.log(mu + 1e-5)
+    return mu * jnp.log(mu + 1.0)
     #return -jnp.sum(mu * slog(mu))
     #return mu * jnp.log(mu)
+
+def split_entropy(mu, lower: float, upper: float, midpoint: float):
+    entropy_ = entropy(mu)
+    return logistic_interpolation(entropy_, lower, upper, midpoint)
+
 
 def difference_cost(n, nu):
     return (jnp.sum(n) - jnp.sum(nu))**2
 
-def onecost(mu):
-    return jnp.sum(mu > 1e-3)
+def sigmoid(x):
+    return 1 / (1 + jnp.exp(-x*1e-2))
+
+def logistic_interpolation(t, lower, upper, midpoint):
+    #d = find_d(C, A, B, k)
+    return lower + (upper - lower) * sigmoid(t - midpoint)
+
+def onecost(mu): # Make smooth by sigmoid
+    return jnp.sum(jnp.arctan(mu))
 
 def cost(mu, R, G_ex, n, bg, n_err, bg_err,
-         alpha=1.0, beta=1e-3):#, alpha=0.3e-1):
+         alpha=1.0, beta=1e-3, lower=1e-3, upper=-1e-3, midpoint=1e4):#, alpha=0.3e-1):
     mu = mu**2
     nu = G_ex@mu@R
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))
+    return jnp.sum(kl(nu, n)) #+ beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) + 1e-6*difference_cost(n, nu)
+    #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
     #return jnp.sum((nu - n)**2/e
     #return jnp.sum(kl(nu, n))
     #jnp.sum(kl(nu, n)) #+ alpha*entropy(mu)
@@ -81,7 +94,7 @@ def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
     #else:
     #    return jnp.sum(kl(nu, n)) + 1e3*onecost(nu) # 2000*entropy(mu)
     #return jnp.sum(kl(nu, n)) + jnp.sum(1e-4*entropy(mu)) + difference_cost(n, nu)
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) #+ alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
     #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
 
 
@@ -118,10 +131,8 @@ class Jaxer(Unfolder):
 
     @override
     def _unfold_vector(self, R: Matrix, data: Vector, background: Vector | None,
-                       initial: Vector,
-                       space: Space,
-                       G: Matrix,
-                        **kwargs):
+                       initial: Vector, space: Space,
+                       G: Matrix | None = None, **kwargs) -> JaxResult1D:
         # Check if cost_1d parameters are iterable
         # At most one can be iterable
         # Construct matrix NxM where N is vector and M is parameters
@@ -129,6 +140,7 @@ class Jaxer(Unfolder):
         # Probably need to use jax.vmap? Or linear algebra trick
         # How does this work with Bootstrap?
         # Perhaps instead have a _unfold_vectors()?
+
         loss = jax.jit(cost_1d)
         grad = jax.jit(jax.grad(cost_1d))
         value_and_grad = jax.jit(jax.value_and_grad(cost_1d))
@@ -152,9 +164,9 @@ class Jaxer(Unfolder):
         return JaxResult1D(meta=meta, cost=total_loss, u=u)
 
 
-    @override
     def _unfold_matrix(self, R: Matrix, data: Matrix, background: Matrix | None, initial: Matrix,
                        use_previous: bool, space: Space, G: Matrix, G_ex: Matrix, **kwargs) -> UnfoldedResult2DSimple:
+
         mask = np.zeros_like(data, dtype=bool)
         bins = np.zeros(data.shape[0])
         for i in range(data.shape[0]):
@@ -346,7 +358,6 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
     mask = ~mask
     alpha = kwargs.pop('alpha', 1.0)
     beta = kwargs.pop('beta', 1.0e-3)
-    #print(alpha)
 
     #@jax.jit
     eps = 1e-8

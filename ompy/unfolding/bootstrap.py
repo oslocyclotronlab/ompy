@@ -8,7 +8,7 @@ from .result2d import UnfoldedResult2D
 from tqdm.autonotebook import tqdm
 import numpy as np
 from scipy.stats import poisson
-from .. import Matrix, Vector
+from .. import Matrix, Vector, ArrayList, H5PY_AVAILABLE
 from ..version import FULLVERSION
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias, overload, Self, TypeVar, Generic
@@ -20,14 +20,25 @@ from ..stubs import Axes, Lines, Plot1D, Plots1D, Unitlike
 from ..array import AsymmetricVector
 from numba import njit
 from abc import ABC, abstractmethod
-from ..helpers import make_ax
+from ..helpers import make_ax, maybe_set, readable_time, bytes_to_readable
+import logging
+import time
+
+LOG = logging.getLogger(__name__)
+
+if H5PY_AVAILABLE:
+    import h5py
 
 """
 TODO
-- [ ] Measure bootstrap convergence
+- [?] Measure bootstrap convergence
 - [ ] Automatic coverage test
-- [ ] Vector bootstrap
+- [x] Vector bootstrap
 - [ ] Covariance
+- [ ] The bootstrap uses *a lot* of memory. Can we reduce it?
+      Remove the _boxes and use custom methods to broadcast over the lists instead
+      Sparse matrices?
+- [ ] Use float16 or some other dtype Jax likes
 """
 
 VSpace: TypeAlias = Literal['mu', 'eta', 'nu']
@@ -86,7 +97,7 @@ def bootstrap_vector_(res: UnfoldedResult1D, N: int, **kwargs) -> BootstrapVecto
         A_boots.append(A_boot)
     bootstraped = BootstrapVector(base=res, bootstraps=A_boots, unfolded=unfolded_boot,  # type: ignore
                                   backgrounds=bgs, costs=costs,
-                                  kwargs=kwargs)
+                                  **kwargs)
     return bootstraped
 
 
@@ -112,10 +123,22 @@ def bootstrap_vector(res: UnfoldedResult1D, N: int, **kwargs) -> BootstrapVector
     bg_boots = None
     if bg is not None:
         bg_boots = [bg.clone(values=np.random.poisson(bg)) for _ in range(N)]
-    res_: UnfoldedResult2D = unfolder.unfold(A_boots, initial=1.1*best, R=R, G=G, background=bg_boots)
+    std = np.maximum(best/2, np.median(best)/2)
+    mean = np.maximum(best, np.mean(best))
+    initials = [best.clone(values=np.random.uniform(9, 5*mean)) for i in range(N)]
+    #for n in range(N):
+        #initial = best + np.random.normal(0, std)
+        # Redistribute negative values
+        #initial[initial < 0] = np.random.poisson(np.abs(initial[initial < 0]))
+        #initials.append(initial)
+    res_: UnfoldedResult2D = unfolder.unfold(A_boots, initial=initials, R=R, G=G,
+                                             background=bg_boots, **kwargs)
+    cost = None
+    if has_cost(res_):
+        cost = res_.cost
     unfolded_boots: list[Vector] = unpack_to_vectors(res_.best())
     bootstraped = BootstrapVector(base=res, bootstraps=A_boots, unfolded=unfolded_boots,  # type: ignore
-                                  backgrounds=bgs, costs=costs,
+                                  backgrounds=bgs, costs=cost, initials=initials,
                                   kwargs=kwargs)
     return bootstraped
 
@@ -139,12 +162,13 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
     """ Create Bootstrap ensemble of `A` using `res` method
 
     """
-    best = res.best()
-    R = (res.meta.space, res.R.T)
-    G = res.G.T
+    best = res.best().astype('float32')
+    R = (res.meta.space, res.R.T.astype('float32'))
+    G = res.G.T.astype('float32')
+    G_ex = res.G_ex.astype('float32')
     kwargs = res.meta.kwargs | kwargs
-    unfolder = Unfolder.resolve_method(res.meta.method)(R=res.R.T, G=G.T)
-    A = res.raw.copy()
+    unfolder = Unfolder.resolve_method(res.meta.method)(R=res.R.T.astype('float32'), G=G.T.astype('float32'))
+    A = res.raw.copy().astype('float32')
     mask = A.last_nonzeros()
     A.values = np.where(A <= 0, 3, A.values)
     A[~mask] = 0
@@ -152,30 +176,49 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
     A_boots: list[Matrix] = []
     unfolded_boot: list[Matrix] = []
     costs: list[np.ndarray] = []
+    initials: list[Matrix] = []
+    backgrounds: list[Matrix] = []
     best = 0.01 * best
+    disable_tqdm = kwargs.pop('disable_tqdm', True)
+    background = res.background
+    if background is not None:
+        background = background.astype('float32')
+        background.values = np.where(background <= 0, 3, background.values)
+        background[~mask] = 0
+
     for i in tqdm(range(N)):
+        initial = best.clone(values=np.random.uniform(1, 3*best))
         A_boot = A.clone(values=np.random.poisson(A))
-        unf = unfolder.unfold(A_boot, initial=best, R=R, G=G,
-                              background=res.background,
-                              disable_tqdm=True,
+        if background is not None:
+            bg = background.clone(values=np.random.poisson(background))
+            backgrounds.append(bg)
+        else:
+            bg = None
+        unf = unfolder.unfold(A_boot, initial=initial, R=R, G=G, G_ex=G_ex,
+                              background=background,
+                              disable_tqdm=disable_tqdm,
                               **kwargs)
-        if unf.cost[-1] > unf.cost[0]:
+        if False and unf.cost[-1] > unf.cost[0]:
             raise RuntimeError("Unfolding diverged")
         unfolded_boot.append(unf.best())
         A_boots.append(A_boot)
-        costs.append(unf.cost)
+        costs.append(unf.cost.astype('float16'))
+        initials.append(initial)
     bootstraped = BootstrapMatrix(base=res, bootstraps=A_boots, unfolded=unfolded_boot,
-                                  kwargs=kwargs, costs=costs)
+                                  kwargs=kwargs, costs=costs, initials=initials,
+                                  backgrounds=backgrounds if background is not None else None)
     return bootstraped
 
 T = TypeVar('T', bound=Matrix | Vector)
+SaveFormat = Literal['hdf5', 'npz']
 
 @dataclass(kw_only=True)
 class Bootstrap(ABC, Generic[T]):
     base: Result[T]
     bootstraps: list[T]
     unfolded: list[T]
-    costs: list[np.ndarray]
+    initials: list[T]
+    costs: np.ndarray | list[np.ndarray]
     backgrounds: list[T] | None = None
     kwargs: dict[str, Any] = field(default_factory=dict)
     ndim: int = field(init=False)
@@ -183,71 +226,162 @@ class Bootstrap(ABC, Generic[T]):
     _etabox: np.ndarray | None = None
     _nubox: np.ndarray | None = None
 
-    def save(self, path: str | Path, exist_ok: bool = False):
+    def save(self, path: str | Path, exist_ok: bool = False, format: SaveFormat = 'hdf5',
+             **kwargs) -> None:
+        format_ = format.lower()
+        LOG.debug(f"Saving bootstrap to {path} in {format_} format(?)")
+        start = time.time()
+        if format_ == 'hdf5':
+            self.save_hdf5(path, exist_ok=exist_ok, **kwargs)
+        elif format_ == 'npz':
+            self.save_npz(path, exist_ok=exist_ok)
+        else:
+            raise ValueError(f"Expected format {SaveFormat}, not {format}")
+        LOG.debug(f"Saved bootstrap to {path} in {format_} format in {readable_time(time.time() - start)}")
+
+    def save_hdf5(self, path: str | Path, exist_ok: bool = False, compression='gzip', **kwargs) -> None:
+        path = Path(path)
+        if not H5PY_AVAILABLE:
+            LOG.error("h5py is not available. Install it or use `npz` format instead.")
+            raise ImportError("h5py is not available. Install it or use `npz` format instead.")
+        path.mkdir(parents=True, exist_ok=exist_ok)
+        metadata = dict(version=FULLVERSION, base=self.base.__class__.__name__,
+                        ndim=self.ndim)
+        LOG.debug(f"Saving metadata to {path / 'metadata.json'}")
+        with open(path / "metadata.json", "w") as f:
+            json.dump(metadata, f)
+        LOG.debug(f"Saving base to {path / 'base'}")
+        self.base.save(path / "base", exist_ok=exist_ok)
+
+        unfolded = ArrayList.from_list(self.unfolded)
+        bootstraps = ArrayList.from_list(self.bootstraps)
+        initials = ArrayList.from_list(self.initials)
+        if self.backgrounds is not None:
+            backgrounds = ArrayList.from_list(self.backgrounds)
+        with h5py.File(path / "matrices.h5", "w") as f:
+
+            LOG.debug(f"Saving `bootstraps` to {path / 'matrices.h5' / 'bootstraps'}"
+                      f" with compression {compression}" + kwargs.get('compression_opts', ''))
+            subg = f.create_group('bootstraps')
+            bootstraps.insert_into_tree(f, 'bootstraps/', compression=compression, **kwargs)
+
+            LOG.debug(f"Saving `unfolded` to {path / 'matrices.h5' / 'unfolded'}")
+            f.create_group('unfolded')
+            unfolded.insert_into_tree(f, "unfolded/", compression=compression, **kwargs)
+
+            LOG.debug(f"Saving `initials` to {path / 'matrices.h5' / 'initials'}")
+            f.create_group('initials')
+            initials.insert_into_tree(f, "initials/", compression=compression, **kwargs)
+            if self.backgrounds is not None:
+                LOG.debug(f"Saving `backgrounds` to {path / 'matrices.h5' / 'backgrounds'}")
+                f.create_group('backgrounds')
+                backgrounds.insert_into_tree(f, "backgrounds/", compression=compression, **kwargs)  # type: ignore
+            LOG.debug(f"Saving `costs` to {path / 'matrices.h5' / 'costs'}")
+            f.create_dataset('costs', data=self.costs, compression=compression, **kwargs)
+        LOG.warn("Saving `kwargs` is not implemented yet")
+
+
+    def save_npz(self, path: str | Path, exist_ok: bool = False, disable_tqdm: bool = False) -> None:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=exist_ok)
         metadata = dict(version=FULLVERSION, base=self.base.__class__.__name__,
                         ndim=self.ndim)
+        LOG.debug(f"Saving metadata to {path / 'metadata.json'}")
         with open(path / "metadata.json", "w") as f:
             json.dump(metadata, f)
 
+        LOG.debug(f"Saving base to {path / 'base'}")
         self.base.save(path / "base", exist_ok=True)
 
-        for i, (A, unfolded) in enumerate(zip(self.bootstraps, self.unfolded)):
-            A.save(path / f"boot_{i}.npz", exist_ok=True)
-            unfolded.save(path / f"unfolded_{i}.npz", exist_ok=True)
+        tqdm_ = tqdm if not disable_tqdm else lambda x: x
+        LOG.debug(f"Saving {len(self.bootstraps)} matrices to {path}")
+        for i in tqdm_(range(len(self.bootstraps))):
+            self.bootstraps[i].save(path / f"boot_{i}.npz", exist_ok=True)
+            self.unfolded[i].save(path / f"unfolded_{i}.npz", exist_ok=True)
+            self.initials[i].save(path / f"initial_{i}.npz", exist_ok=True)
             if self.backgrounds is not None:
                 self.backgrounds[i].save(path / f"background_{i}.npz", exist_ok=True)
-            np.save(path / f"cost_{i}.npy", self.costs[i])
+            #np.save(path / f"cost_{i}.npy", self.costs[i])
 
-        #self.base.save(path / "base", exists_ok=True)
-        warnings.warn("Not saving kwargs")
+        LOG.debug(f"Saving {len(self.costs)} `costs` to {path}")
+        costs = {f"cost_{i}": self.costs[i] for i in range(len(self.costs))}
+        np.savez(path / "costs.npz", **costs)
+
+        LOG.warn("Not saving kwargs")
 
     @overload
     @classmethod
     def _load(cls, path: Path, arraytype: type[Matrix],
                basearray: type[BootstrapMatrix],
-               n: int | None = None) -> BootstrapMatrix: ...
+               read_only: int | None = None) -> BootstrapMatrix: ...
 
     @overload
     @classmethod
     def _load(cls, path: Path, arraytype: type[Vector],
                basearray: type[BootstrapVector],
-               n: int | None = None) -> BootstrapVector: ...
+               read_only: int | None = None) -> BootstrapVector: ...
     @classmethod
     def _load(cls, path: Path, arraytype: type[Matrix] | type[Vector],
                basearray: type[BootstrapMatrix] | type[BootstrapVector],
-               n: int | None = None) -> BootstrapMatrix | BootstrapVector:
+               read_only: int | None = None) -> BootstrapMatrix | BootstrapVector:
+        if (path / "matrices.h5").exists():
+            return cls._load_h5(path, arraytype, basearray, read_only)
+        return self._load_npz(path, arraytype, basearray, read_only)
+
+    @classmethod
+    def _load_npz(cls, path, arraytype, basearray, read_only):
         with open(path / "metadata.json", "r") as f:
             metadata = json.load(f)
         if metadata["version"] != FULLVERSION:
             warnings.warn(f"Version mismatch: {metadata['version']} != {FULLVERSION}")
         if metadata['ndim'] != basearray.ndim:
             raise ValueError(f"Wrong ndim: {metadata['ndim']} != {cls.ndim}")
-        #TODO Load base
         result_cls: type[Result] = RESULT_CLASSES[metadata["base"]]
         base = result_cls.from_path(path / "base")  # type: ignore
         unfolded = []
         bootstraps = []
         costs = []
+        initials = []
+        if (path / 'costs.npz').exists():
+            costs = np.load(path / "costs.npz")
         backgrounds = []
-        has_cost = True    # HACK: For backwards compatibility, temporary!
         for i in range(len(list(path.glob("boot_*.npz")))):
             unfolded.append(arraytype.from_path(path / f"unfolded_{i}.npz"))
             bootstraps.append(arraytype.from_path(path / f"boot_{i}.npz"))
-            if (path / 'cost_i.npy').exists():
-                cost = np.load(path / f"cost_{i}.npy")
-                costs.append(cost)
-            else:
-                has_cost = False
             if (path / 'background_i.npz').exists():
                 backgrounds.append(arraytype.from_path(path / f"background_{i}.npz"))
-            if n is not None and i > n:
+            initials.append(arraytype.from_path(path / f"initial_{i}.npz"))
+            if read_only is not None and i > read_only:
                 break
-        if not has_cost:
-            print("No cost found. Probably wrong version or corrupted files")
         return basearray(base=base, bootstraps=bootstraps, unfolded=unfolded, costs=costs,
-                         backgrounds=backgrounds if backgrounds else None)
+                         backgrounds=backgrounds if backgrounds else None, initials=initials)
+
+    @classmethod
+    def _load_h5(cls, path, arraytype, basearray, read_only):
+        if not H5PY_AVAILABLE:
+            raise ImportError("h5py is not available")
+        with open(path / "metadata.json", "r") as f:
+            metadata = json.load(f)
+        if metadata["version"] != FULLVERSION:
+            warnings.warn(f"Version mismatch: {metadata['version']} != {FULLVERSION}")
+        if metadata['ndim'] != basearray.ndim:
+            raise ValueError(f"Wrong ndim: {metadata['ndim']} != {cls.ndim}")
+        result_cls: type[Result] = RESULT_CLASSES[metadata["base"]]
+        base = result_cls.from_path(path / "base")  # type: ignore
+
+        backgrounds = None
+        with h5py.File(path / "matrices.h5", "r") as f:
+            bootstraps = list(ArrayList.from_tree(f, "bootstraps/", read_only=read_only).to_arrays())
+            unfolded = list(ArrayList.from_tree(f, "unfolded/", read_only=read_only).to_arrays())
+            initials = list(ArrayList.from_tree(f, "initials/", read_only=read_only).to_arrays())
+            costs = np.asarray(f['costs'])
+            if "backgrounds" in f:
+                backgrounds = list(ArrayList.from_tree(f, "backgrounds/", read_only=read_only).to_arrays())
+        return basearray(base=base, bootstraps=bootstraps, unfolded=unfolded, costs=costs,
+                         backgrounds=backgrounds, initials=initials)
+
+
+
 
     @classmethod
     @abstractmethod
@@ -284,18 +418,39 @@ class Bootstrap(ABC, Generic[T]):
     def __len__(self) -> int:
         return len(self.unfolded)
 
+    def memory_usage_rapport(self) -> None:
+        g = bytes_to_readable
+        memory_usage = {
+            'bootstraps': sum([b.nbytes for b in self.bootstraps]),
+            'unfolded': sum([b.nbytes for b in self.unfolded]),
+            'costs': self.costs.nbytes if isinstance(self.costs, np.ndarray) else sum([c.nbytes for c in self.costs]),
+            'backgrounds': sum([b.nbytes for b in self.backgrounds]) if self.backgrounds is not None else 0,
+            #'base': self.base.nbytes,
+            '_ubox': self._ubox.nbytes if self._ubox is not None else 0,
+            '_etabox': self._etabox.nbytes if self._etabox is not None else 0,
+            '_nubox': self._nubox.nbytes if self._nubox is not None else 0,
+            'initial': sum([b.nbytes for b in self.initials])
+        }
+        rapport = "MEMORY USAGE RAPPORT\n"
+        for attr, mem in memory_usage.items():
+            rapport += f"{attr:<15} {g(mem)}\n"
+        rapport += "=============================\n"
+        rapport += f"{'Total':<15} {g(sum(memory_usage.values()))}"
+        print(rapport)
+
 @dataclass(kw_only=True)
 class BootstrapVector(Bootstrap[Vector]):
     base: UnfoldedResult1D
     bootstraps: list[Vector]
     unfolded: list[Vector]
+    costs: np.ndarray
+    initials: list[Vector]
     kwargs: dict[str, Any] = field(default_factory=dict)
     ndim: Literal[1] = 1
 
     @classmethod
-    def from_path(cls, path: str | Path, n: int | None = None) -> BootstrapVector:
-        return cls.__load(Path(path), Vector, n=n)  # type: ignore
-
+    def from_path(cls, path: str | Path, read_only: int | None = None) -> BootstrapVector:
+        return cls.__load(Path(path), Vector, read_only)  # type: ignore
 
     def plot_unfolded(self, ax: Axes | None = None, **kwargs) -> Plots1D:
         ax = make_ax(ax)
@@ -325,6 +480,36 @@ class BootstrapVector(Bootstrap[Vector]):
             if i == 0:
                 lines.append(l)
         return ax, (l, lines[-1])
+
+    def plot_cost(self, ax: Axes | None = None, skip: float | int | None = None, **kwargs) -> Plots1D:
+        ax = make_ax(ax)
+        if len(self.costs) == 0:
+            return ax, []
+        cost = self.costs
+        i = np.arange(len(cost))
+        if skip is not None:
+            if isinstance(skip, float):
+                skip = int(skip * len(cost))
+            cost = cost[skip:]
+            i = i[skip:]
+        l = ax.plot(i, cost, **kwargs)
+        maybe_set(ax, xlabel='Iteration')
+        maybe_set(ax, ylabel='Cost')
+        return ax, l
+
+    def plot_initials(self, ax: Axes | None = None, **kwargs) -> Plots1D:
+        ax = make_ax(ax)
+        lines = []
+        kwargs = {'color': 'k', 'alpha': 1/10} | kwargs
+        x = self.base.best().X
+        dx = self.base.best().dX
+        x = x + dx/2
+        for initial in self.initials:
+            l = ax.plot(initial.X, initial.values, '_', **kwargs)
+            #l = initial.plot(ax=ax, **kwargs)
+            #l = ax.plot(x, initial, '_', **kwargs)
+            lines.extend(l)
+        return ax, lines
 
     def mu(self, alpha=0.05, summary = np.median) -> AsymmetricVector:
         mu = summary(self.ubox, axis=0)
@@ -385,12 +570,13 @@ class BootstrapMatrix(Bootstrap[Matrix]):
     base: UnfoldedResult2D
     bootstraps: list[Matrix]
     unfolded: list[Matrix]
+    initials: list[Matrix]
     kwargs: dict[str, Any] = field(default_factory=dict)
     ndim: Literal[2] = 2
 
     @classmethod
-    def from_path(cls, path: str | Path, n: int | None = None) -> BootstrapMatrix:
-        return Bootstrap._load(Path(path), Matrix, BootstrapMatrix, n=n)
+    def from_path(cls, path: str | Path, read_only: int | None = None) -> BootstrapMatrix:
+        return Bootstrap._load(Path(path), Matrix, BootstrapMatrix, read_only)
 
     def plot_unfolded(self, Ex: float | int, ax: Axes | None = None) -> Plots1D:
         ax = make_ax(ax)
@@ -465,10 +651,23 @@ class BootstrapMatrix(Bootstrap[Matrix]):
         eta = self.base.raw.clone(values=eta)
         return eta
 
+    def eta_ci(self, alpha=0.05, summary = np.median) -> tuple[Matrix, Matrix]:
+        a_low = 100*alpha/2
+        lower = np.percentile(self.etabox, a_low, axis=0)
+        a_high = 100*(1-alpha/2)
+        upper = np.percentile(self.etabox, a_high, axis=0)
+        lower = self.base.raw.clone(values=lower, name=f'Lower {100*(1-alpha):.0f}% PI')
+        upper = self.base.raw.clone(values=upper, name=f'Upper {100*(1-alpha):.0f}% PI')
+        return lower, upper
+
     def nu_mat(self, summary = np.median) -> Matrix:
         nu = summary(self.nubox, axis=0)
         nu = self.base.raw.clone(values=nu)
         return nu
+
+    def get_eta(self, i: int) -> Matrix:
+        return self.base.raw.clone(values=self.etabox[i, :, :],
+                                   name=f'eta {i}')
 
     @property
     def ubox(self) -> np.ndarray:
@@ -517,9 +716,10 @@ def last_nonzero(box: np.ndarray) -> int:
 #@njit
 def mul(X, A):
     Y = np.zeros_like(X)
-    for i in range(X.shape[0]):
+    for i in tqdm(range(X.shape[0])):
         Y[i, :, :] = (A@(X[i, :, :].T)).T
     return np.ascontiguousarray(Y)
+
 
 def bootstrap_CI(b: Bootstrap, N: int, alpha=0.05,
                  space: VSpace = 'nu') -> tuple[np.ndarray, np.ndarray]:

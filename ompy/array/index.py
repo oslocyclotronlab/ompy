@@ -613,7 +613,7 @@ class Edge(Index, ABC):
     def is_inbounds(self, x) -> bool:
         """ Check if index is in bounds """
         y = self.to_same_unit(x)
-        return self.leftmost <= y <= self.rightmost
+        return self.leftmost <= y < self.rightmost
 
     def to_edge(self, edge: Edges) -> Index:
         match edge.lower():
@@ -1240,4 +1240,4 @@ def _from_dict(d: IndexDict) -> Index:
 
 
 def compress(x):
-    return [(k, len(list(g))) for k, g in groupby(x)]
+   return [(k, len(list(g))) for k, g in groupby(x)]

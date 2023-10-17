@@ -20,6 +20,8 @@ def get_logger(name: str, level=logging.INFO):
     if not name.startswith("ompy"):
         name = "ompy." + name
     logger = logging.getLogger(name)
+    if isinstance(level, str):
+        level = level.upper()
     logger.setLevel(level)
     logger.handlers = []
     handler = logging.StreamHandler(sys.stdout)
@@ -43,7 +45,7 @@ def available_loggers() -> List[str]:
     """
     # Is the code from cython source
     existing = logging.root.manager.loggerDict.keys()
-    ompy_loggers = [k.split('.')[1] for k in existing
+    ompy_loggers = [k.split('.', 1)[1] for k in existing
                     if 'ompy' in k and len(k) > 5]
     return ompy_loggers
 

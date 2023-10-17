@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+from . import NUMBA_AVAILABLE, NUMBA_CUDA_AVAILABLE, NUMBA_CUDA_WORKING
 
 def nop_decorator(func, *aargs, **kkwargs):
     def wrapper(*args, **kwargs):
@@ -22,7 +23,7 @@ try:
     NUMPY = True
 except ImportError as e:
     NUMPY = False
-    warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
+    #warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
     int32 = np.int32
     float32 = np.float32
     float64 = np.float64
@@ -35,3 +36,26 @@ except ImportError as e:
     jitclass = nop_nop
     NList = list
     ListType = list
+
+if NUMBA_CUDA_AVAILABLE:
+    from numba import cuda
+    from numba.cuda.cudadrv.driver import CudaAPIError, CudaSupportError
+    HAIL_MARY = False
+
+    if HAIL_MARY:
+        NUMBA_CUDA_WORKING[0] = True
+    else:
+        try:
+            # Test if cuda is working
+            @cuda.jit
+            def cuda_test(x, y):
+                i = cuda.grid(1)
+                y[i] = x[i] + 1
+            x = np.arange(10)
+            y = np.zeros_like(x)
+            cuda_test[1, 10](x, y)
+            NUMBA_CUDA_WORKING[0] = True
+        except (CudaAPIError, CudaSupportError) as e:
+            warnings.warn("Numba CUDA is available but not working.\n"
+                f"{e}")
+            NUMBA_CUDA_WORKING[0] = False

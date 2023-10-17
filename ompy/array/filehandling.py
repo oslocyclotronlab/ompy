@@ -1,21 +1,23 @@
-from typing import Union, Iterable, List, Tuple, Optional, Any, TypeAlias, Literal
+from typing import Union, Iterable, Any, TypeAlias, Literal
 from pathlib import Path
 import tarfile
 import time
 import numpy as np
 import pandas as pd
-from numpy import ndarray
-from scipy.ndimage import gaussian_filter1d
 from dataclasses import asdict
-from .. import __full_version__, H5PY_AVAILABLE
-from .index import Index
+from .. import __full_version__, H5PY_AVAILABLE, Unit, ROOT_AVAILABLE
+from .index import Index, LeftUniformIndex
 from warnings import warn
 from ..helpers import ensure_path
+import logging
 
-from ompy.stubs import Pathlike, array
+from ..stubs import Pathlike, array
 from numpy.typing import NDArray
 
-Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz', 'hdf5', 'csv', 'npy']
+LOG = logging.getLogger(__name__)
+logging.captureWarnings(True)
+
+Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz', 'hdf5', 'csv', 'npy', 'root']
 
 Farray: TypeAlias = NDArray[np.float64]
 
@@ -235,7 +237,7 @@ def save_tar(objects: Union[np.ndarray, Iterable[np.ndarray]],
     tar.close()
 
 
-def load_tar(path: Union[str, Path]) -> List[np.ndarray]:
+def load_tar(path: Union[str, Path]) -> list[np.ndarray]:
     if isinstance(path, str):
         path = Path(path)
 
@@ -382,36 +384,151 @@ def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:
         values = data['values']
     return cls(X=X_index, Y=Y_index, values=values, **meta)
 
+def save_hdf5_2D(matrix, path: Path, exist_ok: bool = False, **kwargs) -> None:
+    raise ImportError("h5py is not installed")
+
+def load_hdf5_2D(path: Path, cls, **kwargs) -> Any:
+    raise ImportError("h5py is not installed")
+
 if H5PY_AVAILABLE:
     import h5py
-    def save_hdf5_2D(path: Path, matrix, exist_ok: bool = False) -> None:
+
+    def dict_to_hdf5(h5file, dictionary: dict[str, Any], path='/'):
+        for key, value in dictionary.items():
+            if False:
+                print('\n ======')
+                print(path)
+                print(key, value)
+                print(h5file[path].keys())
+                print(h5file[path].attrs.keys())
+                print(type(value))
+            match value:
+                case dict():
+                    h5file.create_group(path + key)
+                    dict_to_hdf5(h5file, value, path + key + '/')
+                case int() | float() | str() | np.number():
+                    # Save simple datatypes as attributes
+                    h5file[path].attrs[key] = value
+                case np.ndarray() | list():
+                    h5file[path + key] = value
+                case Unit():
+                    h5file[path].attrs[key] = str(value)
+                case x:
+                    raise TypeError(f"Unsupported type {type(x)}:{x}")
+
+    def hdf5_to_dict(h5file, path='/') -> dict[str, Any]:
+        dictionary = {}
+        for key, item in h5file[path].items():
+            if isinstance(item, h5py.Dataset):  # item is a dataset
+                dictionary[key] = item[()]
+            elif isinstance(item, h5py.Group):  # item is a group (nested dictionary)
+                dictionary[key] = hdf5_to_dict(h5file, path + key + '/')
+        for key, val in h5file[path].attrs.items():
+            dictionary[key] = val
+        return dictionary
+
+    #@ensure_path
+    def _save_hdf5_2D(matrix, path: Path, exist_ok: bool = False, **kwargs) -> None:
         if not exist_ok and path.exists():
             raise FileExistsError(f"{path} already exists")
 
-        with h5py.File(path, 'w') as f:
-            f.create_dataset('X index', data=np.array(list(matrix.X_index.to_dict().items())))
-            f.create_dataset('Y index', data=np.array(list(matrix.Y_index.to_dict().items())))
-            f.create_dataset('values', data=matrix.values)
-            for key, value in asdict(matrix.metadata).items():
-                f.attrs[key] = value
-            f.attrs['version'] = __full_version__
+        kwargs.setdefault('compression', 'gzip')
 
-    def load_hdf5_2D(path: Path, cls, **kwargs) -> Any:
+        start = time.time()
+        with h5py.File(path, 'w') as f:
+            f.create_group('X_index')
+            dict_to_hdf5(f, matrix.X_index.to_dict(), 'X_index/')
+            f.create_group('Y_index')
+            dict_to_hdf5(f, matrix.Y_index.to_dict(), 'Y_index/')
+            f.create_dataset('values', data=matrix.values, **kwargs)
+            f.create_group('meta')
+            dict_to_hdf5(f, asdict(matrix.metadata), 'meta/')
+            f.attrs['version'] = __full_version__
+        elapsed = time.time() - start
+        LOG.debug(f"Saving {path} took {elapsed:.2f} seconds")
+
+    #@ensure_path
+    def _load_hdf5_2D(path: Path, cls, **kwargs) -> Any:
+        start = time.time()
         with h5py.File(path, 'r') as f:
             version = f.attrs['version']
             if version != __full_version__:
-                print(
-                    f"Version mismatch when loading {path}: {version} != {__full_version__}")
                 warn(
                     f"Version mismatch when loading {path}: {version} != {__full_version__}")
-            meta = {key: f.attrs[key] for key in f.attrs.keys() if key != 'version'}
-            X_index = Index.from_dict(dict(f['X index']))
-            Y_index = Index.from_dict(dict(f['Y index']))
+            meta = hdf5_to_dict(f, 'meta/')
+            X_dict = hdf5_to_dict(f, 'X_index/')
+            X_index = Index.from_dict(X_dict)  # type: ignore
+            Y_dict = hdf5_to_dict(f, 'Y_index/')
+            Y_index = Index.from_dict(Y_dict)  # type: ignore
             values = np.array(f['values'])
+        elapsed = time.time() - start
+        LOG.debug(f"Loading {path} took {elapsed:.2f} seconds")
         return cls(X=X_index, Y=Y_index, values=values, **meta)
 
+    save_hdf5_2D = _save_hdf5_2D
+    load_hdf5_2D = _load_hdf5_2D
+
+def save_root_1D(vector, path: Path, exist_ok: bool = False) -> None:
+    raise ImportError("ROOT is not available")
+
+def load_root_1D(path: Path, cls) -> Any:
+    raise ImportError("ROOT is not available")
+
+if ROOT_AVAILABLE:
+    import ROOT
+    from ROOT import TH1D, TFile
+
+    def save_root_1D(vector, path: Path, exist_ok: bool = False,
+                     name: str | None = None, simple: bool = True) -> None:
+        path = path.with_suffix('.root')
+        if not exist_ok and path.exists():
+            raise FileExistsError(f"{path} already exists")
+        vector = vector.to_left()
+        with TFile(str(path), 'recreate') as f:
+            hist = TH1D('hist', 'hist', vector.shape[0], vector._index[0], vector._index[-1])
+            for i, val in enumerate(vector.values):
+                hist.SetBinContent(i+1, val)
+            hist.GetXaxis().SetTitle(vector.xlabel)
+            hist.GetYaxis().SetTitle(vector.ylabel)
+            hist.SetTitle(vector.title)
+            if name is not None:
+                hist.SetName(name)
+            hist.Write()
+            
+            if not simple:
+                # Metadata
+                d = f.mkdir('index')
+                d.cd()
+                index = vector._index.to_dict()
+                for key, val in index.items():
+                    print(key, val)
+                    ROOT.TNamed(key, str(val)).Write()
+                #    f.SetKey(key, val)
+                d = f.mkdir('meta')
+                d.cd()
+                meta = asdict(vector.metadata)
+                for key, val in meta.items():
+                    print(key, val)
+                    ROOT.TNamed(key, str(val)).Write()
+                ROOT.TNamed('version', __full_version__).Write()
 
 
+
+
+    def load_root_1D(path: Path, cls) -> Any:
+        if not path.exists():
+            if path.with_suffix('.root').exists():
+                path = path.with_suffix('.root')
+            # else let root throw the error
+        with TFile(str(path), 'read') as f:
+            hist = f.Get('hist')
+            values = np.array([hist.GetBinContent(i) for i in range(1, hist.GetNbinsX()+1)])
+            arr = np.linspace(hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax(), hist.GetNbinsX())
+            index = LeftUniformIndex.from_array(arr)
+        return cls(X=index, values=values)
+
+
+Suffix: TypeAlias = Literal['.npy', '.tar', '.txt', '.csv', '.m', '.npz', '.h5', 'root']
 def filetype_from_suffix(path: Path) -> Filetype | None:
     suffix = path.suffix
     match suffix:
@@ -429,6 +546,8 @@ def filetype_from_suffix(path: Path) -> Filetype | None:
             return 'npz'
         case '.h5':
             return 'hdf5'
+        case '.root':
+            return 'root'
         case '':
             return ''
         case _:
@@ -440,7 +559,8 @@ def resolve_filetype(path: Path, filetype: str | None) -> tuple[Path, Filetype]:
         filetype = filetype_from_suffix(path)
         if filetype is None:
             raise ValueError(
-                "Filetype could not be determined from suffix: {path}")
+                f"Filetype could not be determined from suffix: {path}"
+            f"Supported suffixes are {Suffix}")
         # Fallback case
         if filetype == '':
             filetype = 'npz'
@@ -452,3 +572,4 @@ def resolve_filetype(path: Path, filetype: str | None) -> tuple[Path, Filetype]:
     if filetype == 'npz' and not path.suffix:
         path = path.with_suffix('.npz')
     return path, filetype
+

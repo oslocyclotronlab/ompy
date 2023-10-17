@@ -4,21 +4,22 @@ import copy
 import logging
 import warnings
 from pathlib import Path
-from typing import (Sequence, overload, Literal, TypeAlias, Callable, Any)
+from typing import (overload, Literal, TypeAlias, Callable, Any, Never)
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
+from matplotlib import colormaps as cmaps
 
-from .. import Unit, make_axes
+from .. import XARRAY_AVAILABLE, Unit, make_axes, ROOT_IMPORTED
 from .abstractarray import AbstractArray
 from .filehandling import (load_numpy_2D, load_tar,
-                           load_txt_2D, mama_read, mama_write, save_numpy_2D,
-                           save_tar, save_txt_2D, Filetype, resolve_filetype, load_npz_2D, save_npz_2D)
-from ..library import fill_negative_gauss
-from ..helpers import maybe_set
+                           load_txt_2D, mama_read, mama_write, save_hdf5_2D, save_numpy_2D,
+                           save_tar, save_txt_2D, Filetype, resolve_filetype,
+                           load_npz_2D, save_npz_2D, save_hdf5_2D, load_hdf5_2D)
+from ..helpers import maybe_set, make_ax
 from ..stubs import (Unitlike, Pathlike, Axes, Figure,
                      Colorbar, QuadMesh, array, arraylike, ArrayBool, numeric, QuantityLike)
 from .vector import Vector, maybe_pop_from_kwargs
@@ -87,18 +88,21 @@ class Matrix(AbstractArray, MatrixProtocol):
         - Make values, Ex and Eg to properties so that
           the integrity of the matrix can be ensured.
     """
+    _ndim = 2
 
     def __init__(self, *,
                  X: arraylike | Index | None = None,
                  Y: arraylike | Index | None = None,
                  values: np.ndarray | None = None,
-                 unit: Unitlike | None = None,
+                 X_unit: Unitlike | None = None,
+                 Y_unit: Unitlike | None = None,
                  edge: Edges = 'left',
                  boundary: bool = False,
                  metadata: MatrixMetadata = MatrixMetadata(),
                  order: Literal['C', 'F'] = 'C',
                  copy: bool = False,
                  indexkwargs: dict[str, Any] | None = None,
+                 dtype: np.dtype | str = 'float32',
                  **kwargs):
         # Resolve aliasing
         kwargs, X, xalias = maybe_pop_from_kwargs(kwargs, X, 'X', 'xalias')
@@ -112,10 +116,10 @@ class Matrix(AbstractArray, MatrixProtocol):
 
         if copy:
             def fetch(x):
-                return np.asarray(x, dtype=float, order=order).copy()
+                return np.asarray(x, dtype=dtype, order=order).copy()
         else:
             def fetch(x):
-                return np.asarray(x, dtype=float, order=order)
+                return np.asarray(x, dtype=dtype, order=order)
 
         super().__init__(fetch(values))
         self.values = fetch(values)
@@ -126,17 +130,20 @@ class Matrix(AbstractArray, MatrixProtocol):
         xlabel = kwargs.pop('xlabel', r"Excitation energy")
         default_ylabel = 'ylabel' not in kwargs
         ylabel = kwargs.pop('ylabel', r"$\gamma$-energy")
-        default_unit = False if unit is not None else True
-        unit = 'keV' if default_unit else unit
-        assert unit is not None
-        self.X_index: Index = make_or_update_index(X, unit=Unit(unit), alias=xalias, label=xlabel,
+        default_X_unit = False if X_unit is not None else True
+        default_Y_unit = False if Y_unit is not None else True
+        X_unit = 'keV' if default_X_unit else X_unit
+        Y_unit = 'keV' if default_Y_unit else Y_unit
+        assert X_unit is not None
+        assert Y_unit is not None
+        self.X_index: Index = make_or_update_index(X, unit=Unit(X_unit), alias=xalias, label=xlabel,
                                             default_label=default_xlabel,
-                                            default_unit=default_unit,
+                                            default_unit=default_X_unit,
                                             edge=edge, boundary=boundary,
                                             **indexkwargs)
-        self.Y_index: Index = make_or_update_index(Y, unit=Unit(unit), alias=yalias, label=ylabel,
+        self.Y_index: Index = make_or_update_index(Y, unit=Unit(Y_unit), alias=yalias, label=ylabel,
                                             default_label=default_ylabel,
-                                            default_unit=default_unit,
+                                            default_unit=default_Y_unit,
                                             edge=edge, boundary=boundary,
                                             **indexkwargs)
         if len(self.X_index) != self.values.shape[0]:
@@ -153,6 +160,10 @@ class Matrix(AbstractArray, MatrixProtocol):
         if wrong_kw:
             raise ValueError(
                 f"Invalid keyword arguments: {', '.join(wrong_kw)}")
+        if isinstance(metadata, dict):
+            metadata = MatrixMetadata(**metadata)
+        if not isinstance(metadata, MatrixMetadata):
+            raise TypeError(f"metadata must be a MatrixMetadata, not {type(metadata)}")
         self.metadata = metadata.update(**kwargs)
         self.iloc = IndexLocator(self)
         self.vloc = ValueLocator(self)
@@ -215,6 +226,8 @@ class Matrix(AbstractArray, MatrixProtocol):
                     return cls(Ex=X, Eg=Y, values=values)  # , edge='mid')
                 else:
                     raise RuntimeError("Wrong format of mama file")
+            case 'hdf5':
+                return load_hdf5_2D(path, cls, **kwargs)
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
         return cls(Ex=X, Eg=Y, values=values)
@@ -254,6 +267,8 @@ class Matrix(AbstractArray, MatrixProtocol):
             case 'mama':
                 warnings.warn("MAMA format does not preserve metadata.")
                 mama_write(self, path, comment="Made by OMpy", **kwargs)
+            case 'hdf5':
+                save_hdf5_2D(self, path, **kwargs)
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
 
@@ -400,7 +415,7 @@ class Matrix(AbstractArray, MatrixProtocol):
                                 self.values, axis=0, preserve=preserve)
             if inplace:
                 self.values = rebinned
-                self.X_index = index 
+                self.X_index = index
             else:
                 return self.clone(X=index, values=rebinned)
         else:
@@ -410,59 +425,9 @@ class Matrix(AbstractArray, MatrixProtocol):
                                 self.values, axis=1, preserve=preserve)
             if inplace:
                 self.values = rebinned
-                self.Y_index = index 
+                self.Y_index = index
             else:
                 return self.clone(Y=index, values=rebinned)
-
-    @overload
-    def fill_negative(self, window: numeric | array,
-                      inplace: Literal[False] = False) -> Matrix: ...
-
-    @overload
-    def fill_negative(self, window: numeric | array,
-                      inplace: Literal[True] = True) -> None: ...
-
-    def fill_negative(self, window: numeric | array, inplace: bool = False) -> Matrix | None:
-        """ Wrapper for :func:`ompy.fill_negative_gauss` """
-        raise NotImplementedError()
-        if not inplace:
-            return self.clone(values=fill_negative_gauss(self.values, self.observed, window))
-        self.values = fill_negative_gauss(self.values, self.observed, window)
-
-    def remove_negative(self, inplace=False) -> Matrix | None:
-        """ Entries with negative values are set to 0 """
-        raise DeprecationWarning("Use matrix[matrix < 0] = 0 instead")
-        raise NotImplementedError()
-        if not inplace:
-            return self.clone(values=np.where(self.values > 0, self.values, 0))
-        self.values[self.values > 0] = np.where(
-            self.values > 0, self.values, 0)
-
-    @overload
-    def fill_and_remove_negative(
-            self, window: numeric | array, inplace: Literal[False] = False) -> Matrix: ...
-
-    @overload
-    def fill_and_remove_negative(
-            self, window: numeric | array, inplace: Literal[True] = True) -> None: ...
-
-    def fill_and_remove_negative(self, window: numeric | array = 20, inplace=False) -> Matrix | None:
-        """ Combination of :meth:`ompy.Matrix.fill_negative` and
-        :meth:`ompy.Matrix.remove_negative`
-
-        Args:
-            window: See `fill_negative`. Defaults to 20 (arbitrary)!.
-            inplace: Whether to change the matrix inplace or return a modified copy.
-            """
-        if window == 20:
-            warnings.warn(
-                "Window size 20 is arbitrary. Consider setting it to an informed value > 0")
-        if not inplace:
-            clone: Matrix = self.fill_negative(window, inplace=False)
-            clone[clone < 0] = 0
-            return clone
-        self.fill_negative(window=window, inplace=True)
-        self.values[self.values < 0] = 0
 
     def index_X(self, x: float) -> int:
         return self.X_index.index_expression(x)
@@ -600,12 +565,27 @@ class Matrix(AbstractArray, MatrixProtocol):
     def summary(self):
         print(self._summary)
 
-    def sum(self, axis: int | str = 'both') -> Vector | float:
+    @overload
+    def sum(self, axis: Literal['both'] = ...,
+            out: np.ndarray | None = ...) -> float: ...
+
+    @overload
+    def sum(self, axis: Literal[2] = ...,
+            out: np.ndarray | None = ...) -> float: ...
+
+    @overload
+    def sum(self, axis: Literal[0,1] | str = ...,
+            out: np.ndarray | None = ...) -> Vector: ...
+
+    def sum(self, axis: int | str = 'both',
+            out: np.ndarray | None = None) -> Vector | float:
+        if out is not None:
+            raise NotImplementedError("ops")
         axis_: AxisBoth = self.axis_to_int(axis, allow_both=True)
         if axis_ == 2:
             return self.values.sum()
         values = self.values.sum(axis=axis_)
-        index = self.X_index if axis else self.Y_index
+        index = self.X_index if axis_ else self.Y_index
         return self.meta_into_vector(index=index, values=values)
 
     def __str__(self) -> str:
@@ -624,6 +604,7 @@ class Matrix(AbstractArray, MatrixProtocol):
     def clone(self, X: Index | None = None, Y: Index | None = None,
               values: np.ndarray | None = None,
               metadata: MatrixMetadata | None = None, copy: bool = False,
+              dtype: np.dtype | None = None,
               **kwargs) -> Matrix:
         """ Copies the object.
 
@@ -641,7 +622,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         values = values if values is not None else self.values
         metadata = metadata if metadata is not None else self.metadata
         metadata = metadata.update(**kwargs)
-        return Matrix(X=X, Y=Y, values=values, metadata=metadata, copy=copy)
+        return Matrix(X=X, Y=Y, values=values, metadata=metadata, copy=copy,
+                      dtype=dtype)
 
     def is_compatible_with(self, other: AbstractArray | Index) -> bool:
         return self.is_compatible_with_X(other) or self.is_compatible_with_Y(other)
@@ -718,8 +700,7 @@ class Matrix(AbstractArray, MatrixProtocol):
              bad_map: Callable[[Matrix], ArrayBool | bool] = lambda x: False,
              **kwargs) -> tuple[Axes, tuple[QuadMesh, None]]: ...
 
-    @make_axes
-    def plot(self, ax: Axes, *,
+    def plot(self, ax: Axes | None = None, *,
              scale: str | None = None,
              vmin: float | None = None,
              vmax: float | None = None,
@@ -746,7 +727,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         Raises:
             ValueError: If scale is unsupported
         """
-        fig: Figure = ax.figure
+        ax = make_ax(ax)
+        fig: Figure = ax.figure  # type: ignore
 
         # Simple heuristic to determine scale
         if scale is None:
@@ -797,8 +779,8 @@ class Matrix(AbstractArray, MatrixProtocol):
             ax.yaxis.set_major_locator(MeshLocator(self.X))
 
         maybe_set(ax, title=self.name)
-        maybe_set(ax, ylabel=self.xlabel + f" [${self.X_index.unit:~L}$]")
-        maybe_set(ax, xlabel=self.ylabel + f" [${self.Y_index.unit:~L}$]")
+        maybe_set(ax, ylabel=self.get_xlabel())
+        maybe_set(ax, xlabel=self.get_ylabel())
 
         # show z-value in status bar
         # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
@@ -835,6 +817,92 @@ class Matrix(AbstractArray, MatrixProtocol):
 
             maybe_set(cbar.ax, ylabel=self.vlabel)
         return ax, (mesh, cbar)
+
+    def plot_3d(self, ax: Axes | None = None, vmin: float | None = None,
+                vmax: float | None = None, scale = 'linear', 
+                add_cbar: bool = True,
+                cbarkwargs: dict| None = None, **kwargs):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+        fig: Figure = ax.figure  # type: ignore
+
+        if scale == 'log':
+            if vmin is not None and vmin <= 0:
+                raise ValueError("`vmin` must be positive for log-scale")
+            if vmin is None:
+                _max = np.log10(self.max())
+                _min = np.log10(self.values[self.values > 0].min())
+                if _max - _min > 10:
+                    vmin = 10**(int(_max-6))
+            norm = LogNorm(vmin=vmin, vmax=vmax)
+        elif scale == 'symlog':
+            lintresh = kwargs.pop('lintresh', 1e-1)
+            linscale = kwargs.pop('linscale', 1)
+            norm = SymLogNorm(lintresh, linscale, vmin, vmax)
+        elif scale == 'linear':
+            norm = Normalize(vmin=vmin, vmax=vmax)
+        else:
+            raise ValueError("Unsupported zscale ", scale)
+        norm = kwargs.pop('norm', norm)
+        cmap = cmaps.get_cmap(kwargs.pop('cmap', cm.get_cmap()))
+        X, Y = self.X, self.Y #self._plot_mesh()
+        dx = X[1] - X[0]
+        dy = Y[1] - Y[0]
+        Y, X = np.meshgrid(Y, X)
+        Z = self.values
+        colors = cmap(norm(Z.flatten()))
+
+        # Plotting a 3D histogram with color based on height (log normalized)
+        mesh = ax.bar3d(Y.flatten(), 
+                 X.flatten(), 
+                 np.zeros_like(Z).flatten(), 
+                 dy, dx, Z.flatten(), shade=True, color=colors)
+
+        if False:
+            if self.Y_index.is_mid():
+                ax.xaxis.set_major_locator(MeshLocator(self.Y))
+                ax.tick_params(axis='x', rotation=40)
+            if self.X_index.is_mid():
+                ax.yaxis.set_major_locator(MeshLocator(self.X))
+
+        cbar: Colorbar | None = None
+        if add_cbar:
+            if cbarkwargs is None:
+                cbarkwargs = {}
+            cbarkwargs.setdefault('fraction', 0.03)
+            cbarkwargs.setdefault('pad', 0.04)
+
+            mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+            mappable.set_array(Z)
+            if vmin is not None and vmax is not None:
+                cbar = fig.colorbar(mappable, ax=ax, extend='both', **cbarkwargs)
+            elif vmin is not None:
+                cbar = fig.colorbar(mappable, ax=ax, extend='min', **cbarkwargs)
+            elif vmax is not None:
+                cbar = fig.colorbar(mappable, ax=ax, extend='max', **cbarkwargs)
+            else:
+                cbar = fig.colorbar(mappable, ax=ax, **cbarkwargs)
+
+            maybe_set(cbar.ax, ylabel=self.vlabel)
+
+        maybe_set(ax, title=self.name)
+        maybe_set(ax, ylabel=self.get_xlabel())
+        maybe_set(ax, xlabel=self.get_ylabel())
+
+        return ax, (mesh, cbar)
+
+    def get_ylabel(self) -> str:
+        unit = f'{self.Y_index.unit:~L}'
+        if unit:
+            return self.ylabel + f" [${unit}$]"
+        return self.ylabel
+
+    def get_xlabel(self) -> str:
+        unit = f'{self.Y_index.unit:~L}'
+        if unit:
+            return self.xlabel + f" [${unit}$]"
+        return self.xlabel
 
     def _plot_mesh(self) -> tuple[np.ndarray, np.ndarray]:
         if self.X_index.is_mid():
@@ -942,6 +1010,42 @@ class Matrix(AbstractArray, MatrixProtocol):
 
     def last_nonzeros(self) -> np.ndarray:
         return last_nonzeros(self.values)
+
+    def to_xarray(self):
+        return to_xarray_matrix(self)
+    
+    def to_root(self, identifier:str | None = None):
+        return to_root_matrix(self, identifier)
+
+if XARRAY_AVAILABLE:
+    import xarray as xr
+    def to_xarray_matrix(mat) -> xr.DataArray:  # type: ignore
+            return xr.DataArray(mat.values, coords=[mat.X, mat.Y],
+                                dims=[mat.xalias, mat.yalias])
+else:
+    def to_xarray_matrix(mat) -> Never:
+        raise NotImplementedError("xarray not available")
+
+
+if ROOT_IMPORTED:
+    import ROOT
+    from ROOT import TH2D  # type: ignore
+    def to_root_matrix(mat, identifier: str | None = None) -> TH2D:  # type: ignore
+        mat = mat.to_left()
+        if identifier is None:
+            identifier = mat.name
+        hist = TH2D(identifier, identifier, len(mat.Y)-1, mat.Y, len(mat.X)-1, mat.X)
+        for i in range(len(mat.Y)):
+            for j in range(len(mat.X)):
+                hist.SetBinContent(i+1, j+1, mat[j,i])
+        hist.GetXaxis().SetTitle(mat.ylabel)
+        hist.GetYaxis().SetTitle(mat.xlabel)
+        hist.SetTitle(mat.name)
+        return hist
+else:
+    def to_root_matrix(mat, *args, **kwargs) -> Never:
+        raise NotImplementedError("ROOT not imported")
+
 
 
 class IndexLocator:

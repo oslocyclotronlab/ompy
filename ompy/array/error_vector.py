@@ -1,7 +1,8 @@
 from __future__ import annotations
+from .index import Index
 from .vector import Vector, VectorMetadata
 from ..stubs import Axes, Plot1D, ErrorPlotKind
-from typing import Iterable, Literal
+from typing import Iterable, Literal, Self
 import numpy as np
 from ..helpers import maybe_set
 import matplotlib.pyplot as plt
@@ -18,18 +19,19 @@ TODO Add a PoissonVector to plot Poisson error bars and CI.
 class ErrorVector(Vector):
     @classmethod
     @abstractmethod
-    def add_error(cls, other: Vector, err: np.ndarray) -> ErrorVector: ...
+    def add_error(cls, other: Vector, err: np.ndarray) -> Self: ...
 
     @classmethod
-    def from_vector(cls, other: Vector, *args, **kwargs) -> ErrorVector:
+    def from_vector(cls, other: Vector, *args, **kwargs) -> Self:
         return cls.add_error(other, *args, **kwargs)
 
     def save(self, *args, **kwargs) -> None:
         raise NotImplementedError()
 
     @classmethod
-    def from_path(cls, *args, **kwargs) -> ErrorVector:
+    def from_path(cls, *args, **kwargs) -> Self:
         raise NotImplementedError()
+
 
 
 class AsymmetricVector(ErrorVector):
@@ -77,6 +79,29 @@ class AsymmetricVector(ErrorVector):
                                   "values. Might be due to numerical precision. "
                                   "Consider setting `clip=True`"))
         return cls(X=other.X_index, values=other.values, lerr=lerr, uerr=uerr, **kwargs)
+
+    @classmethod
+    def from_list(cls, vectors: list[Vector], summary=np.median, alpha: float = 0.68, **kwargs) -> AsymmetricVector:
+        box = np.array([v.values for v in vectors])
+        summaried = summary(box, axis=0)
+        # create a alpha% percentile interval:
+        lerr = np.percentile(box, (1-alpha)/2*100, axis=0)
+        uerr = np.percentile(box, (1+alpha)/2*100, axis=0)
+        vec = vectors[0].clone(values=summaried)
+        return cls.from_CI(vec, lerr, uerr, **kwargs)
+
+
+    def clone_from_slice(self, slice_: slice) -> Self:
+        """ Returns a new vector with the given slice applied.
+        """
+        index: Index = self._index.__getitem__(slice_)
+        values = self.values.__getitem__(slice_)
+        lerr = self.lerr.__getitem__(slice_)
+        uerr = self.uerr.__getitem__(slice_)
+        return self.clone(X=index, values=values,
+                              lerr=lerr, uerr=uerr)
+    def get_CI(self):
+        return self.values - self.lerr, self.values + self.uerr
 
     def plot(self, ax: Axes | None = None,
              kind: str = 'step',

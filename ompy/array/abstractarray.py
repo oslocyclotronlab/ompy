@@ -15,10 +15,21 @@ logging.captureWarnings(True)
 
 #TODO Implement all of the i-methods and logical methods
 # [ ] __imatmul__
+# [ ] Make +- work when one index lines inside the other
+#     - How to handle different array types, with/without error?
+#     - Remember units
+
+
+ARRAY_CLASSES: dict[str, type[AbstractArray]] = {}
 
 
 class AbstractArray(AbstractArrayProtocol, ABC):
     __default_unit: Unit = Unit('keV')
+    _ndim = -1
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        ARRAY_CLASSES[cls.__name__] = cls
 
     def __init__(self, values: np.ndarray):
         self.values: NDArray[Shape['*', ...], Floating] = values
@@ -73,15 +84,15 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def __sub__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values - other)
+        return self.clone(values = self.values - other, name='')
 
     def __rsub__(self, other) -> Self:
-        result = self.clone(values = other - self.values)
+        result = self.clone(values = other - self.values, name='')
         return result
 
     def __add__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values + other)
+        return self.clone(values = self.values + other, name='')
 
     def __radd__(self, other) -> Self:
         x = self.__add__(other)
@@ -89,19 +100,19 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def __mul__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values * other)
+        return self.clone(values = self.values * other, name='')
 
     def __rmul__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = other * self.values)
+        return self.clone(values = other * self.values, name='')
 
     def __truediv__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values / other)
+        return self.clone(values = self.values / other, name='')
 
     def __rtruediv__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = other / self.values)
+        return self.clone(values = other / self.values, name='')
 
     def __pow__(self, val: float) -> Self:
         return self.clone(values = self.values ** val)
@@ -113,11 +124,11 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def __and__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values & other)
+        return self.clone(values = self.values & other, name='')
 
     def __or__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values | other)
+        return self.clone(values = self.values | other, name='')
 
     def __ior__(self, other) -> Self:
         other = self.check_or_assert(other)
@@ -131,15 +142,15 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def __xor__(self, other: AbstractArrayProtocol | np.ndarray) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values = self.values ^ other)
+        return self.clone(values = self.values ^ other, name='')
 
     def __lshift__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values=self.values << other)
+        return self.clone(values=self.values << other, name='')
 
     def __rshift__(self, other) -> Self:
         other = self.check_or_assert(other)
-        return self.clone(values=self.values >> other)
+        return self.clone(values=self.values >> other, name='')
 
     def __ilshift__(self, other) -> Self:
         other = self.check_or_assert(other)
@@ -238,6 +249,17 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     @name.setter
     def name(self, name: str):
         self.metadata = self.metadata.update(name=name)
+
+    @property
+    def title(self) -> str:
+        return self.name
+
+    @title.setter
+    def title(self, title: str):
+        self.name = title
+
+    def astype(self, dtype) -> Self:
+        return self.clone(values=self.values.astype(dtype))
 
 def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
     """Maps axis to 0, 1 or 2 according to which axis is specified

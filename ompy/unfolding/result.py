@@ -4,7 +4,6 @@ from ..array import Matrix, Vector, AbstractArray
 from ..stubs import Axes
 from typing import Any, TypeVar, Generic, Never, TypeAlias
 from abc import ABC, abstractmethod
-from datetime import timedelta
 from .stubs import Space, PlotSpace
 from ..stubs import Plot1D, Plot2D
 from pathlib import Path
@@ -14,6 +13,7 @@ from ..version import FULLVERSION
 from warnings import warn
 from .result_classes import RESULT_CLASSES
 from typing import TYPE_CHECKING
+from ..helpers import print_readable_time
 
 if TYPE_CHECKING:
     from .unfolder import Unfolder
@@ -105,8 +105,10 @@ class Result(ABC, Generic[T]):
     def best_eta(self) -> T:
         if self.meta.space in {'GR', 'RG'}:
             return self.G@self.best()
-        else:
+        elif self.meta.space == 'R':
             return self.best()
+        else:
+            raise ValueError(f"Cannot map from {self.meta.space} to eta")
 
     def resolve_spaces(self, target: PlotSpace) -> tuple[T, str]:
         label = 'unfolded'
@@ -114,12 +116,12 @@ class Result(ABC, Generic[T]):
             if target == 'eta':
                 label = 'G@' + label
                 return self.best_eta(), label
-            else:
+            elif target in {'base', 'mu'}:
                 return self.best(), label
         elif self.meta.space == 'R':
-            return self.best(), label
-        else:
-            raise ValueError(f"Cannot map from {self.meta.space} to {target}")
+            if target in {'eta', 'base'}:
+                return self.best_eta(), label
+        raise ValueError(f"Cannot map from {self.meta.space} to {target}")
 
     def residuals(self) -> T:
         return self.raw - self.best_folded()
@@ -285,26 +287,6 @@ class Parameters2D(Parameters[Matrix]):
         return raw, background, initial
 
 
-def print_readable_time(elapsed):
-    delta = timedelta(seconds=elapsed)
-    hours, remainder = divmod(elapsed, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    milliseconds, microseconds = divmod(delta.microseconds, 1000)
-
-    time_units = []
-    if hours > 0:
-        time_units.append(f"{int(hours)}h")
-    if minutes > 0:
-        time_units.append(f"{int(minutes)}m")
-    if seconds > 0:
-        time_units.append(f"{int(seconds)}s")
-    if milliseconds > 0:
-        time_units.append(f"{int(milliseconds)}ms")
-    if microseconds > 0 or not time_units:
-        time_units.append(f"{microseconds}µs")
-
-    formatted_time = " ".join(time_units)
-    print(f"Elapsed time: {formatted_time}")
 
 
 def get_field(cls, name):

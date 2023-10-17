@@ -9,20 +9,16 @@ from uncertainties import unumpy
 import os
 
 from pathlib import Path
-from typing import Optional, Union, Any, Tuple, List
+from typing import Union, Any
 from scipy.optimize import minimize
 from .ensemble import Ensemble
-from . import Matrix
+from . import Matrix, Vector, AsymmetricVector
 from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
 from .library import contains_zeroes_patches
-from .stubs import Pathlike
-
-
-if 'JPY_PARENT_PID' in os.environ:
-    from tqdm import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
+from .stubs import Pathlike, Axes
+from .helpers import maybe_set
+from tqdm.auto import tqdm
 
 LOG = logging.getLogger(__name__)
 
@@ -82,8 +78,8 @@ class Extractor:
         self.regenerate = False
         self.method = 'Powell'
         self.options = {'disp': True, 'ftol': 1e-3, 'maxfev': None}
-        self.nld: List[Vector] = []
-        self.gsf: List[Vector] = []
+        self.nld: list[Vector] = []
+        self.gsf: list[Vector] = []
         self.trapezoid = trapezoid
 
         if path is None:
@@ -111,8 +107,8 @@ class Extractor:
             raise RuntimeError(f'Found to files at {path}')
 
         assert len(nlds) == len(gsfs), "Corrupt data"
-        self.nld = [Vector(path=nld) for nld in nlds]
-        self.gsf = [Vector(path=gsf) for gsf in gsfs]
+        self.nld = [Vector.from_path(nld) for nld in nlds]
+        self.gsf = [Vector.from_path(gsf) for gsf in gsfs]
         return self
 
     def __call__(self, ensemble: Ensemble | None = None,
@@ -176,7 +172,7 @@ class Extractor:
 
         self.check_unconstrained_results()
 
-    def step(self, num: int) -> (Vector, Vector):
+    def step(self, num: int) -> tuple[Vector, Vector]:
         """ Wrapper around _extract in order to be consistent with other classes
 
         Args:
@@ -185,7 +181,7 @@ class Extractor:
         nld, gsf = self._extract(num)
         return nld, gsf
 
-    def _extract(self, num: int) -> (Vector, Vector):
+    def _extract(self, num: int) -> tuple[Vector, Vector]:
         """ Extract nld and gsf from matrix number i from Ensemble
 
         Args:
@@ -214,7 +210,7 @@ class Extractor:
     def decompose(self, matrix: Matrix,
                   std: Matrix | None = None,
                   x0: np.ndarray | None = None,
-                  product: bool = False) -> (Vector, Vector):
+                  product: bool = False) -> tuple[Vector, Vector]:
         """ Decomposes a matrix into nld and γSF
 
         Algorithm:
@@ -445,7 +441,7 @@ class Extractor:
 
     @staticmethod
     def constraining_counts(matrix: Matrix,
-                            resolution: np.ndarray) -> Tuple[np.ndarray,
+                            resolution: np.ndarray) -> tuple[np.ndarray,
                                                              np.ndarray]:
         """ Number of counts constraining each nld bin and gsf bin
 
@@ -512,9 +508,7 @@ class Extractor:
         fwhm_pars = np.array([73.2087, 0.50824, 9.62481e-05])
         return fFWHM(matrix.Ex, fwhm_pars)
 
-    def plot(self, ax: Any | None = None, scale: str = 'log',
-             plot_mean: bool = False,
-             color='k', **kwargs) -> None:
+    def plot(self, ax: list[Axes] | None = None, **kwargs):
         """ Basic visualization of nld and gsf
 
         Args:
@@ -523,29 +517,23 @@ class Extractor:
             plot_mean: Whether to plot individual samples or mean & std. dev
         """
         if ax is None:
-            fig, ax = plt.subplots(1, 2, constrained_layout=True)
+            fig, ax = plt.subplots(ncols=2, sharex=True, tight_layout=True)
         else:
             fig = ax[0].figure
+        assert ax is not None
 
-        if plot_mean:
-            ax[0].errorbar(self.nld[0].E_true, self.nld_mean(), yerr=self.nld_std(),
-                           fmt='o', ms=2, lw=1, color=color, **kwargs)
-            ax[1].errorbar(self.gsf[0].E_true, self.gsf_mean(), yerr=self.gsf_std(),
-                           fmt='o', ms=2, lw=1, color=color, **kwargs)
-        else:
-            for nld, gsf in zip(self.nld, self.gsf):
-                ax[0].plot(nld.E_true, nld.values, color=color,
-                           alpha=1/len(self.nld), **kwargs)
-                ax[1].plot(gsf.E_true, gsf.values, color=color,
-                           alpha=1/len(self.gsf), **kwargs)
-        ax[0].set_xlabel("Energy " + f"[${self.nld[0].units:~L}$]")
-        ax[1].set_xlabel("Energy " + f"[${self.gsf[0].units:~L}$]")
-
+        alpha = kwargs.pop('alpha', 1/len(self.nld))
+        for nld, gsf in zip(self.nld, self.gsf):
+            nld.plot(ax=ax[0], alpha=alpha, **kwargs)
+            gsf.plot(ax=ax[1], alpha=alpha, **kwargs)
         ax[0].set_title("Level density")
+        ax[0].set_ylabel('')
+        ax[1].set_ylabel('')
         ax[1].set_title(r"$\gamma$SF")
-        if scale == 'log':
-            ax[0].set_yscale("log")
-            ax[1].set_yscale("log")
+        xlabel = ax[0].get_xlabel()
+        ax[0].set_xlabel('')
+        ax[1].set_xlabel('')
+        fig.supxlabel(xlabel)
 
         return fig, ax
 
@@ -583,20 +571,47 @@ class Extractor:
     def nld_std(self) -> np.ndarray:
         return np.nanstd([nld.values for nld in self.nld], axis=0)
 
+    def nld_ci(self, alpha: float = 0.6827) -> np.ndarray:
+        """Confidence interval of nld based on percentiles
+
+        Args:
+            alpha: Confidence level
+
+        Returns:
+            Confidence interval
+        """
+        return np.nanpercentile([nld.values for nld in self.nld],
+                                [100*(1-alpha)/2, 100*(1+alpha)/2], axis=0)
+
+
     def gsf_std(self) -> np.ndarray:
         return np.nanstd([gsf.values for gsf in self.gsf], axis=0)
 
-    def ensemble_nld(self) -> Vector:
-        energy = self.nld[0].E_true
-        values = self.nld_mean()
-        std = self.nld_std()
-        return Vector(values=values, E=energy, std=std)
+    def gsf_ci(self, alpha: float = 0.6827) -> np.ndarray:
+        """Confidence interval of gsf based on percentiles
 
-    def ensemble_gsf(self) -> Vector:
-        energy = self.gsf[0].E_true
-        values = self.gsf_mean()
-        std = self.gsf_std()
-        return Vector(values=values, E=energy, std=std)
+        Args:
+            alpha: Confidence level
+
+        Returns:
+            Confidence interval
+        """
+        return np.nanpercentile([gsf.values for gsf in self.gsf],
+                                [100*(1-alpha)/2, 100*(1+alpha)/2], axis=0)
+
+    def ensemble_nld(self, alpha=0.6827) -> AsymmetricVector:
+        vec = self.nld[0].clone(values=self.nld_mean())
+        low, high = self.nld_ci(alpha=alpha)
+        nld = AsymmetricVector.from_CI(vec, low, high)
+        nld.title = 'NLD'
+        return nld
+
+    def ensemble_gsf(self, alpha=0.6827) -> AsymmetricVector:
+        vec = self.gsf[0].clone(values=self.gsf_mean())
+        low, high = self.gsf_ci(alpha=alpha)
+        gsf = AsymmetricVector.from_CI(vec, low, high)
+        gsf.name = 'GSF'
+        return gsf 
 
     def __getstate__(self):
         """ `__getstate__` excluding `ensemble` attribute to save space """
@@ -616,12 +631,12 @@ class Extractor:
         if Ex is None:
             Ex = self.ensemble.get_firstgen(member).copy().Ex
         Ex = Ex.copy(order='C')
-        T = (2 * np.pi * gsf.E_true ** 3) * np.nan_to_num(gsf.values)
-        resolution = np.zeros_like(gsf.E_true)
+        T = (2 * np.pi * gsf.E ** 3) * np.nan_to_num(gsf.values)
+        resolution = np.zeros_like(gsf.E)
 
         values = nld_T_product(np.nan_to_num(nld.values), T, resolution,
-                               nld.E_true, gsf.E_true, Ex)
-        return Matrix(Eg=gsf.E_true, Ex=Ex, values=values)
+                               nld.E, gsf.E, Ex)
+        return Matrix(Eg=gsf.E, Ex=Ex, values=values)
 
     def get_product_std(self, Ex: np.ndarray | None = None) -> Matrix:
         products = np.asarray([self.get_product(i, Ex=Ex).values
@@ -633,10 +648,10 @@ class Extractor:
 
 
 def normalize(mat: Matrix,
-              std: Matrix | None) -> Tuple[np.ndarray, np.ndarray]:
+              std: Matrix | None) -> tuple[np.ndarray, np.ndarray]:
     """Matrix normalization per row taking into account the std. dev
 
-    Error propagation assuming gaussian error propagation.
+    Error propagation assuming gaussian error propagation (!!!!).
 
     Args:
         mat (Matrix): input matrix

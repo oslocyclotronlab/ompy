@@ -41,7 +41,7 @@ def empty(ex: ..., eg: None, **kwargs) -> Vector: ...
 @overload
 def empty(ex: ..., eg: array, **kwargs) -> Matrix: ...
 
-def empty(ex: ..., eg: array | None, **kwargs) -> Vector | Matrix:
+def empty(ex: ..., eg: array | None = None, **kwargs) -> Vector | Matrix:
     if eg is None:
         values = np.empty(len(ex), **kwargs)
         return Vector(E=ex, values=values)
@@ -149,3 +149,62 @@ def unpack_to_vectors(A: Matrix, ax: int | str = 0) -> list[Vector]:
         return [A.iloc[:, i] for i in range(A.shape[1])]
     else:
         raise ValueError(f"Axis must be 0 or 1, not {ax}.")
+
+
+def compute_transition_matrix(Ei, Eg, matrix, binwidth='min', cut=False):
+    """
+    Compute the matrix corresponding to transitions from Ei to final energy levels Ef.
+
+    Isn't this some sort of shear transformation?
+   
+    Dumb w[i, j] = h[i, i-j] shouldn't work because of bin widths, _but it does_!!
+    
+    Parameters:
+        Ei (array-like): Array of initial energy levels.
+        Eg (array-like): Array of emitted gamma ray energies.
+        matrix (array-like): Input matrix of shape (len(Ei), len(Eg)) with counts of observed gamma rays.
+        
+    Returns:
+        tuple: Array of final energy levels Ef and the transition matrix of shape (len(Ei), len(Ef)).
+    """
+    # Calculate dEi, dEg, and dEf
+    dEi = Ei[1] - Ei[0]
+    dEg = Eg[1] - Eg[0]
+    if binwidth == 'sum':
+        dEf = dEg + dEi
+    elif binwidth == 'min':
+        dEf = min(dEg, dEi)
+    else:
+        dEf = binwidth
+    average= False
+    
+    # Compute the Ef array
+    Ef_min = Ei[0] - Eg[-1] # - dEg  # minimum possible final energy
+    Ef_max = Ei[-1] + dEi         # maximum possible final energy
+    Ef = np.arange(Ef_min, Ef_max + dEf, dEf)
+    dEf = Ef[1] - Ef[0] # !! Tiny float error gave strange bug.
+    
+    # Create a transition matrix initialized with zeros
+    transition_matrix = np.zeros((len(Ei), len(Ef)))
+    count = np.zeros_like(transition_matrix)
+    
+    # Populate the transition matrix
+    for i in range(len(Ei)):
+        for j in range(len(Eg)):
+            k = int((Ei[i] - Eg[j] - Ef[0])//dEf) #search(Ef, Ei[i] - Eg[j])
+            transition_matrix[i, k] += matrix[i, j]
+            count[i, k] += 1
+
+    if average:
+        transition_matrix[count > 1] /= count[count > 1]
+    # Remove unecessary zeros
+    if cut:
+        i = np.argmax(transition_matrix.sum(axis=0) > 0)
+        return Ef[i:], transition_matrix[:, i:]
+    else:
+        return Ef, transition_matrix
+
+def transition_matrix(mat, binwidth='min', cut=False) -> Matrix:
+    Ef, val = compute_transition_matrix(mat.Ex, mat.Eg, mat.values, binwidth=binwidth, cut=cut)
+    return Matrix(Ei=mat.Ex, Ef=Ef, values=val, xlabel='$E_i$', ylabel='$E_f$')
+        

@@ -12,3 +12,4 @@ from .vector import *
 from .rebin import *
 from .error_vector import *
 from .covariance import *
+from .arraylist import ArrayList

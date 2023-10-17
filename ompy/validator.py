@@ -43,7 +43,7 @@ class Unitful(Validator):
                 value = value.magnitude
         else:
             try:
-                value = value.to_unit(self.units)
+                value = value.to(self.units)
             except DimensionalityError:
                 raise DimensionalityError(value.units, self.units) from None
         return value

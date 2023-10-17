@@ -10,9 +10,8 @@ from . import Matrix
 from .array import rebin_1D
 from . import Bounded, Toggle
 
-
 LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
+
 
 def gauss_smoothing_matrix_1D(*args):
     raise NotImplementedError("In development")

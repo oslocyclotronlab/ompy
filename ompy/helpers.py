@@ -6,6 +6,9 @@ from functools import wraps
 from pathlib import Path
 from typing import Callable
 import inspect
+from datetime import timedelta
+from warnings import warn
+import numpy as np
 
 T = TypeVar('T')
 def make_axes(func: Callable[..., T]) -> Callable[..., T]:
@@ -116,3 +119,60 @@ def ensure_path(func: Callable) -> Callable:
                         raise TypeError(f"Argument {param} must be a Path or a string")
         return func(*bound_args.args, **bound_args.kwargs)
     return wrapper
+
+
+def print_readable_time(elapsed) -> None:
+    print(readable_time(elapsed))
+
+def readable_time(elapsed) -> str:
+    delta = timedelta(seconds=elapsed)
+    hours, remainder = divmod(elapsed, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    milliseconds, microseconds = divmod(delta.microseconds, 1000)
+
+    time_units = []
+    if hours > 0:
+        time_units.append(f"{int(hours)}h")
+    if minutes > 0:
+        time_units.append(f"{int(minutes)}m")
+    if seconds > 0:
+        time_units.append(f"{int(seconds)}s")
+    if milliseconds > 0:
+        time_units.append(f"{int(milliseconds)}ms")
+    if microseconds > 0 or not time_units:
+        time_units.append(f"{microseconds}µs")
+
+    formatted_time = " ".join(time_units)
+    return formatted_time
+
+
+def bytes_to_readable(num):
+    """Convert bytes to a human-readable string."""
+    for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if abs(num) < 1024.0:
+            return f"{num:3.1f} {unit}"
+        num /= 1024.0
+    return f"{num:.1f} PB"
+
+
+def warn_memory(memory, msg: str, limit=None):
+    limit = 10e9 if limit is None else limit
+    if memory > limit:
+        warn(f"Memory usage of `{msg}` is {bytes_to_readable(memory)}", RuntimeWarning)
+
+
+def estimate_memory_usage(shape, dtype=np.float64):
+    """Estimate memory usage of a numpy array before allocation."""
+    return np.dtype(dtype).itemsize * np.prod(shape)
+
+
+def append_label(label: str, kwargs: dict[str, Any] | str | None = None) -> str:
+    if isinstance(kwargs, str):
+        return kwargs + ': ' + label
+    if kwargs is None:
+        return label
+    if 'label' in kwargs:
+        label = kwargs.pop('label') + ': ' + label
+    return label
+
+

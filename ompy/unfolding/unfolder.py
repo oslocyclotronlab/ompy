@@ -3,8 +3,9 @@ from collections import Counter
 import numpy as np
 from .. import Vector, Matrix, Response, zeros_like
 from ..helpers import maybe_set
+from ..response import ResponseName
 from abc import ABC, abstractmethod
-from typing import Literal, TypeAlias, overload
+from typing import Literal, TypeAlias, overload, Self
 from tqdm.autonotebook import tqdm
 from .result import Parameters2D, ResultMeta2D, Parameters1D, ResultMeta1D
 from .result1d import UnfoldedResult1D
@@ -60,10 +61,15 @@ class Unfolder(ABC):
     def supports_background() -> bool: ...
 
     @classmethod
-    def from_response(cls, response: Response, data: Matrix | Vector, **kwargs) -> Unfolder:
+    def from_response(cls, response: Response, data: Matrix | Vector, **kwargs) -> Self:
         R = response.specialize_like(data)
         G = response.gaussian_like(data)
         return cls(R, G, **kwargs)
+
+    @classmethod
+    def from_db(cls, db: ResponseName, data: Matrix | Vector, **kwargs) -> Self:
+        response = Response.from_db(db)
+        return cls.from_response(response, data, **kwargs)
 
     @overload
     def unfold(self, data: Matrix, background: Matrix | None = None, **kwargs) -> UnfoldedResult2D:
@@ -133,8 +139,8 @@ class Unfolder(ABC):
             if not R.is_compatible_with(vec.X_index):
                 raise ValueError(f"`R` and vector {i} must have compatible axes")
         if background is not None:
-            if not self.supports_background():
-                raise ValueError("This unfolding algorithm does not support background subtraction.")
+            #if not self.supports_background():
+            #    raise ValueError("This unfolding algorithm does not support background subtraction.")
             if len(background) != len(data):
                 raise ValueError("`background` must have the same length as `data`.")
             for i, vec in enumerate(background):
@@ -196,6 +202,11 @@ class Unfolder(ABC):
     def _unfold_vectors(self, R: Matrix, data: list[Vector], background: list[Vector] | None,
                        initial: list[Vector], space: Space, G: Matrix,
                        **kwargs) -> list[UnfoldedResult1D]:
+        """
+        A default implementation of unfolding a list of vectors 
+
+        Packs the vectors into a matrix and calls unfold_matrix()
+        """
         arr = np.stack([v.values for v in data])
         index = list(range(len(data)))
         mat = Matrix(X=index, Y=data[0].X_index, values=arr)
@@ -205,7 +216,7 @@ class Unfolder(ABC):
             bg = Matrix(X=index, Y=background[0].X_index, values=bg_arr)
         init_arr = np.stack([v.values for v in initial])
         init = Matrix(X=index, Y=initial[0].X_index, values=init_arr)
-        result = self.unfold_matrix(mat, bg, init, R=R.T, G=G, **kwargs)
+        result = self.unfold_matrix(mat, bg, init, R=(space, R.T), G=G, **kwargs)
         return result
 
 
@@ -264,7 +275,7 @@ class Unfolder(ABC):
                 return R, self.G@self.R
             case 'RG':
                 return R, self.R@self.G
-            case Space as space, Matrix() as mat:
+            case (Space as space, Matrix() as mat):
                 return space, mat
             case _:
                 raise ValueError(f"Invalid R {R}")
@@ -276,16 +287,18 @@ InitialMatrix: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Matri
 
 def initial_vector(data: Vector, initial: InitialVector) -> Vector:
     match initial:
-        case 'raw':
-            return data.copy()
+        case str():
+            match initial:
+                case 'raw':
+                    return data.copy()
+                case 'random':
+                    return data.copy(values=np.random.poisson(np.median(data.values), len(data)))
         case float():
             return data.clone(values=float(initial) + zeros_like(data))
         case np.ndarray():
             return data.clone(values=initial.copy())
         case Vector():
             return initial.copy()
-        case 'random':
-            return data.copy(values=np.random.poisson(np.median(data.values), len(data)))
         case _:
             raise ValueError(f"Invalid initial value {initial}")
 

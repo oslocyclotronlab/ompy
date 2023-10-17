@@ -216,7 +216,18 @@ def rebin_2D_nonuniform_left_left(old: np.ndarray, new: np.ndarray, values: np.n
         raise ValueError("Axis must be 0 or 1.")
     return _rebin_2D_nonuniform_left_left(old, new, values, axis, preserve)
 
-def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
+def fit_into_2d(old, new, values, axis) -> np.ndarray:
+    # Assumes old and new are monotone and has the same step
+    start = np.searchsorted(old, new[0])
+    end = np.searchsorted(old, new[-1], side='right')
+    if axis == 0:
+        return values[start:end, :]
+    else:
+        return values[:, start:end]
+
+
+def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray,
+                                values: np.ndarray, axis: int, preserve: Preserve = 'counts'):
     if len(old) == len(new) and np.allclose(old, new):
         return values
     other_axis = (axis + 1) % 2
@@ -224,13 +235,15 @@ def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.nda
     shape = [0, 0]
     shape[axis] = len(new)
     shape[other_axis] = N
-    rebinned = np.zeros(shape, dtype=values.dtype)
     dOld = old[1] - old[0]
     dNew = new[1] - new[0]
+    if is_close(dNew, dOld):
+        return fit_into_2d(old, new, values, axis)
     if dNew < dOld:
         raise ValueError(f"Rebinning to smaller binwidth is ill defined and not supported: {dNew} < {dOld}")
     if not is_close(round(dNew / dOld), dNew / dOld):
         warn("The new step size is not an integral multiple of the old. Induces numerical inaccuracies and/or makes the initial and final bins look wierd.")
+    rebinned = np.zeros(shape, dtype=values.dtype)
     dOld_ = np.repeat(dOld, len(old)+1)
     dNew_ = np.repeat(dNew, len(new)+1)
     if preserve == 'counts':

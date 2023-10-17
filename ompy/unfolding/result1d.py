@@ -10,7 +10,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import overload, TypeGuard, TypeVar
+from typing import overload, TypeGuard, TypeVar, Sequence, TypeAlias
+
 
 
 
@@ -28,12 +29,13 @@ class UnfoldedResult1D(Result[Vector]):
         return self.R @ self.unfolded(*args, **kwargs)
 
     # @make_axes
-    def plot_comparison(self, ax: Axes,
+    def plot_comparison(self, ax: Axes | None = None,
                         unfolded: bool = True, folded: bool = True,
                         raw: bool = True,
                         initial: bool = False,
                         space: PlotSpace = 'base',
                         **kwargs) -> Plots1D:
+        ax = make_ax(ax)
         lines: list[Lines] = []
         if self.background is not None:
             _,  line = self.background.plot(ax=ax, label='background')
@@ -72,6 +74,30 @@ class UnfoldedResult1D(Result[Vector]):
         _, line = self_vec.plot(ax=ax, label=label)
         return ax, lines
 
+    def plot_residuals(self, ax: Sequence[Axes] | None = None,
+                      absolute: bool = True, relative: bool = True,
+                    space: PlotSpace = 'base',
+                    **kwargs) -> Plots1D:
+        if ax is None:
+            fig, ax = plt.subplots(nrows=absolute + relative, sharex=True,
+                                   constrained_layout = True)  # type: ignore
+        assert ax is not None
+        ax = ax.flatten()  # type: ignore
+        lines: list[Lines] = []
+        raw = self.raw
+        nu = self.best_folded()
+        if self.background is not None:
+            raw = raw - self.background
+        if absolute:
+            maybe_set(ax[0], ylabel=r"$\mathrm{raw}- \hat{\nu}$")
+            _, line = (raw - nu).plot(ax=ax[0], **kwargs)
+            lines.append(line)
+        if relative:
+            maybe_set(ax[1], ylabel=r"$\left|\mathrm{raw} - \hat{\nu}\right|/\mathrm{raw}$")
+            _, line = (abs(raw - nu)/raw).plot(ax=ax[1], **kwargs)
+            lines.append(line)
+
+        return ax, lines
 
 @dataclass(kw_only=True)
 class UnfoldedResult1DSimple(UnfoldedResult1D):
@@ -248,8 +274,10 @@ T = TypeVar('T', bound=Matrix | Vector)
 class Cost1D(Result[T]):
     cost: np.ndarray
 
-    def plot_cost(self, ax: Axes | None = None, start: int = 0, **kwargs) -> Plot1D:
+    def plot_cost(self, ax: Axes | None = None, start: int | float = 0, **kwargs) -> Plot1D:
         ax = make_ax(ax)
+        if isinstance(start, float):
+            start = int(start*len(self.cost))
         x = np.arange(start, len(self.cost))
         line, = ax.plot(x, self.cost[start:], **kwargs)
         maybe_set(ax, xlabel='iteration', ylabel='cost')

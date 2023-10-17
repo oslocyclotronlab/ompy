@@ -1,377 +1,259 @@
-import copy
 import logging
 import numpy as np
-from .. import Matrix, Vector, Action, Unitful, Bounded, Choice
+from .. import Matrix, Vector
+from .. import zeros_like, NUMBA_AVAILABLE
+from typing import TypeAlias
+from tqdm.auto import tqdm
+from ..numbalib import njit, prange, jitclass, float32
+from dataclasses import dataclass, asdict
+from ..unfolding import BootstrapMatrix
+
+"""
+TODO:
+- [ ] Improve population normalization estimation
+- [ ] Implement all generation
+- [ ] Handle Ei, Ef limits of N
+      Compute in (Ex, Eg) and map to (Ei, Ef)?
+- [ ] Make a backup implementation in numpy
+- [x] Write a wrapper for bootstrap lists
+- [ ] If I can construct AG from FG,
+      I can use GD to find FG.
+      Need to known population factor.
+- [ ] How to handle bootstraped AG? Share N from median eta?
+- Uncertainties accumulate along Ef, as Ef is the acumulation
+  of all lower Ef.
+- Bootstrap does not account for systematic error, in particular
+  oversubstraction due to wrong N.
+- I can see the shadow of poorly unfolded contaminants in
+  (upper - lower).
+  And diagonal lines with a steeper slope in continuum??
+    - Need higher order calibration
+- How does FG(median) compare to median(FG)?
+- Make some nice graphics of the FG method
+- Population is best constructed from singles spectra,
+  which much be found during sorting. Didn't quite understand
+  how. Ask more later.
+- Can Independent component analysis work to decompose the AG?
+  Or NMF.
+- Unfolding - wavelet?
+"""
 
 LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
+
+spec = [
+    ('values', float32[:, :]),
+    ('Ex', float32[:]),
+    ('Eg', float32[:]),
+]
 
 
-class FirstGeneration:
-    """First generation method from Guttormsen et al. (NIM 1987).
+@jitclass(spec=spec)
+class MatrixNumba:
+    def __init__(self, Ex, Eg, values):
+        self.Ex = Ex
+        self.Eg = Eg
+        self.values = values
 
-    Note:
-        Attributes need to be set only if the respective method
-        (statistical / total) multiplicity estimation is used.
+    def __getitem__(self, key):
+        return self.values[key]
 
-    Attributes:  #noqua
-        num_iterations (int): Number of iterations the first
-            generations method is applied. Defaults to 10.
-        multiplicity_estimation (str): Selects which method should be used
-            for the multiplicity estimation. Can be either "statistical",
-            or "total". Default is "statistical".
-        statistical_upper (float): Threshold for upper limit in
-            `statistical` multiplicity estimation. Defaults to 430 keV.
-        statistical_lower (float): Threshold for lower limit in
-            `statistical` multiplicity estimation.  Defaults to 200 keV.
-        statistical_ratio (float): Ratio in  `statistical` multiplicity
-            estimation. Defaults to 0.3.
-        Ex_entry_shift (float): Shift applied to the energy in
-            `statistical` multiplicity estimation.  Defaults to 200 keV.
-            TODO: Unknown how to pick. Magne described a manual method
-            by looking at the known low energy states.
-        Ex_entry_statistical (float): Average entry point in ground band
-            for statistical multiplicity in statistical multiplicity
-            estimation.  Defaults to 300 keV.
+    def __setitem__(self, key, value):
+        self.values[key] = value
 
-        Ex_entry_total (float): Average entry point in ground band for
-            `total` multiplicity estimation.  Defaults to 0 keV.
+    def index_Ex(self, e):
+        k = int((e - self.Ex[0]) // (self.Ex[1] - self.Ex[0]))
+        return k
 
-        valley_correction (Vector): See `step` method. Default: None.
-        use_slide (bool): Use sliding Ex ratio (?). Default: False.
-        action (Action): Placeholder if an `Action` should be applied. This
-            cut for example be a "cut" of the `Ex` bins to consider.
+spec = [
+    ('values', float32[:]),
+    ('E', float32[:]),
+]
 
-    TODO:
-        - Clean up where attributes are set for the respective methods.
+@jitclass(spec=spec)
+class VectorNumba:
+    def __init__(self, E, values):
+        self.E = E
+        self.values = values
+
+    def __getitem__(self, key):
+        return self.values[key]
+
+def mat_to_numba(mat: Matrix) -> MatrixNumba:
+    mat = mat.clone(dtype='float32')
+    return MatrixNumba(mat.X, mat.Y, mat.values)
+
+def vec_to_numba(vec: Vector) -> VectorNumba:
+    vec = vec.clone(dtype='float32')
+    return VectorNumba(vec.X, vec.values)
+
+
+@dataclass
+class FirstGenerationParameters:
+    iterations: int = 10
+
+FGP: TypeAlias = FirstGenerationParameters
+
+
+@dataclass
+class FirstGenerationResult:
+    AG: Matrix
+    FG: Matrix
+    alpha: Matrix
+    parameters: FirstGenerationParameters
+
+
+def first_generation(AG: Matrix | list[Matrix] | BootstrapMatrix,
+                     params: FGP = FGP(),
+                     multiplicity: Vector | None = None,
+                     population_norm: Matrix | None = None,
+                     disable_tqdm: bool = False,
+                     **kwargs) -> FirstGenerationResult | list[FirstGenerationResult]:
+    match AG:
+        case Matrix():
+            return first_generation_matrix(AG, params, multiplicity, population_norm, disable_tqdm, **kwargs)
+        case list():
+            return first_generation_list(AG, params, multiplicity, population_norm, disable_tqdm, **kwargs)
+        case BootstrapMatrix():
+            AGs = [AG.get_eta(i) for i in range(len(AG))]
+            return first_generation(AGs, params, multiplicity, population_norm, disable_tqdm, **kwargs)
+        case x:
+            raise TypeError(f"AG must be Matrix or list of Matrix, not {type(x)}")
+
+
+def first_generation_list(AG: list[Matrix],
+                     params: FGP = FGP(),
+                     multiplicity: Vector | None = None,
+                     population_norm: Matrix | None = None,
+                     disable_tqdm: bool = False,
+                     **kwargs) -> list[FirstGenerationResult]:
+    res: list[FirstGenerationResult] = []
+    for i in tqdm(range(len(AG))):
+        LOG.info("First generation for AG[%d]", i)
+        res.append(first_generation_matrix(AG[i], params, multiplicity, population_norm, disable_tqdm=True, **kwargs))
+    return res
+
+
+def first_generation_matrix(AG: Matrix,
+                     params: FGP = FGP(),
+                     multiplicity: Vector | None = None,
+                     population_norm: Matrix | None = None,
+                     disable_tqdm: bool = False,
+                     **kwargs) -> FirstGenerationResult:
+    params = FGP(**(asdict(params) | kwargs))
+    FG = zeros_like(AG)
+    alphas = np.zeros((params.iterations, len(AG.Ex)))
+    M = multiplicity_estimation(AG) if multiplicity is None else multiplicity
+    if population_norm is None:
+        N = population_normalization(AG, multiplicity = M)
+    else:
+        N = population_norm
+
+    tqdm_ = tqdm if not disable_tqdm else lambda x: x
+
+    FG = np.zeros_like(AG)
+    FG[AG > 0] = 1
+    AG_ = AG.values
+    FG_prev = FG
+    for i in tqdm_(range(params.iterations)):
+        W = FG / FG.sum(axis=1)[:, np.newaxis]  # Normalize each Ex row
+        G = G_step(AG, W, N)
+        FG = AG_ - G
+        alpha = (1 - 1/M) * (AG.sum(axis=1) / G.sum(axis=1))
+        alpha[~np.isfinite(alpha)] = np.nan
+        alphas[i, :] = alpha
+        alpha_mean = np.nanmedian(alpha)
+        alpha_low = np.nanpercentile(alpha, 25)
+        alpha_high = np.nanpercentile(alpha, 75)
+        
+
+        diff = FG - FG_prev
+        abs_diff = np.abs(diff).sum()
+        rel_diff = np.nansum(abs(diff / FG))
+        max_diff = np.max(np.abs(diff))
+        LOG.info("Iteration %d:\n\tabs = %g, rel = %g, max = %g, \u03B1 = %g±(%g,%g)",
+                 i+1, abs_diff, rel_diff, max_diff, alpha_mean, alpha_low, alpha_high)
+        FG_prev = FG
+    FG = AG.clone(values=FG, name='first generation')
+    alpha = Matrix(Ex=AG.Ex,
+                   i=np.arange(params.iterations),
+                   values=alphas.T,
+                   ylabel='iteration', Y_unit='',
+                   xlabel='Ex',
+                   name='alpha')
+    res = FirstGenerationResult(AG=AG, FG=FG, alpha=alpha,
+                                parameters=params)
+    return res
+
+
+def multiplicity_estimation(AG: Matrix) -> Vector:
+    """ Estimate the multiplicity from all generations matrix
+
+    See DOI: 10.1016/0168-9002(87)91221-6
+
+    Args:
+        AG: All generations matrix, most often from the unfolding step.
+    
+    Returns:
+        Estimated multiplicity vector
     """
-    # MAMA ThresSta
-    statistical_upper = Unitful('430 keV')
-    # MAMA ThresTot
-    statistical_lower = Unitful('200 keV')
-    # MAMA ThresRatio
-    statistical_ratio = Unitful(0.3)
-    Ex_entry_shift = Unitful('200.0 keV')
-    # MAMA ExEntry0s
-    Ex_entry_statistical = Unitful('300.0 keV')
-    # MAMA ExEntry0t
-    Ex_entry_total = Unitful('0.0 keV')
-    num_iterations = Bounded(10, min=1, type=int)
-    multiplicity_estimation = Choice('statistical',
-                                     {'statistical', 'total'},
-                                     str.lower)
+    Eg_sum = AG.sum(axis='Eg')
+    Eg_expectation = (AG.Eg * AG).sum(axis='Eg') / Eg_sum
+    multiplicity = AG.Ex / Eg_expectation
+    multiplicity[multiplicity < 0] = 0
+    multiplicity.xlabel = 'multiplicity'
+    multiplicity.title = 'multiplicity estimation'
+    return multiplicity
+    
 
-    def __init__(self):
-        self.valley_correction: Vector | None = None
-        self.use_slide: bool = False
-        self.action = Action('matrix')
+def population_normalization(AG: Matrix, multiplicity: Vector | None = None) -> Matrix:
+    if multiplicity is None:
+        multiplicity = multiplicity_estimation(AG)
+    Eg_sum = AG.sum(axis='Eg')
+    if NUMBA_AVAILABLE:
+        N = population_normalization_njit(vec_to_numba(multiplicity), 
+                                          vec_to_numba(Eg_sum)).values
+    else:
+        N = population_normalization_np(AG.Ex, multiplicity.values, Eg_sum.values)
+    N = Matrix(Ei=AG.Ex, Ef=AG.Ex, values=N,
+               xlabel='Ei', ylabel='Ef', name='population normalization')
+    return N
 
-    def __call__(self, matrix: Matrix) -> Matrix:
-        """ Wrapper for self.apply() """
-        return self.apply(matrix)
-
-    def apply(self, unfolded: Matrix) -> Matrix:
-        """ Apply the first generation method to a matrix
-
-        Args:
-            unfolded: An unfolded matrix to apply
-                the first generation method to.
-        Returns:
-            The first generation matrix
-        """
-        matrix = unfolded.clone()
-        self.action.act_on(matrix)
-        if np.any(matrix.Ex < 0):
-            raise ValueError("input matrix has to have positive Ex entries"
-                             "only. Consider using `matrix.cut('Ex', Emin=0)`")
-        if np.any(matrix.values < 0):
-            raise ValueError("input matrix has to have positive entries only.")
-
-        valley_correction = self.cut_valley_correction(matrix)
-
-        H, W, normalization = self.setup(matrix)
-        for iteration in range(self.num_iterations):
-            H_old = np.copy(H)
-            H, W = self.step(iteration, H, W, normalization, matrix,
-                             valley_correction)
-
-            diff = np.max(np.abs(H - H_old))
-            LOG.info("iter %i/%i: ε = %g", iteration+1,
-                     self.num_iterations, diff)
-
-        final = unfolded.clone(values=H, std=None)
-        final.state = "firstgen"
-        self.remove_negative(final)
-        return final
-
-    def setup(self, matrix: Matrix) -> (Matrix, Matrix, Matrix):
-        """ Set up initial first generation matrix with normalized Ex rows """
-        H: np.ndarray = self.row_normalized(matrix)
-        # Initial weights should also be row normalized
-        W: np.ndarray = self.row_normalized(matrix)
-        # The multiplicity normalization
-        normalization = self.multiplicity_normalization(matrix)
-
-        return H, W, normalization
-
-    @staticmethod
-    def step(iteration: int, H_old: np.ndarray,
-             W_old: np.ndarray, N: np.ndarray,
-             matrix: Matrix,
-             valley_correction: np.ndarray | None = None)\
-            -> (np.ndarray, np.ndarray):
-        """ An iteration step in the first generation method
-
-        The most interesting part of the first generation method.
-        Implementation of a single step in the first generation method.
-
-        Args:
-            iteration: the current iteration step
-            H_old: The previous H matrix
-            W_old: The previous weights
-            N: The normalization
-            matrix: The matrix the method is applied to
-            valley_correction (np.ndarray, optional): Array of weight factors
-                for each Ex bin that can be used to manually "turn
-                off" /decrease the influence of very large peaks in the method.
-        """
-        # why rebin?
-        # H = rebin_2D(H_old, matrix.Eg, matrix.Ex, 1)
-        H = H_old
-        W = np.zeros_like(H)
-        print("H", H.shape)
-        print("W", W.shape)
-        print("N", N.shape)
-        print(W*N)
-
-        for i in range(W.shape[0]):  # Loop over Ex rows
-            W[i, :i] = H[i, i:0:-1]
-
-        # Prevent oscillations
-        if iteration > 4:
-            W = 0.7*W + 0.3*W_old
-        W = np.nan_to_num(W)
-        W[W < 0] = 0.0
-
-        # Normalize each row to unity
-        W = normalize_rows(W)
-
-        if valley_correction is None:
-            G = (N * W) @ matrix.values
-        else:
-            G = (N * W * valley_correction) @ matrix.values
-        H = matrix.values - G
-        return H, W
-
-    def multiplicity_normalization(self, matrix: Matrix) -> np.ndarray:
-        """ Generate multiplicity normalization
-
-        Args:
-            matrix: The matrix to find the multiplicty
-                normalization of.
-
-        Returns:
-            A square matrix of the normalization
-        """
-        multiplicities = self.multiplicity(matrix)
-        # LOG.debug("Multiplicites:\n%s", tt.to_string(
-        #    np.vstack([matrix.Ex, multiplicities.round(2)]).T,
-        #    header=('Ex', 'Multiplicities')
-        # ))
-        assert (multiplicities >= 0).all(), "Bug. Contact developers"
-        sum_counts = matrix.sum('Eg').values
-
-        normalization = np.outer(
-            sum_counts, multiplicities)/np.outer(multiplicities, sum_counts)
-        return normalization
-
-    def multiplicity(self, matrix: Matrix) -> np.ndarray:
-        """ Dispatch method returning statistical or total multiplicity
-
-        Args:
-            matrix: The matrix to get multiplicities from
-
-        Returns:
-            The multiplicities in a row matrix of same dimension
-            as matrix.Ex
-        """
-        if self.multiplicity_estimation == 'statistical':
-            return self.multiplicity_statistical(matrix)
-        if self.multiplicity_estimation == 'total':
-            return self.multiplicity_total(matrix)
-        raise AssertionError("Impossible condition")
-
-    def multiplicity_statistical(self, matrix: Matrix) -> np.ndarray:
-        """ Finds the multiplicties using Ex above yrast
-
-        Args:
-            matrix: The matrix to get the multiplicites from
-
-        Returns:
-            The multiplicities in a row matrix of same dimension
-            as matrix.Ex
-        """
-        # Hacky solution (creation of Magne) to exclude
-        # difficult low energy regions, while including 2+ decay
-        # if 4+ decay is unlikely
-        # This is done by using statistical_upper for energies above and
-        # statistical lower for energies below, with a sliding threshold
-        # inbetween
-        values = copy.copy(matrix.values)
-        Eg, Ex = np.meshgrid(matrix.Eg, matrix.Ex)
-        Ex_prime = Ex * self.statistical_ratio
-        if self.use_slide:
-            # TODO np.clip is much more elegant
-            slide = np.minimum(np.maximum(Ex_prime,
-                                          self.statistical_lower),
-                               self.statistical_upper)
-        else:
-            slide = self.statistical_upper
-        slide = slide.to('keV').magnitude
-        values[slide > Eg] = 0.0
-
-        # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
-        sum_counts = np.sum(values, axis=1)
-        Eg_sum_counts = np.sum(Eg*values, axis=1)
-        Eg_mean = Eg_sum_counts / sum_counts
-
-        # Statistical multiplicity.
-        # Entry energy where the statistical γ-cascade ends in the
-        # yrast line.
-        entry = np.maximum(
-            np.minimum(matrix.Ex - self.Ex_entry_shift.to('keV').magnitude,
-                       self.Ex_entry_statistical.to('keV').magnitude),
-            0.0)
-
-        multiplicity = (matrix.Ex - entry)/Eg_mean
-        return multiplicity
-
-    def multiplicity_total(self, matrix: Matrix) -> np.ndarray:
-        """ Finds the multiplicties using all of Ex
-
-        Args:
-            matrix: The matrix to get the multiplicites from
-
-        Returns:
-            The multiplicities in a row matrix of same dimension
-            as matrix.Ex
-        """
-        # 〈Eg〉= ∑ xP(x) = ∑ xN(x)/∑ N(x)
-        sum_counts = np.sum(matrix.values, axis=1)
-        Eg_sum_counts = np.sum((matrix.Eg)*matrix.values, axis=1)
-        Eg_mean = Eg_sum_counts / sum_counts
-        multiplicity = matrix.Ex / Eg_mean
-        multiplicity[multiplicity < 0] = 0
-        return multiplicity
-
-    def row_normalized(self, matrix: Matrix) -> np.ndarray:
-        """Set up a diagonal array with constant Ex rows
-
-        Args:
-            matrix (Matrix): Input matrix
-
-        Returns:
-            Array where each Ex-row has constant value given as 1/γ where γ is
-            the length of the row from 0 Eγ to the diagonal.
-        """
-        H = np.zeros(matrix.shape)
-        for i in range(H.shape[0]):
-            j = matrix.last_nonzero(i)
-            H[i, :j] = 1/max(1, j)
-        return H
-
-    def cut_valley_correction(self, matrix: Matrix) -> np.ndarray | None:
-        """ Cut valley correction Ex axis if necessary.
-
-        Ensures valley correction has the same Ex axis as the matrix
-        it will be used with.
-
-        Args:
-            matrix (Matrix): Matrix that the valley correction will be used
-                with.
-
-        Returns:
-            valley_correction (None or np.ndarray): None if
-                self.valley_correction is None. Otherwise a np.ndarray with the
-                same length as matrix.Ex.
-
-            """
-        valley_correction = self.valley_correction
-        if valley_correction is None:
-            return None
-
-        if not isinstance(valley_correction, Vector):
-            raise TypeError("`valley_correction` must be a vector.")
-        valley_correction.clone()
-        valley_correction.cut(Emin=matrix.Ex.min(), Emax=matrix.Ex.max(),
-                              inplace=True)
-        assert np.allclose(valley_correction.E, matrix.Ex)
-        if np.any(valley_correction.values < 0):
-            raise ValueError(
-                "valley correction has to have positive entries only.")
-
-        return valley_correction.values
-
-    @staticmethod
-    def allgen_from_primary(fg: Matrix,
-                            xs: np.ndarray | None = None) -> Matrix:
-        """Create all generation matrix from first generations matrix
-
-        .. code::
-
-          AG(Ex, Eg) = FG(Ex, Eg)
-                       + ∑ σ[Ex] weight(Ex->Ex') AG(Ex', Eg) / σ[Ex'],
-
-        where the sum runs over all excitation energies `Ex' < Ex`.
-
-        Args:
-            fg (Matrix): First generations matrix
-            xs (np.ndarray, optional): Population cross-section for each Ex bin
-                in #times populated, not mb. Default is the same population
-                as the fg_matrix.
-        Returns:
-            ag (Matrix): All generations matrix
-        """
-        if xs is None:
-            xs = fg.values.sum(axis=1)
-
-        fg = fg.clone()
-        w = fg.clone()
-        w[:] = 0
-        ag = fg.clone()
-        ag[:] = 0
-
-        # Note: cannot do this here, as FG matrix "flipped" around Eg_center
-        # w = np.tril(fg)
-        # w = np.flip(w, axis=1)
-
-        for i in range(w.shape[0]):  # Loop over Ex rows
-            w[i, :i+1] = fg[i, i::-1]
-        w.values = normalize_rows(w.values)
-
-        for i, Ex in enumerate(fg.Ex):
-            # 1 fg per population
-            ag[i, :] = fg[i, :] / fg[i, :].sum() * xs[i]
-            if i == 0:
-                continue
-            else:
-                for j, Efinal in enumerate(fg.Ex):  # add underlying AGs
-                    ag[i, :] += xs[i] * w[i, j] * ag[j, :] / xs[j]
-
-        return ag
-
-    def remove_negative(self, matrix: Matrix):
-        """ Wrapper for Matrix.remove_negative()
-
-        Put in as an extra method to facilitate replacing this by eg.
-        `fill_and_remove_negative`
-
-        Args:
-            matrix: Input matrix
-        """
-        matrix.remove_negative()
+    
+@njit
+def population_normalization_njit(multiplicity: VectorNumba,
+                                  Eg_sum: VectorNumba) -> MatrixNumba:
+    Ex = multiplicity.E
+    N = np.zeros((len(Ex), len(Ex)), dtype=multiplicity.values.dtype)
+    for ei in prange(len(Ex)):
+        for ef in prange(len(Ex)):
+            N[ei, ef] = multiplicity[ef] / multiplicity[ei] * Eg_sum[ei] / Eg_sum[ef]
+    return MatrixNumba(Ex, Ex, N)
 
 
-def normalize_rows(array: np.ndarray) -> np.ndarray:
-    """ Normalize each row to unity """
-    return array / array.sum(axis=1)[:, np.newaxis]
+def population_normalization_np(Ex, M, N):
+    ex, ef = np.meshgrid(np.arange(len(Ex)), np.arange(len(Ex)), indexing='ij')
+    n = M[ef] / M[ex] * N[ex] / N[ef]
+    return n
+
+
+def G_step(AG: Matrix, W: np.ndarray, N: Matrix) -> np.ndarray:
+    if NUMBA_AVAILABLE:
+        return G_step_njit(mat_to_numba(AG), W, mat_to_numba(N))
+    else:
+        return G_step_np(AG.values, W, N)
+
+
+@njit(parallel=True)
+def G_step_njit(AG: MatrixNumba, W: np.ndarray, N: MatrixNumba) -> np.ndarray:
+    G = np.zeros_like(AG.values)
+    Ex = AG.Ex
+    NEx = len(Ex)
+    for i_ei in prange(NEx):
+        for i_ef in range(i_ei):
+            eg = Ex[i_ei] - Ex[i_ef]
+            k = AG.index_Ex(eg)  # W.index_Eg
+            if k < 0:
+                continue  # break?
+            factor = N[i_ei, i_ef] * W[i_ei, k]
+            G[i_ei, :] += factor * AG.values[i_ef, :]
+    return G

@@ -48,6 +48,8 @@ PlotBar1D: TypeAlias = tuple[Axes, BarContainer]
 VectorPlot: TypeAlias = Plot1D | Plots1D | PlotError1D | PlotScatter1D | PlotBar1D
 
 array1D: TypeAlias = NDArray[Shape["*"], Floating]
+array2D: TypeAlias = NDArray[Shape["*, *"], Floating]
+array3D: TypeAlias = NDArray[Shape["*, *, *"], Floating]
 
 def is_lines(x) -> TypeGuard[Lines]:
     for line in x:

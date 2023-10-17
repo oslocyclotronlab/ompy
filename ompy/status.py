@@ -1,7 +1,8 @@
 from . import (ROOT_AVAILABLE, MINUIT_AVAILABLE,
                 JAX_AVAILABLE, H5PY_AVAILABLE, NUMBA_AVAILABLE,
                 GPU_AVAILABLE, NUMBA_CUDA_AVAILABLE,
-                NUMBA_CUDA_WORKING, JAX_WORKING)
+                NUMBA_CUDA_WORKING, JAX_WORKING, ROOT_IMPORTED,
+                XARRAY_AVAILABLE)
 from .version import get_version_info
 import os
 import platform
@@ -51,10 +52,12 @@ NUMBA available:      {color_status(NUMBA_AVAILABLE)}
 NUMBA CUDA available: {color_status(NUMBA_CUDA_AVAILABLE)}
 NUMBA CUDA working:   {color_status(NUMBA_CUDA_WORKING[0])}
 ROOT available:       {color_status(ROOT_AVAILABLE)}
+ROOT imported:        {color_status(ROOT_IMPORTED)}
 MINUIT available:     {color_status(MINUIT_AVAILABLE)}
 JAX available:        {color_status(JAX_AVAILABLE)}
 JAX working:          {color_status(JAX_WORKING)}
 H5PY available:       {color_status(H5PY_AVAILABLE)}
+XARRAY available:     {color_status(XARRAY_AVAILABLE)}
 
 Platform:             {platform.platform()}
 CPU:                  {get_cpu()}

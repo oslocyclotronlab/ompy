@@ -1,7 +1,7 @@
 from .result import Result, PlotSpace, ResultMeta2D, Parameters2D
 from .. import Matrix, Vector, Axes
 from ..helpers import make_axes
-from ..stubs import Lines, Plots2D, Plot1D
+from ..stubs import Lines, Plots2D, Plot1D, array2D
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
@@ -20,18 +20,20 @@ class UnfoldedResult2D(Result):
 
     def best_folded(self) -> Matrix:
         if self.G_ex is None:
-            return (self.R@(self.best().T)).T
+            m = (self.R@(self.best().T)).T
         else:
-            return self.G_ex@(self.R@(self.best().T)).T
+            m = self.G_ex@(self.R@(self.best().T)).T
+        return self.raw.clone(values=m)  # Fix labels
 
     def best_eta(self) -> Matrix:
         if self.meta.space in {'GR', 'RG'}:
             if self.G_ex is None:
-                return self.best()@self.G
+                m = self.best()@self.G
             else:
-                return self.G_ex@self.best()@self.G
+                m = self.G_ex@self.best()@self.G
         else:
-            return self.best()
+            m = self.best()
+        return self.raw.clone(values=m)  # Fix labels
 
 
     def plot_comparison(self, ax: Axes | None = None, raw: bool = True, unfolded: bool = True,
@@ -85,6 +87,7 @@ class UnfoldedResult2D(Result):
             i += 1
         if initial:
             add_cbar = i == N-1 and add_cbar_
+            mat, label = self.resolve_spaces(space)
             _, r = self.initial.plot(ax=ax[i], add_cbar=add_cbar, **kwargs)
             res.append(r)
             ax[i].set_title('Initial')
@@ -157,13 +160,28 @@ class UnfoldedResult2DSimple(UnfoldedResult2D):
 
 @dataclass(kw_only=True)
 class Cost2D(Result):
-    cost: np.ndarray
+    cost: array2D
 
     def plot_cost(self, ax: Axes | None = None, **kwargs) -> Plot1D:
         if ax is None:
             fig, ax = plt.subplots()
         assert ax is not None
-        lines = ax.plot(self.cost, **kwargs)
+        lines = []
+        cmap = kwargs.pop('cmap', 'turbo')
+        colormap = plt.get_cmap(cmap)
+        N = self.cost.shape[1]
+        colors = [colormap(i) for i in np.linspace(0, 1, N)]
+        for i, c in enumerate(self.cost.T):
+            ax.plot(c, color=colors[i],  **kwargs)
+        # Create a "fake" mappable for the colorbar
+        index = self.raw.Y
+        norm = plt.Normalize(index.min(), index.max())
+        sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
+        sm.set_array([])
+
+        # Add the colorbar
+        cbar = ax.figure.colorbar(sm, ax=ax, orientation='vertical')
+        cbar.set_label(self.raw.get_xlabel())
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Cost")
         return ax, lines
