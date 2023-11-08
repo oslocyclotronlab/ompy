@@ -1,19 +1,9 @@
 # -*- coding: utf-8 -*-
 from setuptools import setup, Extension, find_packages
-from pkg_resources import get_build_platform
-import numpy
 import subprocess
 import os
 import builtins
 import platform
-from ctypes.util import find_library
-from pybind11.setup_helpers import Pybind11Extension
-
-try:
-    from Cython.Build import cythonize
-    from Cython.Distutils import build_ext
-except ImportError:
-    raise ImportError("Need to have installed Cython module for compilation")
 
 
 # build me (i.e. compile Cython modules) for testing in this directory using
@@ -74,15 +64,7 @@ def get_version_info():
     FULLVERSION = VERSION
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
-    elif os.path.exists('ompy/version_setup.py'):
-        # must be a source distribution, use existing version file
-        try:
-            from ompy.version import git_revision as GIT_REVISION
-        except ImportError:
-            raise ImportError("Unable to import git_revision. Try removing "
-                              "ompy/version_setup.py and the build directory "
-                              "before building.")
-    else:
+    else:  # Previous code failed because of recursive import
         GIT_REVISION = "Unknown"
 
     FULLVERSION += '.dev0+' + GIT_REVISION[:7]
@@ -110,69 +92,67 @@ git_revision = '%(git_revision)s'
         a.close()
 write_version_py()
 
-# If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
-openmp = os.getenv("ompy_OpenMP")
-if openmp is None and platform.system() == 'Darwin':  # Check if macOS
-    if find_library("omp") != None:
+if False:
+
+    from ctypes.util import find_library
+    #from pybind11.setup_helpers import Pybind11Extension
+
+    try:
+        from Cython.Build import cythonize
+        from Cython.Distutils import build_ext
+    except ImportError:
+        raise ImportError("Need to have installed Cython module for compilation")
+    # If macOS, use ctypes.util.find_library to determine if OpenMP is avalible.
+    openmp = os.getenv("ompy_OpenMP")
+    if openmp is None and platform.system() == 'Darwin':  # Check if macOS
+        if find_library("omp") != None:
+            openmp = True
+            print("libOMP found, building with OpenMP")
+        else:
+            print("libOMP not found, building without OpenMP")
+    elif openmp in (None, True, "True", "true"):
         openmp = True
-        print("libOMP found, building with OpenMP")
+    elif openmp in (False, "False", "false"):
+        openmp = False
+        print("Building without OpenMP")
     else:
-        print("libOMP not found, building without OpenMP")
-elif openmp in (None, True, "True", "true"):
-    openmp = True
-elif openmp in (False, "False", "false"):
-    openmp = False
-    print("Building without OpenMP")
-else:
-    raise ValueError("Env var ompy_OpenMP must be either True or False "
-                     "(or not set); use eg. 'export ompy_OpenMP=False'"
-                     f"Now it is: {openmp}")
-fname = "ompy/decomposition.c"  # otherwise it may not recompile
-if os.path.exists(fname):
-    os.remove(fname)
+        raise ValueError("Env var ompy_OpenMP must be either True or False "
+                         "(or not set); use eg. 'export ompy_OpenMP=False'"
+                         f"Now it is: {openmp}")
+    fname = "ompy/decomposition.c"  # otherwise it may not recompile
+    if os.path.exists(fname):
+        os.remove(fname)
 
-extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
-extra_link_args = []
-if openmp and platform.system() == 'Darwin':
-    extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
-    extra_link_args.insert(-1, "-lomp")
-elif openmp:
-    extra_compile_args.insert(-1, "-fopenmp")
-    extra_link_args.insert(-1, "-fopenmp")
+    extra_compile_args = ["-O3", "-ffast-math", "-march=native"]
+    extra_link_args = []
+    if openmp and platform.system() == 'Darwin':
+        extra_compile_args.insert(-1, "-Xpreprocessor -fopenmp")
+        extra_link_args.insert(-1, "-lomp")
+    elif openmp:
+        extra_compile_args.insert(-1, "-fopenmp")
+        extra_link_args.insert(-1, "-fopenmp")
 
-ext_modules = [
-        Extension("ompy.decomposition",
-                  ["ompy/decomposition.pyx"],
-                  # on MacOS the clang compiler pretends not to support OpenMP, but in fact it does so
-                  extra_compile_args=extra_compile_args,
-                  extra_link_args=extra_link_args,
-                  include_dirs=[numpy.get_include()]
-                  ),
-        Extension("ompy.array.rebin_old", ["ompy/array/rebin_old.pyx"], include_dirs=[numpy.get_include()]),
-        #Extension("ompy.array.index", ["ompy/array/index.pyx"], include_dirs=[numpy.get_include()]),
-        #Extension("ompy.gauss_smoothing", ["ompy/gauss_smoothing.pyx"], include_dirs=[numpy.get_include()]),
-        ]
-
-ext_modules_pybind11 = [
-        Pybind11Extension("ompy.stats",
-                          ["src/stats.cpp"],
-                          extra_compile_args=["-std=c++11", "-mfpmath=sse",
-                                              "-O3", "-funroll-loops",
-                                              "-march=native"])
-]
+    ext_modules = [
+            Extension("ompy.decomposition",
+                      ["ompy/decomposition.pyx"],
+                      # on MacOS the clang compiler pretends not to support OpenMP, but in fact it does so
+                      extra_compile_args=extra_compile_args,
+                      extra_link_args=extra_link_args,
+                      include_dirs=[numpy.get_include()]
+                      ),
+            ]
 
 install_requires = [
- "cython",
- "numpy>=1.20.0",
- "pandas",
- "matplotlib",
- "termtables",
- "pymultinest",  # needed only for multinest-runs
- "scipy",
- "uncertainties>=3.0.3",
- "tqdm",
- "pathos",
- "pybind11>=2.6.0"
+    "numpy",
+    "matplotlib",
+    "termtables",
+    #"pymultinest",  # needed only for multinest-runs
+    "scipy",
+    "tqdm",
+    "pint",
+    "nptyping",
+    "pandas",
+    "sympy"
 ]
 
 setup(name='OMpy',
@@ -183,12 +163,20 @@ setup(name='OMpy',
                     "erlenlim@fys.uio.no"),
       url="https://github.com/oslocyclotronlab/ompy",
       packages=find_packages(),
-      ext_modules=cythonize(ext_modules,
-                            compiler_directives={'language_level': "3",
-                                                 'embedsignature': True},
-                            compile_time_env={"OPENMP": openmp}
-                            )+ext_modules_pybind11,
+      #ext_modules=cythonize(ext_modules,
+      #                      compiler_directives={'language_level': "3",
+      #                                           'embedsignature': True},
+      #                      compile_time_env={"OPENMP": openmp}
+      #                      ),
       zip_safe=False,
-      install_requires=install_requires
-      )
+      install_requires=install_requires,
+      extras_require={
+      'full': ['numba', 'jax', 'xarray', 'h5py'],
+      'emcee': ['emcee'],
+      'multinest': ['pymultinest'],
+      'jax': ['jax'],
+      'numba': ['numba'],
+      'recommended': ['numba', 'jax']
+      }
+)
 

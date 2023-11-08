@@ -40,11 +40,14 @@ TODO:
 
 LOG = logging.getLogger(__name__)
 
-spec = [
-    ('values', float32[:, :]),
-    ('Ex', float32[:]),
-    ('Eg', float32[:]),
-]
+if NUMBA_AVAILABLE:
+    spec = [
+        ('values', float32[:, :]),
+        ('Ex', float32[:]),
+        ('Eg', float32[:]),
+    ]
+else:
+    spec = None
 
 
 @jitclass(spec=spec)
@@ -64,10 +67,13 @@ class MatrixNumba:
         k = int((e - self.Ex[0]) // (self.Ex[1] - self.Ex[0]))
         return k
 
-spec = [
-    ('values', float32[:]),
-    ('E', float32[:]),
-]
+if NUMBA_AVAILABLE:
+    spec = [
+        ('values', float32[:]),
+        ('E', float32[:]),
+    ]
+else:
+    spec = None
 
 @jitclass(spec=spec)
 class VectorNumba:

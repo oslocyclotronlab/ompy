@@ -18,7 +18,7 @@ import json
 import matplotlib.pyplot as plt
 from ..stubs import Axes, Lines, Plot1D, Plots1D, Unitlike
 from ..array import AsymmetricVector
-from numba import njit
+from ..numbalib import njit
 from abc import ABC, abstractmethod
 from ..helpers import make_ax, maybe_set, readable_time, bytes_to_readable
 import logging

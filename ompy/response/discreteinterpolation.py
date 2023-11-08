@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from . import ResponseData
+from .responsedata import ResponseData
 from .interpolation import Interpolation
 from .interpolations import (EscapeInterpolator, EscapeInterpolation,
                              FEInterpolator, FEInterpolation,

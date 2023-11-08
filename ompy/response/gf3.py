@@ -5,7 +5,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from sympy import diff, exp, log, lambdify
 
-from . import Interpolator, Interpolation
+from .interpolation import Interpolation, Interpolator
 from .numbalib import prange, njit, jitclass, float64
 from .. import Vector
 from ..stubs import Pathlike

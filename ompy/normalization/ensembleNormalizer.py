@@ -18,7 +18,10 @@ from .. import Vector
 from ..extractor import Extractor
 from .normalizer_nld import NormalizerNLD
 from .normalizer_gsf import NormalizerGSF
-from .normalizer_simultan import NormalizerSimultan
+#from .normalizer_simultan import NormalizerSimultan
+from typing import Any
+
+NormalizerSimultan = Any
 
 
 if 'JPY_PARENT_PID' in os.environ:

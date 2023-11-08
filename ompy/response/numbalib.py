@@ -192,8 +192,9 @@ def normalize(R):
 
 
 spec = OrderedDict()
-spec['_index'] = float64[::1]
-spec['values'] = float64[::1]
+if NUMPY:
+    spec['_index'] = float64[::1]
+    spec['values'] = float64[::1]
 
 
 @jitclass(spec)

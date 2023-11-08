@@ -7,7 +7,9 @@ from typing import Protocol, TypeGuard, TypeVar, overload
 
 import numpy as np
 
-from . import ResponseData, DiscreteInterpolation, interpolate_compton, Components
+from .discreteinterpolation import DiscreteInterpolation
+from .compton import interpolate_compton
+from .responsedata import ResponseData, Components
 from .numbalib import njit, prange
 from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
 from ..stubs import Pathlike, Unitlike
@@ -48,7 +50,6 @@ t = TypedDict('t', {'total': T, 'compton': T, 'FE': T, 'SE': T, 'DE': T, 'AP': T
 class Response:
     def __init__(self, data: ResponseData,
                  interpolation: DiscreteInterpolation,
-                 R: Matrix | None = None,
                  compton: ComptonMatrix | None = None,
                  components: Components = Components(),
                  copy: bool = False):
@@ -82,7 +83,10 @@ class Response:
             E = to_index(E, edge='mid')
         assert isinstance(E, Index)
         sigmafn = self.interpolation.sigma
-        if USE_GPU and GPU:
+        if GPU and not NUMBA_CUDA_WORKING[0]:
+            raise ValueError("GPU interpolation requested but numba cuda not working")
+
+        if GPU:
             compton: ComptonMatrix = interpolate_gpu(self.data, E, sigmafn, sigma)
         else:
             compton: ComptonMatrix = interpolate_compton(self.data, E, sigmafn, sigma)

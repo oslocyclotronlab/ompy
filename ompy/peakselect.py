@@ -5,7 +5,6 @@ from .stubs import ArrayBool, Axes
 
 from scipy.optimize import curve_fit
 import numpy as np
-from numba import njit
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
 

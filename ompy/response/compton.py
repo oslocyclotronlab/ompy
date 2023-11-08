@@ -1,5 +1,5 @@
 from __future__ import annotations
-from . import ResponseData
+from .responsedata import ResponseData
 from .. import Vector, Matrix, Index
 from .numbalib import NVector, index, index_mid, lerp
 import numpy as np

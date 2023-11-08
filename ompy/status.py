@@ -2,7 +2,9 @@ from . import (ROOT_AVAILABLE, MINUIT_AVAILABLE,
                 JAX_AVAILABLE, H5PY_AVAILABLE, NUMBA_AVAILABLE,
                 GPU_AVAILABLE, NUMBA_CUDA_AVAILABLE,
                 NUMBA_CUDA_WORKING, JAX_WORKING, ROOT_IMPORTED,
-                XARRAY_AVAILABLE)
+                XARRAY_AVAILABLE, GAMBIT_AVAILABLE, EMCEE_AVAILABLE,
+                PYMC_AVAILABLE, PYRO_AVAILABLE, SKLEARN_AVAILABLE)
+
 from .version import get_version_info
 import os
 import platform
@@ -58,6 +60,11 @@ JAX available:        {color_status(JAX_AVAILABLE)}
 JAX working:          {color_status(JAX_WORKING)}
 H5PY available:       {color_status(H5PY_AVAILABLE)}
 XARRAY available:     {color_status(XARRAY_AVAILABLE)}
+GAMBIT available:     {color_status(GAMBIT_AVAILABLE)}
+EMCEE available:      {color_status(EMCEE_AVAILABLE)}
+PYMC available:       {color_status(PYMC_AVAILABLE)}
+PYRO available:       {color_status(PYRO_AVAILABLE)}
+SKLEARN available:    {color_status(SKLEARN_AVAILABLE)}
 
 Platform:             {platform.platform()}
 CPU:                  {get_cpu()}

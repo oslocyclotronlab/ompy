@@ -24,6 +24,8 @@ if JAX_AVAILABLE:
     import jax
 else:
     jax = lambda x: x
+    jax.jit = lambda x: x
+
 
 
 @dataclass

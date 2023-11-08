@@ -3,12 +3,12 @@ from __future__ import annotations
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Literal, overload, TypeAlias, Self, TypeVar, Generic
+from typing import Any, Iterable, Literal, overload, TypeAlias, Self, TypeVar, Generic, Never
 from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy import ndarray
-
+from .. import XARRAY_AVAILABLE
 from .abstractarray import AbstractArray
 from .filehandling import (load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
@@ -828,6 +828,20 @@ class Vector(AbstractArray, VectorProtocol):
         values = self.values.__getitem__(slice_)
         return self.clone(X=index, values=values)
 
+
+    def to_xarray(self):
+        return to_xarray_vector(self)
+
+
+if XARRAY_AVAILABLE:
+    import xarray as xr
+    def to_xarray_vector(vec) -> xr.DataArray:
+        """ Convert to xarray DataArray """
+        return xr.DataArray(vec.values, coords=[vec.X], dims=[vec.alias])
+else:
+    def to_xarray_vector(vec) -> Never:
+        raise NotImplementedError("xarray is not installed")
+
 VT = TypeVar('VT', bound=Vector)
 class ValueLocator(Generic[VT]):
     def __init__(self, vector: VT, strict: bool = True):
@@ -909,7 +923,7 @@ def check_contiguous(arr: array1D) -> bool:
         return False
 
     # Check if the contiguous run of True values starts or ends at an edge
-    if true_indices[0] == 0 or true_indices[-1] == len(arr) - 1:
-        return True
+    #if true_indices[0] == 0 or true_indices[-1] == len(arr) - 1:
+    #   return True
 
-    return False
+    return True

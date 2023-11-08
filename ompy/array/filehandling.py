@@ -5,7 +5,7 @@ import time
 import numpy as np
 import pandas as pd
 from dataclasses import asdict
-from .. import __full_version__, H5PY_AVAILABLE, Unit, ROOT_AVAILABLE
+from .. import __full_version__, H5PY_AVAILABLE, Unit, ROOT_AVAILABLE, ROOT_IMPORTED
 from .index import Index, LeftUniformIndex
 from warnings import warn
 from ..helpers import ensure_path
@@ -366,7 +366,7 @@ def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
                'values': matrix.values, 'meta': asdict(matrix.metadata),
                'version': __full_version__}
     if not exist_ok and path.exists():
-        raise FileExistsError(f"{path} already exists")
+        raise FileExistsError(f"{path} already exists. Use `exist_ok=True` to overwrite")
     np.savez(path, **mapping)
 
 
@@ -474,7 +474,7 @@ def save_root_1D(vector, path: Path, exist_ok: bool = False) -> None:
 def load_root_1D(path: Path, cls) -> Any:
     raise ImportError("ROOT is not available")
 
-if ROOT_AVAILABLE:
+if ROOT_IMPORTED:
     import ROOT
     from ROOT import TH1D, TFile
 

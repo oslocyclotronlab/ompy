@@ -1,0 +1,12 @@
+build/
+data/
+docs/
+example_data/
+notebooks/
+OCL_response_functions/
+OMpy.egg-info/
+venv/
+src/
+ompy/__pycache__/
+ompy/.mypy_cache/
+.git/

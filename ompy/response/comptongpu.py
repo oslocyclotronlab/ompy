@@ -12,7 +12,7 @@ from typing import TypeGuard, TypeVar
 
 from .comptonmatrixprotocol import ComptonMatrix
 #from ompy.response.compton import dEdtheta
-from . import ResponseData
+from .responsedata import ResponseData
 from .. import Vector, Matrix, Index
 
 DEBUG = False

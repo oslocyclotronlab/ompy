@@ -207,4 +207,57 @@ def compute_transition_matrix(Ei, Eg, matrix, binwidth='min', cut=False):
 def transition_matrix(mat, binwidth='min', cut=False) -> Matrix:
     Ef, val = compute_transition_matrix(mat.Ex, mat.Eg, mat.values, binwidth=binwidth, cut=cut)
     return Matrix(Ei=mat.Ex, Ef=Ef, values=val, xlabel='$E_i$', ylabel='$E_f$')
+
+def exeg_to_efeg(mat, cut=False) -> Matrix:
+    Ef, val = compute_EfEg(mat.Ex, mat.Eg, mat.values, cut=cut)
+    return Matrix(Ef=Ef, Eg=mat.Eg, values=val, xlabel='$E_f$', ylabel=r'$E_\gamma$')
         
+def compute_EfEg(Ex, Eg, matrix, cut=False):
+    """
+    Compute the matrix corresponding to transitions from Ei to final energy levels Ef.
+
+    Isn't this some sort of shear transformation?
+   
+    Dumb w[i, j] = h[i, i-j] shouldn't work because of bin widths, _but it does_!!
+    
+    Parameters:
+        Ei (array-like): Array of initial energy levels.
+        Eg (array-like): Array of emitted gamma ray energies.
+        matrix (array-like): Input matrix of shape (len(Ei), len(Eg)) with counts of observed gamma rays.
+        
+    Returns:
+        tuple: Array of final energy levels Ef and the transition matrix of shape (len(Ei), len(Ef)).
+    """
+    # Calculate dEi, dEg, and dEf
+    dEx = Ex[1] - Ex[0]
+    dEg = Eg[1] - Eg[0]
+    dEf = min(dEg, dEx)
+    average= False
+    
+    # Compute the Ef array
+    Ef_min = Ex[0] - Eg[-1] # - dEg  # minimum possible final energy
+    Ef_max = Ex[-1] + dEx         # maximum possible final energy
+    Ef = np.arange(Ef_min, Ef_max + dEf, dEf)
+    dEf = Ef[1] - Ef[0] # !! Tiny float error gave strange bug.
+    
+    # Create a transition matrix initialized with zeros
+    transition_matrix = np.zeros((len(Ef), len(Eg)))
+    count = np.zeros_like(transition_matrix)
+    
+    # Populate the transition matrix
+    for i in range(len(Ex)):
+        for j in range(len(Eg)):
+            k = int((Ex[i] - Eg[j] - Ef[0])//dEf) #search(Ef, Ex[i] - Eg[j])
+            transition_matrix[k, j] += matrix[i, j]
+            count[k, j] += 1
+
+    if average:
+        transition_matrix[count > 1] /= count[count > 1]
+    # Remove unecessary zeros
+    if cut:
+        x_sum = transition_matrix.sum(axis=1) > 0
+        i = np.argmax(x_sum)
+        j = len(Ef) - np.argmax(np.flip(x_sum))
+        return Ef[i:j], transition_matrix[i:j, :]
+    else:
+        return Ef, transition_matrix

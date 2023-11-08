@@ -3,10 +3,9 @@ from .guttormsen import *
 #from .EM import EM
 
 from .. import MINUIT_AVAILABLE, JAX_AVAILABLE
-if MINUIT_AVAILABLE:
-    #from .fourier import Fourier
-    #from .ml import *
-    pass
+if MINUIT_AVAILABLE and False:
+    from .fourier import Fourier
+    from .ml import *
 if JAX_AVAILABLE:
     #from . import jax_loss as jloss
     from .jaxer import *

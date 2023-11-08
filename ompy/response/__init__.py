@@ -1,5 +1,4 @@
 from .numbalib import *
-from .response_old import *
 from .calibrator import *
 from .io import save, load
 from .responsedata import *

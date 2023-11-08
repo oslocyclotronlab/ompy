@@ -1,5 +1,4 @@
 from __future__ import annotations
-from . import ResponseData
 from .numbalib import index, jit, prange
 from ..stubs import Axes, Pathlike, LineKwargs, ErrorBarKwargs, Unitlike
 from .. import Vector, __full_version__
@@ -9,27 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 from collections import OrderedDict
-from typing import TypeAlias, Iterable
+from typing import Iterable, Any
 from abc import ABC, abstractmethod
 from pathlib import Path
 import json
-
-
-try:
-    from numba import njit, int32, float32, float64
-    from numba.experimental import jitclass
-except ImportError:
-    warnings.warn("Numba could not be imported. Falling back to non-jiting which will be much slower")
-    int32 = np.int32
-    float32 = np.float32
-    float64 = np.float64
-
-    def nop_decorator(func, *aargs, **kkwargs):
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-        return wrapper
-    njit = nop_decorator
-    jitclass = nop_decorator
 
 
 @dataclass
@@ -49,7 +31,7 @@ class Interpolation(ABC):
     def eval(self, points: np.ndarray) -> np.ndarray: ...
 
     @abstractmethod
-    def _metadata(self) -> dict[str, any]: ...
+    def _metadata(self) -> dict[str, Any]: ...
 
     def save(self, path: Pathlike, exist_ok: bool = True) -> None:
         path = Path(path)
@@ -256,11 +238,6 @@ class LinearInterpolator(Interpolator):
     def interpolate(self) -> LinearInterpolation:
         intp = interp1d(self.x, self.y, kind="linear", fill_value="extrapolate")
         return LinearInterpolation(self.points, intp)
-
-
-spec2 = OrderedDict()
-spec2['x'] = float64[::1]
-spec2['y'] = float64[::1]
 
 
 class Lerp:

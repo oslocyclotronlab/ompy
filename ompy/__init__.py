@@ -21,18 +21,6 @@ else:
     Quantity = ureg.Quantity
     Unit = ureg.Unit
 
-    try:
-        from ompy.decomposition import *
-        # if importing one of the cython modules fails, it may hint on it
-        # not beeing installed correctly
-    except ImportError as e:
-        msg = f"""Error importing ompy: you should not try to import ompy from
-        its source directory unless it is a submodule; please exit the ompy
-        source tree, and relaunch your python interpreter from there.
-        If it is a submodule, you probably forgor to run
-        `python setup.py build_ext --inplace` in the folder.
-        Original exception was: {e}"""
-        raise ImportError(msg)
     from .version import GIT_REVISION as __git_revision__
     from .version import VERSION as __version__
     from .version import FULLVERSION as __full_version__
@@ -84,7 +72,7 @@ else:
     # unless the user explicitly requests it.
     # TODO: This is not working yet. ROOT is currently imported
     ROOT_AVAILABLE = is_available("ROOT", load=True)
-    ROOT_IMPORTED = True
+    ROOT_IMPORTED = ROOT_AVAILABLE
     ROOT_CALLBACKS = []
 
     def import_ROOT() -> None:
@@ -122,6 +110,11 @@ else:
                           "\nSee http://johannesbuchner.github.io/PyMultiNest/install.html#installing-the-python-module"
                           )
     XARRAY_AVAILABLE = is_available("xarray")
+    GAMBIT_AVAILABLE = is_available("gambit")
+    EMCEE_AVAILABLE = is_available("emcee")
+    PYMC_AVAILABLE = is_available("pymc")
+    PYRO_AVAILABLE = is_available("pyro")
+    SKLEARN_AVAILABLE = is_available("sklearn")
 
     from .status import print_status
 
@@ -130,8 +123,6 @@ else:
     # Simply import all functions and classes from all files to make them
     # available at the package level
     from .validator import Unitful, Bounded, Choice, Toggle
-    # from .spinfunctions import (SpinFunction, Const, EB05, EB09CT, EB09Emp,
-    #                            DiscAndEB05, SpinModel)
     from .geometry import Geometry, Line
     # Abstracts away hierachical saving to and from different formats
     #from .fileio import JSONWriter
@@ -139,24 +130,21 @@ else:
     from .array import Vector, Matrix, zeros_like, empty_like, empty, transition_matrix
     from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
     from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector, ArrayList
-    # from .database import Nucleus, get_nucleus, get_nucleus_df
     from .unfolder import Unfolder
-    # from .examples import example_raw, list_examples
-    # from .ensemble import Ensemble
     from . import response
     from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
     from .unfolding import Guttormsen
-    # from .gauss_smoothing import *
     from .action import Action
     from . import firstgeneration
     from .firstgeneration import (FirstGenerationParameters, first_generation, FGP)
-    from .extractor import Extractor
-    # from .decomposition import nld_T_product, index, index_2
+    from .decomposition import (nld_T_product)
     from .normalization import *
     from .shape import Shape, normalize_to_shape
     from .detector import Detector, OSCAR
-    from .peakfit import fit
+    if SKLEARN_AVAILABLE:
+        from .peakfit import fit
     from .peakselect import fit_gauss
     from .peakselect import gaussian as pgaussian
     from .introspection import logging, hooks
-    from .clicker import Clicker
+    if MINUIT_AVAILABLE:
+        from .clicker import Clicker
