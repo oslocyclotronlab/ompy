@@ -45,7 +45,7 @@ def load_npy(path: Pathlike, **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
     discrete = [Vector.from_path(path / f'{field}.npz').clone(xalias='E') for field in fields]
     try:
         fwhm = Vector.from_path(path / 'fwhm.npz', **kwargs)
-        fwhm = fwhm.clone(alias='E')
+        fwhm = fwhm.clone(xalias='E')
     except FileNotFoundError:
         fwhm = None
     discrete.append(fwhm)
