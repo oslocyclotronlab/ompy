@@ -6,10 +6,13 @@ import numpy as np
 import pandas as pd
 from dataclasses import asdict
 from .. import __full_version__, H5PY_AVAILABLE, Unit, ROOT_AVAILABLE, ROOT_IMPORTED
+from ..version import warn_version
 from .index import Index, LeftUniformIndex
 from warnings import warn
 from ..helpers import ensure_path
 import logging
+import json
+from ..version import Version
 
 from ..stubs import Pathlike, array
 from numpy.typing import NDArray
@@ -337,58 +340,140 @@ def save_txt_1D(values: np.ndarray, E: np.ndarray,
     np.savetxt(path, mat, header=header)
 
 
+def encode_dict(d: dict) -> np.ndarray:
+    """ Encode a dictionary as a numpy array of bytes """
+    d = transform_dict(d, lambda x: isinstance(x, Unit), str)
+    d = transform_dict(d, lambda x: isinstance(x, np.ndarray), lambda x: x.tolist())
+    return np.array(json.dumps(d), dtype='S')
+
+def decode_dict(a: np.ndarray) -> dict[str, Any]:
+    """ Decode a numpy array of bytes as a dictionary """
+    return json.loads(a.item())
+
+def encode_string(s: str) -> np.ndarray:
+    """ Encode a string as a numpy array of bytes """
+    return np.array(s, dtype='S')
+
+def decode_string(a: np.ndarray) -> str:
+    """ Decode a numpy array of bytes as a string """
+    b = a.item()
+    if isinstance(b, bytes):
+        return b.decode()
+    return b
+
+
+def transform_dict(d, condition_func, transform_func):
+    """
+    Recursively copy a nested dictionary, applying a transformation function to the values
+    if they meet a given condition.
+
+    :param d: The nested dictionary to transform.
+    :param condition_func: A function that takes a value and returns True if the condition is met.
+    :param transform_func: A function that takes a value and returns its transformed value.
+    :return: A new dictionary with transformed values.
+    """
+    new_dict = {}
+    for key, value in d.items():
+        if isinstance(value, dict):
+            # Recursively apply transformation to sub-dictionaries
+            new_dict[key] = transform_dict(value, condition_func, transform_func)
+        elif condition_func(value):
+            # Apply the transformation function if condition is met
+            new_dict[key] = transform_func(value)
+        else:
+            # Copy the value as is
+            new_dict[key] = value
+    return new_dict
+
 def save_npz_1D(path: Path, vector, exist_ok: bool = False) -> None:
     if not exist_ok and path.exists():
         raise FileExistsError(f"File {path} already exists")
-    mapping = {'index': vector._index.to_dict(), 'values': vector.values,
-               'meta': asdict(vector.metadata), 'version': __full_version__}
-    if vector.std is not None:
-        mapping['std'] = vector.std
+    
+    index = encode_dict(vector._index.to_dict())
+    meta = encode_dict(asdict(vector.metadata))
+    version = encode_string(__full_version__)
+    mapping = {'index': index, 'values': vector.values,
+               'meta': meta, 'version': version}
+
     np.savez(path, **mapping)
 
 
 def load_npz_1D(path: Pathlike, cls, **kwargs) -> Any:
-    with np.load(path, allow_pickle=True, **kwargs) as data:
-        meta = data['meta'][()]
-        index = Index.from_dict(data['index'][()])
+    if use_old_version(path):
+        return load_npz_1D_old(path, cls, **kwargs)
+
+    with np.load(path, allow_pickle=False, **kwargs) as data:
+        meta = decode_dict(data['meta'])
+        index = Index.from_dict(decode_dict(data['index']))
         values = data['values']
-        std = None if 'std' not in data else data['std']
-        version = data['version']
-        if version != __full_version__:
-            warn(
-                f"Version mismatch when loading {path}: {version} != {__full_version__}")
+        version = decode_string(data['version'])
+        warn_version(version)
     return cls(X=index, values=values, **meta)
 
 
 def save_npz_2D(path: Path, matrix, exist_ok: bool = False) -> None:
-    mapping = {'X index': matrix.X_index.to_dict(),
-               'Y index': matrix.Y_index.to_dict(),
-               'values': matrix.values, 'meta': asdict(matrix.metadata),
-               'version': __full_version__}
+    mapping = {'X index': encode_dict(matrix.X_index.to_dict()),
+               'Y index': encode_dict(matrix.Y_index.to_dict()),
+               'values': matrix.values, 'meta': encode_dict(asdict(matrix.metadata)),
+               'version': encode_string(__full_version__)}
     if not exist_ok and path.exists():
         raise FileExistsError(f"{path} already exists. Use `exist_ok=True` to overwrite")
     np.savez(path, **mapping)
 
 
 def load_npz_2D(path: Pathlike, cls, **kwargs) -> Any:
+    if use_old_version(path):
+        return load_npz_2D_old(path, cls, **kwargs)
+
+    with np.load(path, allow_pickle=False, **kwargs) as data:
+        version = decode_string(data['version'])
+        warn_version(version)
+        meta = decode_dict(data['meta'])
+        X_index = Index.from_dict(decode_dict(data['X index']))
+        Y_index = Index.from_dict(decode_dict(data['Y index']))
+        values = data['values']
+    return cls(X=X_index, Y=Y_index, values=values, **meta)
+
+
+def load_npz_1D_old(path: Pathlike, cls, **kwargs) -> Any:
     with np.load(path, allow_pickle=True, **kwargs) as data:
-        version = data['version']
-        if version != __full_version__:
-            print(
-                f"Version mismatch when loading {path}: {version} != {__full_version__}")
-            warn(
-                f"Version mismatch when loading {path}: {version} != {__full_version__}")
+        meta = data['meta'][()]
+        index = Index.from_dict(data['index'][()])
+        values = data['values']
+        version = data['version'].item()
+        warn_version(version)
+    return cls(X=index, values=values, **meta)
+
+
+def load_npz_2D_old(path: Pathlike, cls, **kwargs) -> Any:
+    with np.load(path, allow_pickle=True, **kwargs) as data:
+        version = data['version'].item()
+        warn_version(version)
         meta = data['meta'][()]
         X_index = Index.from_dict(data['X index'][()])
         Y_index = Index.from_dict(data['Y index'][()])
         values = data['values']
     return cls(X=X_index, Y=Y_index, values=values, **meta)
 
+def use_old_version(path: Pathlike) -> bool:
+    with np.load(path, allow_pickle=False) as data:
+        version = data['version'].item()
+        if isinstance(version, bytes):
+            version = version.decode()
+        version = Version.from_str(version)
+        if version < Version.from_str('2.1.0'):
+            # Version 2.1.0 removes pickling
+            return True
+        return False
+
+
 def save_hdf5_2D(matrix, path: Path, exist_ok: bool = False, **kwargs) -> None:
     raise ImportError("h5py is not installed")
 
+
 def load_hdf5_2D(path: Path, cls, **kwargs) -> Any:
     raise ImportError("h5py is not installed")
+
 
 if H5PY_AVAILABLE:
     import h5py
@@ -452,9 +537,7 @@ if H5PY_AVAILABLE:
         start = time.time()
         with h5py.File(path, 'r') as f:
             version = f.attrs['version']
-            if version != __full_version__:
-                warn(
-                    f"Version mismatch when loading {path}: {version} != {__full_version__}")
+            warn_version(version)
             meta = hdf5_to_dict(f, 'meta/')
             X_dict = hdf5_to_dict(f, 'X_index/')
             X_index = Index.from_dict(X_dict)  # type: ignore

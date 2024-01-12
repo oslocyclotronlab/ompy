@@ -8,14 +8,14 @@ ELSE:
     pass
 
 
-ctypedef np.float64_t DTYPE_t
-DTYPE=np.float64
+ctypedef np.float32_t DTYPE_t
+DTYPE=np.float32
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
-                  double[::1] E_nld, double[::1] Eg, double[::1] Ex):
+def nld_T_product(float[::1] nld, float[::1] T, float[::1] resolution,
+                  float[::1] E_nld, float[::1] Eg, float[::1] Ex):
     """ Computes first generation matrix from nld and gSF
 
     Uses the equation
@@ -44,10 +44,10 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
         Py_ssize_t num_Eg = len(Eg)
         Py_ssize_t i_Ex
         int i_Eg, i_E_nld
-        double Eg_max, E_f
-        double halfbin = (Eg[1]-Eg[0])/2
+        float Eg_max, E_f
+        float halfbin = (Eg[1]-Eg[0])/2
     firstgen = np.zeros((num_Ex, num_Eg), dtype=DTYPE)
-    cdef double[:, ::1] firstgen_view = firstgen
+    cdef float[:, ::1] firstgen_view = firstgen
 
     # Remember to change both loops simultaneously
     IF OPENMP:
@@ -79,7 +79,7 @@ def nld_T_product(double[::1] nld, double[::1] T, double[::1] resolution,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-cdef int _index(double[:] array, double element) nogil:
+cdef int _index(float[:] array, float element) nogil:
     """ Finds the index of the closest element in the array
 
     Unsafe.
@@ -93,8 +93,8 @@ cdef int _index(double[:] array, double element) nogil:
     """
     cdef:
         int i = 0
-        double distance
-        double prev_distance = (array[0] - element)**2
+        float distance
+        float prev_distance = (array[0] - element)**2
 
     for i in range(1, len(array)):
         distance = (array[i] - element)**2
@@ -130,8 +130,8 @@ def index(number[:] array, number element):
     """
     cdef:
         int i = 0
-        double distance
-        double prev_distance = (array[0] - element)**2
+        float distance
+        float prev_distance = (array[0] - element)**2
 
     for i in range(1, len(array)):
         distance = (array[i] - element)**2
@@ -158,8 +158,8 @@ def index_2(number[:] array, number element):
     """
     cdef:
         int i = 0
-        double d1
-        double d2
+        float d1
+        float d2
         int N = len(array)
     if array[0] >= element:
         return 0
@@ -179,9 +179,9 @@ def index_2(number[:] array, number element):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
-              double[:, ::1] std, double[::1] resolution,
-              double[::1] Eg, double[::1] Ex):
+def chisquare_diagonal(float[:, ::1] fact, float[:, ::1] fit,
+              float[:, ::1] std, float[::1] resolution,
+              float[::1] Eg, float[::1] Ex):
     """ Computes χ² of two matrices
 
     Exploits the diagonal resolution to do less computation
@@ -199,8 +199,8 @@ def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
     """
 
     cdef:
-        double chi = 0.0
-        double Eg_max
+        float chi = 0.0
+        float Eg_max
         Py_ssize_t num_Eg = len(Eg)
         Py_ssize_t num_Ex = len(Ex)
         int i, j
@@ -219,8 +219,8 @@ def chisquare_diagonal(double[:, ::1] fact, double[:, ::1] fit,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.embedsignature(True)
-def chisquare(double[:, ::1] fact, double[:, ::1] fit,
-              double[:, ::1] std):
+def chisquare(float[:, ::1] fact, float[:, ::1] fit,
+              float[:, ::1] std):
     """ Computes χ² of two matrices
 
     Args:
@@ -231,7 +231,7 @@ def chisquare(double[:, ::1] fact, double[:, ::1] fit,
         The value of χ²
     """
     cdef:
-        double chi = 0.0
+        float chi = 0.0
         Py_ssize_t num_Eg = fact.shape[1]
         Py_ssize_t num_Ex = fact.shape[0]
         int i, j

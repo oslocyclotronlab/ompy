@@ -5,19 +5,17 @@ import matplotlib.pyplot as plt
 import warnings
 import logging
 from contextlib import redirect_stdout
-from uncertainties import unumpy
-import os
+#from uncertainties import unumpy
 
 from pathlib import Path
-from typing import Union, Any
+from typing import Union
 from scipy.optimize import minimize
 from .ensemble import Ensemble
 from . import Matrix, Vector, AsymmetricVector
-from .decomposition import chisquare_diagonal, nld_T_product
+#from .decomposition import chisquare_diagonal, nld_T_product
 from .action import Action
 from .library import contains_zeroes_patches
 from .stubs import Pathlike, Axes
-from .helpers import maybe_set
 from tqdm.auto import tqdm
 
 LOG = logging.getLogger(__name__)
@@ -247,15 +245,7 @@ class Extractor:
         if contains_zeroes_patches(matrix):
             warnings.warn("The matrix contains too many clusters of zeroes."
                           " Consider rebinning.")
-        if std is not None:
-            std = std.clone()
-            if np.any(std.values < 0):
-                raise ValueError("std has to have positive entries only.")
-            assert matrix.shape == std.shape, \
-                f"matrix.shape: {matrix.shape} != std.shape : {std.shape}"
-            matrix.values, std.values = normalize(matrix, std)
-        else:
-            matrix.values, _ = normalize(matrix)
+            matrix.values = normalize(matrix).values
 
         # Eg and Ex *must* have the same step size for the
         # decomposition to make sense.
@@ -634,7 +624,9 @@ class Extractor:
         T = (2 * np.pi * gsf.E ** 3) * np.nan_to_num(gsf.values)
         resolution = np.zeros_like(gsf.E)
 
-        values = nld_T_product(np.nan_to_num(nld.values), T, resolution,
+        X = np.nan_to_num(nld.values)
+        Ex = Ex.astype(np.float32)
+        values = nld_T_product(X, T, resolution,
                                nld.E, gsf.E, Ex)
         return Matrix(Eg=gsf.E, Ex=Ex, values=values)
 
@@ -647,8 +639,7 @@ class Extractor:
         return mat
 
 
-def normalize(mat: Matrix,
-              std: Matrix | None) -> tuple[np.ndarray, np.ndarray]:
+def normalize(mat: Matrix):
     """Matrix normalization per row taking into account the std. dev
 
     Error propagation assuming gaussian error propagation (!!!!).
@@ -660,16 +651,11 @@ def normalize(mat: Matrix,
     Returns:
         Values of normalized matrix and normalized standard deviation
 
-
     """
-    matrix = unumpy.uarray(mat.values, std.values if std is not None else None)
+    #matrix = unumpy.uarray(mat.values, std.values if std is not None else None)
 
     # normalize each Ex row to 1 (-> get decay probability)
-    for i, total in enumerate(matrix.sum(axis=1)):
+    for i, total in enumerate(mat.sum(axis=1).values):
         if total == 0:
             continue
-        matrix[i, :] = np.true_divide(matrix[i, :], total)
-    values = unumpy.nominal_values(matrix)
-    std = unumpy.std_devs(matrix)
-
-    return values, std
+        mat[i, :] = np.true_divide(mat[i, :], total)

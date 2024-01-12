@@ -23,6 +23,7 @@ from abc import ABC, abstractmethod
 from ..helpers import make_ax, maybe_set, readable_time, bytes_to_readable
 import logging
 import time
+import re
 
 LOG = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
     costs: list[np.ndarray] = []
     initials: list[Matrix] = []
     backgrounds: list[Matrix] = []
-    best = 0.01 * best
+    best = best
     disable_tqdm = kwargs.pop('disable_tqdm', True)
     background = res.background
     if background is not None:
@@ -202,7 +203,9 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
             raise RuntimeError("Unfolding diverged")
         unfolded_boot.append(unf.best())
         A_boots.append(A_boot)
-        costs.append(unf.cost.astype('float16'))
+
+        # We do a rescaling to make the cost fit into fewer bytes to take up less space
+        costs.append((unf.cost/unf.cost.max()).astype('float16'))
         initials.append(initial)
     bootstraped = BootstrapMatrix(base=res, bootstraps=A_boots, unfolded=unfolded_boot,
                                   kwargs=kwargs, costs=costs, initials=initials,
@@ -326,7 +329,7 @@ class Bootstrap(ABC, Generic[T]):
                read_only: int | None = None) -> BootstrapMatrix | BootstrapVector:
         if (path / "matrices.h5").exists():
             return cls._load_h5(path, arraytype, basearray, read_only)
-        return self._load_npz(path, arraytype, basearray, read_only)
+        return cls._load_npz(path, arraytype, basearray, read_only)
 
     @classmethod
     def _load_npz(cls, path, arraytype, basearray, read_only):
@@ -651,13 +654,15 @@ class BootstrapMatrix(Bootstrap[Matrix]):
         eta = self.base.raw.clone(values=eta)
         return eta
 
-    def eta_ci(self, alpha=0.05, summary = np.median) -> tuple[Matrix, Matrix]:
+    def eta_ci(self, alpha=0.05, summary = np.median, as_matrix: bool = True,
+               ) -> tuple[Matrix, Matrix] | tuple[np.ndarray, np.ndarray]:
         a_low = 100*alpha/2
         lower = np.percentile(self.etabox, a_low, axis=0)
         a_high = 100*(1-alpha/2)
         upper = np.percentile(self.etabox, a_high, axis=0)
-        lower = self.base.raw.clone(values=lower, name=f'Lower {100*(1-alpha):.0f}% PI')
-        upper = self.base.raw.clone(values=upper, name=f'Upper {100*(1-alpha):.0f}% PI')
+        if as_matrix:
+            lower = self.base.raw.clone(values=lower, name=f'Lower {100*(1-alpha):.0f}% PI')
+            upper = self.base.raw.clone(values=upper, name=f'Upper {100*(1-alpha):.0f}% PI')
         return lower, upper
 
     def nu_mat(self, summary = np.median) -> Matrix:
@@ -678,13 +683,13 @@ class BootstrapMatrix(Bootstrap[Matrix]):
     @property
     def etabox(self) -> np.ndarray:
         if self._etabox is None:
-            self._etabox = mul(self.ubox, self.G.values)
+            self._etabox = gmul(self.ubox, self.G.values)
         return self._etabox
 
     @property
     def nubox(self) -> np.ndarray:
         if self._nubox is None:
-            self._nubox = mul(self.ubox, self.R.values)
+            self._nubox = gmul(self.ubox, self.R.values)
         return self._nubox
 
 def poisson_ci(lambdas, alpha=0.05):
@@ -712,6 +717,8 @@ def last_nonzero(box: np.ndarray) -> int:
             return i
     return 0
 
+def gmul(X, A):
+    return np.einsum('ijk,kl->ijl', X, A)
 
 #@njit
 def mul(X, A):
@@ -800,3 +807,38 @@ def resolve_box_from_space(boot: Bootstrap, space: VSpace) -> np.ndarray:
             return boot.nubox
         case _:
             raise ValueError(f'Unknown space: {space}')
+
+
+class Coverage:
+    def __init__(self, path: Path):
+        self.boots = self.load(path)
+
+    @staticmethod
+    def load(path: Path, pattern = 'boot*') -> list:
+        path = Path(path)
+        boots = []
+        paths = list(path.glob(pattern))
+        for boot_path in tqdm(paths):
+            boot = BootstrapMatrix.from_path(boot_path)
+            boots.append(boot)
+        return boots
+
+    def percentile(self, alpha: float = 0.05):
+        # For each bootstrap, compute the CI
+        pass
+        
+
+    def coverage(self, true: Matrix | np.ndarray, alpha: float = 0.05):
+        # For all bootstrap CI, compute the coverage
+        if isinstance(true, Matrix):
+            true = true.values
+        coverages = np.zeros((len(self.boots), *true.shape), dtype=bool)
+        for i in tqdm(range(len(self.boots))):
+            boot = self.boots[i]
+            lower, upper = boot.eta_ci(as_matrix=False, alpha=alpha)
+            coverages[i] = (lower <= true) & (true <= upper)
+        return coverages
+
+
+
+

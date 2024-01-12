@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from typing import overload, Literal, Callable
 import warnings
 from functools import partial
+from .numbalib import njit
 
 FWHM_TO_SIGMA = 1 / (2 * np.sqrt(2 * np.log(2)))
 
@@ -164,14 +165,14 @@ class CompoundDetector:
         self.exdetector = ex_detector
 
     @overload
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+    def cut_at_resolution_sharp(self, mat: Matrix, *, eg_sigma: ...,
                           ex_sigma: ..., inplace: Literal[False]) -> Matrix: ...
 
     @overload
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+    def cut_at_resolution_sharp(self, mat: Matrix, *, eg_sigma: ...,
                           ex_sigma: ..., inplace: Literal[True]) -> None: ...
 
-    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: float = 3,
+    def cut_at_resolution_sharp(self, mat: Matrix, *, eg_sigma: float = 3,
                           ex_sigma: float = 3,
                           inplace: bool = False) -> Matrix | None:
         """ Return a matrix with the resolution of sigma"""
@@ -193,6 +194,59 @@ class CompoundDetector:
             matrix.values[mask] = 0.0
             return matrix
 
+    @overload
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+                          ex_sigma: ..., inplace: Literal[False]) -> Matrix: ...
+
+    @overload
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: ...,
+                          ex_sigma: ..., inplace: Literal[True]) -> None: ...
+
+    def cut_at_resolution(self, mat: Matrix, *, eg_sigma: float = 3,
+                          ex_sigma: float = 3,
+                          inplace: bool = False) -> Matrix | None:
+        """ Return a matrix with the resolution of sigma"""
+        if inplace:
+            values = mat.values
+        else:
+            values = mat.values.copy()
+
+        sigma_eg = self.egdetector.resolution_sigma(mat.Eg)
+        sigma_ex = self.exdetector.resolution_sigma(mat.Ex)
+        sigma_ex = np.atleast_1d(sigma_ex.to('keV').magnitude)
+        sigma_eg = np.atleast_1d(sigma_eg.to('keV').magnitude)
+        if len(sigma_ex) == 1:
+            sigma_ex = np.full_like(mat.Ex, sigma_ex[0])
+        if len(sigma_eg) == 1:
+            sigma_eg = np.full_like(mat.Eg, sigma_eg[0])
+        # set the dtype to that of the matrix
+        sigma_ex = sigma_ex.astype(mat.values.dtype)
+        sigma_eg = sigma_eg.astype(mat.values.dtype) 
+        Ex = mat.Ex.astype(mat.values.dtype)
+        Eg = mat.Eg.astype(mat.values.dtype)
+        cut_at_resolution(values, Ex, Eg, sigma_ex, sigma_eg,
+                          ex_sigma, eg_sigma)
+        if not inplace:
+            return mat.clone(values=values)
+
+
+@njit
+def cut_at_resolution(mat, Ex, Eg, sigma_ex, sigma_eg, ex_sigma, eg_sigma):
+    for i in range(mat.shape[0]):
+        e_x = Ex[i]
+        s_ex = sigma_ex[i]
+        for j in range(mat.shape[1]):
+            e_g = Eg[j]
+            if e_g < e_x:
+                continue
+            s_eg = sigma_eg[j]
+            distance_eg = e_g - e_x
+            distance_ex = e_x - e_g #?
+            factor_ex = ngaussian(distance_ex, 0, ex_sigma* s_ex)
+            factor_eg = ngaussian(distance_eg, 0, eg_sigma * s_eg)
+            factor = np.sqrt(factor_ex * factor_eg)
+            mat[i, j] *= factor
+
 
 class Oslo(CompoundDetector):
     def __init__(self, eg_detector: EgDetector = OSCAR(),
@@ -208,6 +262,6 @@ class Oslo(CompoundDetector):
         return Oslo(eg_detector=LambdaEgDetector(fwhm))
 
 
-# @njit
+@njit
 def ngaussian(x: array, mu: float, sigma: float):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))

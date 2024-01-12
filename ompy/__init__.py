@@ -71,8 +71,9 @@ else:
     # ROOT messes with the version of system libraries, so it is not imported
     # unless the user explicitly requests it.
     # TODO: This is not working yet. ROOT is currently imported
-    ROOT_AVAILABLE = is_available("ROOT", load=True)
-    ROOT_IMPORTED = ROOT_AVAILABLE
+    load_root = False
+    ROOT_AVAILABLE = is_available("ROOT", load=load_root)
+    ROOT_IMPORTED = load_root and ROOT_AVAILABLE
     ROOT_CALLBACKS = []
 
     def import_ROOT() -> None:

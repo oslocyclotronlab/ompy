@@ -9,7 +9,7 @@ from ..stubs import Plot1D, Plot2D
 from pathlib import Path
 import numpy as np
 import json
-from ..version import FULLVERSION
+from ..version import FULLVERSION, warn_version
 from warnings import warn
 from .result_classes import RESULT_CLASSES
 from typing import TYPE_CHECKING
@@ -48,8 +48,7 @@ class ResultMeta(ABC, Generic[T]):
         path = Path(path)
         with open(path / 'meta.json', 'r') as f:
             meta = json.load(f)
-        if meta['version'] != FULLVERSION:
-            warn(f"Version mismatch: {meta['version']} != {FULLVERSION}")
+        warn_version(meta['version'])
         if meta['name'] != cls.__name__:
             raise ValueError(f"Name mismatch: {meta['name']} != {cls.__name__}")
         paramfield = [f for f in fields(cls) if f.name == 'parameters'][0]
@@ -61,8 +60,7 @@ class ResultMeta(ABC, Generic[T]):
         path = Path(path)
         with open(path / 'meta.json', 'r') as f:
             meta = json.load(f)
-        if meta['version'] != FULLVERSION:
-            warn(f"Version mismatch: {meta['version']} != {FULLVERSION}")
+        warn_version(meta['version'])
         return meta['name']
 
 
@@ -183,8 +181,7 @@ class Result(ABC, Generic[T]):
         path = Path(path)
         with open(path / 'meta.json', 'r') as f:
             meta = json.load(f)
-        if meta['version'] != FULLVERSION:
-            warn(f"Version mismatch: {meta['version']} != {FULLVERSION}")
+        warn_version(meta['version'])
         if meta['name'] != cls.__name__:
             raise ValueError(f"Name mismatch: {meta['name']} != {cls.__name__}")
         meta_cls: str = ResultMeta.read_subclass(path / 'meta')
@@ -236,8 +233,7 @@ class Parameters(ABC, Generic[T]):
         path = Path(path)
         with open(path / 'meta.json', 'r') as f:
             meta = json.load(f)
-        if meta['version'] != FULLVERSION:
-            raise ValueError(f"Version mismatch: {meta['version']} != {FULLVERSION}")
+        warn_version(meta['version'])
         if meta['name'] != cls.__name__:
             raise ValueError(f"Class mismatch: {meta['name']} != {cls.__name__}")
 

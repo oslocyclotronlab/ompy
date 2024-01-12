@@ -10,7 +10,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import ticker
-from matplotlib.colors import LogNorm, Normalize, SymLogNorm
+from matplotlib.colors import LogNorm, Normalize, SymLogNorm, TwoSlopeNorm
 from matplotlib import colormaps as cmaps
 
 from .. import XARRAY_AVAILABLE, Unit, make_axes, ROOT_IMPORTED
@@ -19,7 +19,8 @@ from .filehandling import (load_numpy_2D, load_tar,
                            load_txt_2D, mama_read, mama_write, save_hdf5_2D, save_numpy_2D,
                            save_tar, save_txt_2D, Filetype, resolve_filetype,
                            load_npz_2D, save_npz_2D, save_hdf5_2D, load_hdf5_2D)
-from ..helpers import maybe_set, make_ax
+from ..helpers import maybe_set, make_ax, IQR_range
+from ..helpers import robust_z_score, robust_z_score_i, AnnotatedColorbar
 from ..stubs import (Unitlike, Pathlike, Axes, Figure,
                      Colorbar, QuadMesh, array, arraylike, ArrayBool, numeric, QuantityLike)
 from .vector import Vector, maybe_pop_from_kwargs
@@ -36,6 +37,8 @@ logging.captureWarnings(True)
 AxisEither: TypeAlias = Literal[0, 1]
 AxisBoth: TypeAlias = Literal[0, 1, 2]
 Axis: TypeAlias = AxisEither | AxisBoth
+ColorByArg: TypeAlias = Literal['values', 'z-score', 'IQR', 'IQR2']
+ColorBy: TypeAlias = ColorByArg | tuple[ColorByArg, ...]
 
 
 class Matrix(AbstractArray, MatrixProtocol):
@@ -688,6 +691,7 @@ class Matrix(AbstractArray, MatrixProtocol):
              add_cbar: Literal[True] = ...,
              cbarkwargs: dict[str, Any] | None = None,
              bad_map: Callable[[Matrix], ArrayBool | bool] = lambda x: False,
+             color_by: ColorBy = ...,
              **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar]]: ...
 
     @overload
@@ -698,6 +702,7 @@ class Matrix(AbstractArray, MatrixProtocol):
              add_cbar: Literal[False] = ...,
              cbarkwargs: dict[str, Any] | None = None,
              bad_map: Callable[[Matrix], ArrayBool | bool] = lambda x: False,
+             color_by: ColorBy = ...,
              **kwargs) -> tuple[Axes, tuple[QuadMesh, None]]: ...
 
     def plot(self, ax: Axes | None = None, *,
@@ -707,6 +712,7 @@ class Matrix(AbstractArray, MatrixProtocol):
              add_cbar: bool = True,
              cbarkwargs: dict[str, Any] | None = None,
              bad_map: Callable[[Matrix], ArrayBool | bool] = lambda x: False,
+             color_by: ColorBy = 'values',
              **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
         """ Plots the matrix with the energy along the axis
 
@@ -743,6 +749,54 @@ class Matrix(AbstractArray, MatrixProtocol):
                 else:
                     scale = 'linear'
 
+        mask = np.isnan(self.values) | (self.values == 0) | bad_map(self)
+        masked = np.ma.array(self.values, mask=mask)
+
+        # Try methods to determine colorscale to prevent
+        # outliers from skewing the data
+        if isinstance(color_by, str):
+            color_args = []
+        else:
+            color_args = color_by[1:] if len(color_by) > 1 else []
+            color_by = color_by[0]
+
+        if color_by == 'IQR':
+            factor = color_args[0] if color_args else 1.5
+            vmin_IQR, vmax_IQR = IQR_range(self.values[~mask].ravel(), factor)
+            if scale == 'log':
+                vmin_IQR = max(vmin_IQR, 1e-1)
+            vmin = vmin if vmin is not None else vmin_IQR
+            vmax = vmax if vmax is not None else vmax_IQR
+        elif color_by == 'z-score':
+            z = np.zeros_like(self.values)
+            x = self.values[~mask]
+            z[~mask] = robust_z_score(x)
+            zmin = color_args[0] if color_args else -2
+            zmax = color_args[1] if len(color_args) > 1 else 2
+            vmin_z = max(zmin, z.min())
+            vmax_z = min(zmax, z.max())
+
+            vmin_z = robust_z_score_i(vmin_z, x)
+            vmax_z = robust_z_score_i(vmax_z, x)
+            if scale == 'log':
+                vmin_z = max(vmin_z, 1e-1)
+
+            vmin = vmin if vmin is not None else vmin_z
+            vmax = vmax if vmax is not None else vmax_z
+        elif color_by == 'percentile':
+            lower: float = color_args[0] if color_args else 0.5
+            upper: float = color_args[1] if len(color_args) > 1 else 99.5
+            vmin_p = np.percentile(self.values[~mask], lower)
+            vmax_p = np.percentile(self.values[~mask], upper)
+
+            vmin = vmin if vmin is not None else vmin_p
+            vmax = vmax if vmax is not None else vmax_p
+        elif color_by == 'values':
+            pass
+        else:
+            raise ValueError(f"Unknown color_by: {color_by}. Supported are"
+                             " 'IQR', 'z-score', 'percentile' and 'values'")
+
         if scale == 'log':
             if vmin is not None and vmin <= 0:
                 raise ValueError("`vmin` must be positive for log-scale")
@@ -766,11 +820,9 @@ class Matrix(AbstractArray, MatrixProtocol):
         # Set entries of 0 to white
         current_cmap = copy.copy(cm.get_cmap())
         current_cmap.set_bad(color='white')
-        kwargs.setdefault('cmap', current_cmap)
-        mask = np.isnan(self.values) | (self.values == 0) | bad_map(self)
-        masked = np.ma.array(self.values, mask=mask)
+        cmap = plt.get_cmap(kwargs.pop('cmap', current_cmap))
 
-        mesh = ax.pcolormesh(Y, X, masked, norm=norm, **kwargs)
+        mesh = ax.pcolormesh(Y, X, masked, cmap=cmap, norm=norm, **kwargs)
 
         if self.Y_index.is_mid():
             ax.xaxis.set_major_locator(MeshLocator(self.Y))
@@ -797,25 +849,14 @@ class Matrix(AbstractArray, MatrixProtocol):
             else:
                 return f'x={x:1.0f}, y={y:1.0f}'
         # TODO: Takes waaaay to much CPU
-
-        def nop(x, y):
-            return ''
         # ax.format_coord = nop
 
         cbar: Colorbar | None = None
         if add_cbar:
             if cbarkwargs is None:
                 cbarkwargs = {}
-            if vmin is not None and vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='both', **cbarkwargs)
-            elif vmin is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='min', **cbarkwargs)
-            elif vmax is not None:
-                cbar = fig.colorbar(mesh, ax=ax, extend='max', **cbarkwargs)
-            else:
-                cbar = fig.colorbar(mesh, ax=ax, **cbarkwargs)
+            cbar = AnnotatedColorbar(mesh, ax=ax, **cbarkwargs)
 
-            maybe_set(cbar.ax, ylabel=self.vlabel)
         return ax, (mesh, cbar)
 
     def plot_3d(self, ax: Axes | None = None, vmin: float | None = None,

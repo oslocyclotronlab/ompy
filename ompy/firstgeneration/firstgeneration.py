@@ -36,6 +36,8 @@ TODO:
 - Can Independent component analysis work to decompose the AG?
   Or NMF.
 - Unfolding - wavelet?
+- FG check rhosigchi for Ex=Eg cutoff Februar 2016 ndim xdim smooth 300keV
+  
 """
 
 LOG = logging.getLogger(__name__)
@@ -133,7 +135,8 @@ def first_generation_list(AG: list[Matrix],
                      disable_tqdm: bool = False,
                      **kwargs) -> list[FirstGenerationResult]:
     res: list[FirstGenerationResult] = []
-    for i in tqdm(range(len(AG))):
+    tqdm_ = tqdm if not disable_tqdm else lambda x: x
+    for i in tqdm_(range(len(AG))):
         LOG.info("First generation for AG[%d]", i)
         res.append(first_generation_matrix(AG[i], params, multiplicity, population_norm, disable_tqdm=True, **kwargs))
     return res

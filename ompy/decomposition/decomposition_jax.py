@@ -109,6 +109,8 @@ def optimize(FG: Matrix, N: int = 10_000, optimizer=optimizers.adam(1e-3),
     Ef = jnp.array(Ef, dtype='float32')
     Eg = jnp.array(Eg, dtype='float32')
     Ex = jnp.array(Ex, dtype='float32')
+    
+    print(Eg)
 
     # Initial parameters
     nld_0 = 0.1+jnp.ones_like(Ef)

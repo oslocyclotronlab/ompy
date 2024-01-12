@@ -149,6 +149,12 @@ class Vector(AbstractArray, VectorProtocol):
         if len(self._index) != len(self.values):
             raise ValueError(
                 f"Length of index{_xalias} and values{_valias} must be the same. Got {len(self._index)} and {len(self.values)}")
+        if 'ylabel' in kwargs:
+            ylabel = kwargs.pop('ylabel')
+            if 'vlabel' in kwargs:
+                raise ValueError("Can not specify both `ylabel` and `vlabel`")
+            kwargs['vlabel'] = ylabel
+
         wrong_kw = set(kwargs) - set(VectorMetadata.__slots__)
         if wrong_kw:
             raise ValueError(f"Invalid keyword arguments: {', '.join(wrong_kw)}")

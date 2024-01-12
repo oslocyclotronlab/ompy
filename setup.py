@@ -11,7 +11,7 @@ import platform
 
 # Version routine taken from numpy
 MAJOR = 2
-MINOR = 0
+MINOR = 1
 MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
