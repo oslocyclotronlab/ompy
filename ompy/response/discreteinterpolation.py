@@ -16,7 +16,7 @@ import numpy as np
 from pathlib import Path
 import json
 from typing import Literal, overload
-import warnings
+from ..version import warn_version
 
 SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
 
@@ -94,8 +94,7 @@ class DiscreteInterpolation:
         with (path / 'meta.json').open('r') as f:
             meta = json.load(f)
         version = meta.pop('version')
-        if version != __full_version__:
-            warnings.warn(f"Version mismatch: {version} != {__full_version__}")
+        warn_version(version)
         FE = FEInterpolation.from_path(path / 'FE')
         SE = EscapeInterpolation.from_path(path / 'SE')
         DE = EscapeInterpolation.from_path(path / 'DE')
@@ -141,10 +140,10 @@ class DiscreteInterpolation:
             is_fwhm_normalized if is_fwhm_normalized is not None else self.is_fwhm_normalized
         )
 
-    def plot(self, ax: Axes | None = None, **kwargs) -> Axes:
+    def plot(self, ax: Axes | None = None, **kwargs) -> list[Axes]:
         if ax is None:
             _, ax = plt.subplots(3, 2, sharex=True, constrained_layout=True)
-        ax = ax.flatten()
+        ax: list[Axes] = ax.flatten()
         if len(ax) < 5:
             raise ValueError("Need at least 5 axes")
         E = self.E

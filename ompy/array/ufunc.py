@@ -1,13 +1,16 @@
-from . import Matrix, Vector, MatrixProtocol
+from . import Matrix, Vector, MatrixProtocol, Index, to_index
 from .abstractarray import AbstractArray, to_plot_axis
 from .abstractarrayprotocol import AbstractArrayProtocol
-from typing import Union, Tuple, Optional, overload, Literal, Callable, TypeVar
+from typing import Tuple, overload, Literal, Callable, TypeVar
 import numpy as np
 from ..stubs import array
+from .. import ureg, Quantity
 
 M = TypeVar('M', bound=MatrixProtocol)
 #V = TypeVar('V', bound=VectorProtocol)
 A = TypeVar('A', bound=AbstractArrayProtocol)
+
+T = TypeVar('T')
 
 def zeros_like(array: A, **kwargs) -> A:
     match array:
@@ -46,7 +49,7 @@ def empty(ex: ..., eg: array | None = None, **kwargs) -> Vector | Matrix:
         values = np.empty(len(ex), **kwargs)
         return Vector(E=ex, values=values)
     values = np.empty((len(ex), len(eg)), **kwargs)
-    return Matrix(values=values, Ex=ex, Eg=eg)
+    return Matrix(X=ex, Y=eg, values=values)
 
 
 def zeros(array: array | int | Tuple[int, int],
@@ -70,9 +73,39 @@ def zeros(array: array | int | Tuple[int, int],
         raise ValueError(f"Expected numpy array or iterable, not {type(array)}.")
 
 
-def linspace(start, stop, num, *, edge = 'left', **kwargs) -> Vector:
-    bins = np.linspace(start, stop, num, **kwargs)
-    return Vector(X=bins, values=np.zeros(len(bins), dtype=float))
+def linspace_with_units(start, stop, num=50, **kwargs) -> tuple[np.ndarray, Quantity]:
+    # Convert inputs to Quantity objects
+    start = Quantity(start)
+    stop = Quantity(stop)
+
+    match start.dimensionless, stop.dimensionless:
+        case True, True:
+            start = start * ureg.keV
+            stop = stop * ureg.keV
+        case True, False:
+            start = start * stop.units
+        case False, True:
+            stop = stop * start.units
+        case False, False:
+            if start.is_compatible_with(stop):
+                if start.units != stop.units:
+                    # If the units are not the same, use stop
+                    # TODO Bad solution, fix later.
+                    start = start.to(stop.units)
+            else:
+                raise ValueError(f"Units of start [{start.units}] and stop [{stop.units}] are not compatible.")
+
+    # Create the linspace array
+    result = np.linspace(start.magnitude, stop.magnitude, num, **kwargs)
+
+    return result, stop.units
+
+
+def linspace(start, stop, *args, **kwargs) -> Vector:
+    bins, units = linspace_with_units(start, stop, *args, **kwargs)
+    if units == ureg.dimensionless:
+        units = ureg.Unit("keV")
+    return Vector(X=bins, values=np.zeros(len(bins), dtype=float), unit=units)
 
 @overload
 def fmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...
@@ -111,7 +144,8 @@ def umap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, 
             raise ValueError(f"Expected Array, not {type(array)}.")
 
 
-def omap(func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> any:
+
+def omap(func: Callable[[np.ndarray], T], *args, **kwargs) -> T:
     """ `out_of_map`. Applies `func` while unwrapping the arguments. """
     args = [a.values if isinstance(a, AbstractArray) else a for a in args]
     kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
@@ -149,6 +183,18 @@ def unpack_to_vectors(A: Matrix, ax: int | str = 0) -> list[Vector]:
         return [A.iloc[:, i] for i in range(A.shape[1])]
     else:
         raise ValueError(f"Axis must be 0 or 1, not {ax}.")
+
+
+def pack_into_matrix(vectors: list[Vector], index: Index | array = None) -> Matrix:
+    """ Packs a list of vectors into a matrix. """
+    from .index import MidNonUniformIndex
+    values = np.stack([vec.values for vec in vectors])
+    index_x = vectors[0].X_index
+    if index is None:
+        index = to_index(list(range(len(vectors))), edge='mid', unit='', label='')
+    elif not isinstance(index, Index):
+        index = to_index(index, edge='mid', unit='', label='Index')
+    return Matrix(X=index, Y=index_x, values=values)
 
 
 def compute_transition_matrix(Ei, Eg, matrix, binwidth='min', cut=False):

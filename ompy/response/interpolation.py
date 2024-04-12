@@ -74,8 +74,11 @@ class Interpolation(ABC):
             self.plot_intp(ax, **lkw)
         return ax
 
-    def plot_intp(self, ax: Axes = None, **kwargs) -> Axes:
-        x = np.linspace(min(1e-3, self.points.E.min()), max(self.points.E.max(), 3e4), 2000)
+    def plot_intp(self, ax: Axes = None, emax: None | float = None, **kwargs) -> Axes:
+        if emax is None:
+            emax = max(self.points.E.max(), 3e4)
+        assert emax is not None
+        x = np.linspace(min(1e-3, self.points.E.min()), emax, 4000)
         y = self(x)
         ax.plot(x, y, **kwargs)
         return ax

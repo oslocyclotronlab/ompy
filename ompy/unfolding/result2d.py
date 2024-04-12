@@ -9,6 +9,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+def cache(func):
+    """Decorator to cache the result of a function call.
+    Like functools, but with a simpler implementation.
+    """
+    value = None
+    is_set = False
+    def wrapper(*args, **kwargs):
+        nonlocal value, is_set
+        if not is_set:
+            value = func(*args, **kwargs)
+            is_set = True
+        return value
+    return wrapper
+
 
 @dataclass(kw_only=True)
 class UnfoldedResult2D(Result):
@@ -18,6 +32,7 @@ class UnfoldedResult2D(Result):
     @abstractmethod
     def best(self) -> Matrix: ...
 
+    #@cache
     def best_folded(self) -> Matrix:
         if self.G_ex is None:
             m = (self.R@(self.best().T)).T
@@ -25,6 +40,7 @@ class UnfoldedResult2D(Result):
             m = self.G_ex@(self.R@(self.best().T)).T
         return self.raw.clone(values=m)  # Fix labels
 
+    #@cache
     def best_eta(self) -> Matrix:
         if self.meta.space in {'GR', 'RG'}:
             if self.G_ex is None:

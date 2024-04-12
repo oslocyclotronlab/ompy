@@ -40,7 +40,7 @@ def load_npy(path: Pathlike, **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
 
     """
     path = Path(path)
-    compton = Matrix.from_path(path / 'compton.npz', **kwargs)
+    compton = Matrix.from_npz(path / 'compton.npz', **kwargs)
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
     discrete = [Vector.from_path(path / f'{field}.npz').clone(xalias='E') for field in fields]
     try:

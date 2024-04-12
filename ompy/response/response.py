@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import Protocol, TypeGuard, TypeVar, overload
+from typing import Protocol, TypeGuard, TypeVar, overload, Generic, Iterator
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -12,7 +14,8 @@ from .compton import interpolate_compton
 from .responsedata import ResponseData, Components
 from .numbalib import njit, prange
 from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
-from ..stubs import Pathlike, Unitlike
+from ..stubs import Pathlike, Unitlike, Axes, Plots1D
+from ..helpers import make_ax
 from .responsepath import ResponseName, get_response_path
 from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
 from typing_extensions import TypedDict
@@ -45,6 +48,85 @@ def is_all_matrix_or_vector(x) -> TypeGuard[dict[str, Matrix] | dict[str, Vector
 
 T = TypeVar('T', bound=Matrix | Vector)
 t = TypedDict('t', {'total': T, 'compton': T, 'FE': T, 'SE': T, 'DE': T, 'AP': T})
+
+@dataclass
+class ResponseMatrices:
+    R: Matrix
+    G: Matrix
+    def __iter__(self) -> Iterator[Matrix]:
+        return iter([self.R, self.G])
+
+
+@dataclass
+class FoldedArray(ABC, Generic[T]):
+    FE: T
+    SE: T
+    DE: T
+    AP: T
+    compton: T
+    total: T
+
+    @classmethod
+    def from_dict(cls, d: t) -> FoldedArray[T]:
+        return cls(**d)
+
+    def plot(self, ax: Axes | None = None, fe=True, se=True,
+             de=True, ap=True, compton=True, total=True, **kwargs) -> Plots1D:
+        ax = make_ax(ax)
+        lines = []
+        if fe:
+            _, l0 = self.FE.plot(ax=ax, label='FE', **kwargs)
+            lines.append(l0)
+        if se:
+            _, l1 = self.SE.plot(ax=ax, label='SE', **kwargs)
+            lines.append(l1)
+        if de:
+            _, l2 = self.DE.plot(ax=ax, label='DE', **kwargs)
+            lines.append(l2)
+        if ap: 
+            _, l3 = self.AP.plot(ax=ax, label='AP', **kwargs)
+            lines.append(l3)
+        if compton:
+            _, l4 = self.compton.plot(ax=ax, label='compton', **kwargs)
+            lines.append(l4)
+        if total:
+            _, l5 = self.total.plot(ax=ax, label='total', **kwargs)
+            lines.append(l5)
+        return ax, lines
+
+    def __rmatmul__(self, other: Matrix) -> FoldedArray[T]:
+        fe = other @ self.FE
+        se = other @ self.SE
+        de = other @ self.DE
+        ap = other @ self.AP
+        compton = other @ self.compton
+        total = other @ self.total
+        return FoldedArray(fe, se, de, ap, compton, total)
+
+    def __iter__(self) -> Iterator[tuple[str, T]]:
+        return iter(zip(['FE', 'SE', 'DE', 'AP', 'compton', 'total'],
+                        [self.FE, self.SE, self.DE, self.AP, self.compton, self.total]))
+
+
+
+@dataclass
+class FoldedMatrix(FoldedArray[Matrix]):
+    FE: Matrix
+    SE: Matrix
+    DE: Matrix
+    AP: Matrix
+    compton: Matrix
+    total: Matrix
+
+
+@dataclass
+class FoldedVector(FoldedArray[Vector]):
+    FE: Vector
+    SE: Vector
+    DE: Vector
+    AP: Vector
+    compton: Vector
+    total: Vector
 
 
 class Response:
@@ -93,7 +175,7 @@ class Response:
         self.compton = compton
         return compton
 
-    def specialize(self, bins: np.ndarray | None = None, factor: float | None = None,
+    def discrete(self, bins: np.ndarray | None = None, factor: float | None = None,
                    width: float | None = None, numbins: int | None = None, **kwargs) -> Matrix:
         """
         Rebins the response matrix to the requested energy grid.
@@ -112,7 +194,7 @@ class Response:
         numbins : int or None, default None
             The number of bins in the new energy grid. If specified, `factor` and `width` will be ignored.
         **kwargs : dict
-            Additional keyword arguments to be passed to `self.specialize_()`.
+            Additional keyword arguments to be passed to `self.discrete_()`.
 
         Returns:
         --------
@@ -122,12 +204,12 @@ class Response:
         assert self.compton is not None, "Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first"
         bins_ = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
                                                         binwidth=width)
-        return self.specialize_(E=bins_, **kwargs)
+        return self.discrete_(E=bins_, **kwargs)
 
-    def specialize_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
+    def discrete_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
                     normalize: bool = True, pad: bool = False) -> Matrix:
         """
-        Rebins the response matrix to the requested energy grid.
+        Rebins the discrete response matrix to the requested energy grid.
 
         Parameters:
         -----------
@@ -156,12 +238,12 @@ class Response:
         assert is_compton_matrix(compton)
         assert self.compton is not None
 
-        if self.compton.true_index.leftmost > E.leftmost and not pad:
+        if self.compton.true_index.leftmost_u > E.leftmost_u and not pad:
             t = self.compton.true_index
             raise ValueError(("Requested energy grid is too low. "
                               f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                               f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
-                              f"The energy grid must be truncated at index {E.index(t.leftmost)+1}."))
+                              f"The energy grid must be truncated at index {E.index(t.leftmost_u)+1}."))
         if pad:
             E_all = E.copy()
             E: Index = E_all[E_all >= compton.true_index.leftmost]
@@ -192,7 +274,7 @@ class Response:
         FE, SE, DE, AP = self.interpolation.structures()
         emin = R.observed_index.leftmost
         has_511 = 511 >= emin
-        has_511 = False
+        #has_511 = False
         if has_511:
             j511 = R.index_observed(511)
         for i, e in enumerate(R.true):
@@ -218,21 +300,21 @@ class Response:
                        xlabel='True energy', ylabel='Observed energy')
         return R
 
-    def specialize_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
+    def discrete_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
         """
-        Specialize the response matrix to have axes compatible with given matrix or vector.
+        discretize the response matrix to have axes compatible with given matrix or vector.
 
         Parameters
         ----------
         other : Matrix | Vector
-            The matrix or vector to specialize to.
+            The matrix or vector to discrete to.
         **kwargs : dict
-            Optional keyword arguments to pass to the `specialize_` method.
+            Optional keyword arguments to pass to the `discrete_` method.
 
         Returns
         -------
         Matrix
-            The specialized matrix.
+            The discreted matrix.
 
         Raises
         ------
@@ -241,27 +323,30 @@ class Response:
         """
         match other:
             case Matrix():
-                return self.specialize_(E=other.Y_index, **kwargs)
+                return self.discrete_(E=other.Y_index, **kwargs)
             case Vector():
-                return self.specialize_(E=other.X_index, **kwargs)
+                return self.discrete_(E=other.X_index, **kwargs)
             case _:
-                raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
+                raise ValueError(f"Can only discretize to Matrix or Vector, got {type(other)}")
 
     def gaussian(self, E: np.ndarray | Index) -> Matrix:
         """ Returns a matrix with the same shape as `E`.
 
-        If E is an array, the edge is assumed to be mid. If E is an Index, the gaussians
+        If E is an array, the edge is assumed to be mid in units [keV]. If E is an Index, the gaussians
         are evaluated at the midpoints of the bins but transformed back to the edge of
         the index.
         """
         if isinstance(E, Index):
-            E_ = E.to_mid().bins
+            units = E.unit
+            E_ = E.to_unit('keV').to_mid().bins
         else:
             E_ = E
+            units = 'kev'
         G: Matrix = gaussian_matrix(E_, self.interpolation.sigma)
         if isinstance(E, Index) and E.is_left():
             G = G.to_left()
         G.name = 'Detector resolution'
+        G.to_unit(units)
         return G
 
     def gaussian_like(self, other: Matrix | Vector) -> Matrix:
@@ -272,6 +357,47 @@ class Response:
                 return self.gaussian(other.X_index)
             case _:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
+
+    def specialize(self, E: np.ndarray | Index, **kwargs) -> ResponseMatrices:
+        """ Returns the response matrix and the detector resolution matrix specialized to the given energy grid.
+
+        Parameters
+        ----------
+        E : np.ndarray | Index
+            The energy grid to specialize to.
+        **kwargs : dict
+
+        Returns
+        -------
+        tuple[Matrix, Matrix]
+            The response matrix and the detector resolution matrix specialized to the given energy grid as (R, G)
+        """
+        G = self.gaussian(E)
+        if isinstance(E, Index):
+            E = E.bins
+        R = self.discrete(E, **kwargs)
+        return ResponseMatrices(R, G)
+
+
+    def specialize_like(self, other: Matrix | Vector, **kwargs) -> ResponseMatrices:
+        """ Returns the response matrix and the detector resolution matrix specialized to the given matrix or vector.
+
+        Parameters
+        ----------
+        other : Matrix | Vector
+            The matrix or vector to specialize to.
+        **kwargs : dict
+
+        Returns
+        -------
+        tuple[Matrix, Matrix]
+            The response matrix and the detector resolution matrix specialized to the given matrix or vector as
+            (R, G)
+        """
+        R = self.discrete_like(other, **kwargs)
+        G = self.gaussian_like(other)
+        return ResponseMatrices(R, G)
+
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
               compton: ComptonMatrix | None = None, components: Components | None = None,
@@ -348,12 +474,12 @@ class Response:
             compton: ComptonMatrix = self.compton.copy()
         assert is_compton_matrix(compton)
         if E is not None:
-            if self.compton.true_index.leftmost > E.leftmost:
+            if self.compton.true_index.leftmost_u > E.leftmost_u:
                 t = self.compton.true_index
                 raise ValueError(("Requested energy grid is too low. "
                                   f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                                   f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
-                                  f"The energy grid must be truncated at index {E.index(t.leftmost) + 1}."))
+                                  f"The energy grid must be truncated at index {E.index(t.leftmost_u) + 1}."))
 
             compton = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
             compton.rebin('observed', bins=compton.true, inplace=True)
@@ -410,21 +536,23 @@ class Response:
             case Vector():
                 return self.component_matrices(E=other.X_index, weights=weights)
             case _:
-                raise ValueError(f"Can only specialize to Matrix or Vector, got {type(other)}")
+                raise ValueError(f"Can only discrete to Matrix or Vector, got {type(other)}")
 
     @overload
     def fold_componentwise(self, other: Vector,
-                           weights: Components | None = ...) -> dict[str, Vector]: ...
+                           weights: Components | None = ...) -> FoldedVector: ...
     @overload
     def fold_componentwise(self, other: Matrix,
-                           weights: Components | None = ...) -> dict[str, Matrix]: ...
+                           weights: Components | None = ...) -> FoldedMatrix: ...
 
     def fold_componentwise(self, other: Matrix | Vector,
-                           weights: Components | None = None) -> dict[str, Matrix] | dict[str, Vector]:
+                           weights: Components | None = None) -> FoldedVector | FoldedMatrix:
         components = self.component_matrices_like(other, weights=weights)
         x = {k: comp.T @ other for k, comp in components.items()}
-        #assert is_all_matrix_or_vector(x)  # For Mypy. Is obviously true by construction
-        return x
+        if isinstance(other, Vector):
+            return FoldedVector.from_dict(x)
+        else:
+            return FoldedMatrix.from_dict(x)
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Response | None:
         """ Normalizes the FWHM of the response to the requested value. """

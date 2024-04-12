@@ -10,6 +10,7 @@ import numpy as np
 from numpy import ndarray
 from .. import XARRAY_AVAILABLE
 from .abstractarray import AbstractArray
+from .abstractarray import fetch as _fetch
 from .filehandling import (load_csv_1D, load_numpy_1D,
                            load_tar, load_txt_1D, mama_read, mama_write,
                            save_csv_1D, save_numpy_1D, save_root_1D, save_tar, save_txt_1D,
@@ -89,7 +90,7 @@ class Vector(AbstractArray, VectorProtocol):
                  values: arraylike | None = None,
                  copy: bool = False,
                  unit: Unitlike | None = None,
-                 order: np._OrderKACF = 'C',
+                 order: np._OrderKACF | None = None,
                  edge: Edges = 'left',
                  boundary: bool = False,
                  metadata: VectorMetadata = VectorMetadata(),
@@ -124,10 +125,10 @@ class Vector(AbstractArray, VectorProtocol):
 
         if copy:
             def fetch(x):
-                return np.asarray(x, dtype=dtype, order=order).copy()
+                return _fetch(x, dtype=dtype, order=order).copy()
         else:
             def fetch(x):
-                return np.asarray(x, dtype=dtype, order=order)
+                return _fetch(x, dtype=dtype, order=order)
 
         super().__init__(fetch(values))
 
@@ -292,7 +293,7 @@ class Vector(AbstractArray, VectorProtocol):
         Returns:
             The cut vector if `inplace` is True.
         """
-        return self.from_mask(~np.isnan(self.values))
+        return self.from_mask(~np.isnan(self.values), inplace=inplace)
 
     @overload
     def rebin(self, bins: arraylike | Index | None = None,
@@ -530,7 +531,7 @@ class Vector(AbstractArray, VectorProtocol):
         summary += "\nValues:\n"
         return summary + str(self.values)
 
-    def clone(self, X=None, values=None, order: Literal['C', 'F'] ='C',
+    def clone(self, X=None, values=None, order: np._OrderKACF | None = None,
               metadata=None, copy=False, dtype: np.dtype | None = None,
               **kwargs) -> Self:
         """ Copies the object.
@@ -715,6 +716,9 @@ class Vector(AbstractArray, VectorProtocol):
             assert isinstance(_ax, Axes)
             ax = _ax
 
+        # in case `values` is on the gpu
+        values = np.asarray(self.values)
+
         match kind:
             case "plot" | "line":
                 if self._index.is_left():
@@ -724,7 +728,7 @@ class Vector(AbstractArray, VectorProtocol):
                 kwargs.setdefault("markersize", 3)
                 kwargs.setdefault("marker", ".")
                 kwargs.setdefault("linestyle", "-")
-                line = ax.plot(bins, self.values, **kwargs)
+                line = ax.plot(bins, values, **kwargs)
                 assert isinstance(line, Line2D)
                 maybe_set(ax, xlabel=self.get_xlabel(),
                         ylabel=self.get_ylabel(), title=self.name)
@@ -733,9 +737,9 @@ class Vector(AbstractArray, VectorProtocol):
                 step = 'post' if self._index.is_left() else 'mid'
                 bins = self._index.ticks()
                 if self._index.is_left():
-                    values = np.append(self.values, self.values[-1])
+                    values = np.append(values, values[-1])
                 else:
-                    values = np.append(np.append(self.values[0], self.values), self.values[-1])
+                    values = np.append(np.append(values[0], values), values[-1])
                 kwargs.setdefault("where", step)
                 line = ax.step(bins, values, **kwargs)
                 assert is_lines(line)
@@ -746,7 +750,7 @@ class Vector(AbstractArray, VectorProtocol):
                 align = 'center' if self._index.is_mid() else 'edge'
                 kwargs.setdefault("align", align)
                 kwargs.setdefault('width', self.dX)
-                line = ax.bar(self.X, self.values, **kwargs)
+                line = ax.bar(self.X, values, **kwargs)
                 assert isinstance(line, BarContainer)
                 maybe_set(ax, xlabel=self.get_xlabel(),
                         ylabel=self.get_ylabel(), title=self.name)
@@ -757,7 +761,7 @@ class Vector(AbstractArray, VectorProtocol):
                 else:
                     bins = self.X
                 kwargs.setdefault("marker", ".")
-                line = ax.scatter(bins, self.values, **kwargs)
+                line = ax.scatter(bins, values, **kwargs)
                 assert isinstance(line, PathCollection)
                 maybe_set(ax, xlabel=self.get_xlabel(),
                         ylabel=self.get_ylabel(), title=self.name)
@@ -769,7 +773,7 @@ class Vector(AbstractArray, VectorProtocol):
                     bins = self.X
                 kw = dict(marker = 'o', ls='none', capsize=2, capthick=0.5, ms=3, lw=1)
                 kw |= kwargs
-                line = ax.errorbar(bins, self.values, yerr=np.sqrt(self.values), **kw)  # type: ignore
+                line = ax.errorbar(bins, values, yerr=np.sqrt(values), **kw)  # type: ignore
                 assert isinstance(line, ErrorbarContainer)
                 maybe_set(ax, xlabel=self.get_xlabel(),
                         ylabel=self.get_ylabel(), title=self.name)

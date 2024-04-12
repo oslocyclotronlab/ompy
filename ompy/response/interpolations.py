@@ -12,6 +12,8 @@ from .numbalib import njit, prange
 from .. import Vector
 from ..stubs import Pathlike
 
+# TODO Bug: Doesn't seem the linear interpolation part (the zero part) is working correctly
+
 ESCAPE_LIMIT = 511 * 2
 ESCAPE_LINEAR_TO = 2.5e3
 ANNIHILATION_LINEAR_TO = 4e3
@@ -74,7 +76,7 @@ class EscapeInterpolation(Interpolation):
               linear: LinearInterpolation | None = None,
               linear_to: float | None = None,
               copy: bool = False) -> EscapeInterpolation:
-        return EscapeInterpolation(self.points, linear or self.linear, gf3 or self.gf3, self.linear_to, copy=copy)
+        return EscapeInterpolation(points or self.points, linear or self.linear, gf3 or self.gf3, self.linear_to, copy=copy)
 
     def __str__(self) -> str:
        s = "EscapeInterpolation\n"

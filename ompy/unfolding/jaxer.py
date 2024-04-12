@@ -78,13 +78,13 @@ def cost(mu, R, G_ex, n, bg, n_err, bg_err,
     mu = mu**2
     nu = G_ex@mu@R
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
-    return jnp.sum(kl(nu, n)) #+ beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) + 1e-6*difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
     #return jnp.sum((nu - n)**2/e
     #return jnp.sum(kl(nu, n))
     #jnp.sum(kl(nu, n)) #+ alpha*entropy(mu)
 
-def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
+def _cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
             alpha=1.0, beta=1e-3):#, alpha=0.3e-1):
     mu = mu**2
     nu = R@mu
@@ -94,8 +94,40 @@ def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
     #else:
     #    return jnp.sum(kl(nu, n)) + 1e3*onecost(nu) # 2000*entropy(mu)
     #return jnp.sum(kl(nu, n)) + jnp.sum(1e-4*entropy(mu)) + difference_cost(n, nu)
-    return jnp.sum(kl(nu, n)) #+ alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
+    # The entropy must be taken in eta space
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
     #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
+
+
+def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
+            alpha=1.0, beta=1e-3):#, alpha=0.3e-1):
+    mu = mu**2
+    nu = R@mu
+    nu = jnp.log(nu + 1e-1)
+    n = jnp.log(n + 1e-1)
+    return jnp.sum(jnp.abs(nu - n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
+    #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
+
+
+def cost_1d_v2(mu, R, G_eg, G_ex, n, bg, n_err, bg_err,
+            alpha=1.0, beta=1e-3):#, alpha=0.3e-1):
+    mu = mu**2
+    nu = R@mu
+    eta = G_eg@mu
+    # The entropy must be taken in eta space
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(eta))# + difference_cost(n, nu)
+    #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
+
+
+def cost_components(n, mu, R, eta=None, G_eg=None, G_ex=None, alpha=0, beta=0):
+    nu = R@mu
+    loss = jnp.sum(kl(nu, n))
+    regularization = onecost(mu)**2# - beta*jnp.sum(entropy(eta))
+    if eta is not None:
+        eta_ = G_eg@mu
+        validation = jnp.sum(kl(eta_, eta))
+        return loss, regularization, validation
+    return loss, regularization
 
 
 @dataclass(kw_only=True)
@@ -113,7 +145,8 @@ class JaxResult2D(Cost1D, UnfoldedResult2DSimple):
 @dataclass(kw_only=True)
 class JaxResult1D(Cost1D, UnfoldedResult1DSimple):
     def _save(self, path: Path, exist_ok: bool = False):
-        super()._save(path, exist_ok)
+        UnfoldedResult1DSimple._save(self, path, exist_ok)
+        Cost1D._save(self, path, exist_ok)
 
     @classmethod
     def _load(cls, path: Path) -> dict[str, np.ndarray | Vector]:
@@ -429,10 +462,12 @@ def unfold_adam_1d(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask=None, m
         bg_err = 0
     else:
         bg_err = jnp.where(bg <= eps, 3.0**2, bg)
+    alpha = kwargs.pop('alpha', 1.0)
+    beta = kwargs.pop('beta', 1.0e-3)
 
     @jax.jit
     def body(u, mean, var, i):
-        tloss, g = value_and_grad(u, R, G_ex, raw, bg, n_err, bg_err)#, alpha=alpha)
+        tloss, g = value_and_grad(u, R, G_ex, raw, bg, n_err, bg_err, alpha=alpha, beta=beta)
         mean = beta1*mean + (1-beta1)*g
         var = beta2*var + (1-beta2)*jnp.multiply(g, g)
         mean_cor = mean/(1-beta1**i)

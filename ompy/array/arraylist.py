@@ -9,6 +9,7 @@ from dataclasses import asdict
 import time
 import logging
 from tqdm.auto import tqdm
+from ..version import warn_version
 
 LOG = logging.getLogger(__name__)
 
@@ -131,8 +132,7 @@ class ArrayList(Sequence[T]):
             Y_index = Index.from_dict(Y_dict)
         meta = hdf5_to_dict(tree, root + 'meta/')
         version = tree[root].attrs['version']
-        if version != __full_version__:
-            LOG.warn(f"Warning: Version mismatch: {version} != {__full_version__}")
+        warn_version(version)
         array_paths = sorted(tree[root + 'array'], key=int)
         arrays = []
         for i, arr_path in enumerate(array_paths):

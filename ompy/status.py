@@ -9,6 +9,9 @@ from . import (ROOT_AVAILABLE, MINUIT_AVAILABLE,
 from .version import get_version_info
 import os
 import platform
+import subprocess
+import json
+
 
 def color_status(status: bool) -> str:
     """Returns a string with the status in color."""
@@ -54,19 +57,19 @@ GPU available:        {color_status(GPU_AVAILABLE)}
 NUMBA available:      {color_status(NUMBA_AVAILABLE)}
 """
     if NUMBA_AVAILABLE:
-        msg += f"""    + CUDA available: {color_status(NUMBA_CUDA_AVAILABLE)}
-    + CUDA working:   {color_status(NUMBA_CUDA_WORKING[0])}"""
+        msg += f"""  + CUDA available:   {color_status(NUMBA_CUDA_AVAILABLE)}
+  + CUDA working:     {color_status(NUMBA_CUDA_WORKING[0])}"""
     msg += f"""
 ROOT available:       {color_status(ROOT_AVAILABLE)}"""
     if ROOT_AVAILABLE:
         msg += f"""
-    + imported:       {color_status(ROOT_IMPORTED)}
+  + imported:         {color_status(ROOT_IMPORTED)}
 """
     msg += f"""MINUIT available:     {color_status(MINUIT_AVAILABLE)}
 JAX available:        {color_status(JAX_AVAILABLE)}
 """
     if JAX_AVAILABLE:
-        msg += f"""    + working:        {color_status(JAX_WORKING)}"""
+        msg += f"""  + working:          {color_status(JAX_WORKING)}"""
     msg += f"""
 H5PY available:       {color_status(H5PY_AVAILABLE)}
 XARRAY available:     {color_status(XARRAY_AVAILABLE)}
@@ -102,6 +105,10 @@ JAXlib version:       {jaxlib.__version__}
             msg += f"""
 Available GPUs:       {len(gpus)}
   + kind:             {gpus if len(gpus) > 1 else gpus[0]}
+"""
+        memory = get_gpu_memory()
+        for mem in memory:
+            msg += f"""  + memory:           {mem.free}/{mem.total} MB
 """
     print(msg)
 
@@ -268,3 +275,21 @@ def get_platform_menu() -> Menu:
     except ImportError:
         pass
     return menu
+
+
+@dataclass
+class GPUMemory:
+    total: int
+    free: int
+    used: int
+
+
+def get_gpu_memory() -> list[GPUMemory]:
+    try:
+        smi_output = subprocess.check_output(['nvidia-smi', '--query-gpu=memory.total,memory.free,memory.used', '--format=csv,nounits,noheader'], encoding='utf-8')
+        # Parse the output
+        gpu_memory_info = [x.split(',') for x in smi_output.strip().split("\n")]
+        gpu_memory_info = [GPUMemory(int(total), int(free), int(used)) for total, free, used in gpu_memory_info]
+        return gpu_memory_info
+    except subprocess.CalledProcessError as e:
+        return []

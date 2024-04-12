@@ -11,6 +11,10 @@ if JAX_AVAILABLE:
     from .jaxer import *
     from .jaxer_components import JaxerComponents, JaxCResult2D
 
-from .bootstrap import bootstrap, Bootstrap, sample, bootstrap_CI, coverage_ci, BootstrapMatrix, Coverage
+from .bootstrap import bootstrap, Bootstrap, sample, bootstrap_CI, coverage_ci, BootstrapMatrix, Coverage, BootstrapVector
+from .bootstrap import bca, bca_var, bca_var_2, bca_2
+
+
+
 from .study import Study, Study1D, Study2D, StudyGroup
 from .result import *

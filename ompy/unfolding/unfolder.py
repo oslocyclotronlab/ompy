@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import Counter
 import numpy as np
 from .. import Vector, Matrix, Response, zeros_like
+from ..array import pack_into_matrix, to_index
 from ..helpers import maybe_set
 from ..response import ResponseName
 from abc import ABC, abstractmethod
@@ -62,8 +63,7 @@ class Unfolder(ABC):
 
     @classmethod
     def from_response(cls, response: Response, data: Matrix | Vector, **kwargs) -> Self:
-        R = response.specialize_like(data)
-        G = response.gaussian_like(data)
+        R, G = response.specialize_like(data)
         return cls(R, G, **kwargs)
 
     @classmethod
@@ -207,15 +207,9 @@ class Unfolder(ABC):
 
         Packs the vectors into a matrix and calls unfold_matrix()
         """
-        arr = np.stack([v.values for v in data])
-        index = list(range(len(data)))
-        mat = Matrix(X=index, Y=data[0].X_index, values=arr)
-        bg = None
-        if background is not None:
-            bg_arr = np.stack([v.values for v in background])
-            bg = Matrix(X=index, Y=background[0].X_index, values=bg_arr)
-        init_arr = np.stack([v.values for v in initial])
-        init = Matrix(X=index, Y=initial[0].X_index, values=init_arr)
+        mat = pack_into_matrix(data)
+        bg = None if background is None else pack_into_matrix(background)
+        init = pack_into_matrix(initial)
         result = self.unfold_matrix(mat, bg, init, R=(space, R.T), G=G, **kwargs)
         return result
 

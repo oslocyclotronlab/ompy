@@ -274,12 +274,16 @@ T = TypeVar('T', bound=Matrix | Vector)
 class Cost1D(Result[T]):
     cost: np.ndarray
 
-    def plot_cost(self, ax: Axes | None = None, start: int | float = 0, **kwargs) -> Plot1D:
+    def plot_cost(self, ax: Axes | None = None, start: int | float = 0, relative: bool = False, **kwargs) -> Plot1D:
         ax = make_ax(ax)
         if isinstance(start, float):
             start = int(start*len(self.cost))
+        cost = self.cost[start:]
+        if relative:
+            cost /= cost[0]
+            
         x = np.arange(start, len(self.cost))
-        line, = ax.plot(x, self.cost[start:], **kwargs)
+        line, = ax.plot(x, cost, **kwargs)
         maybe_set(ax, xlabel='iteration', ylabel='cost')
         return ax, line
 

@@ -30,6 +30,9 @@ TODO Mixin architecture is not quite right. Read up.
 -[ ] Batch index, batch index sorted
 -[x] Rebinning
 -[x] Slicing
+-[ ] leftmost and rightmost removes units information, leading to 
+     bugs. Introduced leftmost_u and rightmost_u to fix this, but might
+     be better to redefine the original properties.
 
 How is rebinning handled?
 The index has N+1 "edges" with respect to the N values of the
@@ -303,7 +306,7 @@ class Index(ABC):
         return s
 
     def __str__(self) -> str:
-        return self.summary() + f'\n{self.bins}'
+        return self.summary()# + f'\n{self.bins}'
 
     def __eq__(self, other: Index) -> bool:
         good = np.allclose(self.bins, other.bins) and np.isclose(self.boundary,
@@ -501,6 +504,7 @@ class Index(ABC):
                 self.bins[0], self.bins[-1], binwidth, dtype=float)
         if isinstance(bins, Index):
             warn("Might be buggy")
+            bins = bins.to_unit(self.unit)
             return bins.__clone(meta=self.meta)
         else:
             bins = np.asarray(bins)
@@ -550,6 +554,17 @@ class Index(ABC):
     @property
     @abstractmethod
     def rightmost(self) -> float:
+        pass
+
+
+    @property
+    @abstractmethod
+    def leftmost_u(self) -> float:
+        pass
+
+    @property
+    @abstractmethod
+    def rightmost_u(self) -> float:
         pass
 
     @abstractmethod
@@ -606,9 +621,19 @@ class Edge(Index, ABC):
         return self.left_edge(0)
 
     @property
+    def leftmost_u(self) -> Quantity:
+        """ Left edge of the leftmost bin """
+        return self.leftmost * self.unit
+
+    @property
     def rightmost(self) -> float:
         """ Right edge of the rightmost bin """
         return self.right_edge(-1)
+
+    @property
+    def rightmost_u(self) -> Quantity:
+        """ Right edge of the rightmost bin """
+        return self.rightmost * self.unit
 
     def is_inbounds(self, x) -> bool:
         """ Check if index is in bounds """
@@ -941,9 +966,11 @@ class MidUniformIndex(Mid, Uniform):
 
 class NonUniform(Layout, ABC):
     """ Index for non-equidistant binning """
-    def __init__(self, bins: array1D, dX: array1D, *args, **kwargs):
+    def __init__(self, bins: array1D, dX: array1D, *args, scale: None | str = None, **kwargs):
         Index.__init__(self, bins, *args, **kwargs)
         self._dX: array1D = dX
+        # Preferred scale for plotting
+        self.scale = scale
 
     @property
     def dX(self) -> array1D:
@@ -1139,7 +1166,6 @@ class MidNonUniformIndex(Mid, NonUniform):
         return _index_mid_nonuniform(self.bins, self.steps(), x)
 
 
-
 def to_index(X: arraylike, edge: Edges = 'left',
              boundary: bool = False, **kwargs) -> Index:
     X = np.asarray(X)
@@ -1166,18 +1192,18 @@ def make_or_update_index(X: Index | arraylike, unit: Unitlike | None, alias: str
                          boundary: bool = False, **kwargs) -> Index:
     if isinstance(X, Index):
         # Preserve the label if it exists, but overwrite if a new label is specified
-        label_ = label
-        if X.meta.label and default_label:
-            label_ = None
+        label = X.label if default_label else label
+
         if default_unit:
             unit = X.meta.unit
         elif unit is None:
             raise ValueError("Must specify a unit, or use the default")
         else:
             unit = Unit(unit)
+
         if alias is None or alias == '':
             alias = X.meta.alias
-        return X.update_metadata(unit=unit, alias=alias, label=label_)
+        return X.update_metadata(unit=unit, alias=alias, label=label)
     elif isinstance(X, (np.ndarray, list, tuple)):
         return to_index(X, edge=edge, boundary=boundary, label=label,
                         unit=unit, alias=alias, **kwargs)

@@ -3,7 +3,7 @@ import numpy as np
 from ..numbalib import njit, prange
 from .. import Vector, Matrix, Response, zeros_like, JAX_AVAILABLE, JAX_WORKING
 from .unfolder import Unfolder
-from .result1d import Cost1D, UnfoldedResult1DMultiple, ResultMeta1D, Parameters1D
+from .result1d import Cost1D, UnfoldedResult1DMultiple, ResultMeta1D, Parameters1D, UnfoldedResult1D
 from .result2d import Cost2D, UnfoldedResult2D, ResultMeta2D, Parameters2D
 from .stubs import Space
 from ..stubs import array1D, array2D, array3D, Plots1D, Axes
@@ -105,7 +105,13 @@ class Guttormsen(Unfolder):
         kw = self.handle_kwargs(kwargs)
         LOG.debug("Unfolding vector with Guttormsen method")
         LOG.debug("Unfolding to space: %s", space)
+        data_raw = data
+        if background is not None:
+            LOG.debug("Background is just subtracted from data.")
+            data = data - background
         start = time.time()
+
+
         data = data.astype('float32')
         initial = data.astype('float32')
         if kw.enforce_positivity:
@@ -118,7 +124,7 @@ class Guttormsen(Unfolder):
         elapsed = time.time() - start
         kw_ = asdict(kw)
         kw_.pop('disable_tqdm')
-        parameters = Parameters1D(raw=data,
+        parameters = Parameters1D(raw=data_raw,
                                   background=background,
                                   initial=initial,
                                   G=G,
@@ -374,55 +380,69 @@ def fluctuation_cost(x, sigma: float):
     diff = np.abs(((smoothed - x) / smoothed))
     return diff.sum()
 
+def compton_subtraction(res: UnfoldedResult1D | UnfoldedResult2D,
+                        response: Response,
+                        space='eta',
+                        use_eff: bool = False) -> Vector | Matrix:
+    if space == 'eta':
+        u = res.best_eta()
+    elif space == 'mu':
+        u = res.best()
+    else:
+        raise ValueError(f"Invalid space: {space}")
+    return compton_subtraction_(u, res.raw, response, use_eff=use_eff)
 
-def compton_subtraction(unfolded: Vector, raw: Vector, response: Response):
+
+def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
+                         use_eff: bool = False):
     G = response.gaussian_like(unfolded).T
-    E = unfolded.X
-    fe = response.interpolation.FE(E)
-    se = response.interpolation.SE(E)
-    de = response.interpolation.DE(E)
-    ap = response.interpolation.AP(E)
-    eff = response.interpolation.Eff(E)
+    eff = response.interpolation.Eff(unfolded.Eg)
 
-    ufe = unfolded * fe
-    ufe = G @ ufe
+    f = response.fold_componentwise(unfolded)
+    fe, se, de, ap, compton0 = f.FE, f.SE, f.DE, f.AP, f.compton
+    # Need to smooth AP to correct for commutator
+    ap = G@ap
 
-    use = unfolded * se
-    use = G @ shift(use, 511)
-
-    ude = unfolded * de
-    ude = G @ shift(ude, 2 * 511)
-
-    uap = zeros_like(unfolded)
-    uap.vloc[511] = sum(unfolded * ap)
-    # Unclear whether 511 should be smoothed
-
-    w = use + ude + uap
-    v = ufe + w
+    # The discrete structures: w
+    w = se + de + ap
+    # Total, without compton: v
+    v = fe + w
+    # Assume everything left over from the raw spectrum is the compton.
+    # Incredible bad assumption, doesn't take into account the noise
+    # of the raw spectrum, nor, more importantly, the errors made in the unfolding.
+    # More succintly: the peaks FE, SE, DE, AP, can only be assumed to be correct
+    # when the unfolding is correct, but if the unfolding were correct, there
+    # would be no need for the this compton subtraction method to be used!
     compton = raw - v
+    ax, _ = compton0.plot(label='compton 0')
+    compton.plot(ax=ax, label='compton 1')
+    # We know the compton is smooth, so smooth it.
+    # Assume this is to correct for the noise, but this is too 
+    # ad-hoc. 
     compton = G @ compton
-    u = (raw - compton - w) / fe
-    unf = u / eff
+    compton.plot(ax=ax, label='compton 2')
+    ax.legend()
 
-    return ufe, use, ude, uap, compton, u, unf
+    # The raw spectrum minus the modeled compton, and the folded discrete structures
+    # is the unfolded spectrum. I don't like this either, since now the
+    # noise of the raw spectrum infects the unfolded spectrum, which we *also*
+    # know must be smooth.
+    unf = (raw - compton - w) / fe
 
+    if use_eff:
+        unf = unf / eff
 
-def shift(x: Vector, shift: float) -> Vector:
-    return shift_integer(x, shift)
+    ax0, _ = unf.plot(label='unf')
+    compton.plot(ax=ax0, label='compton')
+    fe.plot(ax=ax0, label='fe')
+    se.plot(ax=ax0, label='se')
+    de.plot(ax=ax0, label='de')
+    ap.plot(ax=ax0, label='uap')
+    raw.plot(ax=ax0, label='raw')
+    unfolded.plot(ax=ax0, label='unfolded')
+    ax0.legend()
 
-
-def shift_integer(v: Vector, shift: float) -> Vector:
-    # Calculate the index shift corresponding to the specified shift value
-    i = v.index(abs(shift)) + 1
-
-    # Create a new array for the shifted values
-    shifted = np.zeros_like(v.X)
-
-    # Shift the values
-    shifted[:len(v) - i] = v[i:]
-
-    u = v.clone(values=shifted)
-    return u
+    return ax, ax0
 
 
 @njit

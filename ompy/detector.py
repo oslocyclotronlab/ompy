@@ -119,7 +119,7 @@ class ExDetector(Detector):
         """
         warnings.warn("Written while sleepy. Might be buggy")
         E = mat.X
-        R: Matrix = empty(E, E)
+        R: Matrix = empty(E, E).set_yalias('measured').set_xalias('true')
         for (i, e) in enumerate(E):
             R[:, i] = self.resolution_gauss(E, e, as_array=True)
         if as_array:
@@ -137,6 +137,13 @@ class LambdaEgDetector(EgDetector):
         return self.func(e)
 
 
+class LambdaExDetector(ExDetector):
+    def __init__(self, func: Callable[[float], float]):
+        self.func = func
+
+    def _FWHM(self, e: float) -> float:
+        return self.func(e)
+
 class OSCAR(EgDetector):
     # From https://doi.org/10.1016/j.nima.2020.164678
     a0 = 60.6473
@@ -150,9 +157,7 @@ class OSCAR(EgDetector):
 class SiRi(ExDetector):
     # From https://doi.org/10.1016/j.nima.2011.05.055
     # says ~= 100 keV
-    # TODO Must be wrong? Way too smeared matrices
-    # EX gauss matrix is wrong
-    #a0 = 100.0
+    # depends on experiment
     a0 = 100.0
 
     def _FWHM(self, e: float) -> float:
@@ -230,7 +235,7 @@ class CompoundDetector:
             return mat.clone(values=values)
 
 
-@njit
+#@njit
 def cut_at_resolution(mat, Ex, Eg, sigma_ex, sigma_eg, ex_sigma, eg_sigma):
     for i in range(mat.shape[0]):
         e_x = Ex[i]

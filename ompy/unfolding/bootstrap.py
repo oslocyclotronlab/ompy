@@ -8,7 +8,7 @@ from .result2d import UnfoldedResult2D
 from tqdm.autonotebook import tqdm
 import numpy as np
 from scipy.stats import poisson
-from .. import Matrix, Vector, ArrayList, H5PY_AVAILABLE
+from .. import Matrix, Vector, ArrayList, H5PY_AVAILABLE, JAX_AVAILABLE
 from ..version import FULLVERSION
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeAlias, overload, Self, TypeVar, Generic
@@ -18,9 +18,10 @@ import json
 import matplotlib.pyplot as plt
 from ..stubs import Axes, Lines, Plot1D, Plots1D, Unitlike
 from ..array import AsymmetricVector
-from ..numbalib import njit
+from ..numbalib import njit, prange
 from abc import ABC, abstractmethod
 from ..helpers import make_ax, maybe_set, readable_time, bytes_to_readable
+from scipy.stats import norm
 import logging
 import time
 import re
@@ -29,6 +30,11 @@ LOG = logging.getLogger(__name__)
 
 if H5PY_AVAILABLE:
     import h5py
+
+if JAX_AVAILABLE:
+    import jax.numpy as jnp
+    from jax.scipy.stats import norm as jax_norm
+    from jax import device_put
 
 """
 TODO
@@ -259,7 +265,7 @@ class Bootstrap(ABC, Generic[T]):
         unfolded = ArrayList.from_list(self.unfolded)
         bootstraps = ArrayList.from_list(self.bootstraps)
         initials = ArrayList.from_list(self.initials)
-        if self.backgrounds is not None:
+        if self.backgrounds is not None and len(self.backgrounds) > 0:
             backgrounds = ArrayList.from_list(self.backgrounds)
         with h5py.File(path / "matrices.h5", "w") as f:
 
@@ -302,7 +308,7 @@ class Bootstrap(ABC, Generic[T]):
             self.bootstraps[i].save(path / f"boot_{i}.npz", exist_ok=True)
             self.unfolded[i].save(path / f"unfolded_{i}.npz", exist_ok=True)
             self.initials[i].save(path / f"initial_{i}.npz", exist_ok=True)
-            if self.backgrounds is not None:
+            if self.backgrounds is not None and len(self.backgrounds) > 0:
                 self.backgrounds[i].save(path / f"background_{i}.npz", exist_ok=True)
             #np.save(path / f"cost_{i}.npy", self.costs[i])
 
@@ -453,7 +459,7 @@ class BootstrapVector(Bootstrap[Vector]):
 
     @classmethod
     def from_path(cls, path: str | Path, read_only: int | None = None) -> BootstrapVector:
-        return cls.__load(Path(path), Vector, read_only)  # type: ignore
+        return Bootstrap._load(Path(path), Vector, BootstrapVector, read_only)  # type: ignore
 
     def plot_unfolded(self, ax: Axes | None = None, **kwargs) -> Plots1D:
         ax = make_ax(ax)
@@ -826,7 +832,6 @@ class Coverage:
     def percentile(self, alpha: float = 0.05):
         # For each bootstrap, compute the CI
         pass
-        
 
     def coverage(self, true: Matrix | np.ndarray, alpha: float = 0.05):
         # For all bootstrap CI, compute the coverage
@@ -841,4 +846,272 @@ class Coverage:
 
 
 
+def bca_2(original_estimate: np.ndarray, bootstrap_samples: np.ndarray,  alpha=0.05):
+    """
+    Compute the Bias-Corrected and Accelerated (BCa) confidence intervals for each variable.
+
+    :param bootstrap_samples: NxM numpy array of N bootstrap samples of M variables.
+    :param original_estimate: M-dimensional vector of original estimates.
+    :param alpha: Significance level for confidence intervals.
+    :return: Mx2 numpy array of BCa confidence intervals for each variable.
+    """
+    N, M = bootstrap_samples.shape
+    conf_intervals = np.zeros((M, 2))
+
+    bias = np.zeros(M)
+    bias_z0 = np.zeros(M)
+    accelerations = np.zeros(M)
+
+    for i in range(M):
+        ci, p, z0, a = bca_var(original_estimate[i], bootstrap_samples[:, i], alpha=alpha)
+
+        # BCa confidence intervals
+        conf_intervals[i, 0] = ci[0]
+        conf_intervals[i, 1] = ci[1]
+
+        bias[i] = p
+        bias_z0[i] = z0
+        accelerations[i] = a
+
+    return conf_intervals, bias, bias_z0, accelerations
+
+
+def _bca_2(original_estimate: np.ndarray, bootstrap_samples: np.ndarray,  alpha=0.05):
+    """
+    Compute the Bias-Corrected and Accelerated (BCa) confidence intervals for each variable.
+
+    :param original_estimate: M-dimensional vector of original estimates.
+    :param bootstrap_samples: NxM numpy array of N bootstrap samples of M variables.
+    :param alpha: Significance level for confidence intervals.
+    :return: Mx2 numpy array of BCa confidence intervals for each variable.
+    """
+    theta_hat = original_estimate
+    theta_star = bootstrap_samples
+    N, M = bootstrap_samples.shape
+
+    bias = np.mean(bootstrap_samples < original_estimate, axis=0)
+    bias = np.clip(bias, 1e-5, 1-1e-5)
+    z0 = norm.ppf(bias)
+
+    # Acceleration by jackknife
+    theta_total = np.sum(bootstrap_samples, axis=0)
+    theta_jacks = (theta_total[np.newaxis, :] -  bootstrap_samples) / (N - 1)
+    theta_jack_mean = np.mean(theta_jacks, axis=0)
+    numerator = np.sum((theta_jack_mean - theta_jacks) ** 3, axis=0)
+    denominator = 6 * np.sum((theta_jacks - theta_jack_mean) ** 2, axis=0) ** 1.5
+    a = numerator / denominator
+
+    # BCa confidence intervals
+    z_alpha = norm.ppf(alpha / 2)
+    z_1_alpha = norm.ppf(1 - alpha / 2)
+
+    adjusted_lower = z0 + (z0 + z_alpha) / (1 - a * (z0 + z_alpha))
+    adjusted_upper = z0 + (z0 + z_1_alpha) / (1 - a * (z0 + z_1_alpha))
+    lower_percentile = 100 * norm.cdf(adjusted_lower)
+    upper_percentile = 100 * norm.cdf(adjusted_upper)
+    #lower_percentile = 100 * norm.cdf(2 * z0 + z_alpha)
+    #upper_percentile = 100 * norm.cdf(2 * z0 + z_1_alpha)
+
+    # BCa confidence intervals
+    q = np.stack([lower_percentile, upper_percentile], axis=1)
+    conf_intervals = np.zeros((M, 2))
+    for m in range(M):
+        conf_intervals[m] = np.percentile(theta_star[:, m], q[m])
+
+    return conf_intervals, bias, z0, a
+
+
+def bca(original_estimate: np.ndarray, bootstrap_samples: np.ndarray,  alpha=0.05, backend='numpy'):
+    """
+    Compute the Bias-Corrected and Accelerated (BCa) confidence intervals for each variable.
+
+    :param original_estimate: M-dimensional vector of original estimates.
+    :param bootstrap_samples: NxM numpy array of N bootstrap samples of M variables.
+    :param alpha: Significance level for confidence intervals.
+    :param backend: Backend to use for computation. Either 'numpy' or 'numba'.
+    :return: Mx2 numpy array of BCa confidence intervals for each variable.
+    """
+    theta_hat = original_estimate
+    theta_star = bootstrap_samples
+    N, M = bootstrap_samples.shape
+
+    #print(theta_star.shape)
+
+    match backend:
+        case 'numpy':
+            bias = np.mean(bootstrap_samples < original_estimate, axis=0)
+            bias = np.clip(bias, 1e-5, 1-1e-5)
+            # Acceleration by jackknife
+            theta_total = np.sum(bootstrap_samples, axis=0)
+            theta_jacks = (theta_total[np.newaxis, :] -  bootstrap_samples) / (N - 1)
+            theta_jack_mean = np.mean(theta_jacks, axis=0)
+            numerator = np.sum((theta_jack_mean - theta_jacks) ** 3, axis=0)
+            denominator = 6 * np.sum((theta_jacks - theta_jack_mean) ** 2, axis=0) ** 1.5
+            a = numerator / denominator
+        case 'numba':
+            bias, a = _compute_bias_acceleration(theta_hat, theta_star)
+        case 'jax':
+            bias = jnp.mean(theta_star < theta_hat, axis=0)
+            bias = jnp.clip(bias, 1e-5, 1-1e-5)
+            
+            theta_total = jnp.sum(theta_star, axis=0)
+            theta_jacks = (theta_total - theta_star) / (N - 1)
+            theta_jack_mean = jnp.mean(theta_jacks, axis=0)
+            
+            numerator = jnp.sum((theta_jack_mean - theta_jacks) ** 3, axis=0)
+            denominator = 6 * jnp.sum((theta_jacks - theta_jack_mean) ** 2, axis=0) ** 1.5
+            a = numerator / denominator
+            
+            z0 = jax_norm.ppf(bias)
+            z_alpha = jax_norm.ppf(alpha / 2)
+            z_1_alpha = jax_norm.ppf(1 - alpha / 2)
+
+            adjusted_lower = z0 + (z0 + z_alpha) / (1 - a * (z0 + z_alpha))
+            adjusted_upper = z0 + (z0 + z_1_alpha) / (1 - a * (z0 + z_1_alpha))
+            
+            lower_percentile = 100 * jax_norm.cdf(adjusted_lower)
+            upper_percentile = 100 * jax_norm.cdf(adjusted_upper)
+            
+            q = jnp.stack([lower_percentile, upper_percentile], axis=1)
+            conf_intervals = jnp.array([jnp.percentile(theta_star[:, m], q[m]) for m in range(M)])
+            return conf_intervals, bias, z0, a
+        case _:
+            raise ValueError(f"Backend `{backend}` not supported.")
+
+    # BCa confidence intervals
+    z0 = norm.ppf(bias)
+    z_alpha = norm.ppf(alpha / 2)
+    z_1_alpha = norm.ppf(1 - alpha / 2)
+    #a = 1e7
+
+    adjusted_lower = z0 + (z0 + z_alpha) / (1 - a * (z0 + z_alpha))
+    adjusted_upper = z0 + (z0 + z_1_alpha) / (1 - a * (z0 + z_1_alpha))
+    lower_percentile = 100 * norm.cdf(adjusted_lower)
+    upper_percentile = 100 * norm.cdf(adjusted_upper)
+
+    # BCa confidence intervals
+    q = np.stack([lower_percentile, upper_percentile], axis=1)
+
+    match backend:
+        case 'numpy':
+            # this is >80% bottleneck
+            conf_intervals = np.zeros((M, 2))
+            for m in range(M):
+                conf_intervals[m] = np.percentile(theta_star[:, m], q[m])
+        case 'numba': # reduced to 50%, shared with bias and acceleration
+            conf_intervals = _percentile_numba(theta_star, q)
+
+    return conf_intervals, bias, z0, a
+
+def _percentile_jax(X, q):
+    pass
+
+@njit(parallel=True)
+def _percentile_numba(X, q):
+    M = X.shape[1]
+    conf = np.zeros((M, 2))
+    for m in prange(M):
+        conf[m] = np.percentile(X[:, m], q[m])
+    return conf
+
+@njit
+def _compute_bias_acceleration(theta_hat, theta_star: np.ndarray):
+    N = theta_star.shape[0]
+    bias = numba_mean_axis_0((theta_star < theta_hat).astype(np.float64))
+    bias = np.clip(bias, 1e-5, 1-1e-5)
+
+    # Acceleration by jackknife
+    theta_total = np.sum(theta_star, axis=0)
+    theta_jacks = (theta_total[np.newaxis, :] -  theta_star) / (N - 1)
+    theta_jack_mean = numba_mean_axis_0(theta_jacks)
+    numerator = np.sum((theta_jack_mean - theta_jacks) ** 3, axis=0)
+    denominator = 6 * np.sum((theta_jacks - theta_jack_mean) ** 2, axis=0) ** 1.5
+    a = numerator / denominator
+    return bias, a
+
+
+@njit(parallel=True)
+def numba_mean_axis_0(a):
+    N = a.shape[1]
+    res = np.zeros(N)
+    for i in prange(N):
+        res[i] = (a[:, i].mean())
+
+    return res
+
+
+def bca_var(theta_hat: float, theta_star: np.ndarray, alpha: float = 0.05) -> tuple[np.ndarray, float, float, float]:
+    """ BCa for a single variable given bootstrap samples
+    :param theta_hat: Original estimate for this variable
+    :param theta_star: Bootstrap estimates for this variable
+    :param alpha: Significance level for confidence intervals.
+    :return: BCa confidence intervals for this variable, bias, bias_z0, acceleration
+    """
+    #theta_hat = np.mean(theta_star)
+
+    # Bias correction z0
+    p = np.mean(theta_star < theta_hat)
+    p = np.clip(p, 1e-5, 1 - 1e-5)
+    z0 = norm.ppf(p)
+
+    # Acceleration by jackknife
+    # assuming mean as the statistic
+    # Can't allocate as the array is (N-1, N-1)
+
+    theta_hat_jacks = np.zeros_like(theta_star)
+    for i in range(len(theta_star)):
+        theta_star_jack = np.delete(theta_star, i)
+        theta_hat_jack = np.mean(theta_star_jack)
+        theta_hat_jacks[i] = theta_hat_jack
+    a = np.sum((np.mean(theta_hat_jacks) - theta_hat_jacks) ** 3) / (6 * np.sum((np.mean(theta_hat_jacks) - theta_hat_jacks) ** 2) ** 1.5)
+
+    # Adjusted percentiles
+    z_alpha = norm.ppf(alpha / 2)
+    z_1_alpha = norm.ppf(1 - alpha / 2)
+    adjusted_lower = z0 + (z0 + z_alpha) / (1 - a * (z0 + z_alpha))
+    adjusted_upper = z0 + (z0 + z_1_alpha) / (1 - a * (z0 + z_1_alpha))
+    lower_percentile = 100 * norm.cdf(adjusted_lower)
+    upper_percentile = 100 * norm.cdf(adjusted_upper)
+    #lower_percentile = 100 * norm.cdf(2 * z0 + z_alpha)
+    #upper_percentile = 100 * norm.cdf(2 * z0 + z_1_alpha)
+
+    # BCa confidence intervals
+    conf_intervals = np.percentile(theta_star, [lower_percentile, upper_percentile])
+
+    return conf_intervals, p, z0, a
+
+
+def bca_var_2(theta_hat, theta_star, alpha: float = 0.05) -> tuple[np.ndarray, float, float, float]:
+    """ BCa for a single variable given bootstrap samples
+    :param theta_hat: Original estimate for this variable
+    :param theta_star: Bootstrap estimates for this variable
+    :param alpha: Significance level for confidence intervals.
+    :return: BCa confidence intervals for this variable, bias, bias_z0, acceleration
+    """
+    #theta_hat = np.mean(theta_star)
+
+    # Bias correction z0
+    p = np.mean(theta_star < theta_hat)
+    z0 = norm.ppf(p)
+
+    # Acceleration by jackknife
+    # assuming mean as the statistic
+    # Can't allocate as the array is (N-1, N-1)
+    # Acceleration by jackknife - optimized
+    n = len(theta_star)
+    theta_total_sum = np.sum(theta_star)
+    theta_hat_jacks = (theta_total_sum - theta_star) / (n - 1)
+
+    a = np.sum((np.mean(theta_hat_jacks) - theta_hat_jacks) ** 3) / (6 * np.sum((np.mean(theta_hat_jacks) - theta_hat_jacks) ** 2) ** 1.5)
+
+    # Adjusted percentiles
+    z_alpha = norm.ppf(alpha / 2)
+    z_1_alpha = norm.ppf(1 - alpha / 2)
+    lower_percentile = 100 * norm.cdf(2 * z0 + z_alpha)
+    upper_percentile = 100 * norm.cdf(2 * z0 + z_1_alpha)
+
+    # BCa confidence intervals
+    conf_intervals = np.percentile(theta_star, [lower_percentile, upper_percentile])
+
+    return conf_intervals, p, z0, a
 

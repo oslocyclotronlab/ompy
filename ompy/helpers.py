@@ -1,24 +1,27 @@
-from .stubs import Axes, Line2D
-from typing import Callable, Any, Iterable, TypeVar
-import matplotlib.pyplot as plt
-import matplotlib.text as mtext
-from functools import wraps
-from pathlib import Path
-from typing import Callable
 import inspect
 from datetime import timedelta
+from functools import wraps
+from pathlib import Path
+from typing import Any, Iterable, TypeVar
+from typing import Callable
 from warnings import warn
-import numpy as np
-from scipy.stats import gaussian_kde
-from matplotlib.colorbar import Colorbar
-from matplotlib.collections import LineCollection
-import matplotlib.colors as mcolors
-import matplotlib.colorbar as cbar
-import matplotlib as mpl
-from time import time
 
+import matplotlib as mpl
+import matplotlib.colorbar as cbar
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import matplotlib.text as mtext
+import numpy as np
+from matplotlib.collections import LineCollection
+from matplotlib.colorbar import Colorbar
+from matplotlib.patches import Rectangle
+from scipy.stats import gaussian_kde
+
+from .stubs import Axes, Line2D
 
 T = TypeVar('T')
+
+
 def make_axes(func: Callable[..., T]) -> Callable[..., T]:
     def wrapper(*args, ax: Axes | None = None, **kwargs) -> T:
         if ax is None:
@@ -28,7 +31,9 @@ def make_axes(func: Callable[..., T]) -> Callable[..., T]:
         assert ax is not None
         result = func(*args, ax=ax, **kwargs)
         return result
+
     return wrapper
+
 
 def make_ax(ax: Axes | None = None, **kwargs) -> Axes:
     if ax is None:
@@ -63,6 +68,7 @@ def combine_legend(headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable
                 handles.append(line)
     return handles, labels
 
+
 def rec_add(handles, labels, collection):
     """ Recursively add legend entries to handles and labels
 
@@ -80,6 +86,7 @@ def rec_add(handles, labels, collection):
             else:
                 rec_add(handles, labels, elem)
 
+
 def make_combined_legend(ax, headings, *misc, **kwargs):
     handles, labels = combine_legend(headings, *misc)
     handler_map = {str: LegendTitle()} | kwargs.pop('handler_map', {})
@@ -96,13 +103,15 @@ class LegendTitle:
         handlebox.add_artist(title)
         return title
 
+
 def maybe_set(ax: Axes, **kwargs) -> list[Any]:
     ret = []
     for attr, value in kwargs.items():
         old = getattr(ax, 'get_' + attr)()
         if not old:
-            ret.append(getattr(ax, 'set_'+attr)(value))
+            ret.append(getattr(ax, 'set_' + attr)(value))
     return ret
+
 
 def ensure_path(func: Callable) -> Callable:
     @wraps(func)
@@ -125,11 +134,13 @@ def ensure_path(func: Callable) -> Callable:
                     case _:
                         raise TypeError(f"Argument {param} must be a Path or a string")
         return func(*bound_args.args, **bound_args.kwargs)
+
     return wrapper
 
 
 def print_readable_time(elapsed) -> None:
     print(readable_time(elapsed))
+
 
 def readable_time(elapsed) -> str:
     delta = timedelta(seconds=elapsed)
@@ -182,6 +193,7 @@ def append_label(label: str, kwargs: dict[str, Any] | str | None = None) -> str:
         label = kwargs.pop('label') + ': ' + label
     return label
 
+
 def is_running_in_jupyter() -> bool:
     try:
         from IPython import get_ipython
@@ -202,6 +214,7 @@ class ReverseNormalization(mcolors.Normalize):
         # Normalize using the original normalization, then reverse
         return 1 - self.original_norm(value, clip)
 
+
 def cmap_complement(cmap):
     """
     Create a complementary colormap based on the given colormap.
@@ -218,6 +231,7 @@ def cmap_complement(cmap):
 
     # Create a new colormap from the complementary colors
     return mcolors.ListedColormap(complementary_colors)
+
 
 def cmap_contrast(cmap):
     """
@@ -251,25 +265,25 @@ class AnnotatedColorbar(Colorbar):
 
     It handles the `extend` by setting it depending on values outside the
     limits.
+    
+    TODO:
+        `draw_kde` works, but handles extreme values poorly.
+        Drawing fails when it is done through a callback (such as `mappable.callback`). I have
+        no idea why, debugging is difficult. 
+        The colorbar should update when the user zooms on the main matrix.
     """
-    def __init__(self, mappable, ax, cax=None, lower: bool = True,
-                 higher: bool = True, nans: bool = True, use_gridspec=True,
-                 linewidth=1, extend=None, color_by: str = 'complement',
-                 draw_kde: bool = True, draw_histogram: bool = False,
-                 **kwargs):
+
+    def __init__(self, mappable, ax, cax=None, lower: bool = True, higher: bool = True, nans: bool = True,
+                 use_gridspec=True, linewidth=1, extend=None, color_by: str = 'complement', draw_kde: bool = False,
+                 draw_histogram: bool = True, n_hist_bins: int = 100, **kwargs):
         # Code copied from matplotlib.Figure.colorbar
         if cax is None:
             fig = (  # Figure of first axes; logic copied from make_axes.
-                [*ax.flat] if isinstance(ax, np.ndarray)
-                else [*ax] if np.iterable(ax)
-                else [ax])[0].figure
+                [*ax.flat] if isinstance(ax, np.ndarray) else [*ax] if np.iterable(ax) else [ax])[0].figure
             current_ax = fig.gca()
-            if (fig.get_layout_engine() is not None and
-                    not fig.get_layout_engine().colorbar_gridspec):
+            if (fig.get_layout_engine() is not None and not fig.get_layout_engine().colorbar_gridspec):
                 use_gridspec = False
-            if (use_gridspec
-                    and isinstance(ax, mpl.axes._base._AxesBase)
-                    and ax.get_subplotspec()):
+            if (use_gridspec and isinstance(ax, mpl.axes._base._AxesBase) and ax.get_subplotspec()):
                 cax, kwargs = cbar.make_axes_gridspec(ax, **kwargs)
             else:
                 cax, kwargs = cbar.make_axes(ax, **kwargs)
@@ -285,16 +299,13 @@ class AnnotatedColorbar(Colorbar):
             any_lower = np.any(array < mappable.norm.vmin)
             any_higher = np.any(array > mappable.norm.vmax)
             if any_lower and any_higher:
-                extend = 'both' 
+                extend = 'both'
             elif any_lower:
                 extend = 'min'
             elif any_higher:
                 extend = 'max'
         kwargs['extend'] = extend
-        
-        super().__init__(cax, mappable, **kwargs)
-        cb = cbar.Colorbar(cax, mappable, **{
-            k: v for k, v in kwargs.items() if k not in NON_COLORBAR_KEYS})
+
         self.lower = lower
         self.higher = higher
         self.nans = nans
@@ -305,20 +316,24 @@ class AnnotatedColorbar(Colorbar):
         self.color_by = color_by
         self.do_draw_kde = draw_kde
         self.do_draw_histogram = draw_histogram
+        self.n_hist_bins = n_hist_bins
+        # Super can call methods defined later, so the attributed must already be defined
+        super().__init__(cax, mappable, **kwargs)
+        cb = cbar.Colorbar(cax, mappable, **{k: v for k, v in kwargs.items() if k not in NON_COLORBAR_KEYS})
         self.annotate(mappable)
-        cax.figure.stale = True
+        cax.figure.stale = True  # ax.callbacks.connect('xlim_changed', lambda ev: print(ev))  # ax.callbacks.connect('ylim_changed')
 
     def annotate(self, mappable):
         if self.do_draw_kde:
             try:
                 self.draw_kde(mappable)
-            except:
-                pass
+            except Exception as e:
+                raise e
         if self.do_draw_histogram:
-            try :
+            try:
                 self.draw_histogram(mappable)
-            except:
-                pass
+            except Exception as e:
+                raise e
         self.set_text(mappable)
 
     def draw_kde(self, mappable):
@@ -335,8 +350,8 @@ class AnnotatedColorbar(Colorbar):
         x = norm.inverse(x)  # [0, 1] -> [vmin, vmax]
         y = kde(x)
         y /= y.max()
-        y*= 0.7  # move it slightly away from the edges
-        y = 1-y  # To make it look like it follows the ticks
+        y *= 0.7  # move it slightly away from the edges
+        y = 1 - y  # To make it look like it follows the ticks
 
         points = np.array([y, x]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
@@ -354,7 +369,6 @@ class AnnotatedColorbar(Colorbar):
         self.set_text(mappable)
 
     def draw_histogram(self, mappable):
-        # TODO: Doesn't work
         data = mappable.get_array()
         norm = self.norm
 
@@ -367,18 +381,10 @@ class AnnotatedColorbar(Colorbar):
         y_norm = norm(y)
 
         # Create histogram
-        hist, bin_edges = np.histogram(y_norm, bins=200, range=(0, 1),
-                                       density=True)
-        hist = hist.astype(float)
-        hist /= hist.max()  # Normalize the histogram
-        hist *= 0.7
-        hist = 1 - hist
+        counts, bin_edges = np.histogram(y_norm, bins=self.n_hist_bins, range=(0, 1), density=True)
 
-        # Create points for line collection
-        x = (bin_edges[:-1] + bin_edges[1:]) / 2  # Compute midpoints of bins
-        x = norm.inverse(x)
-        points = np.array([hist, x]).T.reshape(-1, 1, 2)
-        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        # width = 1/self.n_hist_bins
+        norm_edges = norm(bin_edges)
 
         # Choose color map
         if self.color_by == 'complement':
@@ -388,15 +394,21 @@ class AnnotatedColorbar(Colorbar):
         else:
             cmap = self.color_by
 
-        # Create line collection and add to the axis
-        lc = LineCollection(segments, cmap=cmap, norm=norm, linewidth=self.linewidth)
-        lc.set_array(x)
+        for count, left, right in zip(counts, norm_edges[:-1], norm_edges[1:]):
+            # Height of the rectangle is proportional to the count, scaled down to fit within the colorbar
+            height = count / counts.max() * 0.7  # Scale factor for height; adjust as needed
+            width = right - left
+            xpos = 1 - height
 
-        self.ax.add_collection(lc)
+            # Create and add the rectangle patch to the colorbar's axis
+            # rect = Rectangle((edge, 0), width=bin_width, height=height, transform=self.ax.transAxes, color='k', clip_on=False)
+            rect = Rectangle((xpos, left), width=height, height=width, transform=self.ax.transAxes, color=cmap(left))
+            self.ax.add_patch(rect)
+
         self.set_text(mappable)
 
-
     def set_text(self, mappable):
+        # This can be called by super()
         data = mappable.get_array()
 
         mask = np.isfinite(data)
@@ -409,14 +421,14 @@ class AnnotatedColorbar(Colorbar):
         else:
             data = data[mask & (data != 0)]
         N = data.size
-        
+
         lower = (data < self.norm.vmin).sum() / N
         higher = (data > self.norm.vmax).sum() / N
 
         # This mess sets the text if necessary, and creates it if it doesn't exist
         if self.lower:
             if lower > 0:
-                text = f'{lower*100:.1f}%'
+                text = f'{lower * 100:.1f}%'
                 if self.lower_text is not None:
                     self.lower_text.set_text(text)
                 else:
@@ -425,11 +437,12 @@ class AnnotatedColorbar(Colorbar):
                 self.lower_text.set_text('')
         if self.higher:
             if higher > 0:
-                text = f'{higher*100:.1f}%'
+                text = f'{higher * 100:.1f}%'
                 if self.higher_text is not None:
                     self.higher_text.set_text(text)
                 else:
-                    self.higher_text = self.ax.text(0.5, 1.05, text, transform=self.ax.transAxes, ha='center', va='bottom')
+                    self.higher_text = self.ax.text(0.5, 1.05, text, transform=self.ax.transAxes, ha='center',
+                                                    va='bottom')
             elif self.higher_text is not None:
                 self.higher_text.set_text('')
         if self.nans:
@@ -446,7 +459,8 @@ class AnnotatedColorbar(Colorbar):
 
     def update_normal(self, mappable):
         super().update_normal(mappable)
-        self.set_text(mappable)
+        # self.set_text(mappable)
+        self.annotate(mappable)
 
 
 def IQR_range(data, factor=1.5) -> tuple[float, float]:
@@ -458,7 +472,7 @@ def IQR_range(data, factor=1.5) -> tuple[float, float]:
 
     q25, q75 = np.percentile(data, [25, 75])
     iqr = q75 - q25
-    
+
     # Define color limits to be a certain factor beyond the IQR
     vmin = q25 - factor * iqr
     vmax = q75 + factor * iqr
@@ -498,3 +512,61 @@ def robust_z_score_i(z, data):
     mad = mad if mad else np.finfo(data.dtype).eps
     return z * mad + np.median(data)
 
+
+def mc_boxplot(X: np.ndarray, Y: np.ndarray, ax: Axes | None = None,
+               scale: str | None = None,
+               **kwargs) -> tuple[Axes, Any]:
+    ax = make_ax(ax)
+    match scale:
+        case 'log':
+            X = np.log10(X)
+    width = 0.5
+    default = dict(widths=width)
+    kwargs = default | kwargs
+    lines = ax.boxplot(Y, positions=X, **kwargs)
+    return ax, lines
+
+
+def mc_errplot(X: np.ndarray, Y: np.ndarray, ax: Axes | None = None,
+               mean: bool = True,
+               median: bool = True,
+               fill: bool = False,
+               bars: bool = True,
+               fillkwargs = None,
+               errkwargs = None,
+               **kwargs) -> tuple[Axes, Any]:
+    ax = make_ax(ax)
+    plot_mean = mean
+    plot_median = median
+
+    # Calculate mean, median and standard deviation
+    mean = np.mean(Y, axis=0)
+    median = np.median(Y, axis=0)
+    std = np.std(Y, axis=0)
+
+    lines = []
+    # Plot mean and median
+    if plot_mean:
+        l0 = ax.plot(X, mean, label='mean')
+        lines.append(l0)
+
+    if plot_median:
+        l1 = ax.plot(X, median, label='median')
+        lines.append(l1)
+
+    if fill:
+        default = dict(alpha=0.2)
+        fillkwargs = {} if not fillkwargs else fillkwargs
+        kwargs = default | fillkwargs
+        l = ax.fill_between(X, mean - std, mean + std, **kwargs)
+        lines.append(l)
+
+    # Plot error bars
+    if bars:
+        default = dict()
+        errkwargs = {} if not errkwargs else errkwargs
+        kwargs = default | errkwargs
+        l2 = ax.errorbar(X, mean, yerr=std, **kwargs)
+        lines.append(l2)
+
+    return ax, lines

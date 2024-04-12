@@ -14,7 +14,7 @@ else:
     import os
     from pint import UnitRegistry
     from pint.errors import DimensionalityError
-    ureg = UnitRegistry()
+    ureg = UnitRegistry(system='SI')
     ureg.setup_matplotlib()
     u = ureg
     Q_ = ureg.Quantity
@@ -131,6 +131,7 @@ else:
     from .array import Vector, Matrix, zeros_like, empty_like, empty, transition_matrix
     from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
     from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector, ArrayList
+    from .array import on_gpu, on_cpu
     from .unfolder import Unfolder
     from . import response
     from .response import Response, Calibrator, ResponseData, DiscreteInterpolation

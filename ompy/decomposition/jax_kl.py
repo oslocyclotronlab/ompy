@@ -3,8 +3,8 @@ from jax._src.typing import Array, ArrayLike
 from jax._src.lax.lax import _const as _lax_const
 from jax._src.numpy.util import promote_args_inexact, promote_dtypes_inexact
 from jax._src import custom_derivatives
-from jax._src.numpy.util import _wraps
-from jax._src.ops import special as ops_special
+#from jax._src.numpy.util import wraps
+#from jax._src.ops import special as ops_special
 import jax.numpy as jnp
 import numpy as np
 

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 import logging
 import numpy as np
 from abc import ABC, abstractmethod
 from .index import Index
-from .. import Unit
+from .. import Unit, JAX_WORKING
 from .abstractarrayprotocol import AbstractArrayProtocol
 from nptyping import NDArray, Shape, Floating
-from typing import Self, Literal
+from typing import Iterator, Self, Literal, Callable, overload, TypeAlias
 
 
 LOG = logging.getLogger(__name__)
@@ -18,6 +19,13 @@ logging.captureWarnings(True)
 # [ ] Make +- work when one index lines inside the other
 #     - How to handle different array types, with/without error?
 #     - Remember units
+
+Device: TypeAlias = Literal['cpu']
+if JAX_WORKING:
+    import jax
+    from jaxlib.xla_extension import ArrayImpl
+    from jaxlib.xla_extension import Device as _Device
+    Device: TypeAlias = Literal['cpu'] | _Device
 
 
 ARRAY_CLASSES: dict[str, type[AbstractArray]] = {}
@@ -261,6 +269,243 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     def astype(self, dtype) -> Self:
         return self.clone(values=self.values.astype(dtype))
 
+    def apply(self, func: Callable[[np.ndarray], np.ndarray]) -> Self:
+        return self.clone(values=func(self.values))
+
+    def sample(self, N: int, mask: np.ndarray | None = None, **kwargs) -> list[Self]:
+        """ Draw `N` poisson samples from the array.
+
+        The `mask` specifies values to ignore. If not set, the mask is assumed to be
+        all zero elements "after" the diagonal.
+        Zeros that are not masked are treated to have Poisson std = 3 to allow for
+        non-zero sampling.
+        
+        Args:
+            N (int): The number of samples to generate.
+            mask (np.ndarray, optional): A boolean mask array to apply zeros to. If not provided, the last non-zero elements are used.
+        
+        Returns:
+            list[Self]: An iterator that yields `N` new instances of the array, with the sampled values.
+        """
+        return list(self.sample_it(N, mask, **kwargs))
+
+    def sample_it(self, N: int, mask: np.ndarray | None = None, **kwargs) -> Iterator[Self]:
+        """ Draw `N` poisson samples from the array.
+
+        The `mask` specifies values to ignore. If not set, the mask is assumed to be
+        all zero elements "after" the diagonal.
+        Zeros that are not masked are treated to have Poisson std = 3 to allow for
+        non-zero sampling.
+        
+        Args:
+            N (int): The number of samples to generate.
+            mask (np.ndarray, optional): A boolean mask array to apply zeros to. If not provided, the last non-zero elements are used.
+        
+        Returns:
+            Iterator[Self]: An iterator that yields `N` new instances of the array, with the sampled values.
+        """
+
+        if mask is None:
+            if self.ndim == 1:
+                mask = self.last_nonzero(**kwargs)
+            else:
+                mask = self.last_nonzeros(**kwargs)
+        X = np.where(self.values <= 3, 3, self.values)
+        X[~mask] = 0
+        for _ in range(N):
+            sample = self.clone(values=np.random.poisson(X))
+            yield sample
+
+    @overload
+    def to_gpu(self, inplace: Literal[False] = ..., device=...) -> Self: ...
+
+    @overload
+    def to_gpu(self, inplace: Literal[True] = ..., device=...) -> None: ...
+            
+    def to_gpu(self, inplace: bool = False, device=None) -> Self | None:
+        """
+        Move the .values to the GPU.
+
+        Args:
+            inplace (bool, optional): If True, the operation is performed in-place. Defaults to False.
+            device (Device, optional): The device to which the values are moved. Defaults to None.
+
+        Returns:
+            Self | None: Returns None if inplace is True, otherwise returns a new instance with values moved to GPU.
+        """
+        if inplace:
+            self.values = to_gpu(self.values, device)
+            return None
+        else:
+            return self.clone(values=to_gpu(self.values, device))
+
+    @overload
+    def to_cpu(self, inplace: Literal[False] = ..., device=...) -> Self: ...
+    
+    @overload
+    def to_cpu(self, inplace: Literal[True] = ..., device=...) -> None: ...
+
+    def to_cpu(self, inplace: bool = False, device: Device | None = None) -> Self | None:
+        """
+        Move the .values to the CPU.
+
+        Args:
+            inplace (bool, optional): If True, the operation is performed in-place. Defaults to False.
+            device (Device, optional): The device to which the values are moved. Defaults to None.
+
+        Returns:
+            Self | None: Returns None if inplace is True, otherwise returns a new instance with values moved to CPU.
+        """
+        if inplace:
+            self.values = to_cpu(self.values, device)
+            return None
+        else:
+            return self.clone(values=to_cpu(self.values, device))
+
+    def to_device(self, inplace: bool = False, device: Device | None = None) -> Self | None:
+        """
+        Move the .values to the specified device.
+
+        Args:
+            inplace (bool, optional): If True, the operation is performed in-place. Defaults to False.
+            device (Device, optional): The device to which the values are moved. Defaults to None.
+
+        Returns:
+            Self | None: Returns None if inplace is True, otherwise returns a new instance with values moved to the specified device.
+        """
+        if inplace:
+            self.values = to_device(self.values, device)
+            return None
+        else:
+            return self.clone(values=to_device(self.values, device))
+
+    @property
+    def device(self) -> Device:
+        """
+        Get the device of the .values.
+
+        Returns:
+            Device: The device of the .values.
+        """
+        return _device(self.values)
+
+    @overload
+    def as_numpy(self, inplace: Literal[False] = ...) -> Self: ...
+
+    @overload
+    def as_numpy(self, inplace: Literal[True] = ...) -> None: ...
+
+    def as_numpy(self, inplace: bool = False) -> Self | None:
+        if inplace:
+            self.values = np.asarray(self.values)
+            return None
+        else:
+            return self.clone(values=np.asarray(self.values))
+
+
+
+def to_device(array, device: Device):
+    if device != 'cpu':
+        raise RuntimeError(f"Only CPU device is supported on this system, not {device}.")
+    return array
+
+def to_gpu(array):
+    raise RuntimeError("JAX is not working on this system.")
+
+def to_cpu(array):
+    return array
+
+def _device(array) -> Device: 
+    return 'cpu'
+
+if JAX_WORKING:
+    def to_device(array, device: Device):
+        if device == 'cpu':
+            device = jax.devices('cpu')[0]
+
+        if not isinstance(array, ArrayImpl) or not _device(array) == device:
+            return jax.device_put(array, device)
+        return array
+
+    def to_gpu(array, device: Device | None = None):
+        if device is None:
+            device = jax.devices('gpu')[0]
+        return to_device(array, device)
+
+    def to_cpu(array, device: Device | None = None):
+        if device is None:
+            device = jax.devices('cpu')[0]
+        return to_device(array, device)
+
+    def _device(array) -> Device:
+        if isinstance(array, ArrayImpl):
+            return array.device_buffer.device()
+        else:
+            return 'cpu'
+
+
+@contextmanager
+def on_gpu(*arr: AbstractArray, revert: bool = True):
+    """
+    Context manager that moves the given AbstractArray objects to the GPU,
+    and returns them to their original devices. Created variables in the 
+    context are not handled.
+    
+    Args:
+        *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the GPU.
+        revert (bool): 
+            If True, the objects are reverted to their original devices after the context is exited.
+            If False, the objects are left on the GPU after the context is exited.
+    
+    Yields:
+        None
+    
+    Raises:
+        None
+    
+    Returns:
+        None
+    """
+    devices = []
+    try:
+        for a in arr:
+            devices.append(a.device)
+            a.to_gpu(inplace=True)
+        yield
+    finally:
+        if revert:
+            for a, device in zip(arr, devices):
+                a.to_device(inplace=True, device=device)
+
+@contextmanager
+def on_cpu(*arr: AbstractArray):
+    """
+    Context manager that moves the given AbstractArray objects to the CPU,
+    and returns them to their original devices. Created variables in the 
+    context are not handled.
+    
+    Args:
+        *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the CPU.
+    
+    Yields:
+        None
+    
+    Raises:
+        None
+    
+    Returns:
+        None
+    """
+    devices = []
+    try:
+        for a in arr:
+            devices.append(a.device)
+            a.to_cpu(inplace=True)
+        yield
+    finally:
+        for a, device in zip(arr, devices):
+            a.to_device(inplace=True, device=device)
+
 def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
     """Maps axis to 0, 1 or 2 according to which axis is specified
 
@@ -287,3 +532,22 @@ def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
         return 2
     else:
         raise ValueError(f"Unrecognized axis: {axis}")
+
+
+def fetch(array, dtype, order) -> np.ndarray:
+    order = 'C' if order is None else order
+    return np.asarray(array, dtype=dtype, order=order)
+
+if JAX_WORKING:
+    import jax.numpy as jnp
+    def fetch(array, dtype, order) -> jnp.ndarray:
+        if isinstance(array, jnp.ndarray):
+            if order is not None:
+                # order != 'K' not supported!
+                # We let jax throw the error, and perhaps not throw
+                # the error in the future
+                return jnp.asarray(array, order=order, dtype=dtype)
+            return array.astype(dtype)
+        else:
+            order = 'C' if order is None else order
+            return np.asarray(array, dtype=dtype, order=order)
