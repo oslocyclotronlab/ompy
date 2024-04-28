@@ -154,11 +154,9 @@ class JaxResult1D(Cost1D, UnfoldedResult1DSimple):
         b = UnfoldedResult1DSimple._load(path)
         return a | b
 
-
-
 class Jaxer(Unfolder):
-    @override
     @staticmethod
+    @override
     def supports_background():
         return True
 
@@ -416,7 +414,8 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
     mean = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     var = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     disable_tqdm = kwargs.get('disable_tqdm', False)
-    for i in tqdm(range(max_iter), disable=disable_tqdm):
+    leave_tqdm = kwargs.get('leave_tqdm', True)
+    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm):
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:

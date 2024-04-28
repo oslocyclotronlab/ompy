@@ -124,15 +124,9 @@ def ensure_path(func: Callable) -> Callable:
 
         # Check and modify kwargs
         for param, annotation in sig.parameters.items():
-            if annotation.annotation == Path:
-                value = bound_args.arguments[param]
-                match value:
-                    case Path():
-                        pass
-                    case str():
-                        bound_args.arguments[param] = Path(value)
-                    case _:
-                        raise TypeError(f"Argument {param} must be a Path or a string")
+            # BUG: There is a weird bug here where Path doesn't equal itself.
+            if annotation.annotation == Path or str(annotation.annotation) == 'Path':
+                bound_args.arguments[param] = Path(bound_args.arguments[param])
         return func(*bound_args.args, **bound_args.kwargs)
 
     return wrapper

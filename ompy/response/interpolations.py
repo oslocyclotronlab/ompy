@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, overload, Literal
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -155,11 +155,18 @@ class FWHMInterpolation(Interpolation):
     def eval(self, points: np.ndarray) -> np.ndarray:
         return self.C*fwhm(points, self.a0, self.a1, self.a2)
 
+    @overload
+    def scale(self, C: float, inplace: Literal[False]) -> FWHMInterpolation: ...
+
+    @overload
+    def scale(self, C: float, inplace: Literal[True]) -> None: ...
+
     def scale(self, C: float, inplace=False) -> FWHMInterpolation | None:
+        factor = self.C * C
         if inplace:
-            self.C = self.C * C
+            self.C = factor
             return self
-        return FWHMInterpolation(self.points, self.a0, self.a1, self.a2, C=C, cov=self.cov)
+        return FWHMInterpolation(self.points, self.a0, self.a1, self.a2, C=factor, cov=self.cov)
 
     def _metadata(self) -> dict[str, any]:
         meta =  {

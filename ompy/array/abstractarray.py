@@ -403,20 +403,23 @@ class AbstractArray(AbstractArrayProtocol, ABC):
             return self.clone(values=np.asarray(self.values))
 
 
-
 def to_device(array, device: Device):
     if device != 'cpu':
         raise RuntimeError(f"Only CPU device is supported on this system, not {device}.")
     return array
 
+
 def to_gpu(array):
     raise RuntimeError("JAX is not working on this system.")
+
 
 def to_cpu(array):
     return array
 
+
 def _device(array) -> Device: 
     return 'cpu'
+
 
 if JAX_WORKING:
     def to_device(array, device: Device):

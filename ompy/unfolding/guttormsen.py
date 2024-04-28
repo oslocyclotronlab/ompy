@@ -36,6 +36,7 @@ class GuttormsenKwargs:
     save_block: bool = True
     disable_tqdm: bool = False
     enforce_positivity: bool = True
+    leave_tqdm: bool = True
 
 
 class Guttormsen(Unfolder):
@@ -124,6 +125,7 @@ class Guttormsen(Unfolder):
         elapsed = time.time() - start
         kw_ = asdict(kw)
         kw_.pop('disable_tqdm')
+        kw_.pop('leave_tqdm')
         parameters = Parameters1D(raw=data_raw,
                                   background=background,
                                   initial=initial,
@@ -174,6 +176,7 @@ class Guttormsen(Unfolder):
 
         kw_ = asdict(kw) | {'save_block': self.save_block}
         kw_.pop('disable_tqdm')
+        kw_.pop('leave_tqdm')
         parameters = Parameters2D(R=R,
                                   raw=raw,
                                   background=background,
@@ -325,7 +328,10 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: GuttormsenKwargs):
     if kw.disable_tqdm:
         tqdm_ = lambda x: x
     else:
-        tqdm_ = tqdm
+        if not kw.leave_tqdm:
+            tqdm_ = lambda x: tqdm(x, leave=False)
+        else:
+            tqdm_ = tqdm
 
     for i in tqdm_(range(iterations)):
         u, f = body(R, Gex, u, f)

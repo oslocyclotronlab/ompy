@@ -2,23 +2,23 @@ from __future__ import annotations
 
 import json
 import warnings
-from pathlib import Path
-from typing import Protocol, TypeGuard, TypeVar, overload, Generic, Iterator
+from abc import ABC
 from dataclasses import dataclass
-from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import TypeGuard, TypeVar, overload, Generic, Iterator
 
 import numpy as np
-
-from .discreteinterpolation import DiscreteInterpolation
-from .compton import interpolate_compton
-from .responsedata import ResponseData, Components
-from .numbalib import njit, prange
-from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
-from ..stubs import Pathlike, Unitlike, Axes, Plots1D
-from ..helpers import make_ax
-from .responsepath import ResponseName, get_response_path
-from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
 from typing_extensions import TypedDict
+
+from .compton import interpolate_compton
+from .comptonmatrixprotocol import ComptonMatrix, is_compton_matrix
+from .discreteinterpolation import DiscreteInterpolation
+from .numbalib import njit, prange
+from .responsedata import ResponseData, Components
+from .responsepath import ResponseName, get_response_path
+from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
+from ..helpers import make_ax
+from ..stubs import Pathlike, Unitlike, Axes, Plots1D
 
 if NUMBA_CUDA_WORKING[0]:
     from .comptongpu import interpolate_gpu
@@ -27,7 +27,7 @@ import logging
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
-#TODO
+# TODO
 # [x] Save and load components
 # [ ] Interpolate compton down to 0
 # [x] Is the response specialized correctly? We *know* the components at all E
@@ -37,22 +37,28 @@ logging.captureWarnings(True)
 
 CMatrix = TypeVar('CMatrix', bound='ComptonMatrix')
 
+
 def is_all_vector(x) -> TypeGuard[dict[str, Vector]]:
     return isinstance(x, dict) and all(isinstance(v, Vector) for v in x.values())
+
 
 def is_all_matrix(x) -> TypeGuard[dict[str, Matrix]]:
     return isinstance(x, dict) and all(isinstance(v, Matrix) for v in x.values())
 
+
 def is_all_matrix_or_vector(x) -> TypeGuard[dict[str, Matrix] | dict[str, Vector]]:
     return is_all_vector(x) or is_all_matrix(x)
 
+
 T = TypeVar('T', bound=Matrix | Vector)
 t = TypedDict('t', {'total': T, 'compton': T, 'FE': T, 'SE': T, 'DE': T, 'AP': T})
+
 
 @dataclass
 class ResponseMatrices:
     R: Matrix
     G: Matrix
+
     def __iter__(self) -> Iterator[Matrix]:
         return iter([self.R, self.G])
 
@@ -70,8 +76,8 @@ class FoldedArray(ABC, Generic[T]):
     def from_dict(cls, d: t) -> FoldedArray[T]:
         return cls(**d)
 
-    def plot(self, ax: Axes | None = None, fe=True, se=True,
-             de=True, ap=True, compton=True, total=True, **kwargs) -> Plots1D:
+    def plot(self, ax: Axes | None = None, fe=True, se=True, de=True, ap=True, compton=True, total=True,
+             **kwargs) -> Plots1D:
         ax = make_ax(ax)
         lines = []
         if fe:
@@ -83,7 +89,7 @@ class FoldedArray(ABC, Generic[T]):
         if de:
             _, l2 = self.DE.plot(ax=ax, label='DE', **kwargs)
             lines.append(l2)
-        if ap: 
+        if ap:
             _, l3 = self.AP.plot(ax=ax, label='AP', **kwargs)
             lines.append(l3)
         if compton:
@@ -108,7 +114,6 @@ class FoldedArray(ABC, Generic[T]):
                         [self.FE, self.SE, self.DE, self.AP, self.compton, self.total]))
 
 
-
 @dataclass
 class FoldedMatrix(FoldedArray[Matrix]):
     FE: Matrix
@@ -130,11 +135,8 @@ class FoldedVector(FoldedArray[Vector]):
 
 
 class Response:
-    def __init__(self, data: ResponseData,
-                 interpolation: DiscreteInterpolation,
-                 compton: ComptonMatrix | None = None,
-                 components: Components = Components(),
-                 copy: bool = False):
+    def __init__(self, data: ResponseData, interpolation: DiscreteInterpolation, compton: ComptonMatrix | None = None,
+                 components: Components = Components(), copy: bool = False):
         self.data: ResponseData = data if not copy else data.clone()  # Copy instead?
         self.interpolation: DiscreteInterpolation = interpolation if not copy else interpolation.clone()
         self.compton: ComptonMatrix | None = compton if not copy else compton.copy() if compton is not None else None
@@ -175,8 +177,8 @@ class Response:
         self.compton = compton
         return compton
 
-    def discrete(self, bins: np.ndarray | None = None, factor: float | None = None,
-                   width: float | None = None, numbins: int | None = None, **kwargs) -> Matrix:
+    def discrete(self, bins: np.ndarray | None = None, factor: float | None = None, width: float | None = None,
+                 numbins: int | None = None, **kwargs) -> Matrix:
         """
         Rebins the response matrix to the requested energy grid.
 
@@ -203,11 +205,11 @@ class Response:
         """
         assert self.compton is not None, "Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first"
         bins_ = self.compton.true_index.handle_rebin_arguments(bins=bins, factor=factor, numbins=numbins,
-                                                        binwidth=width)
+                                                               binwidth=width)
         return self.discrete_(E=bins_, **kwargs)
 
     def discrete_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
-                    normalize: bool = True, pad: bool = False) -> Matrix:
+                  normalize: bool = True, pad: bool = False) -> Matrix:
         """
         Rebins the discrete response matrix to the requested energy grid.
 
@@ -231,7 +233,8 @@ class Response:
         """
         if compton is None:
             if self.compton is None:
-                raise ValueError("Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first")
+                raise ValueError(
+                    "Compton matrix must be set or given as argument before adding structures. Use `interpolate_compton` first")
             compton = self.compton
 
         # For mypy 'cause its too stupid to figure out that compton is not None
@@ -243,7 +246,7 @@ class Response:
             raise ValueError(("Requested energy grid is too low. "
                               f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                               f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
-                              f"The energy grid must be truncated at index {E.index(t.leftmost_u)+1}."))
+                              f"The energy grid must be truncated at index {E.index(t.leftmost_u) + 1}."))
         if pad:
             E_all = E.copy()
             E: Index = E_all[E_all >= compton.true_index.leftmost]
@@ -263,7 +266,7 @@ class Response:
         if E is not None:
             dE_intp = np.max(R.true_index.steps())
             dE = np.min(self.interpolation.E_index.steps())
-            N = int(np.ceil(dE_intp / dE)) # Number of steps per bin
+            N = int(np.ceil(dE_intp / dE))  # Number of steps per bin
 
             def mean(fn, e):
                 return np.mean(fn(np.linspace(e, e + dE_intp, N)))
@@ -274,11 +277,11 @@ class Response:
         FE, SE, DE, AP = self.interpolation.structures()
         emin = R.observed_index.leftmost
         has_511 = 511 >= emin
-        #has_511 = False
+        # has_511 = False
         if has_511:
             j511 = R.index_observed(511)
         for i, e in enumerate(R.true):
-            #if e < emin:
+            # if e < emin:
             #    continue
             R.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
@@ -378,7 +381,6 @@ class Response:
         R = self.discrete(E, **kwargs)
         return ResponseMatrices(R, G)
 
-
     def specialize_like(self, other: Matrix | Vector, **kwargs) -> ResponseMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given matrix or vector.
 
@@ -398,13 +400,11 @@ class Response:
         G = self.gaussian_like(other)
         return ResponseMatrices(R, G)
 
-
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
               compton: ComptonMatrix | None = None, components: Components | None = None,
               copy: bool = False) -> Response:
         return Response(data=data or self.data, interpolation=interpolation or self.interpolation,
-                        compton=compton or self.compton, components=components or self.components,
-                        copy=copy)
+                        compton=compton or self.compton, components=components or self.components, copy=copy)
 
     def copy(self, **kwargs):
         return self.clone(copy=True, **kwargs)
@@ -463,8 +463,8 @@ class Response:
         if self.compton is not None:
             self.compton.save(path / 'compton.npz', exist_ok=exist_ok)
 
-    def component_matrices(self, *, E: Index | None, compton: ComptonMatrix | None = None, weights: Components | None = None,
-                           normalize: bool = True) -> dict[str, Matrix]:
+    def component_matrices(self, *, E: Index | None, compton: ComptonMatrix | None = None,
+                           weights: Components | None = None, normalize: bool = True) -> dict[str, Matrix]:
         if weights is None:
             weights = self.components
         if self.compton is None and compton is None:
@@ -497,9 +497,10 @@ class Response:
         if E is not None:
             dE_intp = np.max(compton.true_index.steps())
             dE = np.min(self.interpolation.E_index.steps())
-            N = int(np.ceil(dE_intp/dE))
+            N = int(np.ceil(dE_intp / dE))
+
             def mean(fn, e):
-                return np.mean(fn(np.linspace(e, e+dE_intp, N)))
+                return np.mean(fn(np.linspace(e, e + dE_intp, N)))
         else:
             def mean(fn, e):
                 return fn(e)
@@ -509,7 +510,7 @@ class Response:
         if has_511:
             j511 = APm.index_observed(511.0)
         for i, e in enumerate(compton.true):
-            #if e > emin:
+            # if e > emin:
             FEm.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
                 SEm.loc[i, e - 511.0] += mean(SE, e) * weights.SE
@@ -523,13 +524,15 @@ class Response:
         if normalize:
             T = total.sum(axis=1)
             T[T == 0] = 1
+
             def norm(x):
                 x.values /= T[:, np.newaxis]
+
             [norm(x) for x in [total, compton, FEm, SEm, DEm, APm]]
         return {'total': total, 'compton': compton, 'FE': FEm, 'SE': SEm, 'DE': DEm, 'AP': APm}
 
-    def component_matrices_like(self, other: Matrix | Vector | Index,
-                                weights: Components | None = None) -> dict[str, Matrix]:
+    def component_matrices_like(self, other: Matrix | Vector | Index, weights: Components | None = None) -> dict[
+        str, Matrix]:
         match other:
             case Matrix():
                 return self.component_matrices(E=other.Y_index, weights=weights)
@@ -539,11 +542,12 @@ class Response:
                 raise ValueError(f"Can only discrete to Matrix or Vector, got {type(other)}")
 
     @overload
-    def fold_componentwise(self, other: Vector,
-                           weights: Components | None = ...) -> FoldedVector: ...
+    def fold_componentwise(self, other: Vector, weights: Components | None = ...) -> FoldedVector:
+        ...
+
     @overload
-    def fold_componentwise(self, other: Matrix,
-                           weights: Components | None = ...) -> FoldedMatrix: ...
+    def fold_componentwise(self, other: Matrix, weights: Components | None = ...) -> FoldedMatrix:
+        ...
 
     def fold_componentwise(self, other: Matrix | Vector,
                            weights: Components | None = None) -> FoldedVector | FoldedMatrix:
@@ -577,11 +581,10 @@ class Response:
 
 def gaussian_matrix(E: np.ndarray, sigmafn) -> Matrix:
     # TODO HACK Add 2 bins to account for the interpolation error.
-    sigma = sigmafn(E + 2*(E[1] - E[0]))
+    sigma = sigmafn(E + 2 * (E[1] - E[0]))
     values = _gaussian_matrix(E, sigma)
     values = values / values.sum(axis=1)[:, None]
-    return Matrix(true=E, observed=E, values=values, ylabel='Observed', xlabel='True',
-                  edge='mid')
+    return Matrix(true=E, observed=E, values=values, ylabel='Observed', xlabel='True', edge='mid')
 
 
 @njit(parallel=True)

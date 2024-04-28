@@ -1167,13 +1167,13 @@ class MidNonUniformIndex(Mid, NonUniform):
 
 
 def to_index(X: arraylike, edge: Edges = 'left',
-             boundary: bool = False, **kwargs) -> Index:
+             boundary: bool = False, enforce_uniform: bool = False, **kwargs) -> Index:
     X = np.asarray(X)
     if edge not in {'left', 'mid'}:
         raise ValueError(f"`edge` must be one of {Edges} not {edge}")
     if not is_monotone(X):
         raise ValueError("Indices must be monotone")
-    if is_uniform_fn(X):
+    if enforce_uniform or is_uniform_fn(X):
         if edge == 'left':
             return LeftUniformIndex.from_array(X, extrapolate_boundary=not boundary, **kwargs)
         else:

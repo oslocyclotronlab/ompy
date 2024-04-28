@@ -12,11 +12,18 @@ def is_monotone(x: np.ndarray) -> bool:
     return True
 
 
-@njit
-def is_uniform(X: np.ndarray, rtol=1e-5, atol=1e-8) -> bool:
+#@njit
+def is_uniform(X: np.ndarray, rtol=1e-3, atol=None) -> bool:
     """ Check if X is equidistant """
     dX = X[1] - X[0]
-    return np.allclose(X[1:] - X[:-1], dX, rtol=rtol, atol=atol, equal_nan=False)
+    if atol is None:
+        if np.issubdtype(X.dtype, np.floating):
+            _atol = np.finfo(X.dtype).eps * np.abs(X).max()
+        else:
+            _atol = 0.5
+    else:
+        _atol = atol
+    return np.allclose(X[1:] - X[:-1], dX, rtol=rtol, atol=_atol, equal_nan=False)
 
 
 @njit()
@@ -30,7 +37,7 @@ def is_length_congruent(X: np.ndarray, Y: np.ndarray) -> bool:
     return True
 
 
-@njit()
+#@njit()
 def is_monotone_uniform(X: np.ndarray) -> bool:
     return is_monotone(X) and is_uniform(X)
 

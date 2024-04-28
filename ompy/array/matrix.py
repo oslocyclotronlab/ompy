@@ -25,7 +25,7 @@ from .matrixprotocol import MatrixProtocol
 from .rebin import rebin_2D, Preserve
 from .vector import Vector, maybe_pop_from_kwargs
 from .. import XARRAY_AVAILABLE, Unit, ROOT_IMPORTED
-from ..helpers import maybe_set, make_ax, IQR_range
+from ..helpers import maybe_set, make_ax, IQR_range, ensure_path
 from ..helpers import robust_z_score, robust_z_score_i, AnnotatedColorbar
 from ..numbalib import njit
 from ..stubs import (Unitlike, Pathlike, Axes, Figure,
@@ -238,26 +238,31 @@ class Matrix(AbstractArray, MatrixProtocol):
                 raise ValueError(f"Unknown filetype: {filetype}")
 
     @classmethod
-    def from_npz(cls, path: Pathlike, **kwargs) -> Self:
+    @ensure_path
+    def from_npz(cls, path: Path, **kwargs) -> Self:
         return load_npz_2D(path, cls, **kwargs)
 
     @classmethod
-    def from_npy(cls, path: Pathlike) -> Self:
+    @ensure_path
+    def from_npy(cls, path: Path) -> Self:
         values, Y, X = load_numpy_2D(path)
         return cls(Ex=X, Eg=Y, values=values)
 
     @classmethod
-    def from_txt(cls, path: Pathlike) -> Self:
+    @ensure_path
+    def from_txt(cls, path: Path) -> Self:
         values, Y, X = load_txt_2D(path)
         return cls(Ex=X, Eg=Y, values=values)
 
     @classmethod
-    def from_tar(cls, path: Pathlike) -> Self:
+    @ensure_path
+    def from_tar(cls, path: Path) -> Self:
         values, Y, X = load_tar(path)
         return cls(Ex=X, Eg=Y, values=values)
 
     @classmethod
-    def from_mama(cls, path: Pathlike) -> Self:
+    @ensure_path
+    def from_mama(cls, path: Path) -> Self:
         ret = mama_read(path)
         if len(ret) == 3:
             values, Y, X = ret
@@ -265,10 +270,13 @@ class Matrix(AbstractArray, MatrixProtocol):
         else:
             raise RuntimeError("Wrong format of mama file")
 
-    def from_hdf5(cls, path: Pathlike, **kwargs) -> Self:
+    @classmethod
+    @ensure_path
+    def from_hdf5(cls, path: Path, **kwargs) -> Self:
         return load_hdf5_2D(path, cls, **kwargs)
 
-    def save(self, path: Pathlike, filetype: Filetype | None = None, **kwargs) -> None:
+    @ensure_path
+    def save(self, path: Path, filetype: Filetype | None = None, **kwargs) -> None:
         """Save matrix to file
 
         Legacy method. Prefer `to_<format>(path)` methods instead.
@@ -281,7 +289,6 @@ class Matrix(AbstractArray, MatrixProtocol):
         Raises:
             ValueError: If filetype is unknown
         """
-        path = Path(path)
         path, filetype = resolve_filetype(path, filetype)
 
         match filetype:
@@ -302,16 +309,19 @@ class Matrix(AbstractArray, MatrixProtocol):
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
 
-    def to_npz(self, path: Pathlike, **kwargs) -> None:
+    @ensure_path
+    def to_npz(self, path: Path, **kwargs) -> None:
         """Save matrix to NPZ file format.
 
         Args:
             path (Pathlike): Path to save the file.
             **kwargs: Additional keyword arguments to pass to save_npz_2D.
         """
+        print(path, type(path))
         save_npz_2D(path, self, **kwargs)
 
-    def to_hdf5(self, path: Pathlike, **kwargs) -> None:
+    @ensure_path
+    def to_hdf5(self, path: Path, **kwargs) -> None:
         """Save matrix to HDF5 file format.
 
         Args:
@@ -320,7 +330,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         """
         save_hdf5_2D(self, path, **kwargs)
 
-    def to_txt(self, path: Pathlike, **kwargs) -> None:
+    @ensure_path
+    def to_txt(self, path: Path, **kwargs) -> None:
         """Save matrix to TXT file format.
 
         Args:
@@ -331,7 +342,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         Y = self.Y_index.to_unit('keV').bins
         save_txt_2D(self.values, Y, X, path, **kwargs)
 
-    def to_numpy(self, path: Pathlike) -> None:
+    @ensure_path
+    def to_numpy(self, path: Path) -> None:
         """Save matrix to NumPy binary file format.
 
         Args:
@@ -342,7 +354,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         Y = self.Y_index.to_unit('keV').bins
         save_numpy_2D(self.values, Y, X, path)
 
-    def to_mama(self, path: Pathlike, **kwargs) -> None:
+    @ensure_path
+    def to_mama(self, path: Path, **kwargs) -> None:
         """Save matrix to MAMA file format.
 
         Args:
@@ -351,7 +364,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         """
         mama_write(self, path, comment="Made by OMpy", **kwargs)
 
-    def to_tar(self, path: Pathlike) -> None:
+    @ensure_path
+    def to_tar(self, path: Path) -> None:
         """Save matrix as tarball
 
         Args:
@@ -638,6 +652,9 @@ class Matrix(AbstractArray, MatrixProtocol):
         summary += "\nValues:\n"
         return summary + str(self.values)
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({self.shape})[{self.device}]{self.title} at {hex(id(self))}"
+
     @property
     def X(self) -> np.ndarray:
         return self.X_index.bins
@@ -860,7 +877,7 @@ class Matrix(AbstractArray, MatrixProtocol):
         elif scale == 'linear':
             norm = Normalize(vmin=vmin, vmax=vmax)
         else:
-            raise ValueError("Unsupported zscale ", scale)
+            norm = scale(vmin=vmin, vmax=vmax)
         norm = kwargs.pop('norm', norm)
         X, Y = self._plot_mesh()
 

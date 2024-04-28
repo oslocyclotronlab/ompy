@@ -105,7 +105,8 @@ def linspace(start, stop, *args, **kwargs) -> Vector:
     bins, units = linspace_with_units(start, stop, *args, **kwargs)
     if units == ureg.dimensionless:
         units = ureg.Unit("keV")
-    return Vector(X=bins, values=np.zeros(len(bins), dtype=float), unit=units)
+    index = to_index(bins, edge='left', unit=units, label='Energy', enforce_uniform=True)
+    return Vector(X=index, values=np.zeros(len(bins), dtype=float), unit=units)
 
 @overload
 def fmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...

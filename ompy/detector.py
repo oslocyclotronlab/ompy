@@ -1,8 +1,9 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from .stubs import Unitlike, Axes, array
+from .stubs import Unitlike, Axes
+from .stubs import array as Array
 from .library import from_unit, into_unit
-from . import u, Vector, Matrix, empty
+from . import u, Vector, Matrix, empty, Index
 from .response import DiscreteInterpolation, Response
 import numpy as np
 import matplotlib.pyplot as plt
@@ -57,19 +58,36 @@ class Detector(ABC):
         Ex = into_unit(e, 'keV') + sigma*res
         return Ex
 
-    def resolution_gauss(self, E: array | Vector, mu: Unitlike, as_array=False) -> array | Vector:
+    @overload
+    def resolution_gauss(self, E: Index | Array | Vector, mu: Unitlike, as_array: Literal[False] = ...) -> Vector: ...
+
+    @overload
+    def resolution_gauss(self, E: Index | Array | Vector, mu: Unitlike, as_array: Literal[True] = ...) -> Array: ...
+
+    def resolution_gauss(self, E: Index | Array | Vector, mu: Unitlike, as_array=False) -> Array | Vector:
+        _E = E
         if isinstance(E, Vector):
             E = E.to('keV').E_true
+        elif isinstance(E, Index):
+            E = E.to_unit('keV').bins
         Eg = from_unit(mu, 'keV')
         sigma = self._resolution_sigma(Eg)
         gauss = ngaussian(E, Eg, sigma)
         normalized = gauss / gauss.sum()
         if as_array:
             return normalized
-        return Vector(E=E, values=normalized)
+        return Vector(E=_E, values=normalized)
+
+    @overload
+    @abstractmethod
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array: Literal[False]) -> Matrix: ...
+
+    @overload
+    @abstractmethod
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array: Literal[True]) -> np.ndarray: ...
 
     @abstractmethod
-    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array=True) -> Matrix | np.ndarray:
         ...
 
     def plot_FWHM(self, ax: Axes | None = None, start=0, stop='10MeV', n=100, **kwargs) -> Axes:
@@ -91,16 +109,28 @@ class Detector(ABC):
 
 
 class EgDetector(Detector):
-    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
+    @overload
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array: Literal[False] = ...) -> Matrix: ...
+    @overload
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array: Literal[True] = ...) -> Array: ...
+
+    def resolution_matrix(self, array: Vector | Matrix, *, as_array: bool = False) -> Matrix | Array:
         """ Return a matrix with the resolution of sigma
+
+        If `array` is a matrix, uses the Y-axis, otherwise uses the X-axis.
 
         R := resolution
         U := unfolded
         F = U@R
         """
-        E = mat.Y
+        if hasattr(array, 'Y'):
+            E = array.Y_index
+        else:
+            E = array.X_index
+
         R: Matrix = empty(E, E)
-        for (i, e) in enumerate(E):
+        E_ = E.to_unit('keV').bins
+        for (i, e) in enumerate(E_):
             R[i, :] = self.resolution_gauss(E, e, as_array=True)
         if as_array:
             return R.values
@@ -110,17 +140,25 @@ class EgDetector(Detector):
 
 
 class ExDetector(Detector):
-    def resolution_matrix(self, mat: Matrix, *, as_array=False) -> Matrix | array:
+    @overload
+    def resolution_matrix(self, array: Matrix | Vector, *, as_array: Literal[False] = ...) -> Matrix: ...
+    @overload
+    def resolution_matrix(self, array: Matrix | Vector, *, as_array: Literal[True] = ...) -> Array: ...
+
+    def resolution_matrix(self, array: Matrix | Vector, *, as_array=False) -> Matrix | Array:
         """ Return a matrix with the resolution of sigma
+
+        Uses the `X` axis for the energy values.
 
         R := resolution
         U := unfolded
         F = R@U
         """
         warnings.warn("Written while sleepy. Might be buggy")
-        E = mat.X
+        E = array.X_index
         R: Matrix = empty(E, E).set_yalias('measured').set_xalias('true')
-        for (i, e) in enumerate(E):
+        E_ = E.to_unit('keV').bins
+        for (i, e) in enumerate(E_):
             R[:, i] = self.resolution_gauss(E, e, as_array=True)
         if as_array:
             return R.values
@@ -143,6 +181,7 @@ class LambdaExDetector(ExDetector):
 
     def _FWHM(self, e: float) -> float:
         return self.func(e)
+
 
 class OSCAR(EgDetector):
     # From https://doi.org/10.1016/j.nima.2020.164678

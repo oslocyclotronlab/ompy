@@ -572,7 +572,9 @@ class Vector(AbstractArray, VectorProtocol):
         self.update(xlabel=value, inplace=True)
 
     def get_xlabel(self) -> str:
-        return self.xlabel + f" [${self.unit:~L}$]"
+        unit = f'{self.unit:~L}'
+        unit = f" [${unit}$]" if unit else ''
+        return self.xlabel + unit
 
     @property
     def ylabel(self) -> str:
@@ -838,9 +840,11 @@ class Vector(AbstractArray, VectorProtocol):
         values = self.values.__getitem__(slice_)
         return self.clone(X=index, values=values)
 
-
     def to_xarray(self):
         return to_xarray_vector(self)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}({len(self)})[{self.device}]{self.name} at {hex(id(self))}>"
 
 
 if XARRAY_AVAILABLE:
