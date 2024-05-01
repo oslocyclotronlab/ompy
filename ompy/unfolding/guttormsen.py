@@ -64,13 +64,20 @@ class Guttormsen(Unfolder):
                  G: Matrix,
                  iterations: int = 10,
                  weight: float = 1e-3,
-                 use_JAX: bool = True,
+                 use_JAX: bool | None = None,
                  save_block: bool = False,
                  enforce_positivity: bool = False):
         super().__init__(R, G)
         self.iterations = iterations
         self.weight = weight  # Fluctuation weight
-        self.use_JAX = use_JAX
+        # We prefer to use GPUs, but fall back to CPU if not available
+        # If the user specifies GPU, but GPU is not available, raise an error
+        if use_JAX is None:
+            self.use_JAX = JAX_AVAILABLE and JAX_WORKING
+        elif use_JAX and not JAX_WORKING:
+            raise ValueError("JAX is not working. Cannot use GPU. Specify 'use_JAX=False' to use CPU.")
+        else:
+            self.use_JAX = use_JAX
         self.lr = 1  # Learning rate. Unused
         self.save_block = save_block  # Save block of unfolded matrices
         self.enforce_positivity = enforce_positivity

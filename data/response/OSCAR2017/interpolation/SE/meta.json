@@ -1,1 +1,1 @@
-{"linear_to": 2500.0, "lerppath": "lerp", "gf3path": "gf3", "class": "EscapeInterpolation", "datapath": "data.npy", "version": "2.0.0.dev0+b7d23b4"}
+{"linear_to": 2500.0, "lerppath": "lerp", "gf3path": "gf3", "class": "EscapeInterpolation", "datapath": "data.npy", "version": "2.1.0.dev0+e597e1a"}

@@ -48,7 +48,7 @@ def is_close(x, y, rtol=1e-5, atol=1e-8) -> bool:
     return abs(x - y) <= (atol + rtol * abs(y))
 
 
-@njit()
+#@njit()
 def are_congruent(X: np.ndarray, Y: np.ndarray) -> bool:
     if not is_length_congruent(X, Y):
         return False

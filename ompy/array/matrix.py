@@ -317,7 +317,6 @@ class Matrix(AbstractArray, MatrixProtocol):
             path (Pathlike): Path to save the file.
             **kwargs: Additional keyword arguments to pass to save_npz_2D.
         """
-        print(path, type(path))
         save_npz_2D(path, self, **kwargs)
 
     @ensure_path

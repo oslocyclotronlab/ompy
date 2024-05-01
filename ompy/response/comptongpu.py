@@ -45,7 +45,8 @@ TODO:
 
 Note for readers: This is identical to the code in `compton.py` but translated to
 the GPU. It is significantly harder to read as the GPU does not like any abstractions, and
-indices and energies are precomputed all over the place.
+indices and energies are precomputed all over the place. 
+All functions only mutate their first argument.
 
 Algorithm:
     - All vectors and vectorial operations are done on the CPU
@@ -342,7 +343,7 @@ def unscattered_into(out: MEO2, Et: VT, Eo: VO, angle: MEO, E_to_T: VE) -> None:
             out[i, j, k] = nb.float32(-1.0)  # Sentinel value
 
 
-@cuda.jit(func_or_sig="f4(f4[::1], f4)", device=True, debug=DEBUG, inline=True)
+@cuda.jit(func_or_sig="i4(f4[::1], f4)", device=True, debug=DEBUG, inline=True)
 def index(X: vector, x) -> int:
     """ Uses binary search. Muuuch faster! O(log n) """
     if x < X[0] or x > X[-1]:
@@ -365,8 +366,8 @@ def index(X: vector, x) -> int:
     return -1
 
 
-@cuda.jit(func_or_sig="f4(f4[::1], f4, i4)", device=True, debug=DEBUG, inline=True)
-def index_from(index: vector, x, start) -> nb.float32:
+@cuda.jit(func_or_sig="i4(f4[::1], f4, i4)", device=True, debug=DEBUG, inline=True)
+def index_from(index: vector, x, start) -> nb.int32:
     """ Find the position of `x` in `index` """
     i = nb.int32(start)
     while i < len(index):

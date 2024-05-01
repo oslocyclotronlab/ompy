@@ -170,10 +170,10 @@ class ResponseData:
         return ResponseData(FE, SE, DE, AP, compton, Eff, FWHM=FWHM[0] if FWHM else None)
 
     @staticmethod
-    def from_db(name: ResponseFunctionName) -> ResponseData:
+    def from_db(name: ResponseFunctionName, **kwargs) -> ResponseData:
         if name not in RESPONSE_FUNCTIONS.keys():
             raise ValueError(f"Response function {name} available. Available functions are {list(RESPONSE_FUNCTIONS.keys())}")
-        return ResponseData.from_path(RESPONSE_FUNCTIONS[name])
+        return ResponseData.from_path(RESPONSE_FUNCTIONS[name], **kwargs)
 
     def plot(self, ax: Axes | None = None, **kwargs):
         if ax is None:

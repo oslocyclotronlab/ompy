@@ -52,8 +52,8 @@ def _rebin_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarra
         # No rebinning
         return values
     # Case for when the rebinning is a simple shift
-    if are_congruent(old, new) and False:
-        return fit_into(old, new, values)
+    #if are_congruent(old, new) and False:
+    #    return fit_into(old, new, values)
 
     dOld = old[1] - old[0]
     dNew = new[1] - new[0]

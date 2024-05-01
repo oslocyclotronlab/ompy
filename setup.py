@@ -145,8 +145,6 @@ if False:
 install_requires = [
     "numpy",
     "matplotlib",
-    "termtables",
-    #"pymultinest",  # needed only for multinest-runs
     "scipy",
     "tqdm",
     "pint",

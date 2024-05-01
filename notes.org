@@ -159,3 +159,25 @@
  - Finstruktur i nivåtteheten bør følge finsturkturen i de diskrete nivåene.
  - Inkomplette nivåer? En annen forskjell i populert spinn.
  - Beholde adgang, skjema.
+
+
+* Unfolding
+  Bootstrap distribution in eta is approx normal for many counts, skewed for
+  small.
+  Is bias correlated with FE, SE, ...?X
+  Are we interested in the ensemble itself, or a statistic on the ensemble?
+  Are we interested in the *mean*? If so, what CI?
+  Each X*_i in [X*_1, X*_2, ...] is the result of optimizing a loss function.
+  Do I bootstrap the MC ensemble???
+  Is skewness correlated with confusion of FE and SE?
+  From the Ex=5MeV test, the higher Eg (diagonal) is poorly unfolded. Unfold
+  them by themselves as a "bias" first?
+
+  The unfolding still fails where the non-interjectivity of R allows for
+  neighbor solutions. Kernel?
+
+  Entropy. We have tried to maximize the entropy of a bin. But what about the
+  spectrum as a whole. The discrete area should have low entropy which few
+  active bins. The continuum should be high entropy. Here entropy as #bin>0, not
+  value of the bins.
+  

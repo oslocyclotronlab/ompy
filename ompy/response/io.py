@@ -70,6 +70,11 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
         Suffix of the files, by default '.m'
     Eg : list[int], optional
         List of Eg values to load, by default None, in which case it loads all matching files.
+    handle_error : Literal['raise', 'drop', 'rebin', 'ignore'], optional
+        Some GEANT files have different binning. This shouldn't have been done in the
+        first place since it makes compton interpolation almost impossible.
+        To make the user aware of the issue, this option raises an error. 
+        The option 'rebin' will probably work in most cases.
     """
     path = Path(path)
     compton: list[Vector] = []
