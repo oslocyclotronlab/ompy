@@ -28,11 +28,11 @@ else:
     import warnings
     # warnings.simplefilter('always', DeprecationWarning)
 
-    import pkgutil
+    from importlib import util 
 
-    def is_available(pkg, load=True, suppress_warnings=True):
+    def is_available(pkg, load=False, suppress_warnings=True):
         try:
-            exists = pkgutil.find_loader(pkg) is not None
+            exists = util.find_spec(pkg) is not None
         except ImportError: 
             # As usual, ROOT is a special case. It can refuse to
             # import for no particular reason, in which case it
@@ -70,10 +70,10 @@ else:
 
     # ROOT messes with the version of system libraries, so it is not imported
     # unless the user explicitly requests it.
-    # TODO: This is not working yet. ROOT is currently imported
-    load_root = False
-    ROOT_AVAILABLE = is_available("ROOT", load=load_root)
-    ROOT_IMPORTED = load_root and ROOT_AVAILABLE
+    # TODO: This is not working yet. ROOT is currently imported:?
+    __load_root = False
+    ROOT_AVAILABLE = is_available("ROOT", load=__load_root)
+    ROOT_IMPORTED = __load_root and ROOT_AVAILABLE
     ROOT_CALLBACKS = []
 
     def import_ROOT() -> None:
@@ -116,14 +116,15 @@ else:
     PYMC_AVAILABLE = is_available("pymc")
     PYRO_AVAILABLE = is_available("pyro")
     SKLEARN_AVAILABLE = is_available("sklearn")
+    OPTAX_AVAILABLE = is_available("optax")
 
     from .status import print_status
 
-    from .stubs import Axes
+    #from .stubs import Axes
     from .helpers import make_axes, make_combined_legend
     # Simply import all functions and classes from all files to make them
     # available at the package level
-    from .validator import Unitful, Bounded, Choice, Toggle
+    #from .validator import Unitful, Bounded, Choice, Toggle
     from .geometry import Geometry, Line
     # Abstracts away hierachical saving to and from different formats
     #from .fileio import JSONWriter
@@ -132,21 +133,21 @@ else:
     from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
     from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector, ArrayList
     from .array import on_gpu, on_cpu
-    from .unfolder import Unfolder
-    from . import response
-    from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
-    from .unfolding import Guttormsen
-    from .action import Action
-    from . import firstgeneration
-    from .firstgeneration import (FirstGenerationParameters, first_generation, FGP)
-    from .decomposition import (nld_T_product)
-    from .normalization import *
-    from .shape import Shape, normalize_to_shape
-    from .detector import Detector, OSCAR
-    if SKLEARN_AVAILABLE:
-        from .peakfit import fit
-    from .peakselect import fit_gauss
-    from .peakselect import gaussian as pgaussian
+    #from .unfolder import Unfolder
+    #from . import response
+    #from .response import Response, Calibrator, ResponseData, DiscreteInterpolation
+    #from .unfolding import Guttormsen
+    #from .action import Action
+    #from . import firstgeneration
+    #from .firstgeneration import (FirstGenerationParameters, first_generation, FGP)
+    #from .decomposition import (nld_T_product)
+    #from .normalization import *
+    #from .shape import Shape, normalize_to_shape
+    #from .detector import Detector, OSCAR
+    #if SKLEARN_AVAILABLE:
+    #    from .peakfit import fit
+    #from .peakselect import fit_gauss
+    #from .peakselect import gaussian as pgaussian
     from .introspection import logging, hooks
-    if MINUIT_AVAILABLE:
-        from .clicker import Clicker
+    #if MINUIT_AVAILABLE:
+    #    from .clicker import Clicker

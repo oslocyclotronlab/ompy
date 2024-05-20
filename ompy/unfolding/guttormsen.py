@@ -1,7 +1,8 @@
 from __future__ import annotations
 import numpy as np
 from ..numbalib import njit, prange
-from .. import Vector, Matrix, Response, zeros_like, JAX_AVAILABLE, JAX_WORKING
+from .. import Vector, Matrix, zeros_like, JAX_AVAILABLE, JAX_WORKING
+from ..response import Response
 from .unfolder import Unfolder
 from .result1d import Cost1D, UnfoldedResult1DMultiple, ResultMeta1D, Parameters1D, UnfoldedResult1D
 from .result2d import Cost2D, UnfoldedResult2D, ResultMeta2D, Parameters2D

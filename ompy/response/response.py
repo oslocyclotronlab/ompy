@@ -182,6 +182,9 @@ class Response:
         """
         Rebins the response matrix to the requested energy grid.
 
+        When specializing the response matrix to an energy grid, the value in a bin
+        is the mean value of the response matrix over the bin. This is equivalent to a rebinning.
+
         Parameters:
         -----------
         bins : np.ndarray or None, default None
@@ -300,7 +303,7 @@ class Response:
             R0[:E, :E] = 0
             R0[E:, :E] = R.values
             R = Matrix(true=E_all, observed=E_all, values=R0, name='Response',  # type: ignore
-                       xlabel='True energy', ylabel='Observed energy')
+                       xlabel='True energy', ylabel='Measured energy')
         return R
 
     def discrete_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
@@ -584,7 +587,7 @@ def gaussian_matrix(E: np.ndarray, sigmafn) -> Matrix:
     sigma = sigmafn(E + 2 * (E[1] - E[0]))
     values = _gaussian_matrix(E, sigma)
     values = values / values.sum(axis=1)[:, None]
-    return Matrix(true=E, observed=E, values=values, ylabel='Observed', xlabel='True', edge='mid')
+    return Matrix(true=E, observed=E, values=values, ylabel=r'Measured $E_\gamma$', xlabel=r'True $E_\gamma$', edge='mid')
 
 
 @njit(parallel=True)

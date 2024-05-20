@@ -1,7 +1,7 @@
 from .result import Result, PlotSpace, ResultMeta2D, Parameters2D
-from .. import Matrix, Vector, Axes
+from .. import Matrix, Vector 
 from ..helpers import make_axes
-from ..stubs import Lines, Plots2D, Plot1D, array2D
+from ..stubs import Lines, Plots2D, Plot1D, array2D, Axes
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
 from dataclasses import dataclass
 from abc import ABC, abstractmethod

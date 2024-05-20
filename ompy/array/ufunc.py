@@ -114,7 +114,12 @@ def fmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwarg
 def fmap(array: Matrix, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Matrix: ...
 
 def fmap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> AbstractArray:
-    """ `functor_map`. Applies a function to the values of an array. Equal to a Haskell fmap <&>"""
+    """ `functor_map`. Applies a function to the values of an array. Equal to a Haskell fmap <&>
+    
+    Example::
+        >>> fmap(vec, lambda x: x + 1)
+        # same as vec.clone(values=vec.values + 1) 
+    """
     match array:
         case Vector():
             return array.clone(values=func(*args, **kwargs))
@@ -133,6 +138,10 @@ def umap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, 
 
     This is the same as fmap, but uses the array as the first argument of the function and
     unwraps other arguments.
+
+    Example::
+        >>> umap(vec, lambda x: x + 1)
+        # returns a vector with values of vec + 1
     """
     args = [a.values if isinstance(a, AbstractArray) else a for a in args]
     kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
@@ -147,7 +156,13 @@ def umap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, 
 
 
 def omap(func: Callable[[np.ndarray], T], *args, **kwargs) -> T:
-    """ `out_of_map`. Applies `func` while unwrapping the arguments. """
+    """ `out_of_map`. Applies `func` while unwrapping the arguments. 
+    
+    Example::
+        >>> omap(np.add, vec1, vec2)
+        # returns vec1 + vec2 as np.ndarray
+    
+    """
     args = [a.values if isinstance(a, AbstractArray) else a for a in args]
     kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}
     return func(*args, **kwargs)
@@ -163,6 +178,10 @@ def xmap(array: AbstractArray, func: Callable[[np.ndarray], np.ndarray], *args, 
 
     This is the same as fmap, but uses the index of the array as the first argument of the function and
     unwraps other arguments.
+
+    Example::
+        >>> xmap(vec, lambda x: x + 1)
+        # returns a vector with values of vec.X + 1
     """
     args = [a.values if isinstance(a, AbstractArray) else a for a in args]
     kwargs = {k: v.values if isinstance(v, AbstractArray) else v for k, v in kwargs.items()}

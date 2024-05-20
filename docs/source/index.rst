@@ -23,6 +23,7 @@ simply `click here`_ to launch it on Binder.
 
    install
    getting_started
+   array
    concepts
    API/index
    cite

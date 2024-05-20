@@ -7,6 +7,7 @@ import subprocess
 import pathlib
 from .version_setup import version as VERSION
 
+# TODO Can be replaced with packaging.version.Version
 
 # Return the git revision as a string
 def git_version():

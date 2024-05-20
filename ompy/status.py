@@ -4,21 +4,33 @@ from . import (ROOT_AVAILABLE, MINUIT_AVAILABLE,
                 GPU_AVAILABLE, NUMBA_CUDA_AVAILABLE,
                 NUMBA_CUDA_WORKING, JAX_WORKING, ROOT_IMPORTED,
                 XARRAY_AVAILABLE, GAMBIT_AVAILABLE, EMCEE_AVAILABLE,
-                PYMC_AVAILABLE, PYRO_AVAILABLE, SKLEARN_AVAILABLE)
+                PYMC_AVAILABLE, PYRO_AVAILABLE, SKLEARN_AVAILABLE, OPTAX_AVAILABLE)
 
 from .version import get_version_info
 import os
 import platform
 import subprocess
-import json
+from importlib import util, metadata
+import warnings
+import sys
+import pkg_resources
 
 
-def color_status(status: bool) -> str:
+#TODO Add version
+
+
+def color_status(status: bool | None) -> str:
     """Returns a string with the status in color."""
-    if status:
-        return "\033[92mOK\033[0m"
-    else:
-        return "\033[91mNO\033[0m"
+    match status:
+        case None:
+            return "\033[93mUnknown\033[0m"
+        case True:
+            return "\033[92mOK\033[0m"
+        case False:
+            return "\033[91mNO\033[0m"
+        case _:
+            raise ValueError(f"Invalid status: {status}")
+
 
 def get_cpu() -> str:
     """Returns the CPU name."""
@@ -78,6 +90,7 @@ EMCEE available:      {color_status(EMCEE_AVAILABLE)}
 PYMC available:       {color_status(PYMC_AVAILABLE)}
 PYRO available:       {color_status(PYRO_AVAILABLE)}
 SKLEARN available:    {color_status(SKLEARN_AVAILABLE)}
+OPTAX available:      {color_status(OPTAX_AVAILABLE)}
 
 Platform:             {platform.platform()}
 CPU:                  {get_cpu()}
@@ -136,7 +149,7 @@ class Entry(ABC):
 
 @dataclass
 class StatusEntry(Entry):
-    status: bool
+    status: bool | None
 
     def render_parts(self, pad: int = 0) -> tuple[str, str]:
         s = color_status(self.status)
@@ -153,6 +166,7 @@ class InfoEntry(Entry):
         s = s.ljust(pad)
         return f"{self.name}", s
 
+    
 
 class Menu:
     def __init__(self, title: str):
@@ -219,6 +233,53 @@ class Menu:
         return html_content + script
 
 
+def is_available(pkg, load=False, suppress_warnings=True) -> tuple[bool, str]:
+    version = ''
+    try:
+        exists = util.find_spec(pkg) is not None
+        version = metadata.version(pkg)
+    except ImportError: 
+        # As usual, ROOT is a special case. It can refuse to
+        # import for no particular reason, in which case it
+        # throws an exception
+        exists = False
+    if exists and load:
+        if suppress_warnings:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                __import__(pkg)
+        else:
+            __import__(pkg)
+    return exists, version
+
+
+def is_imported(pkg: str) -> bool:
+    return pkg in sys.modules
+
+
+class Package(Menu):
+
+    def __init__(self, package: str, available: bool, working: bool | None = None, imported: bool | None = None, version: str = ''):
+        self.package = package
+        self.available = available
+        self.working = working
+        self.imported = imported
+        self.version = version
+        super().__init__(package)
+        self.entries.append(StatusEntry("Available", available))
+        if available:
+            self.entries.append(StatusEntry("Working", working))
+            self.entries.append(StatusEntry("Imported", imported))
+        if version:
+            self.entries.append(InfoEntry("Version", version))
+
+    @classmethod
+    def from_pkg(cls, package: str) -> Package:
+        available, version = is_available(package)
+        imported = is_imported(package)
+        return cls(package, available, imported=imported, version=version)
+
+
 def get_status_menu() -> Menu:
     menu = Menu("OMpy Status")
     full_version, git_version = get_version_info()
@@ -237,7 +298,8 @@ def get_status_menu() -> Menu:
     if JAX_AVAILABLE:
         menu.append(StatusEntry("JAX working", JAX_WORKING))
     menu.append(StatusEntry("H5PY available", H5PY_AVAILABLE))
-    menu.append(StatusEntry("XARRAY available", XARRAY_AVAILABLE))
+    #menu.append(StatusEntry("XARRAY available", XARRAY_AVAILABLE))
+    menu.add_submenu(Package.from_pkg("xarray"))
     menu.append(StatusEntry("GAMBIT available", GAMBIT_AVAILABLE))
     menu.append(StatusEntry("EMCEE available", EMCEE_AVAILABLE))
     menu.append(StatusEntry("PYMC available", PYMC_AVAILABLE))

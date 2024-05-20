@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, Iterable, Literal, overload, TypeAlias, Self, TypeVar, Generic, Never
+from typing import Any, Callable, Iterable, Literal, overload, TypeAlias, Self, TypeVar, Generic, Never
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -477,16 +477,16 @@ class Vector(AbstractArray, VectorProtocol):
             return self._index.dX
         return self._index.steps()
 
-    def last_nonzero(self) -> int:
+    def last_nonzero(self, eps: float = 0) -> int:
         """ Returns the index of the last nonzero value """
         j = len(self)
         while (j := j - 1) >= 0:
-            if self[j] != 0:
+            if self[j] > eps:
                 break
         return j
 
-    def cut_at_last_nonzero(self) -> Self:
-        return self.iloc[:self.last_nonzero() + 1]
+    def cut_at_last_nonzero(self, **kwargs) -> Self:
+        return self.iloc[:self.last_nonzero(**kwargs) + 1]
 
     def update(self, xlabel: str | None = None, vlabel: str | None = None,
                name: str | None = None, misc: dict[str, Any] | None = None,
@@ -845,6 +845,14 @@ class Vector(AbstractArray, VectorProtocol):
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}({len(self)})[{self.device}]{self.name} at {hex(id(self))}>"
+
+    def integrate(self, method: Callable[[np.ndarray, np.ndarray], np.float_] = np.trapz) -> np.float_:
+        """ Returns the integral of the vector
+         
+        Args:
+            method: The integration method to use. Default is `np.trapz`
+        """
+        return method(self.values, self.X)
 
 
 if XARRAY_AVAILABLE:

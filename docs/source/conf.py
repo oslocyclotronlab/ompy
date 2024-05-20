@@ -19,10 +19,10 @@ import sys
 # sys.path.insert(0, os.path.abspath('../..'))
 
 # if autodoc or autosummary is not called, we cannot use their rutine
-import mock
-MOCK_MODULES = ['pymultinest']
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = mock.Mock()
+#import mock
+#MOCK_MODULES = ['pymultinest']
+#for mod_name in MOCK_MODULES:
+#    sys.modules[mod_name] = mock.Mock()
 
 
 # -- Project information -----------------------------------------------------
@@ -30,7 +30,7 @@ from ompy import __version__
 from ompy import __full_version__
 
 project = 'OMpy'
-copyright = '2019, Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima'
+copyright = '2024, Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima'
 author = 'Jørgen Eriksson Midtbø, Fabio Zeiser, Erlend Lima'
 version = __version__
 release = __full_version__

@@ -205,6 +205,18 @@ class Parameters(ABC, Generic[T]):
     G_ex: Matrix | None = None
     kwargs: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self):
+        # Can eat up GPU memory
+        self.raw.to_cpu(inplace=True)
+        if self.background is not None:
+            self.background.to_cpu(inplace=True)
+        self.initial.to_cpu(inplace=True)
+        self.R.to_cpu(inplace=True)
+        self.G.to_cpu(inplace=True)
+        if self.G_ex is not None:
+            self.G_ex.to_cpu(inplace=True)
+        
+
     def save(self, path: Path, exist_ok: bool = False) -> None:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=exist_ok)

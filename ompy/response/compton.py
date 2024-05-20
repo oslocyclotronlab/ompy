@@ -13,15 +13,6 @@ TODO: Find a good weighting of the backscattering and compton interpolations
        + Nevermind, it seems to be a visual artifact when the compton edge changes a lot between two energies.
     - The first bin is always 0. Why?
       + Because of indexing error. Not fixed.
-    - For GPU precompute [N = len(E true), M = len(E measured)]:
-      - The compton edge as 1xM
-      - Backscattering 1xM
-      - theta matrix N x M upper diagonal
-      - scattered matrix from theta NxM
-      - Fanlow NxM
-      - Fanhigh NxM
-      - de/dtheta matrices NxM
-      - fan lerped NxM
     - The fan-method is slightly incorrect. A fan will pass through more bins in the higher compton
       than the lower, which is not accounted for.
 """

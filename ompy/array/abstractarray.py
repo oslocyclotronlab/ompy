@@ -20,12 +20,13 @@ logging.captureWarnings(True)
 #     - How to handle different array types, with/without error?
 #     - Remember units
 
-Device: TypeAlias = Literal['cpu']
 if JAX_WORKING:
     import jax
     from jaxlib.xla_extension import ArrayImpl
     from jaxlib.xla_extension import Device as _Device
     Device: TypeAlias = Literal['cpu'] | _Device
+else:
+    Device: TypeAlias = Literal['cpu']
 
 
 ARRAY_CLASSES: dict[str, type[AbstractArray]] = {}
@@ -307,7 +308,9 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
         if mask is None:
             if self.ndim == 1:
-                mask = self.last_nonzero(**kwargs)
+                mask = np.ones(len(self.values), dtype=bool)
+                i = self.last_nonzero(**kwargs)
+                mask[i:] = False
             else:
                 mask = self.last_nonzeros(**kwargs)
         X = np.where(self.values <= 3, 3, self.values)
@@ -409,11 +412,11 @@ def to_device(array, device: Device):
     return array
 
 
-def to_gpu(array):
+def to_gpu(array, device: Device | None = None):
     raise RuntimeError("JAX is not working on this system.")
 
 
-def to_cpu(array):
+def to_cpu(array, device: Device | None = None):
     return array
 
 

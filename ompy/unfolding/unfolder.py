@@ -1,18 +1,16 @@
 from __future__ import annotations
 from collections import Counter
 import numpy as np
-from .. import Vector, Matrix, Response, zeros_like
-from ..array import pack_into_matrix, to_index
-from ..helpers import maybe_set
-from ..response import ResponseName
+from .. import Vector, Matrix, zeros_like
+from ..array import pack_into_matrix
+from ..response import ResponseName, Response
 from abc import ABC, abstractmethod
 from typing import Literal, TypeAlias, overload, Self
 from tqdm.autonotebook import tqdm
-from .result import Parameters2D, ResultMeta2D, Parameters1D, ResultMeta1D
+from .result import Parameters2D, ResultMeta2D
 from .result1d import UnfoldedResult1D
 from .result2d import UnfoldedResult2D, UnfoldedResult2DSimple
 from .stubs import Space
-from ..stubs import array1D
 
 
 UNFOLDER_CLASSES: dict[str, type[Unfolder]] = {}
@@ -21,7 +19,7 @@ UNFOLDER_CLASSES: dict[str, type[Unfolder]] = {}
 class Unfolder(ABC):
     """ Abstract base class for unfolding algorithms
 
-    Parameters
+    Attributes
     ----------
     R: Matrix
         The unsmoothed response matrix
@@ -34,6 +32,7 @@ class Unfolder(ABC):
             raise ValueError(
                 f"R and G must have the same shape, got {R.shape} and {G.shape}")
         if not R.X_index.is_compatible_with(R.Y_index):
+            # TODO: Is this necessarily true?
             raise ValueError("R must be square")
         if not R.X_index.is_compatible_with(G.X_index):
             raise ValueError(

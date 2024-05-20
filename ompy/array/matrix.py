@@ -772,7 +772,7 @@ class Matrix(AbstractArray, MatrixProtocol):
              add_cbar: bool = True,
              cbarkwargs: dict[str, Any] | None = None,
              bad_map: Callable[[Matrix], ArrayBool | bool] = lambda x: False,
-             color_by: ColorBy = 'values',
+             color_by: ColorBy = 'IQR',
              **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
         """ Plots the matrix with the energy along the axis
 

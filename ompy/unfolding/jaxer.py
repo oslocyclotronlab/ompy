@@ -3,7 +3,7 @@ from .unfolder import Unfolder
 from .result1d import UnfoldedResult1DSimple, Cost1D, Parameters1D, ResultMeta1D
 from .result2d import UnfoldedResult2DSimple, Cost2D, Parameters2D, ResultMeta2D
 from .stubs import Space
-from .. import Matrix, Vector
+from .. import Matrix, Vector, OPTAX_AVAILABLE
 from ..stubs import Plot1D, Axes, array1D
 import numpy as np
 import time
@@ -15,6 +15,9 @@ from functools import partial
 from pathlib import Path
 from itertools import product
 from typing_extensions import override
+
+if OPTAX_AVAILABLE:
+    import optax
 
 
 import jax
@@ -74,9 +77,11 @@ def onecost(mu): # Make smooth by sigmoid
     return jnp.sum(jnp.arctan(mu))
 
 def cost(mu, R, G_ex, n, bg, n_err, bg_err,
-         alpha=1.0, beta=1e-3, lower=1e-3, upper=-1e-3, midpoint=1e4):#, alpha=0.3e-1):
+         alpha=0.0, beta=0):
     mu = mu**2
     nu = G_ex@mu@R
+    if bg is not None:
+        n = n - bg
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
     return jnp.sum(kl(nu, n)) + alpha*onecost(mu) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
@@ -118,8 +123,15 @@ def cost_1d_v2(mu, R, G_eg, G_ex, n, bg, n_err, bg_err,
     return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(eta))# + difference_cost(n, nu)
     #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
 
+def cost_components_from_result(result, eta, alpha=0, beta=0):
+    return cost_components(result.raw.values, result.unfolded().values,
+                           result.R.values, eta=eta, G_eg=result.G.values, G_ex=result.G_ex,
+                           alpha=result.meta.kwargs['alpha'])
+
 
 def cost_components(n, mu, R, eta=None, G_eg=None, G_ex=None, alpha=0, beta=0):
+    """ Return the loss, regularization and validation components of the cost function
+    """
     nu = R@mu
     loss = jnp.sum(kl(nu, n))
     regularization = onecost(mu)**2# - beta*jnp.sum(entropy(eta))
@@ -224,6 +236,8 @@ class Jaxer(Unfolder):
                 unfold = unfold_GD
             case 'adam':
                 unfold = unfold_adam
+            case 'optax':
+                unfold = unfold_optax
             case _:
                 raise ValueError(f"Unknown method {method}")
         value_and_grad = jax.jit(jax.value_and_grad(cost), static_argnames=('alpha', 'beta'))
@@ -262,11 +276,14 @@ class Jaxer(Unfolder):
             raise NotImplementedError
 
     def grid_search_1D(self, eta: Matrix, param: str, values: np.ndarray,
-                       mask: np.ndarray,
                        unfkwargs: dict[str, Any]) -> GridSearchResult1D:
         kw = unfkwargs.copy()
         results: list[JaxResult1D] = []
-        for i, value in tqdm(enumerate(values), total=len(values)):
+        if 'leave_tqdm' not in kw:
+            kw['leave_tqdm'] = False
+        bar = tqdm(enumerate(values), total=len(values))
+        for i, value in bar: 
+            bar.set_postfix({param: value})
             kw[param] = value
             res = self.unfold(**kw)
             results.append(res)
@@ -279,14 +296,34 @@ class Jaxer(Unfolder):
         kw = unfkwargs.copy()
         results: list[JaxResult2D] = []
         values = list(product(values1, values2))
-        for i, (value1, value2) in tqdm(enumerate(values), total=len(values)):
-            print(value1, value2)
+        bar = tqdm(enumerate(values), total=len(values))
+        for i, (value1, value2) in bar:
+            bar.set_postfix()
             kw[param1] = value1
             kw[param2] = value2
             res = self.unfold(**kw)
             results.append(res)
         return GridSearchResult2D(param1=param1, grid1=values1,
                                   param2=param2, grid2=values2, results=results)
+
+    def tune_learning_rate(self, lr: np.ndarray | None = None, unfkwargs: dict[str, Any] | None = None) -> tuple[GridSearchResult1D, float]:
+        # Perform a grid search over the learning rates
+        if lr is None:
+            lr = np.logspace(-3, 1, 10)
+        if unfkwargs is None:
+            unfkwargs = {}
+        if 'max_iter' not in unfkwargs:
+            unfkwargs['max_iter'] = 1000
+        result = self.grid_search_1D(None, 'lr', lr, unfkwargs)
+
+        # Find the learning rate that gave the lowest cost
+        min_cost = np.inf
+        for i, res in enumerate(result.results):
+            if res.cost[-1] < min_cost:
+                min_cost = res.cost[-1]
+                best = i
+
+        return result, result.grid[best]
 
 
 @dataclass(kw_only=True)
@@ -298,6 +335,22 @@ class GridSearchResult1D(GridSearchResult):
     hyperparameter: str
     grid: np.ndarray
     results: list[JaxResult1D]
+
+    def plot(self, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
+
+        costs = [res.cost[-1] for res in self.results]
+        line = ax.plot(self.grid, costs, '-o')
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel(self.hyperparameter)
+        ax.set_ylabel('Cost')
+        ax.set_title('Grid Search Results')
+        ax.grid(True)
+
+        return ax, line
+
 
 @dataclass(kw_only=True)
 class GridSearchResult2D(GridSearchResult):
@@ -387,8 +440,8 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
     total_cost = np.zeros(max_iter)
     #print(loss(u, R, raw))
     mask = ~mask
-    alpha = kwargs.pop('alpha', 1.0)
-    beta = kwargs.pop('beta', 1.0e-3)
+    alpha = kwargs.pop('alpha', 0.0)
+    beta = kwargs.pop('beta', 0.0)
 
     #@jax.jit
     eps = 1e-8
@@ -415,8 +468,13 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
     var = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     disable_tqdm = kwargs.get('disable_tqdm', False)
     leave_tqdm = kwargs.get('leave_tqdm', True)
-    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm):
+    bar = tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm)
+    for i in bar:
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
+        # Check if cost is NaN
+        if jnp.isnan(total_cost[i]):
+            raise RuntimeError(f"NaN cost at iteration {i}")    
+    
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:
                 j = i
@@ -424,7 +482,130 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
             if use_rel_tol and np.abs(total_cost[i] - total_cost[i-1])/total_cost[i-1] < rel_tol:
                 j = i
                 break
+        std = rolling_standard_deviation(total_cost[:i], 10)
+        cv = rolling_coefficient_of_variation(total_cost[:i], 10)
+        ema = exponential_moving_average(total_cost[:i], 0.1)
+        bar.set_postfix({'cost': total_cost[i], 'std': std, 'cv': cv, 'ema': ema}, refresh=True)
+
     return u**2, total_cost[:j]
+
+
+def rolling_standard_deviation(cost_array, window_size):
+    if len(cost_array) < window_size:
+        return np.std(cost_array)  # If not enough data, use the entire array
+    return np.std(cost_array[-window_size:])
+
+def rolling_coefficient_of_variation(cost_array, window_size):
+    if len(cost_array) < window_size:
+        mean = np.mean(cost_array)
+        std_dev = np.std(cost_array)
+    else:
+        recent_values = cost_array[-window_size:]
+        mean = np.mean(recent_values)
+        std_dev = np.std(recent_values)
+    
+    return std_dev / mean if mean != 0 else float('inf')
+
+def exponential_moving_average(cost_array, alpha=0.1):
+    if len(cost_array) == 0:
+        return np.inf
+    ema = [cost_array[0]]  # Start with the first cost
+    for cost in cost_array[1:]:
+        ema.append(alpha * cost + (1 - alpha) * ema[-1])
+    return ema[-1]
+
+def unfold_optax(*args, **kwargs):
+    raise ImportError("Optax is not available on your system")
+
+def requires_lr(f) -> bool:
+    try:
+        return 'learning_rate' in f.__code__.co_varnames
+    except AttributeError:
+        if f == optax.nadam:
+            return True
+    return False  # Je ne sais pas, let the error be thrown
+
+def requires_max_learning_rate(f) -> bool:
+    try:
+        return 'max_learning_rate' in f.__code__.co_varnames
+    except AttributeError:
+        if f == optax.nadam:
+            return False
+    return False  # Je ne sais pas, let the error be thrown
+
+def requires_values(f) -> bool:
+    match f:
+        case optax.polyak_sgd:
+            return True
+        case _:
+            return False
+
+if OPTAX_AVAILABLE:
+    def unfold_optax(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask, **kwargs):
+        
+        # Initialize the Adam optimizer
+        rename_key(kwargs, 'lr', 'learning_rate')
+        num_iters = int(kwargs.pop('max_iter', 1000))
+        bar = tqdm(range(num_iters), disable=kwargs.pop('disable_tqdm', False),
+                leave=kwargs.pop('leave_tqdm', True))
+        break_at_nan = kwargs.pop('break_at_nan', True)
+
+        method = kwargs.pop('optimizer', optax.adam)
+        alpha = kwargs.pop('alpha', 0.0)
+        beta = kwargs.pop('beta', 0.0)
+        optim_kwargs = kwargs.pop('optimizer_kwargs', {})
+        rename_key(optim_kwargs, 'lr', 'learning_rate')
+        if 'learning_rate' in optim_kwargs and 'learning_rate' in kwargs:
+            raise ValueError("Only provide 'learning_rate' in 'optimizer_kwargs' or 'kwargs', not both")
+        if 'learning_rate' not in optim_kwargs and 'learning_rate' not in kwargs and requires_lr(method):
+            optim_kwargs['learning_rate'] = 0.001
+        elif 'learning_rate' in kwargs:
+            optim_kwargs['learning_rate'] = kwargs.pop('learning_rate')
+
+        if requires_max_learning_rate(method):
+            if 'learning_rate' in optim_kwargs:
+                rename_key(optim_kwargs, 'learning_rate', 'max_learning_rate')
+            # Let optax throw the error for missing keyword
+
+        
+        # All keyword arguments should be handled
+        if len(kwargs) > 0:
+            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
+
+        optimizer = method(**optim_kwargs)
+
+        # Initialize the optimizer state
+        state = optimizer.init(u)
+
+        # Perform the optimization
+        total_cost = np.zeros(num_iters)
+        for i in bar:
+            # Compute the gradient
+            value, gradients = value_and_grad(u, R, G_ex, raw, bg, None, None, alpha=alpha)
+
+            # Update the parameters and the optimizer state
+            updates, state = optimizer.update(gradients, state, u, value=value)
+            u = optax.apply_updates(u, updates)
+            total_cost[i] = value ##loss(u, R, G_ex, raw, bg, None, None, alpha=alpha)
+            if break_at_nan and not np.isfinite(value):
+                i = i+1
+                break
+
+            std = rolling_standard_deviation(total_cost[:i], 10)
+            cv = rolling_coefficient_of_variation(total_cost[:i], 10)
+            ema = exponential_moving_average(total_cost[:i], 0.1)
+            bar.set_postfix({'cost': total_cost[i], 'std': std, 'cv': cv, 'ema': ema}, refresh=True)
+
+        return u**2, total_cost[:i]
+
+def rename_key(kw, old_key, new_key, default_value=None):
+    if old_key in kw and new_key in kw:
+        raise ValueError(f"Only provide '{old_key}' or '{new_key}', not both")
+    if old_key in kw:
+        kw[new_key] = kw.pop(old_key)
+    elif new_key not in kw and default_value is not None:
+        kw[new_key] = default_value
+
 
 @dataclass
 class AdamParams:
@@ -480,7 +661,8 @@ def unfold_adam_1d(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask=None, m
     mean = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     var = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     disable_tqdm = kwargs.get('disable_tqdm', False)
-    for i in tqdm(range(max_iter), disable=disable_tqdm):
+    leave_tqdm = kwargs.get('leave_tqdm', True)
+    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm):
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:

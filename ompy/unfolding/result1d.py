@@ -1,8 +1,8 @@
 from __future__ import annotations
 from .result import Result, PlotSpace, ResultMeta1D, Parameters1D, Result
-from .. import Matrix, Vector, Axes
+from .. import Matrix, Vector
 from ..helpers import make_ax, maybe_set
-from ..stubs import Lines, Plot1D, Plots1D
+from ..stubs import Lines, Plot1D, Plots1D, Axes
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
 from ..response import Components
 from dataclasses import dataclass

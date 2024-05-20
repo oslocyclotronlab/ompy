@@ -269,7 +269,8 @@ class AnnotatedColorbar(Colorbar):
 
     def __init__(self, mappable, ax, cax=None, lower: bool = True, higher: bool = True, nans: bool = True,
                  use_gridspec=True, linewidth=1, extend=None, color_by: str = 'complement', draw_kde: bool = False,
-                 draw_histogram: bool = True, n_hist_bins: int = 100, **kwargs):
+                 draw_histogram: bool = True, n_hist_bins: int = 100,
+                 hist_norm=np.log10,  **kwargs):
         # Code copied from matplotlib.Figure.colorbar
         if cax is None:
             fig = (  # Figure of first axes; logic copied from make_axes.
@@ -311,6 +312,7 @@ class AnnotatedColorbar(Colorbar):
         self.do_draw_kde = draw_kde
         self.do_draw_histogram = draw_histogram
         self.n_hist_bins = n_hist_bins
+        self.hist_norm = hist_norm
         # Super can call methods defined later, so the attributed must already be defined
         super().__init__(cax, mappable, **kwargs)
         cb = cbar.Colorbar(cax, mappable, **{k: v for k, v in kwargs.items() if k not in NON_COLORBAR_KEYS})
@@ -341,7 +343,7 @@ class AnnotatedColorbar(Colorbar):
         y = y[(y > vmin) & (y < vmax)]
         kde = gaussian_kde(y)
         x = np.linspace(0, 1, 100)
-        x = norm.inverse(x)  # [0, 1] -> [vmin, vmax]
+        x = norm.inverse(x)  # [0, 1] -> [vmin, vmax] # this is false
         y = kde(x)
         y /= y.max()
         y *= 0.7  # move it slightly away from the edges
@@ -367,18 +369,23 @@ class AnnotatedColorbar(Colorbar):
         norm = self.norm
 
         # We don't want outliers to affect the histogram
+        # This can conflict with the vmin, vmax of the main plot
+        # Should be, given data in the range [vmin, vmax] of the main plot
         vmin, vmax = IQR_range(data, factor=1.5)
+        vmin = max(vmin, norm.vmin)
+        vmax = min(vmax, norm.vmax)
 
         y = data[np.isfinite(data)].ravel()
         y = y[(y > vmin) & (y < vmax)]
 
-        y_norm = norm(y)
-
         # Create histogram
-        counts, bin_edges = np.histogram(y_norm, bins=self.n_hist_bins, range=(0, 1), density=True)
+        bins = np.linspace(0, 1, self.n_hist_bins+1)
+        bins = norm.inverse(bins)
+        counts, bin_edges = np.histogram(y, bins=bins, density=True)
 
         # width = 1/self.n_hist_bins
-        norm_edges = norm(bin_edges)
+        #norm_edges = norm(bin_edges)
+        norm_edges = bin_edges
 
         # Choose color map
         if self.color_by == 'complement':
@@ -387,16 +394,17 @@ class AnnotatedColorbar(Colorbar):
             cmap = cmap_contrast(self.cmap)
         else:
             cmap = self.color_by
+        assert isinstance(cmap, mcolors.Colormap)
 
         for count, left, right in zip(counts, norm_edges[:-1], norm_edges[1:]):
             # Height of the rectangle is proportional to the count, scaled down to fit within the colorbar
             height = count / counts.max() * 0.7  # Scale factor for height; adjust as needed
             width = right - left
             xpos = 1 - height
+            #xpos = self.hist_norm(xpos)
 
             # Create and add the rectangle patch to the colorbar's axis
-            # rect = Rectangle((edge, 0), width=bin_width, height=height, transform=self.ax.transAxes, color='k', clip_on=False)
-            rect = Rectangle((xpos, left), width=height, height=width, transform=self.ax.transAxes, color=cmap(left))
+            rect = Rectangle((xpos, left), width=height, height=width, color=cmap(norm(left + width/2)))
             self.ax.add_patch(rect)
 
         self.set_text(mappable)
