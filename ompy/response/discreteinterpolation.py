@@ -1,12 +1,16 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from .responsedata import ResponseData
-from .interpolation import Interpolation
+from .interpolation import (Interpolation,
+                            LinearInterpolator, LinearInterpolation,
+                            SplineInterpolator, SplineInterpolation,
+                            ISplineInterpolator, ISplineInterpolation,
+                            Scalable
+                            )
 from .interpolations import (EscapeInterpolator, EscapeInterpolation,
                              FEInterpolator, FEInterpolation,
                              FWHMInterpolator, FWHMInterpolation,
-                             AnnihilationInterpolator, AnnihilationInterpolation,
-                             LinearInterpolator, LinearInterpolation)
+                             AnnihilationInterpolator, AnnihilationInterpolation)
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt
 from ..stubs import Axes, Pathlike, Unitlike
@@ -15,7 +19,7 @@ from .responsepath import ResponseName, get_response_path
 import numpy as np
 from pathlib import Path
 import json
-from typing import Literal, overload
+from typing import Literal, overload, TypeAlias, Self
 from ..version import warn_version
 
 SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
@@ -29,6 +33,8 @@ SIGMA_TO_FWHM = 2 * np.sqrt(2 * np.log(2))
 # after the initial interpolation. The error is small, and is therefore
 # ignored in this version.
 
+InterpolationScheme: TypeAlias = Literal['oscar', 'cactus', 'spline', 'interpolating spline']
+
 @dataclass
 class DiscreteInterpolation:
     FE: Interpolation
@@ -36,13 +42,41 @@ class DiscreteInterpolation:
     DE: Interpolation
     AP: Interpolation
     Eff: Interpolation
-    FWHM: Interpolation | None = None  # TODO Replace with fwhm_function
+    FWHM: Scalable | None = None  # TODO Replace with fwhm_function
     is_fwhm_normalized: bool = False
 
-    @staticmethod
-    def from_data(data: ResponseData) -> DiscreteInterpolation:
+    @classmethod
+    def from_data(cls, data: ResponseData, method: InterpolationScheme = 'oscar',
+                  **kwargs) -> Self:
+        """ Interpolates the discrete response data.
+        Args:
+            data: ResponseData: The discrete response data, obtained from
+                loading either ompy or mama formatted data. Must be normalized.
+            method: InterpolationScheme: The interpolation method to use.
+                'oscar' uses the Oscar interpolation scheme based on radware,
+                'cactus' uses the CACTUS interpolation scheme based on
+                mama using linear interpolations.
+        Returns:
+            DiscreteInterpolation: The interpolated discrete response data.
+        """
+        match method.lower():
+            case 'oscar':
+                return cls.from_data_oscar(data, **kwargs)
+            case 'cactus':
+                return cls.from_data_cactus(data, **kwargs)
+            case 'spline':
+                return cls.from_data_spline(data, **kwargs)
+            case 'interpolating spline':
+                return cls.from_data_interpolating_spline(data, **kwargs)
+            case _:
+                raise ValueError(f"Unknown interpolation method: {method}.\n"
+                                 f"Valid methods are 'oscar', 'cactus', 'spline'.")
+
+    @classmethod
+    def from_data_oscar(cls, data: ResponseData) -> Self:
         if not data.is_normalized:
             raise ValueError("Data must be normalized before interpolation")
+
         FE: FEInterpolation = FEInterpolator(data.FE).interpolate(order=9)
         SE: EscapeInterpolation = EscapeInterpolator(data.SE).interpolate()
         DE: EscapeInterpolation = EscapeInterpolator(data.DE).interpolate()
@@ -51,16 +85,63 @@ class DiscreteInterpolation:
         if data.FWHM is not None:
             FWHM = FWHMInterpolator(data.FWHM).interpolate()
         Eff: LinearInterpolation = LinearInterpolator(data.Eff).interpolate()
-        return DiscreteInterpolation(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
+        return cls(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
 
+    @classmethod
+    def from_data_cactus(cls, data: ResponseData) -> Self:
+        if not data.is_normalized:
+            raise ValueError("Data must be normalized before interpolation")
+
+        FE: LinearInterpolation = LinearInterpolator(data.FE).interpolate()
+        SE: LinearInterpolation = LinearInterpolator(data.SE).interpolate()
+        DE: LinearInterpolation = LinearInterpolator(data.DE).interpolate()
+        AP: LinearInterpolation = LinearInterpolator(data.AP).interpolate()
+        FWHM = None
+        if data.FWHM is not None:
+            FWHM = LinearInterpolator(data.FWHM).interpolate()
+            FWHM = Scalable(FWHM)
+        Eff: LinearInterpolation = LinearInterpolator(data.Eff).interpolate()
+        return cls(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
+
+    @classmethod
+    def from_data_spline(cls, data: ResponseData, **kwargs) -> Self:
+        if not data.is_normalized:
+            raise ValueError("Data must be normalized before interpolation")
+
+        FE: SplineInterpolation = SplineInterpolator(data.FE).interpolate(**kwargs)
+        SE: SplineInterpolation = SplineInterpolator(data.SE).interpolate(**kwargs)
+        DE: SplineInterpolation = SplineInterpolator(data.DE).interpolate(**kwargs)
+        AP: SplineInterpolation = SplineInterpolator(data.AP).interpolate(**kwargs)
+        FWHM = None
+        if data.FWHM is not None:
+            FWHM = SplineInterpolator(data.FWHM).interpolate(**kwargs)
+            FWHM = Scalable(FWHM)
+        Eff: SplineInterpolation = SplineInterpolator(data.Eff).interpolate(**kwargs)
+        return cls(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
+
+    @classmethod
+    def from_data_interpolating_spline(cls, data: ResponseData, **kwargs) -> Self:
+        if not data.is_normalized:
+            raise ValueError("Data must be normalized before interpolation")
+
+        FE: ISplineInterpolation = ISplineInterpolator(data.FE).interpolate(**kwargs)
+        SE: ISplineInterpolation = ISplineInterpolator(data.SE).interpolate(**kwargs)
+        DE: ISplineInterpolation = ISplineInterpolator(data.DE).interpolate(**kwargs)
+        AP: ISplineInterpolation = ISplineInterpolator(data.AP).interpolate(**kwargs)
+        FWHM = None
+        if data.FWHM is not None:
+            FWHM = ISplineInterpolator(data.FWHM).interpolate(**kwargs)
+            FWHM = Scalable(FWHM)
+        Eff: ISplineInterpolation = ISplineInterpolator(data.Eff).interpolate(**kwargs)
+        return cls(FE, SE, DE, AP, Eff, FWHM, is_fwhm_normalized=data.is_fwhm_normalized)
 
     @overload
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[True] = ...) -> None: ...
 
     @overload
-    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> DiscreteInterpolation: ...
+    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: Literal[False] = ...) -> Self: ...
 
-    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
+    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Self | None:
         fwhm: float = self.FWHM.to_same_unit(fwhm)
         energy: float = self.FWHM.to_same_unit(energy)
         old = self.FWHM(energy)
@@ -71,7 +152,7 @@ class DiscreteInterpolation:
         else:
             return self.clone(FWHM=self.FWHM.scale(ratio), is_fwhm_normalized=True)
 
-    def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> DiscreteInterpolation | None:
+    def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> Self | None:
         sigma = self.FWHM.to_same_unit(sigma)
         return self.normalize_FWHM(energy, sigma * SIGMA_TO_FWHM, inplace=inplace)
 
@@ -89,27 +170,27 @@ class DiscreteInterpolation:
         self.FWHM.save(path / 'FWHM')
 
     @classmethod
-    def from_path(cls, path: Pathlike) -> DiscreteInterpolation:
+    def from_path(cls, path: Pathlike) -> Self:
         path = Path(path)
         with (path / 'meta.json').open('r') as f:
             meta = json.load(f)
         version = meta.pop('version')
         warn_version(version)
-        FE = FEInterpolation.from_path(path / 'FE')
-        SE = EscapeInterpolation.from_path(path / 'SE')
-        DE = EscapeInterpolation.from_path(path / 'DE')
-        AP = AnnihilationInterpolation.from_path(path / 'AP')
-        Eff = LinearInterpolation.from_path(path / 'Eff')
-        FWHM = FWHMInterpolation.from_path(path / 'FWHM')
+        FE = Interpolation.from_path(path / 'FE')
+        SE = Interpolation.from_path(path / 'SE')
+        DE = Interpolation.from_path(path / 'DE')
+        AP = Interpolation.from_path(path / 'AP')
+        Eff = Interpolation.from_path(path / 'Eff')
+        FWHM = Interpolation.from_path(path / 'FWHM')
         return cls(FE, SE, DE, AP, Eff, FWHM, **meta)
 
     @classmethod
-    def from_response_path(cls, path: Pathlike) -> DiscreteInterpolation:
+    def from_response_path(cls, path: Pathlike) -> Self:
         path = Path(path) / 'interpolation'
         return cls.from_path(path)
 
     @classmethod
-    def from_db(cls, name: ResponseName) -> DiscreteInterpolation:
+    def from_db(cls, name: ResponseName) -> Self:
         return cls.from_response_path(get_response_path(name))
 
     @property
@@ -129,8 +210,8 @@ class DiscreteInterpolation:
               AP: Interpolation | None = None,
               Eff: Interpolation | None = None,
               FWHM: Interpolation | None = None,
-              is_fwhm_normalized: bool | None = None) -> DiscreteInterpolation:
-        return DiscreteInterpolation(
+              is_fwhm_normalized: bool | None = None) -> Self:
+        return type(self)(
             FE or self.FE,
             SE or self.SE,
             DE or self.DE,

@@ -1,7 +1,7 @@
 from typing import TypeAlias, Literal
 from pathlib import Path
 
-ResponseName: TypeAlias = Literal['OSCAR2017', 'OSCAR2020']
+ResponseName: TypeAlias = Literal['OSCAR2017', 'OSCAR2020', 'CACTUS']
 
 
 def get_response_path(name: ResponseName) -> Path:

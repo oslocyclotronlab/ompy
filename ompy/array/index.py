@@ -8,6 +8,7 @@ from warnings import warn
 from typing_extensions import TypedDict
 
 import numpy as np
+from numpy.typing import DTypeLike
 
 from .index_fn import _index_left, _index_mid_uniform, is_monotone, is_length_congruent
 from .index_fn import is_uniform as is_uniform_fn
@@ -190,11 +191,14 @@ class Index(ABC):
 
     def __init__(self, bins: array1D, boundary: float,
                  metadata: IndexMetadata = IndexMetadata(),
-                 dtype: type = np.float64, **kwargs):
+                 dtype: DTypeLike | None = np.single, **kwargs):
         if len(bins) <= 0:
             raise ValueError("Bins must have at least one element.")
         if not is_monotone(bins):
             raise ValueError("Bins must be monotonically increasing.")
+        if dtype is None:
+            dtype = np.single
+
         self.bins = np.asarray(bins, dtype=dtype)
         self.boundary = dtype(boundary)
         self.meta = metadata.update(**kwargs)
@@ -281,6 +285,11 @@ class Index(ABC):
     def __getitem__(self, key: int | slice) -> float | Index:
         match key:
             case slice():
+                # Check if slice is all ints and/or nones
+                if ((key.start is not None and not isinstance(key.start, int)) or
+                        (key.stop is not None and not isinstance(key.stop, int)) or
+                        (key.step is not None and not isinstance(key.step, int))):
+                    key = self.index_slice(key)
                 return self.from_array(self.bins[key], metadata=self.meta)
             case _:
                 return self.bins[key]
@@ -1189,7 +1198,9 @@ def make_or_update_index(X: Index | arraylike, unit: Unitlike | None, alias: str
                          default_label: bool,
                          default_unit: bool,
                          edge: Edges = 'left',
-                         boundary: bool = False, **kwargs) -> Index:
+                         boundary: bool = False,
+                         dtype: DTypeLike | None = None,
+                         **kwargs) -> Index:
     if isinstance(X, Index):
         # Preserve the label if it exists, but overwrite if a new label is specified
         label = X.label if default_label else label
@@ -1203,10 +1214,13 @@ def make_or_update_index(X: Index | arraylike, unit: Unitlike | None, alias: str
 
         if alias is None or alias == '':
             alias = X.meta.alias
+
+        if dtype is not None:
+            X.bins = X.bins.astype(dtype)
         return X.update_metadata(unit=unit, alias=alias, label=label)
     elif isinstance(X, (np.ndarray, list, tuple)):
         return to_index(X, edge=edge, boundary=boundary, label=label,
-                        unit=unit, alias=alias, **kwargs)
+                        unit=unit, alias=alias, dtype=dtype, **kwargs)
     else:
         raise ValueError(f"Cannot make index from {type(X)}: {X}")
 

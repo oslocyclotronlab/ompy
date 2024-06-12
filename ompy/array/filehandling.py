@@ -344,6 +344,8 @@ def encode_dict(d: dict) -> np.ndarray:
     """ Encode a dictionary as a numpy array of bytes """
     d = transform_dict(d, lambda x: isinstance(x, Unit), str)
     d = transform_dict(d, lambda x: isinstance(x, np.ndarray), lambda x: x.tolist())
+    # Find all numbers that are np.float32, and convert to float
+    d = transform_dict(d, lambda x: isinstance(x, np.float32), float)
     return np.array(json.dumps(d), dtype='S')
 
 def decode_dict(a: np.ndarray) -> dict[str, Any]:

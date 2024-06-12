@@ -30,7 +30,7 @@ from ..helpers import robust_z_score, robust_z_score_i, AnnotatedColorbar
 from ..numbalib import njit
 from ..stubs import (Unitlike, Pathlike, Axes, Figure,
                      Colorbar, QuadMesh, arraylike, ArrayBool, QuantityLike)
-
+from numpy.typing import DTypeLike
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
@@ -106,7 +106,7 @@ class Matrix(AbstractArray, MatrixProtocol):
                  order: np._OrderKACF | None = None,
                  copy: bool = False,
                  indexkwargs: dict[str, Any] | None = None,
-                 dtype: np.dtype | str = 'float32',
+                 dtype: DTypeLike = np.float32,
                  **kwargs):
         # Resolve aliasing
         kwargs, X, xalias = maybe_pop_from_kwargs(kwargs, X, 'X', 'xalias')
@@ -149,11 +149,13 @@ class Matrix(AbstractArray, MatrixProtocol):
                                                    default_label=default_xlabel,
                                                    default_unit=default_X_unit,
                                                    edge=edge, boundary=boundary,
+                                                   dtype=dtype,
                                                    **indexkwargs)
         self.Y_index: Index = make_or_update_index(Y, unit=Unit(Y_unit), alias=yalias, label=ylabel,
                                                    default_label=default_ylabel,
                                                    default_unit=default_Y_unit,
                                                    edge=edge, boundary=boundary,
+                                                   dtype=dtype,
                                                    **indexkwargs)
         if len(self.X_index) != self.values.shape[0]:
             _alias = f' ({xalias})' if xalias else ''
@@ -607,7 +609,7 @@ class Matrix(AbstractArray, MatrixProtocol):
 
     @property
     def _summary(self) -> str:
-        s = f"Array type: {type(self.values)}\n"
+        s = f"Array type: {self.values.__class__.__name__}\n"
         s += f'X index:\n{self.X_index.summary()}\n'
         s += f'Y index:\n{self.Y_index.summary()}\n'
         if len(self.metadata.misc) > 0:
@@ -665,7 +667,7 @@ class Matrix(AbstractArray, MatrixProtocol):
     def clone(self, X: Index | None = None, Y: Index | None = None,
               values: np.ndarray | None = None,
               metadata: MatrixMetadata | None = None, copy: bool = False,
-              dtype: np.dtype | None = None,
+              dtype: DTypeLike | None = None,
               **kwargs) -> Self:
         """ Copies the object.
 
@@ -798,6 +800,8 @@ class Matrix(AbstractArray, MatrixProtocol):
 
         # In case `values` is on the gpu
         values = np.asarray(self.values)
+        if np.all(~np.isfinite(values)):
+            raise ValueError("Matrix contains only NaN or infinite values")
 
         # Simple heuristic to determine scale
         if scale is None:
