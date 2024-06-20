@@ -1,5 +1,5 @@
 from .result import Result, PlotSpace, ResultMeta2D, Parameters2D
-from .. import Matrix, Vector 
+from .. import Matrix, Vector, on_device
 from ..helpers import make_axes
 from ..stubs import Lines, Plots2D, Plot1D, array2D, Axes
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
@@ -33,20 +33,26 @@ class UnfoldedResult2D(Result):
     def best(self) -> Matrix: ...
 
     #@cache
-    def best_folded(self) -> Matrix:
+    def best_folded(self, device='gpu?') -> Matrix:
+        best = self.best()
         if self.G_ex is None:
-            m = (self.R@(self.best().T)).T
+            with on_device(device, best, self.R, endpoint='numpy'):
+                m = best@self.R.T
         else:
-            m = self.G_ex@(self.R@(self.best().T)).T
+            with on_device(device, best, self.R, self.G_ex, endpoint='numpy'):
+                m = self.G_ex@best@self.R.T
         return self.raw.clone(values=m)  # Fix labels
 
     #@cache
-    def best_eta(self) -> Matrix:
+    def best_eta(self, device='gpu?') -> Matrix:
         if self.meta.space in {'GR', 'RG'}:
+            best = self.best()
             if self.G_ex is None:
-                m = self.best()@self.G
+                with on_device(device, best, self.G, endpoint='numpy'):
+                    m = best@self.G
             else:
-                m = self.G_ex@self.best()@self.G
+                with on_device(device, best, self.G, self.G_ex, endpoint='numpy'):
+                    m = self.G_ex.T@best@self.G
         else:
             m = self.best()
         return self.raw.clone(values=m)  # Fix labels

@@ -30,7 +30,7 @@ from ..helpers import robust_z_score, robust_z_score_i, AnnotatedColorbar
 from ..numbalib import njit
 from ..stubs import (Unitlike, Pathlike, Axes, Figure,
                      Colorbar, QuadMesh, arraylike, ArrayBool, QuantityLike)
-
+from numpy.typing import DTypeLike
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
 
@@ -106,7 +106,7 @@ class Matrix(AbstractArray, MatrixProtocol):
                  order: np._OrderKACF | None = None,
                  copy: bool = False,
                  indexkwargs: dict[str, Any] | None = None,
-                 dtype: np.dtype | str = 'float32',
+                 dtype: DTypeLike = np.float32,
                  **kwargs):
         # Resolve aliasing
         kwargs, X, xalias = maybe_pop_from_kwargs(kwargs, X, 'X', 'xalias')
@@ -149,11 +149,13 @@ class Matrix(AbstractArray, MatrixProtocol):
                                                    default_label=default_xlabel,
                                                    default_unit=default_X_unit,
                                                    edge=edge, boundary=boundary,
+                                                   dtype=dtype,
                                                    **indexkwargs)
         self.Y_index: Index = make_or_update_index(Y, unit=Unit(Y_unit), alias=yalias, label=ylabel,
                                                    default_label=default_ylabel,
                                                    default_unit=default_Y_unit,
                                                    edge=edge, boundary=boundary,
+                                                   dtype=dtype,
                                                    **indexkwargs)
         if len(self.X_index) != self.values.shape[0]:
             _alias = f' ({xalias})' if xalias else ''
@@ -607,7 +609,7 @@ class Matrix(AbstractArray, MatrixProtocol):
 
     @property
     def _summary(self) -> str:
-        s = f"Array type: {type(self.values)}\n"
+        s = f"Array type: {self.values.__class__.__name__}\n"
         s += f'X index:\n{self.X_index.summary()}\n'
         s += f'Y index:\n{self.Y_index.summary()}\n'
         if len(self.metadata.misc) > 0:
@@ -665,7 +667,7 @@ class Matrix(AbstractArray, MatrixProtocol):
     def clone(self, X: Index | None = None, Y: Index | None = None,
               values: np.ndarray | None = None,
               metadata: MatrixMetadata | None = None, copy: bool = False,
-              dtype: np.dtype | None = None,
+              dtype: DTypeLike | None = None,
               **kwargs) -> Self:
         """ Copies the object.
 
@@ -798,6 +800,8 @@ class Matrix(AbstractArray, MatrixProtocol):
 
         # In case `values` is on the gpu
         values = np.asarray(self.values)
+        if np.all(~np.isfinite(values)):
+            raise ValueError("Matrix contains only NaN or infinite values")
 
         # Simple heuristic to determine scale
         if scale is None:
@@ -884,7 +888,6 @@ class Matrix(AbstractArray, MatrixProtocol):
         current_cmap = copy.copy(cm.get_cmap())
         current_cmap.set_bad(color='white')
         cmap = plt.get_cmap(kwargs.pop('cmap', current_cmap))
-
         mesh = ax.pcolormesh(Y, X, masked, cmap=cmap, norm=norm, **kwargs)
 
         # TODO: Let the index handle the ticks?
@@ -907,20 +910,20 @@ class Matrix(AbstractArray, MatrixProtocol):
         # show z-value in status bar
         # https://stackoverflow.com/questions/42577204/show-z-value-at-mouse-pointer-position-in-status-line-with-matplotlibs-pcolorme
         def format_coord(x, y):
-            xarr = X
-            yarr = Y
-            if ((x > xarr.min()) & (x <= xarr.max())
-                    & (y > yarr.min()) & (y <= yarr.max())):
+            xarr = Y
+            yarr = X
+            if ((x > xarr[0]) & (x <= xarr[-1])
+                    & (y > yarr[0]) & (y <= yarr[-1])):
                 col = np.searchsorted(xarr, x) - 1
                 row = np.searchsorted(yarr, y) - 1
                 z = masked[row, col]
-                return f'x={x:1.2f}, y={y:1.2f}, z={z:1.2E}'
+                return f'{self.yalias}={x:1.0f}{self.X_index.unit:~}, {self.xalias}={y:1.0f}{self.Y_index.unit:~}, z={z:1.2E}'
                 # return f'x={x:1.0f}, y={y:1.0f}, z={z:1.3f}   [{row},{col}]'
             else:
                 return f'x={x:1.0f}, y={y:1.0f}'
 
         # TODO: Takes waaaay to much CPU
-        # ax.format_coord = nop
+        ax.format_coord = format_coord
 
         cbar: Colorbar | None = None
         if add_cbar:

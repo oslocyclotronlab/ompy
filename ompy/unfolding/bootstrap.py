@@ -53,13 +53,11 @@ MV = TypeVar('MV', bound=Matrix | Vector)
 
 
 def bootstrap(res: Result, N: int, base: Literal['raw', 'nu'] = 'raw', **kwargs) -> Bootstrap:
-    if base != 'raw':
-        raise NotImplementedError("Only raw bootstrap implemented")
     match res:
         case UnfoldedResult1D():
-            return bootstrap_vector(res, N, **kwargs)
+            return bootstrap_vector(res, N, base=base, **kwargs)
         case UnfoldedResult2D():
-            return bootstrap_matrix(res, N, **kwargs)
+            return bootstrap_matrix(res, N, base=base, **kwargs)
         case _:
             raise ValueError(f"Unknown result type {res.__class__.__name__}")
 
@@ -104,7 +102,7 @@ def bootstrap_vector_(res: UnfoldedResult1D, N: int, **kwargs) -> BootstrapVecto
     return bootstraped
 
 
-def bootstrap_vector(res: UnfoldedResult1D, N: int, sample: Literal['raw', 'folded'], **kwargs) -> BootstrapVector:
+def bootstrap_vector(res: UnfoldedResult1D, N: int, base: Literal['raw', 'nu'] = 'raw', **kwargs) -> BootstrapVector:
     A_boots: list[Vector] = []
     unfolded_boot: list[Vector] = []
     best = res.best()
@@ -113,20 +111,20 @@ def bootstrap_vector(res: UnfoldedResult1D, N: int, sample: Literal['raw', 'fold
     kwargs = res.meta.kwargs | kwargs
     unfolder = Unfolder.resolve_method(res.meta.method)(R=res.R.T, G=G.T)
 
-    match sample:
+    match base:
         case 'raw':
             A = res.raw.copy()
-        case 'folded':
+        case 'folded' | 'nu':
             A = res.best_folded().copy()
         case _:
-            raise ValueError(f"Unknown sample type {sample}. Expected 'raw' or 'folded'")
-    A_boots = A.sample(N, eps=1)
+            raise ValueError(f"Unknown sample type {base}. Expected 'raw' or 'folded'")
+    A_boots = A.sample(N)
 
     bg: Vector | None = None
     if res.background is not None:
         bg = res.background.copy()
         assert bg is not None
-        bg.values = np.where(bg <= 0, 3, bg.values)
+        bg.values = np.where(bg <= 0, 0, bg.values)
     bgs: list[Vector] = []
     # To avoid Poisson(0)
     # A.values = np.where(A <= 0, 3, A.values)
@@ -152,22 +150,8 @@ def bootstrap_vector(res: UnfoldedResult1D, N: int, sample: Literal['raw', 'fold
     return bootstraped
 
 
-def sample(A: Matrix, N: int, mask: np.ndarray | None = None) -> list[Matrix]:
-    """ Sample N matrices from A
-
-    """
-    if mask is None:
-        mask = A.last_nonzeros()
-    X = np.where(A.values <= 3, 3, A.values)
-    X[mask] = 0
-    As: list[Matrix] = []
-    for i in range(N):
-        A_i = A.clone(values=np.random.poisson(X))
-        As.append(A_i)
-    return As
-
-
-def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix:
+def bootstrap_matrix(res: UnfoldedResult2D, N: int, base: Literal['raw', 'folded'] = 'folded',
+                     **kwargs) -> BootstrapMatrix:
     """ Create Bootstrap ensemble of `A` using `res` method
 
     """
@@ -177,12 +161,16 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
     G_ex = res.G_ex.astype('float32')
     kwargs = res.meta.kwargs | kwargs
     unfolder = Unfolder.resolve_method(res.meta.method)(R=res.R.T.astype('float32'), G=G.T.astype('float32'))
-    A = res.raw.copy().astype('float32')
-    mask = A.last_nonzeros()
-    A.values = np.where(A <= 0, 3, A.values)
-    A[~mask] = 0
+
+    match base:
+        case 'raw':
+            A = res.raw.as_numpy().copy().astype('float32')
+        case 'folded':
+            A = res.best_folded().as_numpy().copy().astype('float32')
+        case _:
+            raise ValueError(f"Unknown sample type {base}. Expected 'raw' or 'folded'")
     # TODO Add background
-    A_boots: list[Matrix] = []
+    A_boots: list[Matrix] = A.sample(N)
     unfolded_boot: list[Matrix] = []
     costs: list[np.ndarray] = []
     initials: list[Matrix] = []
@@ -191,24 +179,25 @@ def bootstrap_matrix(res: UnfoldedResult2D, N: int, **kwargs) -> BootstrapMatrix
     disable_tqdm = kwargs.pop('disable_tqdm', True)
     background = res.background
     if background is not None:
+        raise NotImplementedError("Background not implemented yet")
         background = background.astype('float32')
         background.values = np.where(background <= 0, 3, background.values)
         background[~mask] = 0
 
     for i in tqdm(range(N)):
         initial = best.clone(values=np.random.uniform(1, 3 * best))
-        A_boot = A.clone(values=np.random.poisson(A))
         if background is not None:
             bg = background.clone(values=np.random.poisson(background))
             backgrounds.append(bg)
         else:
             bg = None
-        unf = unfolder.unfold(A_boot, initial=initial, R=R, G=G, G_ex=G_ex, background=background,
+        unf = unfolder.unfold(A_boots[i], initial=initial, R=R, G=G, G_ex=G_ex, background=background,
                               disable_tqdm=disable_tqdm, **kwargs)
+        unf.to_device('cpu')
+        unf.as_numpy()
         if False and unf.cost[-1] > unf.cost[0]:
             raise RuntimeError("Unfolding diverged")
         unfolded_boot.append(unf.best())
-        A_boots.append(A_boot)
 
         # We do a rescaling to make the cost fit into fewer bytes to take up less space
         costs.append((unf.cost / unf.cost.max()).astype('float16'))

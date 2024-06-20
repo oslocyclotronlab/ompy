@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field, fields
-from ..array import Matrix, Vector, AbstractArray
+from ..array import Matrix, Vector, AbstractArray, on_device
 from ..stubs import Axes
 from typing import Any, TypeVar, Generic, Never, TypeAlias
 from abc import ABC, abstractmethod
@@ -73,6 +73,7 @@ class ResultMeta1D(ResultMeta[Vector]):
 class ResultMeta2D(ResultMeta[Matrix]):
     parameters: Parameters2D
 
+
 @dataclass(kw_only=True)
 class Result(ABC, Generic[T]):
     meta: ResultMeta[T]
@@ -97,14 +98,18 @@ class Result(ABC, Generic[T]):
     @abstractmethod
     def best(self) -> T: ...
 
-    def best_folded(self) -> T:
-        return self.R@self.best()
+    def best_folded(self, device='gpu?') -> T:
+        best = self.best()
+        with on_device(device, self.R, best, endpoint='numpy'):
+            return self.R@best
 
-    def best_eta(self) -> T:
+    def best_eta(self, device='gpu?') -> T:
+        best = self.best()
         if self.meta.space in {'GR', 'RG'}:
-            return self.G@self.best()
+            with on_device(device, self.G, best, endpoint='numpy'):
+                return self.G@best
         elif self.meta.space == 'R':
-            return self.best()
+            return best
         else:
             raise ValueError(f"Cannot map from {self.meta.space} to eta")
 
@@ -193,6 +198,11 @@ class Result(ABC, Generic[T]):
     @abstractmethod
     def _load(cls, path: Path) -> dict[str, Any]: ...
 
+    def to_device(self, device):
+        self.meta.parameters.to_device(device)
+
+    def as_numpy(self):
+        self.meta.parameters.as_numpy()
 
 
 @dataclass(kw_only=True)
@@ -208,15 +218,27 @@ class Parameters(ABC, Generic[T]):
     def __post_init__(self):
         # Can eat up GPU memory
         if False:
-            self.raw.to_cpu(inplace=True)
-            if self.background is not None:
-                self.background.to_cpu(inplace=True)
-            self.initial.to_cpu(inplace=True)
-            self.R.to_cpu(inplace=True)
-            self.G.to_cpu(inplace=True)
-            if self.G_ex is not None:
-                self.G_ex.to_cpu(inplace=True)
-        
+            self.to_device('cpu')
+
+    def to_device(self, device):
+        self.raw.to_device(device, inplace=True)
+        if self.background is not None:
+            self.background.to_device(device, inplace=True)
+        self.initial.to_device(device, inplace=True)
+        self.R.to_device(device, inplace=True)
+        self.G.to_device(device, inplace=True)
+        if self.G_ex is not None:
+            self.G_ex.to_device(device, inplace=True)
+
+    def as_numpy(self):
+        self.raw.as_numpy(inplace=True)
+        if self.background is not None:
+            self.background.as_numpy(inplace=True)
+        self.initial.as_numpy(inplace=True)
+        self.R.as_numpy(inplace=True)
+        self.G.as_numpy(inplace=True)
+        if self.G_ex is not None:
+            self.G_ex.as_numpy(inplace=True)
 
     def save(self, path: Path, exist_ok: bool = False) -> None:
         path = Path(path)
@@ -265,7 +287,7 @@ class Parameters(ABC, Generic[T]):
 
     @classmethod
     @abstractmethod
-    def _load(cls, path: Path) -> tuple[T, T| None, T]: ...
+    def _load(cls, path: Path) -> tuple[T, T | None, T]: ...
 
 
 @dataclass(kw_only=True)

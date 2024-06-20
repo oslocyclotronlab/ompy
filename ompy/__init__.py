@@ -11,6 +11,14 @@ if __OMPY_SETUP__:
     sys.stderr.write('Running from ompy source directory.\n')
 else:
 
+    import numpy as np
+    __DTYPE = np.float32
+    def set_global_dtype(dtype):
+        global __DTYPE
+        __DTYPE = dtype
+    def get_global_dtype():
+        return __DTYPE
+
     import os
     from pint import UnitRegistry
     from pint.errors import DimensionalityError
@@ -50,7 +58,7 @@ else:
     NUMBA_AVAILABLE = is_available("numba")
     GPU_AVAILABLE = False
     NUMBA_CUDA_AVAILABLE = False
-    if NUMBA_AVAILABLE:
+    if False and NUMBA_AVAILABLE:
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -118,6 +126,8 @@ else:
     SKLEARN_AVAILABLE = is_available("sklearn")
     OPTAX_AVAILABLE = is_available("optax")
 
+    from .computation_context import ComputationContext, new_context
+
     from .status import print_status
 
     #from .stubs import Axes
@@ -132,7 +142,7 @@ else:
     from .array import Vector, Matrix, zeros_like, empty_like, empty, transition_matrix
     from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
     from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector, ArrayList
-    from .array import on_gpu, on_cpu
+    from .array import on_gpu, on_cpu, on_device
     #from .unfolder import Unfolder
     #from . import response
     #from .response import Response, Calibrator, ResponseData, DiscreteInterpolation

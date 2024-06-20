@@ -6,6 +6,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from .index import Index
 from .. import Unit, JAX_WORKING
+from ..computation_context import new_context, active_context, ComputationContext, delete_context
 from .abstractarrayprotocol import AbstractArrayProtocol
 from nptyping import NDArray, Shape, Floating
 from typing import Iterator, Self, Literal, Callable, overload, TypeAlias
@@ -42,6 +43,21 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def __init__(self, values: np.ndarray):
         self.values: NDArray[Shape['*', ...], Floating] = values
+        # The context in which the array was created
+        # only used for internal bookkeeping. Should not be saved
+        # or modified by the user.
+        self.__context: ComputationContext | None = active_context()
+        if self.__context is not None:
+            self.__context.push(self)
+
+    def _disconnect_context(self, context: ComputationContext | None = None):
+        if context is not None:
+            if context != self.__context:
+                raise RuntimeError("Context mismatch")
+        self.__context = None
+
+    def _get_context(self) -> ComputationContext | None:
+        return self.__context
 
     @property
     def __array_interface__(self):
@@ -290,7 +306,8 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         """
         return list(self.sample_it(N, mask, **kwargs))
 
-    def sample_it(self, N: int, mask: np.ndarray | None = None, **kwargs) -> Iterator[Self]:
+    def sample_it(self, N: int, mask: np.ndarray | None = None, zero_value: int = 0,
+                  zero_limit: int = 0, **kwargs) -> Iterator[Self]:
         """ Draw `N` poisson samples from the array.
 
         The `mask` specifies values to ignore. If not set, the mask is assumed to be
@@ -313,7 +330,7 @@ class AbstractArray(AbstractArrayProtocol, ABC):
                 mask[i:] = False
             else:
                 mask = self.last_nonzeros(**kwargs)
-        X = np.where(self.values <= 3, 3, self.values)
+        X = np.where(self.values <= zero_limit, zero_value, self.values)
         X[~mask] = 0
         for _ in range(N):
             sample = self.clone(values=np.random.poisson(X))
@@ -365,13 +382,19 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         else:
             return self.clone(values=to_cpu(self.values, device))
 
-    def to_device(self, inplace: bool = False, device: Device | None = None) -> Self | None:
+    @overload
+    def to_device(self, device: Device | None = ..., inplace: Literal[False] = ...) -> Self: ...
+
+    @overload
+    def to_device(self, device: Device | None = ..., inplace: Literal[True] = ...) -> None: ...
+
+    def to_device(self, device: Device | None = None, inplace: bool = False) -> Self | None:
         """
         Move the .values to the specified device.
 
         Args:
-            inplace (bool, optional): If True, the operation is performed in-place. Defaults to False.
             device (Device, optional): The device to which the values are moved. Defaults to None.
+            inplace (bool, optional): If True, the operation is performed in-place. Defaults to False.
 
         Returns:
             Self | None: Returns None if inplace is True, otherwise returns a new instance with values moved to the specified device.
@@ -407,9 +430,12 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
 
 def to_device(array, device: Device):
-    if device != 'cpu':
-        raise RuntimeError(f"Only CPU device is supported on this system, not {device}.")
-    return array
+    match device:
+        case 'cpu' | 'gpu?':
+            return array
+        case _:
+            if device != 'cpu':
+                raise RuntimeError(f"Only CPU device is supported on this system, not {device}.")
 
 
 def to_gpu(array, device: Device | None = None):
@@ -424,10 +450,24 @@ def _device(array) -> Device:
     return 'cpu'
 
 
+def get_default_gpu() -> Device:
+    raise RuntimeError("JAX is not working on this system.")
+
+
+def get_default_cpu() -> Device:
+    return 'cpu'
+
+
 if JAX_WORKING:
+    def get_default_gpu() -> Device:
+        return jax.devices('gpu')[0]
+
+    def get_default_cpu() -> Device:
+        return jax.devices('cpu')[0]
+
     def to_device(array, device: Device):
         if device == 'cpu':
-            device = jax.devices('cpu')[0]
+            device = get_default_cpu()
 
         if not isinstance(array, ArrayImpl) or not _device(array) == device:
             return jax.device_put(array, device)
@@ -435,12 +475,12 @@ if JAX_WORKING:
 
     def to_gpu(array, device: Device | None = None):
         if device is None:
-            device = jax.devices('gpu')[0]
+            device = get_default_gpu()
         return to_device(array, device)
 
     def to_cpu(array, device: Device | None = None):
         if device is None:
-            device = jax.devices('cpu')[0]
+            device = get_default_cpu()
         return to_device(array, device)
 
     def _device(array) -> Device:
@@ -450,8 +490,7 @@ if JAX_WORKING:
             return 'cpu'
 
 
-@contextmanager
-def on_gpu(*arr: AbstractArray, revert: bool = True):
+def on_gpu(*arr: AbstractArray, revert: bool = True, endpoint: Device | Literal['leave', 'numpy'] = 'leave'):
     """
     Context manager that moves the given AbstractArray objects to the GPU,
     and returns them to their original devices. Created variables in the 
@@ -459,10 +498,13 @@ def on_gpu(*arr: AbstractArray, revert: bool = True):
     
     Args:
         *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the GPU.
-        revert (bool): 
+        revert (bool):
             If True, the objects are reverted to their original devices after the context is exited.
             If False, the objects are left on the GPU after the context is exited.
-    
+        endpoint (Device, optional): The device to which the objects within the
+            active context are moved to once it exits. Defaults to 'leave', leaving
+            them on the same device.
+
     Yields:
         None
     
@@ -472,45 +514,103 @@ def on_gpu(*arr: AbstractArray, revert: bool = True):
     Returns:
         None
     """
-    devices = []
-    try:
-        for a in arr:
-            devices.append(a.device)
-            a.to_gpu(inplace=True)
-        yield
-    finally:
-        if revert:
-            for a, device in zip(arr, devices):
-                a.to_device(inplace=True, device=device)
+    return on_device('gpu', *arr, revert=revert, endpoint=endpoint)
 
-@contextmanager
-def on_cpu(*arr: AbstractArray):
+
+def on_cpu(*arr: AbstractArray, revert: bool = True, endpoint: Device | Literal['leave', 'numpy'] = 'leave'):
     """
     Context manager that moves the given AbstractArray objects to the CPU,
-    and returns them to their original devices. Created variables in the 
+    and returns them to their original devices. Created variables in the
     context are not handled.
-    
+
     Args:
-        *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the CPU.
-    
+        *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the GPU.
+        revert (bool):
+            If True, the objects are reverted to their original devices after the context is exited.
+            If False, the objects are left on the GPU after the context is exited.
+        endpoint (Device, optional): The device to which the objects within the
+            active context are moved to once it exits. Defaults to 'leave', leaving
+            them on the same device.
+
     Yields:
         None
-    
+
     Raises:
         None
-    
+
+    Returns:
+        None
+    """
+    return on_device('cpu', *arr, revert=revert, endpoint=endpoint)
+
+
+@contextmanager
+def on_device(device: Device, *arr: AbstractArray, revert: bool = True,
+              endpoint: Device | Literal['leave', 'numpy'] = 'leave'):
+    """
+    Context manager that moves the given AbstractArray objects to the specified device,
+    and returns them to their original devices. Created variables in the context are not handled.
+
+    Args:
+        device (Device): The device to which the objects are moved to.
+        *arr (AbstractArray): Variable number of AbstractArray objects to be moved to the GPU.
+        revert (bool):
+            If True, the objects are reverted to their original devices after the context is exited.
+            If False, the objects are left on the GPU after the context is exited.
+        endpoint (Device, optional): The device to which the objects within the
+            active context are moved to once it exits. Defaults to 'leave', leaving
+            them on the same device.
+
+    Yields:
+        None
+
+    Raises:
+        None
+
     Returns:
         None
     """
     devices = []
-    try:
-        for a in arr:
-            devices.append(a.device)
-            a.to_cpu(inplace=True)
-        yield
-    finally:
-        for a, device in zip(arr, devices):
-            a.to_device(inplace=True, device=device)
+    array_types = []
+    match device:
+        case 'cpu':
+            device = get_default_cpu()
+        case 'gpu':
+            device = get_default_gpu()
+        case 'gpu?':
+            try:
+                device = get_default_gpu()
+            except Exception:
+                device = get_default_cpu()
+
+
+    with new_context() as compute_context:
+        try:
+            for a in arr:
+                devices.append(a.device)
+                array_types.append(type(a.values))
+                a.to_device(inplace=True, device=device)
+            yield
+        finally:
+            # Handle the original variables
+            if revert:
+                for a, device, atype in zip(arr, devices, array_types):
+                    a.to_device(inplace=True, device=device)
+                    if atype == np.ndarray:
+                        a.as_numpy(inplace=True)
+
+            # Handle the created variables
+            match endpoint:
+                case 'leave':
+                    pass
+                case 'numpy':
+                    for a in compute_context:
+                        a.to_cpu(inplace=True)
+                        a.as_numpy(inplace=True)
+                case _:
+                    for a in compute_context:
+                        a.to_device(inplace=True, device=endpoint)
+
 
 def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
     """Maps axis to 0, 1 or 2 according to which axis is specified

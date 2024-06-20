@@ -8,16 +8,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import warnings
 from collections import OrderedDict
-from typing import Iterable, Any
+from typing import Iterable, Any, Self, overload, Literal
 from abc import ABC, abstractmethod
 from pathlib import Path
 import json
+from scipy.interpolate import UnivariateSpline, InterpolatedUnivariateSpline
 
 
 @dataclass
 class Interpolation(ABC):
+    __subclasses = {}
     def __init__(self, points: Vector, copy: bool = False):
         self.points: Vector = points if not copy else points.copy()
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.__subclasses[cls.__name__] = cls
 
     def __call__(self, points: float | Vector | np.ndarray) -> float | Vector | np.ndarray:
         match points:
@@ -48,8 +54,15 @@ class Interpolation(ABC):
         self.points.save(path / meta['datapath'])
 
     @classmethod
-    @abstractmethod
-    def from_path(cls, path: Pathlike) -> Interpolation: ...
+    def from_path(cls, path: Pathlike) -> Self:
+        path = Path(path)
+        with (path / 'meta.json').open() as f:
+            meta = json.load(f)
+        expected_class = meta['class']
+        cls_ = cls.__subclasses.get(expected_class)
+        if cls.from_path == cls_.from_path:
+            raise NotImplementedError(f"from_path() not implemented in {cls_.__name__}")
+        return cls_.from_path(path)
 
     @staticmethod
     def _load(path: Pathlike) -> tuple[Vector, dict[str, any]]:
@@ -76,7 +89,7 @@ class Interpolation(ABC):
 
     def plot_intp(self, ax: Axes = None, emax: None | float = None, **kwargs) -> Axes:
         if emax is None:
-            emax = max(self.points.E.max(), 3e4)
+            emax = self.points.E.max()
         assert emax is not None
         x = np.linspace(min(1e-3, self.points.E.min()), emax, 4000)
         y = self(x)
@@ -118,12 +131,59 @@ class Interpolation(ABC):
     def to_same_unit(self, unit: Unitlike) -> float:
         return self.points.X_index.to_same_unit(unit)
 
-    def clone(self, points: Vector | None = None, copy: bool = False) -> Interpolation:
+    def clone(self, points: Vector | None = None, copy: bool = False) -> Self:
         return self.__class__(points or self.points, copy=copy)
 
-    def copy(self, **kwargs) -> Interpolation:
+    def copy(self, **kwargs) -> Self:
         return self.clone(copy=True, **kwargs)
 
+
+class Scalable(Interpolation):
+    def __init__(self, intp: Interpolation, C: float = 1.0, copy: bool = False):
+        super().__init__(intp.points, copy=copy)
+        self.intp = intp
+        self.C = C
+
+    def eval(self, points: np.ndarray) -> np.ndarray:
+        return self.C * self.intp(points)
+
+    @overload
+    def scale(self, C: float, inplace: Literal[False]) -> Self: ...
+
+    @overload
+    def scale(self, C: float, inplace: Literal[True]) -> None: ...
+
+    def scale(self, C: float, inplace=False) -> Self | None:
+        factor = self.C * C
+        if inplace:
+            self.C = factor
+            return self
+        return self.clone(C=factor)
+
+    def _metadata(self) -> dict[str, any]:
+        meta = {"C": self.C, 'intp_path': 'scaled_intp.npy',
+                'intp_class': self.intp.__class__.__name__}
+        return meta
+
+    @classmethod
+    def from_path(cls, path: Pathlike) -> Self:
+        path = Path(path)
+        points, meta = Interpolation._load(path)
+        C = meta["C"]
+        intp = Interpolation.from_path(path / meta['intp_path'])
+        return cls(intp, C=C)
+
+    def save(self, path: Pathlike, exist_ok: bool = True) -> None:
+        path = Path(path)
+        super().save(path, exist_ok)
+        meta = self._metadata()
+        self.intp.save(path / meta['intp_path'])
+
+    def clone(self, points: Vector | None = None, intp: Interpolation | None = None,
+                C: float | None = None, copy: bool = False) -> Self:
+            return type(self)(intp if intp is not None else self.intp,
+                            C if C is not None else self.C,
+                            copy=copy)
 
 class PoissonInterpolation(Interpolation):
     def plot(self, ax: Axes = None, ebkw: ErrorBarKwargs | None = None,
@@ -164,17 +224,69 @@ class LinearInterpolation(Interpolation):
     def _metadata(self) -> dict[str, any]:
         return {}
 
-    @staticmethod
-    def from_path(path: Pathlike) -> LinearInterpolation:
+    @classmethod
+    def from_path(cls, path: Pathlike) -> Self:
         data, meta = Interpolation._load(path)
         intp = interp1d(data.X, data.values, bounds_error=False, fill_value='extrapolate')
-        return LinearInterpolation(data, intp)
+        return cls(data, intp)
 
     def clone(self, points: Vector | None = None, intp: interp1d | None = None,
-              copy: bool = False) -> LinearInterpolation:
+              copy: bool = False) -> Self:
         return LinearInterpolation(points if points is not None else self.points,
                                    intp if intp is not None else self.intp,
                                    copy=copy)
+
+
+class SplineInterpolation(Interpolation):
+    def __init__(self, data: Vector, intp: UnivariateSpline, copy: bool = False,
+                 kwargs = None):
+        super().__init__(data, copy=copy)
+        self.intp = intp
+        self.kwargs = kwargs
+
+    def eval(self, points: np.ndarray) -> np.ndarray:
+        return self.intp(points)
+
+    def _metadata(self) -> dict[str, any]:
+        return self.kwargs
+
+    @classmethod
+    def from_path(cls, path: Pathlike) -> Self:
+        data, meta = Interpolation._load(path)
+        intp = UnivariateSpline(data.X, data.values)
+        return cls(data, intp)
+
+    def clone(self, points: Vector | None = None, intp: UnivariateSpline | None = None,
+              copy: bool = False) -> Self:
+        return SplineInterpolation(points if points is not None else self.points,
+                                   intp if intp is not None else self.intp,
+                                   copy=copy)
+
+
+class ISplineInterpolation(Interpolation):
+    def __init__(self, data: Vector, intp: InterpolatedUnivariateSpline, copy: bool = False,
+                 kwargs = None):
+        super().__init__(data, copy=copy)
+        self.intp = intp
+        self.kwargs = kwargs
+
+    def eval(self, points: np.ndarray) -> np.ndarray:
+        return self.intp(points)
+
+    def _metadata(self) -> dict[str, any]:
+        return self.kwargs
+
+    @classmethod
+    def from_path(cls, path: Pathlike) -> Self:
+        data, meta = Interpolation._load(path)
+        intp = InterpolatedUnivariateSpline(data.X, data.values)
+        return cls(data, intp)
+
+    def clone(self, points: Vector | None = None, intp: InterpolatedUnivariateSpline | None = None,
+              copy: bool = False) -> Self:
+        return type(self)(points if points is not None else self.points,
+                          intp if intp is not None else self.intp,
+                          copy=copy)
 
 
 class CompoundInterpolation(Interpolation):
@@ -241,6 +353,18 @@ class LinearInterpolator(Interpolator):
     def interpolate(self) -> LinearInterpolation:
         intp = interp1d(self.x, self.y, kind="linear", fill_value="extrapolate")
         return LinearInterpolation(self.points, intp)
+
+
+class SplineInterpolator(Interpolator):
+    def interpolate(self, **kwargs) -> SplineInterpolation:
+        intp = UnivariateSpline(self.x, self.y, **kwargs)
+        return SplineInterpolation(self.points, intp, kwargs=kwargs)
+
+
+class ISplineInterpolator(Interpolator):
+    def interpolate(self, **kwargs) -> ISplineInterpolation:
+        intp = InterpolatedUnivariateSpline(self.x, self.y, **kwargs)
+        return ISplineInterpolation(self.points, intp, kwargs=kwargs)
 
 
 class Lerp:

@@ -79,6 +79,8 @@ def logistic_interpolation(t, lower, upper, midpoint):
     return lower + (upper - lower) * sigmoid(t - midpoint)
 
 def onecost(mu, C):
+    # Smooth approximation of the Heaviside step function using a logistic function
+    #return jnp.sum(0.5 * (1 + jnp.tanh((mu - C) / (1e-6 + C / 10))))
     return jnp.sum(0.5*(1 + 2/3.141592*jnp.arctan((mu - C)/(C/10))))
 
 def cost(mu, R, G_ex, n, bg, n_err, bg_err,
@@ -90,7 +92,9 @@ def cost(mu, R, G_ex, n, bg, n_err, bg_err,
         # Isn't it better with
         # nu = nu + bg
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.mean(n)) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
+    #return jnp.sum(kl(nu, n)) + alpha*onecost(mu, 10) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, 1) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
+    #return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.mean(n)) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
     #return jnp.sum((nu - n)**2/e
     #return jnp.sum(kl(nu, n))
@@ -556,6 +560,7 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
         bg_err = 0
     else:
         bg_err = jnp.where(bg <= eps, 3.0**2, bg)
+
     @jax.jit
     def body(u, mean, var, i):
         lr_i = lr_schedule(i)
@@ -784,7 +789,7 @@ def unfold_adam_1d(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask=None, m
     if is_jupyter_notebook() and min_interval is None:
         # We need to slow down the output since jupyter can't keep up
         min_interval = 0.5
-    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm, min_interval=min_interval):
+    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm, mininterval=min_interval):
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:

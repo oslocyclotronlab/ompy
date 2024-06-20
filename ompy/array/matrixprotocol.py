@@ -53,10 +53,6 @@ class MatrixProtocol(AbstractArrayProtocol, Protocol):
     def reshape_like(self, other: MatrixProtocol,
                      inplace: bool = False) -> MatrixProtocol | None: ...
 
-    def trapezoid(self, Ex_min: float, Ex_max: float,
-                  Eg_min: float, Eg_max: float | None = None,
-                  inplace: bool = False) -> MatrixProtocol | None: ...
-
     @overload
     def rebin(self, axis: int | str, *,
               bins: Sequence[float] | Index | None = None,

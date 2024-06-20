@@ -44,7 +44,7 @@ def load_npy(path: Pathlike, **kwargs) -> tuple[tuple[Vector, ...], Matrix]:
     fields = ('FE', 'SE', 'DE', 'AP', 'Eff')
     discrete = [Vector.from_path(path / f'{field}.npz').clone(xalias='E') for field in fields]
     try:
-        fwhm = Vector.from_path(path / 'fwhm.npz', **kwargs)
+        fwhm = Vector.from_path(path / 'FWHM.npz', **kwargs)
         fwhm = fwhm.clone(xalias='E')
     except FileNotFoundError:
         fwhm = None
@@ -87,7 +87,7 @@ def load_compton_mama(path: Pathlike, pattern: str = 'cmp*.m', Eg: Iterable[int]
             if e not in Eg:
                 continue
         Eg_.append(e)
-        compton.append(Vector.from_path(file))
+        compton.append(Vector.from_path(file, filetype='mama'))
     if not len(compton):
         raise FileNotFoundError(f'No files found with glob pattern {pattern} in {path}')
     if Eg is not None and set(Eg_) != set(Eg):
@@ -169,7 +169,7 @@ def load_discrete_mama(path: Pathlike, name: str = 'resp.dat', read_fwhm: bool =
             break
 
     df = pd.DataFrame([line.split() for line in lines[i+2:i+number_of_lines+3]],
-                      columns=['E', 'FWHM', 'Eff', 'FE', 'SE', 'DE', 'AP'])
+                      columns=['E', 'FWHM', 'Eff', 'FE', 'SE', 'DE', 'AP']).dropna()
     df = df.astype(float)
     df['E'] = df['E'].astype(int)
     assert len(df) == number_of_lines, f"Corrupt {path / name}"

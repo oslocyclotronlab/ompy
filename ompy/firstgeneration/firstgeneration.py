@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from .. import Matrix, Vector
 from .. import zeros_like, NUMBA_AVAILABLE
-from typing import TypeAlias
+from typing import TypeAlias, Literal
 from tqdm.auto import tqdm
 from ..numbalib import njit, prange, jitclass, float32
 from dataclasses import dataclass, asdict
@@ -11,7 +11,7 @@ from ..unfolding import BootstrapMatrix
 """
 TODO:
 - [ ] Improve population normalization estimation
-- [ ] Implement all generation
+- [ ] Implement all generation method
 - [ ] Handle Ei, Ef limits of N
       Compute in (Ex, Eg) and map to (Ei, Ef)?
 - [ ] Make a backup implementation in numpy
@@ -37,7 +37,25 @@ TODO:
   Or NMF.
 - Unfolding - wavelet?
 - FG check rhosigchi for Ex=Eg cutoff Februar 2016 ndim xdim smooth 300keV
-  
+- The method fails for RAINIER mu data. I suspect it is the Ex Eg bin resolution
+  that makes small errors that accumulate, yielding negative bins.
+  Should there be any lines at all in FG?
+  I forgot to copy over my FG AG. Unable to check.
+- Can smoothness conditions be enforced to regularize the solution?
+  All vertical lines "of" the AG should be in the G, not FG. Right?
+- Could there be flaws with the RAINIER simulation?
+  When folded with G, there are gradients along Ex. I suspect there are
+  some binning issues with the RAINIER discretization.
+- I was mistaken. The FG method is not significantly worse when done on
+  G folded data than on mu space.
+  Maybe? Maybe a trick of the color scale.
+  The discrete levels are completely identical. 
+  BUG: For the example I used it suddenly deviates at ex=4.000MeV. Very strange
+  This is so strange that I can't help but suspect a bug.
+  Oh, maybe RAINIER! If the discrete levels are used up to 4MeV, maybe the problem
+  is with the simulation not faithfully reproducing the quasi continuum.
+  Nevertheless my intuition has recieved a blow.
+
 """
 
 LOG = logging.getLogger(__name__)
@@ -50,6 +68,9 @@ if NUMBA_AVAILABLE:
     ]
 else:
     spec = None
+
+Backend: TypeAlias = Literal['numpy', 'numba']
+DEFAULT_BACKEND: Backend = 'numba' if NUMBA_AVAILABLE else 'numpy'
 
 
 @jitclass(spec=spec)
@@ -87,7 +108,7 @@ class VectorNumba:
         return self.values[key]
 
 def mat_to_numba(mat: Matrix) -> MatrixNumba:
-    mat = mat.clone(dtype='float32')
+    mat = mat.clone(dtype=np.float32)
     return MatrixNumba(mat.X, mat.Y, mat.values)
 
 def vec_to_numba(vec: Vector) -> VectorNumba:
@@ -147,13 +168,14 @@ def first_generation_matrix(AG: Matrix,
                      multiplicity: Vector | None = None,
                      population_norm: Matrix | None = None,
                      disable_tqdm: bool = False,
+                     backend: Backend = DEFAULT_BACKEND,
                      **kwargs) -> FirstGenerationResult:
     params = FGP(**(asdict(params) | kwargs))
     FG = zeros_like(AG)
     alphas = np.zeros((params.iterations, len(AG.Ex)))
     M = multiplicity_estimation(AG) if multiplicity is None else multiplicity
     if population_norm is None:
-        N = population_normalization(AG, multiplicity = M)
+        N = population_normalization(AG, multiplicity = M, backend=backend)
     else:
         N = population_norm
 
@@ -214,15 +236,19 @@ def multiplicity_estimation(AG: Matrix) -> Vector:
     return multiplicity
     
 
-def population_normalization(AG: Matrix, multiplicity: Vector | None = None) -> Matrix:
+def population_normalization(AG: Matrix, multiplicity: Vector | None = None,
+                             backend: Backend = DEFAULT_BACKEND) -> Matrix:
     if multiplicity is None:
         multiplicity = multiplicity_estimation(AG)
     Eg_sum = AG.sum(axis='Eg')
-    if NUMBA_AVAILABLE:
-        N = population_normalization_njit(vec_to_numba(multiplicity), 
-                                          vec_to_numba(Eg_sum)).values
-    else:
-        N = population_normalization_np(AG.Ex, multiplicity.values, Eg_sum.values)
+    match backend:
+        case 'numba':
+            N = population_normalization_njit(vec_to_numba(multiplicity), 
+                                              vec_to_numba(Eg_sum)).values
+        case 'numpy':
+            N = population_normalization_np(AG.Ex, multiplicity.values, Eg_sum.values)
+        case _:
+            raise ValueError(f"Invalid backend: {backend}. Must be 'numpy' or 'numba'")
     N = Matrix(Ei=AG.Ex, Ef=AG.Ex, values=N,
                xlabel='Ei', ylabel='Ef', name='population normalization')
     return N
@@ -235,6 +261,8 @@ def population_normalization_njit(multiplicity: VectorNumba,
     N = np.zeros((len(Ex), len(Ex)), dtype=multiplicity.values.dtype)
     for ei in prange(len(Ex)):
         for ef in prange(len(Ex)):
+            if multiplicity[ef] == 0 or Eg_sum[ef] == 0:
+                continue
             N[ei, ef] = multiplicity[ef] / multiplicity[ei] * Eg_sum[ei] / Eg_sum[ef]
     return MatrixNumba(Ex, Ex, N)
 
@@ -245,11 +273,16 @@ def population_normalization_np(Ex, M, N):
     return n
 
 
-def G_step(AG: Matrix, W: np.ndarray, N: Matrix) -> np.ndarray:
-    if NUMBA_AVAILABLE:
-        return G_step_njit(mat_to_numba(AG), W, mat_to_numba(N))
-    else:
-        return G_step_np(AG.values, W, N)
+def G_step(AG: Matrix, W: np.ndarray, N: Matrix, backend: Backend = DEFAULT_BACKEND) -> np.ndarray:
+    match backend:
+        case 'numba':
+            # This makes a copy :(
+            return G_step_njit(mat_to_numba(AG), W, mat_to_numba(N))
+        case 'numpy':
+            raise NotImplementedError("Numpy backend not implemented")
+            return G_step_np(AG.values, W, N)
+        case _:
+            raise ValueError(f"Invalid backend: {backend}. Must be 'numpy' or 'numba'")
 
 
 @njit(parallel=True)

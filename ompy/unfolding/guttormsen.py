@@ -93,8 +93,6 @@ class Guttormsen(Unfolder):
                         save_block=self.save_block,
                         enforce_positivity=self.enforce_positivity)
         kw = GuttormsenKwargs(**(defaults | described))
-        assert kw.lr == 1, "Learning rate must be 1. Bug in code or in me?"
-
         LOG.debug(f"Unfolding up to {kw.iterations} iterations")
         LOG.debug(f"Fluctuation weight of {kw.weight}")
         LOG.debug(f"Learning rate of {kw.lr}")
@@ -102,6 +100,10 @@ class Guttormsen(Unfolder):
         if superfluous:
             LOG.warning(f"Unused kwargs: {superfluous}")
         return kw
+
+    def optimal_lr(self, tol: float | None = None) -> float:
+        kappa = np.linalg.cond(self.R.values, tol)
+        return 1 - 2 / (kappa + 1)
 
     def _unfold_vector(self,
                        R: Matrix,
@@ -127,6 +129,12 @@ class Guttormsen(Unfolder):
             fn = _unfold_vector_pos
         else:
             fn = _unfold_vector
+
+        # TODO Abstract this away
+        R = R.as_numpy().astype('float32')
+        data = data.as_numpy().astype('float32')
+        G = G.as_numpy().astype('float32')
+        initial = initial.as_numpy().astype('float32')
         uall, cost, fluctuations, kl = fn(R.values, data.values,
                                         initial.values,
                                         kw.iterations, kw.lr)
@@ -349,10 +357,10 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: GuttormsenKwargs):
     u_all = u
     return u_all, cost, fluctuations, kl_div
 
+
 @jax.jit
 def kl_jax(nu, n):
     return nu - n + n * jnp.log(n / (nu+1e-10) + 1e-10)
-
 
 
 @jax.jit
@@ -360,6 +368,7 @@ def chi2_jax(a, b, mask):
     diff = (a - b)**2 / a
     # Use elementwise multiplication with the mask and then sum
     return jnp.sum(diff * mask, axis=1)
+
 
 def _unfold_matrix_jax_block(R, raw, initial, kw: GuttormsenKwargs):
     lr = kw.lr
@@ -410,12 +419,14 @@ def compton_subtraction(res: UnfoldedResult1D | UnfoldedResult2D,
 def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
                          use_eff: bool = False):
     G = response.gaussian_like(unfolded).T
-    eff = response.interpolation.Eff(unfolded.Eg)
+    eff = response.interpolation.Eff(unfolded.observed)
 
     f = response.fold_componentwise(unfolded)
     fe, se, de, ap, compton0 = f.FE, f.SE, f.DE, f.AP, f.compton
+    pfe = response.component_matrices_like(unfolded)['FE'].sum('true')
     # Need to smooth AP to correct for commutator
     ap = G@ap
+    ap *= 0
 
     # The discrete structures: w
     w = se + de + ap
@@ -424,9 +435,9 @@ def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
     # Assume everything left over from the raw spectrum is the compton.
     # Incredible bad assumption, doesn't take into account the noise
     # of the raw spectrum, nor, more importantly, the errors made in the unfolding.
-    # More succintly: the peaks FE, SE, DE, AP, can only be assumed to be correct
+    # More succinctly: the peaks FE, SE, DE, AP, can only be assumed to be correct
     # when the unfolding is correct, but if the unfolding were correct, there
-    # would be no need for the this compton subtraction method to be used!
+    # would be no need for the compton subtraction method to be used!
     compton = raw - v
     ax, _ = compton0.plot(label='compton 0')
     compton.plot(ax=ax, label='compton 1')
@@ -441,7 +452,7 @@ def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
     # is the unfolded spectrum. I don't like this either, since now the
     # noise of the raw spectrum infects the unfolded spectrum, which we *also*
     # know must be smooth.
-    unf = (raw - compton - w) / fe
+    unf = (raw - compton - w) / pfe
 
     if use_eff:
         unf = unf / eff
@@ -453,6 +464,7 @@ def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
     de.plot(ax=ax0, label='de')
     ap.plot(ax=ax0, label='uap')
     raw.plot(ax=ax0, label='raw')
+    v.plot(ax=ax0, label='v')
     unfolded.plot(ax=ax0, label='unfolded')
     ax0.legend()
 

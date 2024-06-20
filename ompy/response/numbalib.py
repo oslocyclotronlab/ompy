@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 from collections import OrderedDict
+from .. import get_global_dtype
 
 try:
     from numba import jit, njit, int32, float32, float64, prange
@@ -36,8 +37,28 @@ except ImportError as e:
     NList = list
     ListType = list
 
+LOCAL_DTYPE = get_global_dtype()
+match LOCAL_DTYPE:
+    case np.float32:
+        LOCAL_DTYPE = float32
+    case np.float64:
+        LOCAL_DTYPE = float64
+    case _:
+        raise ValueError(f"Unsupported dtype {LOCAL_DTYPE}")
+def set_local_dtype(dtype):
+    global LOCAL_DTYPE
+    LOCAL_DTYPE = dtype
+
+def get_local_dtype():
+    return LOCAL_DTYPE
+
 @njit
-def index(E: np.ndarray, e: float64) -> int:
+def get_local_dtype_njit():
+    return LOCAL_DTYPE
+
+
+@njit
+def index(E: np.ndarray, e: LOCAL_DTYPE) -> int:
     if e < E[0]:
         raise IndexError("Energy below bounds.")
     i = 0
@@ -51,7 +72,7 @@ def index(E: np.ndarray, e: float64) -> int:
 
 
 # @njit
-# def index(E: np.ndarray, e: float64) -> int:
+# def index(E: np.ndarray, e: LOCAL_DTYPE) -> int:
 #     if e < E[0]:
 #         return 0
 #         #raise IndexError("Energy below bounds.")
@@ -64,7 +85,7 @@ def index(E: np.ndarray, e: float64) -> int:
 #     return i-1
 
 @njit
-def index_mid(E: np.ndarray, e: float64) -> int:
+def index_mid(E: np.ndarray, e: LOCAL_DTYPE) -> int:
     """ Index for mid-binning """
     i = 0
     while i < len(E):
@@ -193,9 +214,8 @@ def normalize(R):
 
 spec = OrderedDict()
 if NUMPY:
-    spec['_index'] = float64[::1]
-    spec['values'] = float64[::1]
-
+    spec['_index'] = LOCAL_DTYPE[::1]
+    spec['values'] = LOCAL_DTYPE[::1]
 
 @jitclass(spec)
 class NVector:
@@ -223,6 +243,15 @@ class NVector:
 
     def __len__(self) -> int:
         return len(self._index)
+
+    @property
+    def dtype(self):
+        return self.values.dtype
+
+
+@njit
+def empty_nvector(E: np.ndarray, dtype=LOCAL_DTYPE):
+    return NVector(E, np.empty(len(E), dtype=dtype))
 
 
 @njit

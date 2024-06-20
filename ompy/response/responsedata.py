@@ -9,15 +9,7 @@ import matplotlib.pyplot as plt
 from typing import overload, Literal
 from .io import load, save
 import json
-
-"""
-TODO Use the db from response
-"""
-
-
-ResponseFunctionName = Literal['Oscar2017', 'Oscar2020']
-RESPONSE_FUNCTIONS = {'Oscar2017': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2017_scale1.15",
-                      'Oscar2020': Path(__file__).parent.parent.parent / "OCL_response_functions/oscar2020/mama_export"}
+from .responsepath import get_response_path, ResponseName
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +118,7 @@ class ResponseData:
             If inplace is True, None is returned. If inplace is False, a new ResponseData object is returned.
 
         """
-        total_eff = self.sum() / self.Eff
+        total_eff = self.sum(as_vector=True) / self.Eff
         # Scale all counts to the median. Not obvious if this is correct,
         # as I would have assumed all elements in total_eff corresponding to the
         # same simulations should be equal. they are not, but close.
@@ -164,16 +156,35 @@ class ResponseData:
         else:
             return self.clone(FWHM=self.FWHM * ratio, is_fwhm_normalized=True)
 
+    @overload
+    def scale_FWHM_MAMA(self, inplace: Literal[True] = ...) -> None: ...
+
+
+    @overload
+    def scale_FWHM_MAMA(self, inplace: Literal[False] = ...) -> ResponseData: ...
+
+    def scale_FWHM_MAMA(self, inplace: bool = False) -> ResponseData | None:
+        """ Scale the FWHM from MAMA format to OMpy format
+
+        MAMA uses a normalized version of the FWHM scaled to 1 at 1330keV and inverted
+        by the energy. OMpy requires the FWHM to be a proper function of energy.
+        """
+        fwhm = self.FWHM.copy()
+        fwhm.values *= fwhm.E * 1 / 1330
+        if inplace:
+            self.FWHM = fwhm
+        else:
+            return self.clone(FWHM=fwhm)
+
     @staticmethod
     def from_path(path: Pathlike, **kwargs) -> ResponseData:
         (FE, SE, DE, AP, Eff, *FWHM), compton = load(path, **kwargs)
         return ResponseData(FE, SE, DE, AP, compton, Eff, FWHM=FWHM[0] if FWHM else None)
 
     @staticmethod
-    def from_db(name: ResponseFunctionName, **kwargs) -> ResponseData:
-        if name not in RESPONSE_FUNCTIONS.keys():
-            raise ValueError(f"Response function {name} available. Available functions are {list(RESPONSE_FUNCTIONS.keys())}")
-        return ResponseData.from_path(RESPONSE_FUNCTIONS[name], **kwargs)
+    def from_db(name: ResponseName, **kwargs) -> ResponseData:
+        kwargs.setdefault('format', 'ompy')
+        return ResponseData.from_path(get_response_path(name) / 'data', **kwargs)
 
     def plot(self, ax: Axes | None = None, **kwargs):
         if ax is None:
@@ -182,6 +193,7 @@ class ResponseData:
         ax = ax.flatten()
         if len(ax) < 7:
             raise ValueError("Need at least 5 axes")
+        kwargs.setdefault('kind', 'scatter')
         self.FE.plot(ax=ax[0], **kwargs)
         self.SE.plot(ax=ax[1], **kwargs)
         self.DE.plot(ax=ax[2], **kwargs)
@@ -192,6 +204,7 @@ class ResponseData:
         for i in range(6):
             ax[i].set_xlabel('')
             ax[i].set_ylabel('')
+        kwargs.pop('kind')
         self.compton.plot(ax=ax[6], **kwargs)
         self.sum().plot(ax=ax[7], **kwargs)
         ax[7].set_xlabel('')
