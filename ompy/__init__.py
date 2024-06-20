@@ -11,6 +11,14 @@ if __OMPY_SETUP__:
     sys.stderr.write('Running from ompy source directory.\n')
 else:
 
+    import numpy as np
+    __DTYPE = np.float32
+    def set_global_dtype(dtype):
+        global __DTYPE
+        __DTYPE = dtype
+    def get_global_dtype():
+        return __DTYPE
+
     import os
     from pint import UnitRegistry
     from pint.errors import DimensionalityError
@@ -50,7 +58,7 @@ else:
     NUMBA_AVAILABLE = is_available("numba")
     GPU_AVAILABLE = False
     NUMBA_CUDA_AVAILABLE = False
-    if NUMBA_AVAILABLE:
+    if False and NUMBA_AVAILABLE:
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")

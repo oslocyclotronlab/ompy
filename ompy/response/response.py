@@ -144,8 +144,8 @@ class Response:
         self.components = components
 
     @classmethod
-    def from_data(cls, data: ResponseData) -> Response:
-        intp = DiscreteInterpolation.from_data(data.normalize(inplace=False))
+    def from_data(cls, data: ResponseData, **kwargs) -> Response:
+        intp = DiscreteInterpolation.from_data(data.normalize(inplace=False), **kwargs)
         return cls(data, intp)
 
     def best_energy_resolution(self) -> Index:
@@ -249,19 +249,31 @@ class Response:
             raise ValueError(("Requested energy grid is too low. "
                               f"The lowest energy in the response is {t.leftmost:.2f} {t.unit:~}. "
                               f"The requested energy grid starts at {E.leftmost:.2f} {E.unit:~}. "
-                              f"The energy grid must be truncated at index {E.index(t.leftmost_u) + 1}."))
+                              f"The energy grid must be truncated at index {E.index(t.leftmost_u) + 1}. "
+                              "Alternatively, set `pad=True` to pad the response matrix."))
         if pad:
             E_all = E.copy()
-            E: Index = E_all[E_all >= compton.true_index.leftmost]
+            emin = compton.true_index.to_unit(E).leftmost
+            E: Index = E_all[emin:]
         if weights is None:
             weights = self.components
 
         # We preserve area as we want a mean value, not the sum
         R = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
-        R.rebin('observed', bins=R.true_index, inplace=True)
+        if pad:
+            R.rebin('observed', bins=E_all, inplace=True)
+        else:
+            R.rebin('observed', bins=R.true, inplace=True)
         R = R.to_left()
         R *= weights.compton
         R.name = "Response"
+
+        if pad:
+            R_full = Matrix(true=E_all, observed=E_all, values=np.zeros((len(E_all), len(E_all))), name='Response',
+                            xlabel='True energy', ylabel='Measured energy')
+            R_full.loc[emin:, :] = R.values
+            R = R_full
+            R = R.to_unit('keV', axis='both')
 
         # The functions need to be evaluated over the values within the bin
         # to account for their behaviour across the bin. The resolution
@@ -283,9 +295,9 @@ class Response:
         # has_511 = False
         if has_511:
             j511 = R.index_observed(511)
+        # FIXME: Isn't this wrong? We also want to evalute the discrete structures on the
+        # entire matrix, then rebin at the very end.
         for i, e in enumerate(R.true):
-            # if e < emin:
-            #    continue
             R.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
                 R.loc[i, e - 511.0] += mean(SE, e) * weights.SE
@@ -296,14 +308,6 @@ class Response:
 
         if normalize:
             R.normalize(axis='observed', inplace=True)
-        if pad:
-            N = len(E_all)  # type: ignore
-            M = len(E)
-            R0 = np.empty((N, N))
-            R0[:E, :E] = 0
-            R0[E:, :E] = R.values
-            R = Matrix(true=E_all, observed=E_all, values=R0, name='Response',  # type: ignore
-                       xlabel='True energy', ylabel='Measured energy')
         return R
 
     def discrete_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
