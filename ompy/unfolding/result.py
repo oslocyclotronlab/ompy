@@ -207,14 +207,15 @@ class Parameters(ABC, Generic[T]):
 
     def __post_init__(self):
         # Can eat up GPU memory
-        self.raw.to_cpu(inplace=True)
-        if self.background is not None:
-            self.background.to_cpu(inplace=True)
-        self.initial.to_cpu(inplace=True)
-        self.R.to_cpu(inplace=True)
-        self.G.to_cpu(inplace=True)
-        if self.G_ex is not None:
-            self.G_ex.to_cpu(inplace=True)
+        if False:
+            self.raw.to_cpu(inplace=True)
+            if self.background is not None:
+                self.background.to_cpu(inplace=True)
+            self.initial.to_cpu(inplace=True)
+            self.R.to_cpu(inplace=True)
+            self.G.to_cpu(inplace=True)
+            if self.G_ex is not None:
+                self.G_ex.to_cpu(inplace=True)
         
 
     def save(self, path: Path, exist_ok: bool = False) -> None:

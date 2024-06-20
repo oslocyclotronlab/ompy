@@ -56,7 +56,7 @@ else:
                 warnings.simplefilter("ignore")
                 from numba import cuda
             NUMBA_CUDA_AVAILABLE = True
-        except ImportError:
+        except Exception:
             warnings.warn(
                 "Numba.CUDA could not be imported. GPU acceleration will not be available")
     else:

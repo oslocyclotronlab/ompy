@@ -10,11 +10,16 @@ import time
 from tqdm.autonotebook import tqdm
 from dataclasses import dataclass, fields
 import matplotlib.pyplot as plt
-from typing import Any, TypedDict, Iterable
+from typing import Any, TypedDict, Iterable, Callable, TypeAlias
 from functools import partial
 from pathlib import Path
 from itertools import product
 from typing_extensions import override
+import os
+from abc import ABC, abstractmethod
+
+def is_jupyter_notebook():
+    return 'JPY_PARENT_PID' in os.environ
 
 if OPTAX_AVAILABLE:
     import optax
@@ -73,8 +78,8 @@ def logistic_interpolation(t, lower, upper, midpoint):
     #d = find_d(C, A, B, k)
     return lower + (upper - lower) * sigmoid(t - midpoint)
 
-def onecost(mu): # Make smooth by sigmoid
-    return jnp.sum(jnp.arctan(mu))
+def onecost(mu, C):
+    return jnp.sum(0.5*(1 + 2/3.141592*jnp.arctan((mu - C)/(C/10))))
 
 def cost(mu, R, G_ex, n, bg, n_err, bg_err,
          alpha=0.0, beta=0):
@@ -82,8 +87,10 @@ def cost(mu, R, G_ex, n, bg, n_err, bg_err,
     nu = G_ex@mu@R
     if bg is not None:
         n = n - bg
+        # Isn't it better with
+        # nu = nu + bg
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.mean(n)) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
     #return jnp.sum((nu - n)**2/e
     #return jnp.sum(kl(nu, n))
@@ -105,12 +112,13 @@ def _cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
 
 
 def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
-            alpha=1.0, beta=1e-3):#, alpha=0.3e-1):
+            alpha=0.0, beta=1e-3):#, alpha=0.3e-1):
     mu = mu**2
     nu = R@mu
-    nu = jnp.log(nu + 1e-1)
-    n = jnp.log(n + 1e-1)
-    return jnp.sum(jnp.abs(nu - n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.median(n))**2
+    #nu = jnp.log(nu + 1e-1)
+    #n = jnp.log(n + 1e-1)
+    #return jnp.sum(jnp.abs(nu - n)) + alpha*onecost(mu)**2 #- beta*jnp.sum(entropy(mu))# + difference_cost(n, nu)
     #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
 
 
@@ -120,7 +128,7 @@ def cost_1d_v2(mu, R, G_eg, G_ex, n, bg, n_err, bg_err,
     nu = R@mu
     eta = G_eg@mu
     # The entropy must be taken in eta space
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 - beta*jnp.sum(entropy(eta))# + difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu)**2 #- beta*jnp.sum(entropy(eta))# + difference_cost(n, nu)
     #total = jnp.sum(kl(nu, n)) #- alpha*jnp.sum(entropy(mu)) + beta*difference_cost(n, nu)
 
 def cost_components_from_result(result, eta, alpha=0, beta=0):
@@ -431,17 +439,115 @@ def unfold_NAG(u, raw, R, loss, grad, value_and_grad, mask, max_iter=10,
     return u**2, total_cost[:j]
 
 
+Schedule: TypeAlias = Callable[[int], float]
+
+
+class Scheduler(ABC):
+    @abstractmethod
+    def make(self) -> Schedule: ...
+
+    def plot(self, x: np.ndarray | None = None, ax = None):
+        if ax is None:
+            fig, ax = plt.subplots()
+        if x is None:
+            x = np.arange(0, 1_000_000, 10_000)
+        fn = np.vectorize(self.make())
+        ax.plot(x, fn(x))
+        return ax
+
+class ConstScheduler(Scheduler):
+    def __init__(self, lr):
+        self.lr = lr
+
+    def make(self):
+        lr = self.lr
+        return lambda t: lr
+
+
+class ExponentialDecayScheduler(Scheduler):
+    def __init__(self, initial_lr, decay_rate):
+        self.initial_lr = initial_lr
+        self.decay_rate = decay_rate
+
+    def make(self):
+        # Return a function that computes the learning rate given the epoch
+        lr0 = self.initial_lr
+        theta = self.decay_rate
+        def lr_schedule(epoch):
+            return lr0 * (theta ** epoch)
+        return lr_schedule
+
+    @classmethod
+    def from_point(cls, initial_lr, epoch, lr):
+        # Calculate the necessary decay_rate
+        decay_rate = (lr / initial_lr) ** (1 / epoch)
+        return cls(initial_lr, decay_rate)
+
+
+class StepScheduler(Scheduler):
+    def __init__(self, initial_lr, drop_factor, drop_every):
+        self.initial_lr = initial_lr
+        self.drop_factor = drop_factor
+        self.drop_every = drop_every
+
+    def make(self):
+        def lr_schedule(epoch):
+            steps = epoch // self.drop_every
+            return self.initial_lr - (self.drop_factor * steps)
+        return lr_schedule
+
+
+class StepsScheduler(Scheduler):
+    def __init__(self, points):
+        # Ensure points are sorted by epoch
+        self.points = sorted(points)
+
+    def make(self):
+        def lr_schedule(epoch):
+            for i in range(len(self.points) - 1):
+                if epoch < self.points[i + 1][0]:
+                    return self.points[i][1]
+            return self.points[-1][1]
+        return lr_schedule
+
+
+class CosineAnnealingScheduler(Scheduler):
+    def __init__(self, initial_lr, min_lr, T_max):
+        """
+        :param initial_lr: The initial learning rate.
+        :param min_lr: The minimum learning rate.
+        :param T_max: The maximum number of iterations (epochs) for the schedule.
+        """
+        self.initial_lr = initial_lr
+        self.min_lr = min_lr
+        self.T_max = T_max
+
+    def make(self):
+        def lr_schedule(epoch):
+            # Cosine Annealing formula
+            return self.min_lr + (self.initial_lr - self.min_lr) * (1 + np.cos(np.pi * epoch / self.T_max)) / 2
+        return lr_schedule
+
+
 def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
                 G_ex: Array, loss, grad, value_and_grad, mask, max_iter=10,
-               lr=0.001, beta1=0.9, beta2=0.999,
-               abs_tol=1e-3, rel_tol=1e-3,
-           use_abs_tol: bool = False, use_rel_tol: bool = False, **kwargs):
+                lr=0.001, beta1=0.9, beta2=0.999,
+                abs_tol=1e-3, rel_tol=1e-3,
+                use_abs_tol: bool = False, use_rel_tol: bool = False,
+                lr_scheduler: Scheduler | None = None,
+                **kwargs):
     max_iter = int(max_iter)
     total_cost = np.zeros(max_iter)
     #print(loss(u, R, raw))
     mask = ~mask
     alpha = kwargs.pop('alpha', 0.0)
     beta = kwargs.pop('beta', 0.0)
+
+    if lr_scheduler is None:
+        lr_schedule = ConstScheduler(lr).make()
+    else:
+        lr_schedule = lr_scheduler.make()
+    #print(lr_scheduler, lr_schedule(0))
 
     #@jax.jit
     eps = 1e-8
@@ -452,13 +558,14 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
         bg_err = jnp.where(bg <= eps, 3.0**2, bg)
     @jax.jit
     def body(u, mean, var, i):
+        lr_i = lr_schedule(i)
         tloss, g = value_and_grad(u, R, G_ex, raw, bg, n_err, bg_err,
                                   alpha=alpha, beta=beta)
         mean = beta1*mean + (1-beta1)*g
         var = beta2*var + (1-beta2)*jnp.multiply(g, g)
         mean_cor = mean/(1-beta1**i)
         var_cor = var/(1-beta2**i)
-        v = jnp.multiply(lr/(jnp.sqrt(var_cor) + eps), mean_cor)
+        v = jnp.multiply(lr_i/(jnp.sqrt(var_cor) + eps), mean_cor)
         u = u - v
         u = u.at[mask].set(0)
         #tloss = loss(u, R, raw, alpha=alpha)
@@ -468,7 +575,13 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
     var = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     disable_tqdm = kwargs.get('disable_tqdm', False)
     leave_tqdm = kwargs.get('leave_tqdm', True)
-    bar = tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm)
+    min_interval = kwargs.get('mininterval_tqdm', None)
+    # Check if is in jupyter
+    if is_jupyter_notebook() and min_interval is None:
+        # We need to slow down the output since jupyter can't keep up
+        min_interval = 1
+    bar = tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm, mininterval=min_interval)
+    time0 = time.time()
     for i in bar:
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
         # Check if cost is NaN
@@ -478,14 +591,18 @@ def unfold_adam(u: Array, *, raw: Array, bg: Array, R: Array,
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:
                 j = i
+                bar.container.close()
                 break
             if use_rel_tol and np.abs(total_cost[i] - total_cost[i-1])/total_cost[i-1] < rel_tol:
                 j = i
+                bar.container.close()
                 break
-        std = rolling_standard_deviation(total_cost[:i], 10)
-        cv = rolling_coefficient_of_variation(total_cost[:i], 10)
-        ema = exponential_moving_average(total_cost[:i], 0.1)
-        bar.set_postfix({'cost': total_cost[i], 'std': std, 'cv': cv, 'ema': ema}, refresh=True)
+        if min_interval is not None and time.time() - time0 > min_interval:
+            std = rolling_standard_deviation(total_cost[:i], 10)
+            cv = rolling_coefficient_of_variation(total_cost[:i], 10)
+            ema = exponential_moving_average(total_cost[:i], 0.1)
+            bar.set_postfix({'cost': total_cost[i], 'std': std, 'cv': cv, 'ema': ema}, refresh=True)
+            time0 = time.time()
 
     return u**2, total_cost[:j]
 
@@ -642,8 +759,8 @@ def unfold_adam_1d(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask=None, m
         bg_err = 0
     else:
         bg_err = jnp.where(bg <= eps, 3.0**2, bg)
-    alpha = kwargs.pop('alpha', 1.0)
-    beta = kwargs.pop('beta', 1.0e-3)
+    alpha = kwargs.pop('alpha', 0.0)
+    beta = kwargs.pop('beta', 0.0)
 
     @jax.jit
     def body(u, mean, var, i):
@@ -662,7 +779,12 @@ def unfold_adam_1d(u, raw, bg, R, G_ex, loss, grad, value_and_grad, mask=None, m
     var = jnp.zeros_like(u) #grad(u, R, raw, alpha=alpha)
     disable_tqdm = kwargs.get('disable_tqdm', False)
     leave_tqdm = kwargs.get('leave_tqdm', True)
-    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm):
+    min_interval = kwargs.get('min_interval_tqdm', None)
+    # Check if is in jupyter
+    if is_jupyter_notebook() and min_interval is None:
+        # We need to slow down the output since jupyter can't keep up
+        min_interval = 0.5
+    for i in tqdm(range(max_iter), disable=disable_tqdm, leave=leave_tqdm, min_interval=min_interval):
         u, mean, var, total_cost[i] = body(u, mean, var, i+1)#, alpha=kwargs['alpha'])
         if i > 0:
             if use_abs_tol and np.abs(total_cost[i] - total_cost[i-1]) < abs_tol:
