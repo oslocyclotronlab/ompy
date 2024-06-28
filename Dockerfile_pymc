@@ -1,0 +1,72 @@
+# Use an official Python runtime as a parent image
+FROM ubuntu:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Update the package repository and install required packages
+RUN apt-get update && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y python3.11
+
+# Set the default Python version to 3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN apt-get install -y python3-pip
+RUN apt-get install -y python3.11-dev
+
+# Install numpy
+# Replace X.X.X with the version compatible with your PyMC version
+RUN pip install numpy==1.26
+
+# Install PyMC
+# Replace Y.Y.Y with the version of PyMC you want to use
+RUN pip install pymc
+RUN pip install matplotlib
+RUN pip install numba
+RUN pip install scipy
+RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Install Jupyter
+RUN pip install jupyter
+RUN pip install termtables
+RUN pip install tqdm
+RUN pip install pint
+RUN pip install nptyping
+RUN pip install sympy
+RUN pip install pandas
+RUN pip install numpyro
+RUN pip install blackjax
+RUN pip install nutpie
+RUN pip install graphviz
+RUN pip install arviz
+RUN pip install ipympl
+RUN pip install bambi
+RUN pip install statsmodels
+RUN pip install scikit-learn
+
+# Make port 8888 available to the world outside this container
+EXPOSE 8889
+
+# Create an alias for the Jupyter command
+RUN echo "alias jupyter-notebook='jupyter notebook --allow-root --ip=0.0.0.0 --port=8889'" >> ~/.bashrc
+
+# Ensure that .bashrc gets sourced upon login
+RUN echo "source ~/.bashrc" >> ~/.bash_login
+
+ARG USER_ID
+ARG GROUP_ID
+RUN addgroup --gid $GROUP_ID user && \
+    adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID user
+USER user
+
+# Run a command to verify the Python version
+CMD ["/bin/bash"]
+
+# Run Jupyter Notebook when the container launches
+# --ip=0.0.0.0 makes the notebook accessible from outside the container
+#CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root", "--no-browser"]
+
