@@ -43,7 +43,7 @@ except ImportError as e:
 
 if NUMBA_CUDA_AVAILABLE:
     from numba import cuda
-    from numba.cuda.cudadrv.driver import CudaAPIError, CudaSupportError
+    from numba.cuda.cudadrv.driver import CudaAPIError, CudaSupportError, LinkerError
     from numba.core.errors import NumbaPerformanceWarning
     HAIL_MARY = False
 
@@ -64,7 +64,7 @@ if NUMBA_CUDA_AVAILABLE:
                 y = np.zeros_like(x)
                 cuda_test[1, 10](x, y)
                 NUMBA_CUDA_WORKING[0] = True
-            except (CudaAPIError, CudaSupportError) as e:
+            except (CudaAPIError, CudaSupportError, LinkerError) as e:
                 warnings.warn("Numba CUDA is available but not working.\n"
                     f"{e}")
                 NUMBA_CUDA_WORKING[0] = False

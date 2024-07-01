@@ -11,11 +11,16 @@ import matplotlib.colorbar as cbar
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.text as mtext
+from matplotlib.colors import Normalize, BoundaryNorm, to_rgba
+from matplotlib.cm import ScalarMappable
 import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.colorbar import Colorbar
 from matplotlib.patches import Rectangle
 from scipy.stats import gaussian_kde
+from matplotlib.widgets import Cursor, SpanSelector
+from ipywidgets import Button, VBox
+from IPython.display import display
 
 from .stubs import Axes, Line2D
 
@@ -60,10 +65,14 @@ def combine_legend(headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable
         rec_add(handles, labels, line_collection)
     if misc is not None:
         for line in misc:
-            if isinstance(line, tuple):
+            if isinstance(line, (tuple, list)):
                 labels.append(line[0].get_label())
-                handles.append(line)
+                if len(line) > 1:
+                    handles.append(line)
+                else:
+                    handles.append(line[0])
             else:
+                print(line, line.get_label())
                 labels.append(line.get_label())
                 handles.append(line)
     return handles, labels
@@ -196,6 +205,73 @@ def is_running_in_jupyter() -> bool:
     except Exception:
         return False
     return True
+
+
+class ColorScheme:
+    def __init__(self, iterable, cmap='viridis', padding=0.1):
+        self.iterable = list(iterable)
+        self.cmap_name = cmap
+        self.padding = padding
+        self.colors = self._generate_colors(cmap, padding)
+        self.value_to_index = {value: idx for idx, value in enumerate(self.iterable)}
+        self._cmap = None
+        self._norm = None
+
+    def _generate_colors(self, cmap_name, padding):
+        cmap = plt.get_cmap(cmap_name)
+        num_colors = len(self.iterable)
+        color_values = np.linspace(padding, 1, num_colors)
+        return [cmap(value) for value in color_values]
+
+    def __getitem__(self, index):
+        return self.colors[index]
+
+    def __call__(self, value):
+        idx = self.value_to_index.get(value)
+        if idx is not None:
+            return self.colors[idx]
+        else:
+            raise KeyError(f"Value {value} not found in the iterable")
+
+    def mappable(self, discrete=False):
+        norm = Normalize(vmin=min(self.iterable), vmax=max(self.iterable))
+        cmap = plt.get_cmap(self.cmap_name)
+
+        if discrete:
+            # Create discrete color levels
+            boundaries = np.linspace(min(self.iterable), max(self.iterable), len(self.iterable) + 1)
+            norm = BoundaryNorm(boundaries, cmap.N, clip=True)
+        self._cmap = cmap
+        self._norm = norm
+        sm = ScalarMappable(norm=norm, cmap=self.cmap_name)
+        sm.set_array([])
+        return sm
+
+    def set_ticks(self, cbar, adjust_color=True):
+        # Create discrete color levels
+        boundaries = np.linspace(min(self.iterable), max(self.iterable), len(self.iterable) + 1)
+        # Set the ticks to be in the middle of each segment
+        tick_locs = (boundaries[:-1] + boundaries[1:]) / 2
+        cbar.set_ticks(tick_locs)
+        cbar.set_ticklabels(self.iterable)
+        if adjust_color:
+            self._adjust_tick_colors(cbar)
+            cbar.ax.figure.canvas.draw()
+
+    def _adjust_tick_colors(self, cbar):
+        for tick in cbar.ax.get_yticklines():
+            color = self._get_color_for_tick(tick)
+            tick.set_markeredgecolor(color)
+
+    def _get_color_for_tick(self, tick):
+        tick_value = tick.get_ydata()[0]
+        color = self._cmap(self._norm(tick_value))
+        r, g, b, _ = to_rgba(color)
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        # Calculate the gray level based on luminance
+        return 'white' if luminance < 0.5 else 'black'
+
+
 
 
 class ReverseNormalization(mcolors.Normalize):
@@ -572,3 +648,57 @@ def mc_errplot(X: np.ndarray, Y: np.ndarray, ax: Axes | None = None,
         lines.append(l2)
 
     return ax, lines
+
+
+
+def setup_interactive_plot(matrix, ax, enable_button=True, enable_hotkey=True, hotkey='a'):
+    """
+    Sets up an interactive plot with a matrix, allowing selection of a range along the x-axis to sum columns.
+
+    Parameters:
+    - matrix: 2D numpy array to be plotted
+    - ax: Matplotlib axis to which the matrix is already plotted
+    - enable_button: Boolean, if True a button will be displayed to activate the range selector
+    - enable_hotkey: Boolean, if True a hotkey can be used to activate the range selector
+    - hotkey: Character, the key to be used as a hotkey for activating the range selector
+    """
+
+    # Function to sum and plot selected columns
+    def plot_selected_columns(x_min, x_max):
+        x_min, x_max = int(np.floor(x_min)), int(np.ceil(x_max))
+        x_min = max(x_min, 0)
+        x_max = min(x_max, matrix.shape[1])
+
+        selected_region = matrix[:, x_min:x_max]
+        summed_values = np.sum(selected_region, axis=1)
+
+        plt.figure(figsize=(10, 4))
+        plt.plot(summed_values, marker='o')
+        plt.title(f"Summed Values from Column {x_min} to {x_max}")
+        plt.xlabel("Y-axis")
+        plt.ylabel("Sum")
+        plt.grid(True)
+        plt.show()
+
+    # Span selector
+    def on_select(x_min, x_max):
+        plot_selected_columns(x_min, x_max)
+
+    span_selector = SpanSelector(ax, on_select, 'horizontal', useblit=True, minspan=1, interactive=True)
+
+    # Function to activate selector via button or hotkey
+    def activate_selector(event=None):
+        span_selector.set_active(True)
+        print(f"Range selector activated by {('button' if event else 'hotkey')}")
+
+    if enable_hotkey:
+        def on_key(event):
+            if event.key == hotkey:
+                activate_selector()
+        ax.figure.canvas.mpl_connect('key_press_event', on_key)
+
+    # Button to activate the selector
+    if enable_button:
+        activate_button = Button(description="Activate Range Selector")
+        activate_button.on_click(activate_selector)
+        display(VBox([activate_button]))

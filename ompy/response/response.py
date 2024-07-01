@@ -142,6 +142,7 @@ class Response:
         self.compton: ComptonMatrix | None = compton if not copy else compton.copy() if compton is not None else None
         self.compton_special: Matrix | None = None
         self.components = components
+        self.disable_ap = False
 
     @classmethod
     def from_data(cls, data: ResponseData, **kwargs) -> Response:
@@ -291,8 +292,7 @@ class Response:
 
         FE, SE, DE, AP = self.interpolation.structures()
         emin = R.observed_index.leftmost
-        has_511 = 511 >= emin
-        # has_511 = False
+        has_511 = (511 >= emin) and not self.disable_ap
         if has_511:
             j511 = R.index_observed(511)
 
@@ -512,7 +512,7 @@ class Response:
                 return fn(e)
 
         emin = compton.observed_index.leftmost
-        has_511 = 511 > emin
+        has_511 = 511 > emin and not self.disable_ap
         if has_511:
             j511 = APm.index_observed(511.0)
         for i, e in enumerate(compton.true):

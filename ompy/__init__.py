@@ -64,7 +64,7 @@ else:
                 warnings.simplefilter("ignore")
                 from numba import cuda
             NUMBA_CUDA_AVAILABLE = True
-        except ImportError:
+        except Exception:
             warnings.warn(
                 "Numba.CUDA could not be imported. GPU acceleration will not be available")
     else:
@@ -126,6 +126,8 @@ else:
     SKLEARN_AVAILABLE = is_available("sklearn")
     OPTAX_AVAILABLE = is_available("optax")
 
+    from .computation_context import ComputationContext, new_context
+
     from .status import print_status
 
     #from .stubs import Axes
@@ -140,7 +142,7 @@ else:
     from .array import Vector, Matrix, zeros_like, empty_like, empty, transition_matrix
     from .array import to_index, Index, fmap, umap, omap, linspace, unpack_to_vectors
     from .array import ErrorVector, SymmetricVector, AsymmetricVector, CorrelationMatrix, PoissonVector, ArrayList
-    from .array import on_gpu, on_cpu
+    from .array import on_gpu, on_cpu, on_device
     #from .unfolder import Unfolder
     #from . import response
     #from .response import Response, Calibrator, ResponseData, DiscreteInterpolation

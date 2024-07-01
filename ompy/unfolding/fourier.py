@@ -12,6 +12,8 @@ from scipy.optimize import OptimizeResult
 from scipy.fft import ifft
 
 
+# Much faster for gpu
+
 @dataclass
 class FourierResult1D(UnfoldedResult1DSimple):
     nparams: int
