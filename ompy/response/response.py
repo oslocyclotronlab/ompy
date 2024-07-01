@@ -295,8 +295,7 @@ class Response:
         # has_511 = False
         if has_511:
             j511 = R.index_observed(511)
-        # FIXME: Isn't this wrong? We also want to evalute the discrete structures on the
-        # entire matrix, then rebin at the very end.
+
         for i, e in enumerate(R.true):
             R.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
