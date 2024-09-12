@@ -10,6 +10,8 @@ Added:
 
 Changed:
 - Fixed a bug where the `std` attribute of `Vector` was not saved to file.
+- Added `evidence` attribute to the `ResultsNormalized` class such that the global evidence of the Bayesian fit
+  are stored with the results.
 - Reimplemented PPF for normal distribution and truncated normal distribution in C++ for improved performance (about 300% faster than the SciPy implementation!).
 - Fixed a potential bug where `units` attribute is set erroniously when reading the discrete level density from file (`load_levels_discrete` and `load_levels_discrete_smooth`).
 
