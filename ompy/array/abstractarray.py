@@ -8,7 +8,7 @@ from .index import Index
 from .. import Unit, JAX_WORKING
 from ..computation_context import new_context, active_context, ComputationContext, delete_context
 from .abstractarrayprotocol import AbstractArrayProtocol
-from nptyping import NDArray, Shape, Floating
+#from nptyping import NDArray, Shape, Floating
 from typing import Iterator, Self, Literal, Callable, overload, TypeAlias
 
 
@@ -42,7 +42,8 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         ARRAY_CLASSES[cls.__name__] = cls
 
     def __init__(self, values: np.ndarray):
-        self.values: NDArray[Shape['*', ...], Floating] = values
+        #self.values: NDArray[Shape['*', ...], Floating] = values
+        self.values: np.ndarray = values
         # The context in which the array was created
         # only used for internal bookkeeping. Should not be saved
         # or modified by the user.

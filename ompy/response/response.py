@@ -213,7 +213,7 @@ class Response:
         return self.discrete_(E=bins_, **kwargs)
 
     def discrete_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
-                  normalize: bool = True, pad: bool = False) -> Matrix:
+                  normalize: bool = True, pad: bool = False, force_trilu: bool = True) -> Matrix:
         """
         Rebins the discrete response matrix to the requested energy grid.
 
@@ -229,6 +229,8 @@ class Response:
             Whether to normalize the rebinned response matrix.
         pad : bool, default False
             Whether to pad the rebinned response matrix.
+        force_trilu : bool, default True
+            Whether to force the rebinned response matrix to be lower triangular.
 
         Returns:
         --------
@@ -306,6 +308,10 @@ class Response:
             if has_511 and e > 1022:
                 R[i, j511] += mean(AP, e) * weights.AP  # type: ignore
 
+        if force_trilu:
+            mask = np.tril_indices_from(R.values.T, k=-1)
+            R.values.T[mask] = 0
+
         if normalize:
             R.normalize(axis='observed', inplace=True)
         return R
@@ -351,7 +357,7 @@ class Response:
             E_ = E.to_unit('keV').to_mid().bins
         else:
             E_ = E
-            units = 'kev'
+            units = 'keV'
         G: Matrix = gaussian_matrix(E_, self.interpolation.sigma)
         if isinstance(E, Index) and E.is_left():
             G = G.to_left()

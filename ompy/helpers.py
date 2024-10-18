@@ -382,7 +382,7 @@ class AnnotatedColorbar(Colorbar):
         self.nans = nans
         self.linewidth = linewidth
         self.lower_text = None
-        self.higher_text = None
+        self.upper_text = None
         self.nans_text = None
         self.color_by = color_by
         self.do_draw_kde = draw_kde
@@ -516,13 +516,13 @@ class AnnotatedColorbar(Colorbar):
         if self.higher:
             if higher > 0:
                 text = f'{higher * 100:.1f}%'
-                if self.higher_text is not None:
-                    self.higher_text.set_text(text)
+                if self.upper_text is not None:
+                    self.upper_text.set_text(text)
                 else:
-                    self.higher_text = self.ax.text(0.5, 1.05, text, transform=self.ax.transAxes, ha='center',
+                    self.upper_text = self.ax.text(0.5, 1.05, text, transform=self.ax.transAxes, ha='center',
                                                     va='bottom')
-            elif self.higher_text is not None:
-                self.higher_text.set_text('')
+            elif self.upper_text is not None:
+                self.upper_text.set_text('')
         if self.nans:
             if nans > 0:
                 text = f'{nans} nan'

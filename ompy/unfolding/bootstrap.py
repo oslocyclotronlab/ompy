@@ -35,6 +35,7 @@ if H5PY_AVAILABLE:
 if JAX_AVAILABLE:
     import jax.numpy as jnp
     from jax.scipy.stats import norm as jax_norm
+    import jax
 
 """
 TODO
@@ -382,6 +383,13 @@ class Bootstrap(ABC, Generic[T]):
         ...
 
     @property
+    def G_ex(self) -> Matrix:
+        return self.base.G_ex
+
+    def has_G_ex(self) -> bool:
+        return hasattr(self.base, 'G_ex') and self.G_ex is not None
+
+    @property
     def G(self) -> Matrix:
         return self.base.G
 
@@ -664,6 +672,21 @@ class BootstrapMatrix(Bootstrap[Matrix]):
         nu = self.base.raw.clone(values=nu)
         return nu
 
+    def mu_mat(self, summary=np.median) -> Matrix:
+        mu = summary(self.ubox, axis=0)
+        mu = self.base.raw.clone(values=mu)
+        return mu
+
+    def mu_vec(self, Ex: float | int, alpha=0.05, summary=np.median) -> AsymmetricVector:
+        i = self.base.raw.X_index.index_expression(Ex, strict=False)
+        j = last_nonzero(self.ubox[:, i, :])
+        mu = summary(self.ubox[:, i, :j], axis=0)
+        mu = self.base.raw.iloc[i, :j].clone(values=mu)
+        lower = np.percentile(self.ubox[:, i, :j], 100 * alpha / 2, axis=0)
+        upper = np.percentile(self.ubox[:, i, :j], 100 * (1 - alpha / 2), axis=0)
+        mu = AsymmetricVector.from_CI(mu, lower=lower, upper=upper, clip=True)
+        return mu
+
     def get_eta(self, i: int) -> Matrix:
         return self.base.raw.clone(values=self.etabox[i, :, :], name=f'eta {i}')
 
@@ -675,14 +698,16 @@ class BootstrapMatrix(Bootstrap[Matrix]):
 
     @property
     def etabox(self) -> np.ndarray:
+        if self.base.meta.space != 'RG':
+            warnings.warn(f"eta is only properly defined for the RG space, not {self.base.meta.space}.")
         if self._etabox is None:
-            self._etabox = gmul(self.ubox, self.G.values)
+            self._etabox = gmul(self.ubox, self.G.values, self.G_ex.values)
         return self._etabox
 
     @property
     def nubox(self) -> np.ndarray:
         if self._nubox is None:
-            self._nubox = gmul(self.ubox, self.R.values)
+            self._nubox = gmul(self.ubox, self.R.values.T, self.G_ex.values)
         return self._nubox
 
 
@@ -715,9 +740,25 @@ def last_nonzero(box: np.ndarray) -> int:
             return i
     return 0
 
+def gmul(X, A, B=None):
+    if B is None:
+        return np.einsum('ijk,kl->ijl', X, A)
+    else:
+        raise NotImplementedError('Numpy einsum just stalls. Use jax.')
+        # For the daredevils, this is the einsum
+        return np.einsum('ij,kjl,lm->kim', B, X, A)
 
-def gmul(X, A):
-    return np.einsum('ijk,kl->ijl', X, A)
+if JAX_AVAILABLE:
+    @jax.jit
+    def _gmul(X, A, B=None):
+        if B is None:
+            return jnp.einsum('ijk,kl->ijl', X, A)
+        else:
+            return jnp.einsum('ij,kjl,lm->kim', B, X, A)
+
+    def gmul(X, A, B=None):
+        x = _gmul(X, A, B)
+        return np.asarray(x)
 
 
 # @njit

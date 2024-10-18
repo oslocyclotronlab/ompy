@@ -5,7 +5,7 @@ from typing import TypeAlias, Callable
 
 import numba as nb
 import numpy as np
-from nptyping import NDArray, Shape, Float32, Int32
+#from nptyping import NDArray, Shape, Float32, Int32
 from numba import cuda
 from numba import njit, prange, types
 from typing import TypeGuard, TypeVar
@@ -18,22 +18,22 @@ from .. import Vector, Matrix, Index
 DEBUG = False
 # There are a lot of shapes to get right. These are an attempt
 # to make it harder to get lost in the code
-DTYPE: TypeAlias = Float32
+DTYPE: TypeAlias = np.float32
 # 'Observed' is the dimension of the observed Eg in the raw compton spectra
-VO: TypeAlias = NDArray[Shape['Observed'], DTYPE]
+VO: TypeAlias = np.ndarray  #  NDArray[Shape['Observed'], DTYPE]
 # 'True' is the dimension of the true Eg in the raw compton spectra
-VT: TypeAlias = NDArray[Shape['True'], DTYPE]
+VT: TypeAlias = np.ndarray  #  NDArray[Shape['True'], DTYPE]
 # 'E' is the dimension of the user requested energies
-VE: TypeAlias = NDArray[Shape['E'], DTYPE]
-MEO: TypeAlias = NDArray[Shape['E, Observed'], DTYPE]
-MTO: TypeAlias = NDArray[Shape['True, Observed'], DTYPE]
-MEO2: TypeAlias = NDArray[Shape['E, Observed, 2'], DTYPE]
-vector: TypeAlias = NDArray[Shape['*'], DTYPE]
-matrix: TypeAlias = NDArray[Shape['*, *'], DTYPE]
-MAT: TypeAlias = NDArray
-VEC: TypeAlias = NDArray
+VE: TypeAlias = np.ndarray  #  NDArray[Shape['E'], DTYPE]
+MEO: TypeAlias = np.ndarray  #  NDArray[Shape['E, Observed'], DTYPE]
+MTO: TypeAlias = np.ndarray  #  NDArray[Shape['True, Observed'], DTYPE]
+MEO2: TypeAlias = np.ndarray  #  NDArray[Shape['E, Observed, 2'], DTYPE]
+vector: TypeAlias = np.ndarray  #  NDArray[Shape['*'], DTYPE]
+matrix: TypeAlias = np.ndarray  #  NDArray[Shape['*, *'], DTYPE]
+MAT: TypeAlias = np.ndarray  #  NDArray
+VEC: TypeAlias = np.ndarray  #  NDArray
 D: TypeAlias = DTYPE
-S: TypeAlias = Shape
+#S: TypeAlias = Shape
 
 CT = TypeVar('CT')
 #Elementwise = Callable[[float], float] | Callable[[vector], vector] | Callable[[np.ndarray], np.ndarray]
@@ -265,8 +265,9 @@ def lerp(out: MEO, E: VE, Et: VT, E_to_T: VE, compton: MTO):
         out[i, j] = (1 - t) * compton[low, j] + t * compton[high, j]
 
 
+#def find_closest(X: NDArray[S['M'], DTYPE], Y: NDArray[S['N'], DTYPE]) -> NDArray[S['M'], Int32]:
 @njit
-def find_closest(X: NDArray[S['M'], DTYPE], Y: NDArray[S['N'], DTYPE]) -> NDArray[S['M'], Int32]:
+def find_closest(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     """ Find the closest value in Y for each value in X
 
     Assumes that X and Y are sorted in ascending order and
