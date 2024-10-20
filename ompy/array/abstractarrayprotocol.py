@@ -6,7 +6,7 @@ from abc import abstractmethod
 from .index import Index
 from .. import Unit
 from typing import Protocol, Self
-from nptyping import NDArray, Floating, Shape
+#from nptyping import NDArray, Floating, Shape
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
@@ -17,7 +17,8 @@ logging.captureWarnings(True)
 
 class AbstractArrayProtocol(Protocol):
     __default_unit: Unit
-    values: NDArray[Shape['*', ...], Floating]
+    #values: NDArray[Shape['*', ...], Floating]
+    values: np.ndarray
 
     def __init__(self, values: np.ndarray): ...
 

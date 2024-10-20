@@ -222,6 +222,7 @@ class GSFModel(NormalizationModel):
 class CT_(NLDModel):
     """
     Constant temperature model.
+    Todo: use a "register_parameter"
     """
     def __init__(self, T, E0, backend: BACKENDS | None = None):
         super().__init__(backend=backend)

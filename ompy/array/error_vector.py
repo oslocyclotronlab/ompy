@@ -107,6 +107,7 @@ class AsymmetricVector(ErrorVector):
              kind: str = 'step',
              ekind: ErrorPlotKind = 'line',
              ekwargs: dict | None = None,
+             e_offset: float | np.ndarray = 0,
              **kwargs) -> Plot1D:
         """ Plots the vector
 
@@ -118,6 +119,9 @@ class AsymmetricVector(ErrorVector):
                 - 'plot' : same as 'line'
                 - 'step' : step plot
                 - 'bar' : vertical bar plot
+            ekwargs (dict, optional): Keyword arguments for the error bars.
+            e_offset (float or array-like, optional): Offset for the error bars.
+                Useful for plotting several sets of error bars.
             kwargs (optional): Additional kwargs to plot command.
 
         Returns:
@@ -164,7 +168,7 @@ class AsymmetricVector(ErrorVector):
                           'capthick': 0.5, 'ms': 1} | ekwargs
                     err = np.array([self.lerr, self.uerr])
                     #err = np.append(err, err[:, -1:], axis=1)
-                    eline = ax.errorbar(bins, self.values, yerr=err, **kw)
+                    eline = ax.errorbar(bins + e_offset, self.values, yerr=err, **kw)
                     lines = (line, eline)
                 elif ekind == 'fill':
                     kw = {'step': step, 'edgecolor': None, 'alpha': 0.2, 'color': color} | ekwargs

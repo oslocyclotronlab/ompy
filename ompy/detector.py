@@ -307,5 +307,5 @@ class Oslo(CompoundDetector):
 
 
 @njit
-def ngaussian(x: array, mu: float, sigma: float):
+def ngaussian(x: np.ndarray, mu: float, sigma: float):
     return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))

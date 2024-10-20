@@ -148,7 +148,7 @@ install_requires = [
     "scipy",
     "tqdm",
     "pint",
-    "nptyping",
+  #  "nptyping",  # No longer maintained :(
     "pandas",
     "sympy"
 ]

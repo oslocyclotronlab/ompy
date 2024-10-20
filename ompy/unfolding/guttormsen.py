@@ -103,7 +103,12 @@ class Guttormsen(Unfolder):
 
     def optimal_lr(self, tol: float | None = None) -> float:
         kappa = np.linalg.cond(self.R.values, tol)
-        return 1 - 2 / (kappa + 1)
+        # get the largest and smallest singular values
+        s = np.linalg.svd(self.R.values, compute_uv=False)
+        s_max = s.max()
+        s_min = s.min()
+        #return 1 - 2 / (kappa + 1)
+        return 2 / (s_max + s_min)
 
     def _unfold_vector(self,
                        R: Matrix,

@@ -139,7 +139,7 @@ def __rebin_nonuniform_left_left(rebinned, old, new, values, dOld, dNew) -> None
 @njit
 def __rebin_nonuniform_left_left_encode(old, new, dOld, dNew, flag: bool) -> tuple[np.ndarray, np.ndarray]:
     N = 2*len(old)
-    do_move_old_ptr = np.zeros(N, dtype=np.bool8)
+    do_move_old_ptr = np.zeros(N, dtype=np.bool)
     C = np.zeros(N, dtype=np.float64)
     start = 1
     k = 1
@@ -252,10 +252,11 @@ def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray,
         preserve_counts = False
     else:
         raise ValueError(f"{preserve} is not a valid option. Options are {Preserve}.")
-    __rebin_2D_left_left(rebinned, old, new, values, dOld_, dNew_, axis, N, preserve_counts)
+    __rebin_2D_left_left(rebinned, old, new, values, dOld_, dNew_, axis, N, np.bool(preserve_counts))
     return rebinned
 
 def _rebin_2D_nonuniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarray, dOld: np.ndarray, dNew: np.ndarray, axis: int, preserve: Preserve = 'counts'):
+    axis = int(axis)
     if len(old) == len(new) and np.allclose(old, new):
         return values
     if not (len(old) + 1 == len(dOld) and len(new) + 1 == len(dNew)):
@@ -281,7 +282,7 @@ def _rebin_2D_nonuniform_left_left(old: np.ndarray, new: np.ndarray, values: np.
     return rebinned
 
 @njit(parallel=True)
-def __rebin_2D_left_left(rebinned: np.ndarray, old: np.ndarray, new: np.ndarray, values: np.ndarray, dOld: np.ndarray, dNew: np.ndarray, axis: int, N: int, preserve_counts: bool) -> None:
+def __rebin_2D_left_left(rebinned: np.ndarray, old: np.ndarray, new: np.ndarray, values: np.ndarray, dOld: np.ndarray, dNew: np.ndarray, axis: int, N: int, preserve_counts: np.bool) -> None:
     """
 
     Rebin 2D along one axis. To speed up the rebinning, the rebinning process is "encoded" and

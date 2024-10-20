@@ -5,7 +5,7 @@ from typing import (Any, Callable, Literal, Protocol, Sequence, TypeAlias,
                     TypeVar, overload, Self)
 
 import numpy as np
-from nptyping import Floating, NDArray, Shape
+#from nptyping import Floating, NDArray, Shape
 
 from ..stubs import (ArrayBool, Axes, Colorbar, Pathlike, QuadMesh, Unitlike,
                      array, arraylike, numeric)
@@ -27,7 +27,8 @@ Axis: TypeAlias = AxisEither | AxisBoth
 T = TypeVar('T', bound='MatrixProtocol')
 
 class MatrixProtocol(AbstractArrayProtocol, Protocol):
-    values: NDArray[Shape['*', '*'], Floating]
+    #values: NDArray[Shape['*', '*'], Floating]
+    values: np.ndarray # NDArray[Shape['*', '*'], Floating]
 
     def __init__(self, *,
                  X: arraylike | Index | None = None,
