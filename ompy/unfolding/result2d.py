@@ -45,7 +45,7 @@ class UnfoldedResult2D(Result):
 
     #@cache
     def best_eta(self, device='gpu?') -> Matrix:
-        if self.meta.space in {'GR', 'RG'}:
+        if self.meta.space in {'GD', 'DG'}:
             best = self.best()
             if self.G_ex is None:
                 with on_device(device, best, self.G, endpoint='numpy'):

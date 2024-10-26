@@ -10,11 +10,10 @@ from tqdm.autonotebook import tqdm
 from .result import Parameters2D, ResultMeta2D
 from .result1d import UnfoldedResult1D
 from .result2d import UnfoldedResult2D, UnfoldedResult2DSimple
-from .stubs import Space
+from .stubs import Space, UnfoldingMatrix
 
 
 UNFOLDER_CLASSES: dict[str, type[Unfolder]] = {}
-
 
 class Unfolder(ABC):
     """ Abstract base class for unfolding algorithms
@@ -97,7 +96,8 @@ class Unfolder(ABC):
                 raise ValueError(
                     f"Expected both Matrix, Vector or list of Vectors, got {type(data), type(background)}")
 
-    def unfold_vector(self, data: Vector, background: Vector | None = None, initial: InitialVector = 'raw', R: str | Matrix = 'R', G: str | Matrix = 'G', **kwargs) -> UnfoldedResult1D:
+    def unfold_vector(self, data: Vector, background: Vector | None = None, initial: InitialVector = 'raw',
+                      R: UnfoldingMatrix | Matrix = 'D', G: str | Matrix = 'G', **kwargs) -> UnfoldedResult1D:
         space, R = self._resolve_response(R)
         if not R.is_compatible_with(data.X_index):
             raise ValueError("R and data must have the same axes")
@@ -123,7 +123,7 @@ class Unfolder(ABC):
     def unfold_vectors(self, data: list[Vector],
                        background: list[Vector] | None = None,
                        initial: InitialVector | list[InitialVector] = 'raw',
-                       R: str | Matrix = 'R',
+                       R: UnfoldingMatrix | Matrix = 'D',
                        G: str | Matrix = 'G', **kwargs) -> list[UnfoldedResult1D]:
         space, R = self._resolve_response(R)
         # All vectors must be the same shape
@@ -256,22 +256,26 @@ class Unfolder(ABC):
         best = data.clone(values=best)
         return UnfoldedResult2DSimple(meta=meta, u=best)
 
-    def _resolve_response(self, R: str | Matrix | tuple[Space, Matrix]) -> tuple[Space, Matrix]:
+    def _resolve_response(self, R: UnfoldingMatrix | Matrix | tuple[Space, Matrix]) -> tuple[Space, Matrix]:
         match R:
             case Matrix():
                 return 'unknown', R
-            case 'R':
+            case 'D':
                 return R, self.R
             case 'G':
                 return R, self.G
-            case 'GR':
-                return R, self.G@self.R
-            case 'RG':
+            case 'GD':
+                # Confusingly, since we've defined R as R.T in the code
+                # for fast access pattern, 'GD' corresponds to R@G, which is later
+                # transposed to become G.T@R.T
                 return R, self.R@self.G
+            case 'DG':
+                return R, self.G@self.R
             case (Space as space, Matrix() as mat):
                 return space, mat
             case _:
-                raise ValueError(f"Invalid R {R}")
+                raise ValueError(f"Invalid unfolding matrix {R}. \n"
+                                 f"Expected {UnfoldingMatrix.__args__} or (Space, Matrix)")
 
 
 InitialVector: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Vector

@@ -102,9 +102,18 @@ else:
     JAX_WORKING = False
     if JAX_AVAILABLE:
         import jax
-        devices = jax.devices()
-        JAX_WORKING = any("gpu" in device.platform.lower()
-                          for device in devices)
+        try:
+            devices = jax.devices()
+        except Exception:
+            # A lot of things can go wrong here, e.g. if the GPU is not available
+            # or the user does not have the right permissions.
+            # Just catch everything, throw a warning and disable JAX
+            warnings.warn("JAX could not query devices. JAX will be disabled.\n"
+                          "To see the error message, run `jax.devices()`")
+            JAX_WORKING = False
+        else:
+            JAX_WORKING = any("gpu" in device.platform.lower()
+                            for device in devices)
     GPU_AVAILABLE = NUMBA_CUDA_AVAILABLE or JAX_WORKING
 
     H5PY_AVAILABLE = is_available("h5py")

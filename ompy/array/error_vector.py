@@ -170,7 +170,7 @@ class AsymmetricVector(ErrorVector):
                     #err = np.append(err, err[:, -1:], axis=1)
                     eline = ax.errorbar(bins + e_offset, self.values, yerr=err, **kw)
                     lines = (line, eline)
-                elif ekind == 'fill':
+                elif ekind in ('fill', 'band'):
                     kw = {'step': step, 'edgecolor': None, 'alpha': 0.2, 'color': color} | ekwargs
                     lerr = np.append(self.lerr, self.lerr[-1])
                     uerr = np.append(self.uerr, self.uerr[-1])

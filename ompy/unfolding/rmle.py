@@ -81,6 +81,11 @@ def logistic_interpolation(t, lower, upper, midpoint):
 def onecost(mu, C):
     # Smooth approximation of the Heaviside step function using a logistic function
     #return jnp.sum(0.5 * (1 + jnp.tanh((mu - C) / (1e-6 + C / 10))))
+    return jnp.sum(0.5*(1 + 2/3.141592*jnp.arctan((mu - C)/(C/100))))
+
+def onecost_2(mu, C):
+    # Smooth approximation of the Heaviside step function using a logistic function
+    #return jnp.sum(0.5 * (1 + jnp.tanh((mu - C) / (1e-6 + C / 10))))
     return jnp.sum(0.5*(1 + 2/3.141592*jnp.arctan((mu - C)/(C/10))))
 
 def cost(mu, R, G_ex, n, bg, n_err, bg_err,
@@ -88,12 +93,10 @@ def cost(mu, R, G_ex, n, bg, n_err, bg_err,
     mu = mu**2
     nu = G_ex@mu@R
     if bg is not None:
-        n = n - bg
-        # Isn't it better with
-        # nu = nu + bg
+        nu = nu + bg
     #return jnp.sum((n - bg - nu)**2/(n_err + bg_err))# + onecost(mu)
     #return jnp.sum(kl(nu, n)) + alpha*onecost(mu, 10) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
-    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, 1) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
+    return jnp.sum(kl(nu, n)) + alpha*onecost(mu, 0.1)**2 #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.mean(n)) #beta*jnp.sum(entropy(mu)) + alpha*onecost(mu) # + 1e-6*difference_cost(n, nu)
     #return jnp.sum(kl(nu, n)) - jnp.sum(split_entropy(mu, lower, upper, midpoint))# + alpha*onecost(mu) + 1e-5*difference_cost(n, nu)
     #return jnp.sum((nu - n)**2/e
@@ -119,6 +122,8 @@ def cost_1d(mu, R, G_ex, n, bg, n_err, bg_err,
             alpha=0.0, beta=1e-3):#, alpha=0.3e-1):
     mu = mu**2
     nu = R@mu
+    if bg is not None:
+        nu = nu + bg
     return jnp.sum(kl(nu, n)) + alpha*onecost(mu, jnp.median(n))**2
     #nu = jnp.log(nu + 1e-1)
     #n = jnp.log(n + 1e-1)
@@ -155,7 +160,7 @@ def cost_components(n, mu, R, eta=None, G_eg=None, G_ex=None, alpha=0, beta=0):
 
 
 @dataclass(kw_only=True)
-class JaxResult2D(Cost1D, UnfoldedResult2DSimple):
+class RMLEResult2D(Cost1D, UnfoldedResult2DSimple):
     def _save(self, path: Path, exist_ok: bool = False):
         Cost2D._save(self, path, exist_ok)
         UnfoldedResult2DSimple._save(self, path, exist_ok)
@@ -167,7 +172,7 @@ class JaxResult2D(Cost1D, UnfoldedResult2DSimple):
         return a | b
 
 @dataclass(kw_only=True)
-class JaxResult1D(Cost1D, UnfoldedResult1DSimple):
+class RMLEResult1D(Cost1D, UnfoldedResult1DSimple):
     def _save(self, path: Path, exist_ok: bool = False):
         UnfoldedResult1DSimple._save(self, path, exist_ok)
         Cost1D._save(self, path, exist_ok)
@@ -178,16 +183,26 @@ class JaxResult1D(Cost1D, UnfoldedResult1DSimple):
         b = UnfoldedResult1DSimple._load(path)
         return a | b
 
-class Jaxer(Unfolder):
+class RMLE(Unfolder):
     @staticmethod
     @override
     def supports_background():
         return True
 
+    def richardson_rate(self, tol: float | None = None) -> float:
+        kappa = np.linalg.cond(self.R.values, tol)
+        # get the largest and smallest singular values
+        s = np.linalg.svd(self.R.values, compute_uv=False)
+        s_max = s.max()
+        s_min = s.min()
+        #return 1 - 2 / (kappa + 1)
+        return 2 / (s_max + s_min)
+
+
     @override
     def _unfold_vector(self, R: Matrix, data: Vector, background: Vector | None,
                        initial: Vector, space: Space,
-                       G: Matrix | None = None, **kwargs) -> JaxResult1D:
+                       G: Matrix | None = None, **kwargs) -> RMLEResult1D:
         # Check if cost_1d parameters are iterable
         # At most one can be iterable
         # Construct matrix NxM where N is vector and M is parameters
@@ -207,6 +222,8 @@ class Jaxer(Unfolder):
         else:
             bg = jnp.asarray(background.values)
         start = time.time()
+        if 'lr' not in kwargs or kwargs['lr'] == 'auto':
+            kwargs['lr'] = self.richardson_rate()
         u, total_loss = unfold_adam_1d(u, raw=raw, bg=bg, R=R_, G_ex=None,
                                        loss=loss, grad=grad, value_and_grad=value_and_grad,
                                        **kwargs)
@@ -216,7 +233,7 @@ class Jaxer(Unfolder):
                                   kwargs=kwargs, G=G)
         meta = ResultMeta1D(time=elapsed, space=space, parameters=parameters,
                             method=self.__class__)
-        return JaxResult1D(meta=meta, cost=total_loss, u=u)
+        return RMLEResult1D(meta=meta, cost=total_loss, u=u)
 
 
     def _unfold_matrix(self, R: Matrix, data: Matrix, background: Matrix | None, initial: Matrix,
@@ -253,6 +270,9 @@ class Jaxer(Unfolder):
             case _:
                 raise ValueError(f"Unknown method {method}")
         value_and_grad = jax.jit(jax.value_and_grad(cost), static_argnames=('alpha', 'beta'))
+
+        if 'lr' not in kwargs or kwargs['lr'] == 'auto':
+            kwargs['lr'] = self.richardson_rate()
         start = time.time()
         u, total_cost = unfold(u, raw=n, bg=bg, R=R_, G_ex=G_ex_,
                                loss=loss, grad=grad, value_and_grad=value_and_grad,
@@ -269,7 +289,7 @@ class Jaxer(Unfolder):
         meta = ResultMeta2D(time=elapsed, space=space, parameters=parameters,
                             method=self.__class__)
         u = data.clone(values=u)
-        return JaxResult2D(meta=meta, cost=total_cost, u=u)
+        return RMLEResult2D(meta=meta, cost=total_cost, u=u)
 
     def grid_search(self, eta: Matrix,
                     *args,
@@ -290,7 +310,7 @@ class Jaxer(Unfolder):
     def grid_search_1D(self, eta: Matrix, param: str, values: np.ndarray,
                        unfkwargs: dict[str, Any]) -> GridSearchResult1D:
         kw = unfkwargs.copy()
-        results: list[JaxResult1D] = []
+        results: list[RMLEResult1D] = []
         if 'leave_tqdm' not in kw:
             kw['leave_tqdm'] = False
         bar = tqdm(enumerate(values), total=len(values))
@@ -306,7 +326,7 @@ class Jaxer(Unfolder):
                        mask: np.ndarray,
                        unfkwargs: dict[str, Any]) -> GridSearchResult2D:
         kw = unfkwargs.copy()
-        results: list[JaxResult2D] = []
+        results: list[RMLEResult2D] = []
         values = list(product(values1, values2))
         bar = tqdm(enumerate(values), total=len(values))
         for i, (value1, value2) in bar:
@@ -346,7 +366,7 @@ class GridSearchResult:
 class GridSearchResult1D(GridSearchResult):
     hyperparameter: str
     grid: np.ndarray
-    results: list[JaxResult1D]
+    results: list[RMLEResult1D]
 
     def plot(self, ax=None):
         if ax is None:
@@ -370,7 +390,7 @@ class GridSearchResult2D(GridSearchResult):
     grid1: np.ndarray
     param2: str
     grid2: np.ndarray
-    results: list[JaxResult2D]
+    results: list[RMLEResult2D]
 
 
 

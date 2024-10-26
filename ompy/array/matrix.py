@@ -827,6 +827,11 @@ class Matrix(AbstractArray, MatrixProtocol):
             color_args = color_by[1:] if len(color_by) > 1 else []
             color_by = color_by[0]
 
+        # If there are no good values, dont try to set vmin and vmax
+        all_bad = np.all(mask)
+        if all_bad:
+            color_by = 'values'
+
         if color_by == 'IQR':
             factor = color_args[0] if color_args else 1.5
             vmin_IQR, vmax_IQR = IQR_range(values[~mask].ravel(), factor)
@@ -925,12 +930,14 @@ class Matrix(AbstractArray, MatrixProtocol):
         # TODO: Takes waaaay to much CPU
         ax.format_coord = format_coord
 
-        cbar: Colorbar | None = None
-        if add_cbar:
+        cbar: Colorbar | tuple[cm.ScalarMappable, Normalize] = None
+        if add_cbar and not all_bad:
             if cbarkwargs is None:
                 cbarkwargs = {}
             kwargs = dict(ax=ax) | cbarkwargs
             cbar = AnnotatedColorbar(mesh,  **kwargs)
+        else:
+            cbar = (cmap, norm)
 
         return ax, (mesh, cbar)
 

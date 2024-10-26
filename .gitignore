@@ -135,3 +135,5 @@ data/**/R.npz
 
 # Apple attribute file
 .DS_Store
+.idea/
+.vscode/

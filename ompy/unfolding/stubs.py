@@ -1,5 +1,6 @@
 from typing import TypeAlias, Literal
 
 
-Space: TypeAlias = Literal['R', 'G', 'RG', 'GR', 'unknown']
+UnfoldingMatrix: TypeAlias = Literal['D', 'G', 'GD', 'DG']
+Space: TypeAlias = Literal['D', 'G', 'DG', 'GD', 'unknown']
 PlotSpace: TypeAlias = Literal['eta', 'base']

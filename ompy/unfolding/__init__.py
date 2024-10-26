@@ -1,5 +1,5 @@
 from .unfolder import Unfolder
-from .guttormsen import *
+from .fics import *
 #from .EM import EM
 
 from .. import MINUIT_AVAILABLE, JAX_AVAILABLE
@@ -8,8 +8,8 @@ if MINUIT_AVAILABLE and False:
     from .ml import *
 if JAX_AVAILABLE:
     #from . import jax_loss as jloss
-    from .jaxer import *
-    from .jaxer_components import JaxerComponents, JaxCResult2D
+    from .rmle import *
+    from .rmle_components import JaxerComponents, JaxCResult2D
 
 from .bootstrap import bootstrap, Bootstrap, bootstrap_CI, coverage_ci, BootstrapMatrix, Coverage, BootstrapVector
 from .bootstrap import bca, bca_var, bca_var_2, bca_2

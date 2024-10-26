@@ -30,7 +30,7 @@ else:
 
 
 @dataclass
-class GuttormsenKwargs:
+class FICSKwargs:
     iterations: int
     weight: float
     lr: float
@@ -40,7 +40,7 @@ class GuttormsenKwargs:
     leave_tqdm: bool = True
 
 
-class Guttormsen(Unfolder):
+class FICS(Unfolder):
     """ Unfolding algorithm from Guttormsen et al. 1998
 
     This algorithm is only valid for 1D histograms with uniform binning.
@@ -79,12 +79,12 @@ class Guttormsen(Unfolder):
             raise ValueError("JAX is not working. Cannot use GPU. Specify 'use_JAX=False' to use CPU.")
         else:
             self.use_JAX = use_JAX
-        self.lr = 1  # Learning rate. Unused
+        self.lr = 1  # Learning rate.
         self.save_block = save_block  # Save block of unfolded matrices
         self.enforce_positivity = enforce_positivity
 
-    def handle_kwargs(self, kwargs) -> GuttormsenKwargs:
-        supported = [f.name for f in fields(GuttormsenKwargs)]
+    def handle_kwargs(self, kwargs) -> FICSKwargs:
+        supported = [f.name for f in fields(FICSKwargs)]
         described = {k: v for k, v in kwargs.items() if k in supported}
         superfluous = {k: v for k, v in kwargs.items() if k not in supported}
         defaults = dict(iterations=self.iterations,
@@ -92,7 +92,7 @@ class Guttormsen(Unfolder):
                         lr=self.lr,
                         save_block=self.save_block,
                         enforce_positivity=self.enforce_positivity)
-        kw = GuttormsenKwargs(**(defaults | described))
+        kw = FICSKwargs(**(defaults | described))
         LOG.debug(f"Unfolding up to {kw.iterations} iterations")
         LOG.debug(f"Fluctuation weight of {kw.weight}")
         LOG.debug(f"Learning rate of {kw.lr}")
@@ -232,13 +232,14 @@ def _unfold_vector(R: array1D, raw: array1D, initial: array1D, iterations: int,
     cost = np.empty(iterations)
     kl_cost = np.empty_like(cost)
     fluctuations = np.empty(iterations)
+    mask = raw > 0
     f = R @ u
     for i in range(iterations):
         u += lr * (raw - f)
         f = R @ u
         u_all[i] = u
-        cost[i] = chi2(f, raw)
-        fluctuations[i] = fluctuation_cost(u, 20)
+        cost[i] = chi2_safe_1d(raw, f, mask)
+        fluctuations[i] = fluctuation_cost(u, 20, mask)
         kl_cost[i] = kl(f, raw).sum()
     return u_all, cost, fluctuations, kl_cost
 
@@ -293,6 +294,14 @@ def _unfold_matrix(R: array2D, raw: array2D, initial: array2D, iterations: int,
 def chi2(a, b):
     return np.sum((a - b)**2 / a)
 
+@njit
+def chi2_safe_1d(a, b, mask):
+    s = 0.0
+    for i in range(a.shape[0]):
+        if mask[i]:
+            s += (a[i] - b[i])**2 / a[i]
+    return s
+
 
 @njit
 def chi2_safe(a, b, mask):
@@ -308,7 +317,7 @@ def kl(nu, n):
     return nu - n + n * np.log(n / (nu+1e-10) + 1e-10)
 
 
-def _unfold_matrix_jax(R, Gex, raw, initial, kw: GuttormsenKwargs):
+def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
     lr = kw.lr
     iterations = kw.iterations
     if kw.enforce_positivity:
@@ -375,7 +384,7 @@ def chi2_jax(a, b, mask):
     return jnp.sum(diff * mask, axis=1)
 
 
-def _unfold_matrix_jax_block(R, raw, initial, kw: GuttormsenKwargs):
+def _unfold_matrix_jax_block(R, raw, initial, kw: FICSKwargs):
     lr = kw.lr
     iterations = kw.iterations
 
@@ -403,10 +412,13 @@ def _unfold_matrix_jax_block(R, raw, initial, kw: GuttormsenKwargs):
 
 
 @njit
-def fluctuation_cost(x, sigma: float):
+def fluctuation_cost(x, sigma: float, mask):
     smoothed = gaussian_filter_1d(x, sigma)
-    diff = np.abs(((smoothed - x) / smoothed))
-    return diff.sum()
+    diff = 0.0
+    for i in range(x.shape[0]):
+        if mask[i]:
+            diff += np.abs(((smoothed[i] - x[i]) / smoothed[i]))
+    return diff
 
 def compton_subtraction(res: UnfoldedResult1D | UnfoldedResult2D,
                         response: Response,
@@ -510,6 +522,8 @@ class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
                   legend: bool = True, yscale: str = 'log', **kwargs) -> Plots1D:
         if ax is None:
             fig, ax = plt.subplots(nrows=4, sharex=True, constrained_layout=True)
+        else:
+            fig = ax[0].figure
         ax = np.atleast_1d(ax).ravel()
         if len(ax) < 4:
             raise ValueError("Not enough axes. Expected 4.")

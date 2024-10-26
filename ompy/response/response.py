@@ -56,11 +56,11 @@ t = TypedDict('t', {'total': T, 'compton': T, 'FE': T, 'SE': T, 'DE': T, 'AP': T
 
 @dataclass
 class ResponseMatrices:
-    R: Matrix
+    D: Matrix
     G: Matrix
 
     def __iter__(self) -> Iterator[Matrix]:
-        return iter([self.R, self.G])
+        return iter([self.D, self.G])
 
 
 @dataclass
@@ -262,27 +262,28 @@ class Response:
             weights = self.components
 
         # We preserve area as we want a mean value, not the sum
-        R = compton.rebin('true', bins=E, preserve='area').to_left()  # type: ignore
+        D = compton.rebin('true', bins=E, preserve='area').to_left()
         if pad:
-            R.rebin('observed', bins=E_all, inplace=True)
+            D.rebin('observed', bins=E_all, inplace=True)
         else:
-            R.rebin('observed', bins=R.true, inplace=True)
-        R = R.to_left()
-        R *= weights.compton
-        R.name = "Response"
+            D.rebin('observed', bins=D.true, inplace=True)
+        D = D.to_left()
+        D *= weights.compton
+        D.name = "Response"
 
         if pad:
-            R_full = Matrix(true=E_all, observed=E_all, values=np.zeros((len(E_all), len(E_all))), name='Response',
+            D_full = Matrix(true=E_all, observed=E_all, values=np.zeros((len(E_all), len(E_all))), name='Response',
                             xlabel='True energy', ylabel='Measured energy')
-            R_full.loc[emin:, :] = R.values
-            R = R_full
-            R = R.to_unit('keV', axis='both')
+            D_full.loc[emin:, :] = D.values
+            D = D_full
+            D = D.to_unit('keV', axis='both')
 
         # The functions need to be evaluated over the values within the bin
         # to account for their behaviour across the bin. The resolution
         # is the same as that of the raw structure data (go finer?)
+        assert D is not None
         if E is not None:
-            dE_intp = np.max(R.true_index.steps())
+            dE_intp = np.max(D.true_index.steps())
             dE = np.min(self.interpolation.E_index.steps())
             N = int(np.ceil(dE_intp / dE))  # Number of steps per bin
 
@@ -293,27 +294,27 @@ class Response:
                 return fn(e)
 
         FE, SE, DE, AP = self.interpolation.structures()
-        emin = R.observed_index.leftmost
+        emin = D.observed_index.leftmost
         has_511 = (511 >= emin) and not self.disable_ap
         if has_511:
-            j511 = R.index_observed(511)
+            j511 = D.index_observed(511)
 
-        for i, e in enumerate(R.true):
-            R.loc[i, e] += mean(FE, e) * weights.FE
+        for i, e in enumerate(D.true):
+            D.loc[i, e] += mean(FE, e) * weights.FE
             if e - 511 > emin:
-                R.loc[i, e - 511.0] += mean(SE, e) * weights.SE
+                D.loc[i, e - 511.0] += mean(SE, e) * weights.SE
             if e - 2 * 511 > emin:
-                R.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
+                D.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
             if has_511 and e > 1022:
-                R[i, j511] += mean(AP, e) * weights.AP  # type: ignore
+                D[i, j511] += mean(AP, e) * weights.AP  # type: ignore
 
         if force_trilu:
-            mask = np.tril_indices_from(R.values.T, k=-1)
-            R.values.T[mask] = 0
+            mask = np.tril_indices_from(D.values.T, k=-1)
+            D.values.T[mask] = 0
 
         if normalize:
-            R.normalize(axis='observed', inplace=True)
-        return R
+            D.normalize(axis='observed', inplace=True)
+        return D
 
     def discrete_like(self, other: Matrix | Vector, **kwargs) -> Matrix:
         """
@@ -360,7 +361,7 @@ class Response:
         G: Matrix = gaussian_matrix(E_, self.interpolation.sigma)
         if isinstance(E, Index) and E.is_left():
             G = G.to_left()
-        G.name = 'Detector resolution'
+        G.name = r'$\gamma$-Detector resolution'
         G.to_unit(units)
         return G
 
@@ -390,8 +391,8 @@ class Response:
         G = self.gaussian(E)
         if isinstance(E, Index):
             E = E.bins
-        R = self.discrete(E, **kwargs)
-        return ResponseMatrices(R, G)
+        D = self.discrete(E, **kwargs)
+        return ResponseMatrices(D, G)
 
     def specialize_like(self, other: Matrix | Vector, **kwargs) -> ResponseMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given matrix or vector.
@@ -408,9 +409,9 @@ class Response:
             The response matrix and the detector resolution matrix specialized to the given matrix or vector as
             (R, G)
         """
-        R = self.discrete_like(other, **kwargs)
+        D = self.discrete_like(other, **kwargs)
         G = self.gaussian_like(other)
-        return ResponseMatrices(R, G)
+        return ResponseMatrices(D, G)
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
               compton: ComptonMatrix | None = None, components: Components | None = None,

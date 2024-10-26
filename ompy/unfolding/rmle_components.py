@@ -15,7 +15,7 @@ from typing import Any
 from functools import partial
 from pathlib import Path
 from ..response import Components, Response
-from .jaxer import JaxResult2D
+from .rmle import RMLEResult2D
 
 
 import jax
@@ -80,7 +80,7 @@ def inverse_hyperbolic_tangent_map(x):
     return jnp.arctanh(2*(x - a)/(b - a) - 1)
 
 @dataclass(kw_only=True)
-class JaxCResult2D(ComponentsRes, JaxResult2D):
+class JaxCResult2D(ComponentsRes, RMLEResult2D):
     ws: np.ndarray
     def _save(self, path: Path, exist_ok: bool = False):
         Cost2D._save(self, path, exist_ok)

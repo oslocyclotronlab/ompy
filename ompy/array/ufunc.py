@@ -1,4 +1,7 @@
-from . import Matrix, Vector, MatrixProtocol, Index, to_index
+from .matrix import Matrix
+from .vector import Vector
+from .matrixprotocol import MatrixProtocol
+from .index import Index, to_index
 from .abstractarray import AbstractArray, to_plot_axis
 from .abstractarrayprotocol import AbstractArrayProtocol
 from typing import Tuple, overload, Literal, Callable, TypeVar
@@ -50,6 +53,9 @@ def empty(ex: ..., eg: array | None = None, **kwargs) -> Vector | Matrix:
         return Vector(E=ex, values=values)
     values = np.empty((len(ex), len(eg)), **kwargs)
     return Matrix(X=ex, Y=eg, values=values)
+
+def eye(array: array, **kwargs) -> Matrix:
+    return Matrix(X=array, Y=array, values=np.eye(len(array), **kwargs))
 
 
 def zeros(array: array | int | Tuple[int, int],
@@ -107,6 +113,12 @@ def linspace(start, stop, *args, **kwargs) -> Vector:
         units = ureg.Unit("keV")
     index = to_index(bins, edge='left', unit=units, label='Energy', enforce_uniform=True)
     return Vector(X=index, values=np.zeros(len(bins), dtype=float), unit=units)
+
+def index_linspace(start, stop, *args, **kwargs) -> Index:
+    bins, units = linspace_with_units(start, stop, *args, **kwargs)
+    if units == ureg.dimensionless:
+        units = ureg.Unit("keV")
+    return to_index(bins, edge='left', unit=units, label='Energy', enforce_uniform=True)
 
 @overload
 def fmap(array: Vector, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Vector: ...

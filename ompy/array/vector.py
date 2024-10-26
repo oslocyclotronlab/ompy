@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy import ndarray
-from .. import XARRAY_AVAILABLE
+from .. import XARRAY_AVAILABLE, NUMBA_AVAILABLE
 from .abstractarray import AbstractArray
 from .abstractarray import fetch as _fetch
 from .filehandling import (load_csv_1D, load_numpy_1D,
@@ -853,6 +853,19 @@ class Vector(AbstractArray, VectorProtocol):
             method: The integration method to use. Default is `np.trapz`
         """
         return method(self.values, self.X)
+
+    def to_numba(self):
+        return to_numba(self)
+
+
+def to_numba(vec: Vector) -> None:
+    raise NotImplementedError("Numba is not available")
+
+if NUMBA_AVAILABLE:
+    from .numba import Vector as NumbaVector
+    def to_numba(vec: Vector) -> NumbaVector:
+        return NumbaVector(vec.X, vec.values)
+
 
 
 if XARRAY_AVAILABLE:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import (Any, Callable, Literal, Protocol, Sequence, TypeAlias,
-                    TypeVar, overload, Self)
+                    TypeVar, overload, Self, TYPE_CHECKING)
 
 import numpy as np
 #from nptyping import Floating, NDArray, Shape
@@ -14,7 +14,9 @@ from .abstractarrayprotocol import AbstractArrayProtocol
 from .filehandling import Filetype
 from .index import Edges, Index
 from .matrixmetadata import MatrixMetadata
-from .vector import Vector
+
+if TYPE_CHECKING:
+    from .vector import Vector
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)

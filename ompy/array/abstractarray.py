@@ -486,7 +486,17 @@ if JAX_WORKING:
 
     def _device(array) -> Device:
         if isinstance(array, ArrayImpl):
-            return array.device_buffer.device()
+            # Jax changed its internal representation of arrays,
+            # there is a bug where the @device property is not available
+            # We instead look at the sharding device set.
+            # I don't know if this is a viable method.
+            device_set = array.sharding.device_set
+            if len(device_set) < 1:
+                raise RuntimeError("Could not determine device of JAX array. Empty device set.")
+            if len(device_set) > 1:
+                raise RuntimeError(f"Could not determine device of JAX array. Multiple devices found: {device_set}")
+            device = device_set.pop()
+            return device
         else:
             return 'cpu'
 

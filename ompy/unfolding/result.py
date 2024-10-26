@@ -105,23 +105,23 @@ class Result(ABC, Generic[T]):
 
     def best_eta(self, device='gpu?') -> T:
         best = self.best()
-        if self.meta.space in {'GR', 'RG'}:
+        if self.meta.space in {'GD', 'DG'}:
             with on_device(device, self.G, best, endpoint='numpy'):
                 return self.G@best
-        elif self.meta.space == 'R':
+        elif self.meta.space == 'D':
             return best
         else:
             raise ValueError(f"Cannot map from {self.meta.space} to eta")
 
     def resolve_spaces(self, target: PlotSpace) -> tuple[T, str]:
         label = 'unfolded'
-        if self.meta.space in {'GR', 'RG'}:
+        if self.meta.space in {'GD', 'DG'}:
             if target == 'eta':
                 label = 'G@' + label
                 return self.best_eta(), label
             elif target in {'base', 'mu'}:
                 return self.best(), label
-        elif self.meta.space == 'R':
+        elif self.meta.space == 'D':
             if target in {'eta', 'base'}:
                 return self.best_eta(), label
         raise ValueError(f"Cannot map from {self.meta.space} to {target}")
