@@ -5,13 +5,13 @@ from ..helpers import make_ax, maybe_set
 from ..stubs import Lines, Plot1D, Plots1D, Axes
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
 from ..response import Components
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import overload, TypeGuard, TypeVar, Sequence, TypeAlias
-
+from typing import overload, TypeGuard, TypeVar, Sequence, TypeAlias, Iterable
+import warnings
 
 
 
@@ -273,22 +273,40 @@ T = TypeVar('T', bound=Matrix | Vector)
 @dataclass(kw_only=True)
 class Cost1D(Result[T]):
     cost: np.ndarray
+    aux: dict[str, np.ndarray] = field(default_factory=dict)
 
-    def plot_cost(self, ax: Axes | None = None, start: int | float = 0, relative: bool = False, **kwargs) -> Plot1D:
+    def plot_cost(self, ax: Axes | None = None, start: int | float = 0, relative: bool = False,
+                  aux: bool | Iterable[str] = True, **kwargs) -> Plot1D:
         ax = make_ax(ax)
         if isinstance(start, float):
             start = int(start*len(self.cost))
         cost = self.cost[start:]
+        if len(self.aux) > 0:
+            if isinstance(aux, bool):
+                keys = self.aux.keys() if aux else []
+            else:
+                keys = aux
+            aux = {k: self.aux[k][start:] for k in keys}
         if relative:
             cost /= cost[0]
+            for k in aux:
+                aux[k] /= aux[k][0]
             
         x = np.arange(start, len(self.cost))
+        lines: list[Lines] = []
         line, = ax.plot(x, cost, **kwargs)
+        lines.append(line)
+        for k, v in aux.items():
+            line, = ax.plot(x, v, label=k)
+            lines.append(line)
         maybe_set(ax, xlabel='iteration', ylabel='cost')
-        return ax, line
+        ax.legend()
+        return ax, lines
 
     def _save(self, path: Path, exist_ok: bool = False):
         np.save(path / 'cost.npy', self.cost)
+        if len(self.aux) > 0:
+            warnings.warn("Not saving auxilliary data to disk!")
 
     @classmethod
     def _load(cls, path: Path) -> dict[str, np.ndarray]:

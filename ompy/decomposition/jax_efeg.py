@@ -2,7 +2,8 @@
 import jax
 import jax.numpy as jnp
 from jax import grad, jit, vmap, value_and_grad
-from jax.example_libraries import optimizers
+#from jax.example_libraries import optimizers
+import optax
 from tqdm.autonotebook import tqdm, trange
 from .product import index_map, nld_T_product
 import numpy as np
@@ -49,6 +50,18 @@ TODO:
          Maybe aggressive smoothing on diagonals in (Ef, Eg) to ensure continuum
     -[ ] Regularize by enforcing G'@rho and T@G. Other regularizations?
     -[ ] Put the error plot into its own class
+
+
+    The discrepancy is perhaps just a result of the fact that the spectrum is not
+    "sufficiently" contiuum. Trying to rectify it by agressive smoothing is hiding
+    the underlying problem.
+    
+    We can regularize the solution by enforcing rho >= 0 and T >= 0. Also,
+    by construction, we have smoothing by G_g and G_in. We use the same remapping trick
+    as in unfolding to enforce this.
+
+    The edges are often not well determined. We know rho(Ef < 0) = 0 and T(Eg < 0) = 0.
+    Enforce this.
 """
 
 
@@ -80,8 +93,14 @@ class DecompositionResult:
                                  sharex=True, sharey=True,
                                  figsize=(10, 10))  # type: ignore
         ax = np.ravel(ax)
+
+        vmin = min(self.FG.min(), self.P.min())
+        vmax = max(self.FG.max(), self.P.max())
+        kwargs = {} if kwargs is None else kwargs
+        kwargs = {'vmin': vmin, 'vmax': vmax} | kwargs
         self.FG.plot(ax=ax[0], **kwargs)
         self.P.plot(ax=ax[1], **kwargs)
+
         err = self.FG - self.P
         rel_err = err / self.FG
 
@@ -116,6 +135,11 @@ class DecompositionResult:
         P = exeg_to_efeg(self.P, cut=True)
         ef0 = P.Ef[0]
         FG = FG.loc[f'>{ef0}':, :]
+        vmin = min(FG.min(), P.min())
+        vmax = max(FG.max(), P.max())
+        kwargs = {} if kwargs is None else kwargs
+        kwargs = {'vmin': vmin, 'vmax': vmax} | kwargs
+
         FG.plot(ax=ax[0], **kwargs)
         P.plot(ax=ax[1], **kwargs)
         err = FG - P
@@ -150,7 +174,7 @@ def error_plot(mat: Matrix, ax, **kwargs):
     vmin, vmax = kwargs['vmin'], kwargs['vmax']
 
     ax, (_, cbar) = mat.plot(ax=ax, **kwargs)
-    IQR_cbar(y, cbar, vmin, vmax)
+    #IQR_cbar(y, cbar, vmin, vmax)
     return cbar
 
     #TODO @property nld and gsf
@@ -202,11 +226,20 @@ def IQR_range(data, factor=1.5):
     vmax = q75 + factor * iqr
     return vmin, vmax
 
+@jit
+def tau_to_theta(params):
+    rho, T = params
+    #rho = jnp.exp(rho/1e4)
+    #T = jnp.exp(T/1e4)
+    return rho, T
+
 
 # Define the loss function
 @jit
 def loss_fn(params, P, mask):
-    rho, T = params
+    # We don't want negative values,
+    # so we optimize in a transformed tau space.
+    rho, T = tau_to_theta(params)
     P_hat = jnp.outer(rho, T)
     #loss = (P - P_hat)**2
     #loss = (P - P_hat)**2 / P
@@ -226,7 +259,7 @@ def setup(FG: Matrix) -> tuple[array2D, array1D, array1D, array1D]:
 
 
 # Begin the optimization
-def optimize(FG: Matrix, N: int = 500, optimizer=optimizers.rmsprop_momentum(1e-5),
+def optimize(FG: Matrix, N: int = 500, optimizer=optax.rmsprop(1e-5),
              normalize: bool = True, disable_tqdm: bool = False):
     if normalize:
         FG = FG / FG.sum()
@@ -240,23 +273,16 @@ def optimize(FG: Matrix, N: int = 500, optimizer=optimizers.rmsprop_momentum(1e-
 
     # Initial parameters
     # If they are too high, the optimizer will fail
-    #rho_0 = jnp.exp(0.05*Ef / 1000)
-    #T_0 = jnp.exp(0.06*Eg / 1000)
-    a = np.sqrt(np.mean(P.sum(axis=1)))
-    b = np.sqrt(np.mean(P.sum(axis=0)))
     a = 1e-8
     b = 1e-8
     rho_0 = a*jnp.ones_like(Ef)
     T_0 = b*jnp.ones_like(Eg)
 
-    #rho_0 = jnp.log(rho_0)
-    #v = jnp.array(np.random.rand(len(nld)))
-    #w = jnp.array(np.random.rand(len(gsf)))
-    params_init = (rho_0, T_0)
+    params = (rho_0, T_0)
 
     # Optimizer setup
-    opt_init, opt_update, get_params = optimizer
-    opt_state = opt_init(params_init)
+    #opt_init, opt_update, get_params = optimizer
+    opt_state = optimizer.init(params)
 
     # Loss function gradient
     loss_and_grad = jit(value_and_grad(loss_fn))
@@ -270,19 +296,23 @@ def optimize(FG: Matrix, N: int = 500, optimizer=optimizers.rmsprop_momentum(1e-
 
     # Update step
     @jit
-    def step(i, opt_state):
-        params = get_params(opt_state)
-        loss, g = loss_and_grad(params, P, mask)
-        return loss, opt_update(i, g, opt_state)
+    def step(i, params, opt_state):
+        loss, grads = loss_and_grad(params, P, mask)
+        updates, opt_state = optimizer.update(grads, opt_state)
+        params = optax.apply_updates(params, updates)
+        return loss, params
 
     losses = np.zeros(N)
 
-    trange_ = trange
     if disable_tqdm:
-        trange_ = range
-    for i in trange_(N):  # Arbitrary number of steps
-        loss, opt_state = step(i, opt_state)
+        bar = range(N)
+    else:
+        bar = tqdm(range(N))
+    for i in bar:  # Arbitrary number of steps
+        loss, params= step(i, params, opt_state)
         losses[i] = loss
+        if not disable_tqdm:
+            bar.set_postfix_str(f'loss: {loss:.2e}')
 
     # There seems to be a small floating point error in jnp to np
     # Ensure exact binwidths
@@ -290,7 +320,7 @@ def optimize(FG: Matrix, N: int = 500, optimizer=optimizers.rmsprop_momentum(1e-
     Eg = np.linspace(Eg[0], Eg[-1], len(Eg))
     Ef = np.linspace(Ef[0], Ef[-1], len(Ef))
 
-    rho, T = get_params(opt_state)
+    rho, T = tau_to_theta(params)
     rho = Vector(E=Ef, values=np.array(rho), ylabel='unormalized nld')
     T = Vector(E=Eg, values=np.array(T), xlabel=r'$E_\gamma$', ylabel='unormalized T')
 

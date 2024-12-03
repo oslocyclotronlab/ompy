@@ -103,7 +103,10 @@ def bootstrap_vector_(res: UnfoldedResult1D, N: int, **kwargs) -> BootstrapVecto
     return bootstraped
 
 
-def bootstrap_vector(res: UnfoldedResult1D, N: int, base: Literal['raw', 'nu'] = 'raw', **kwargs) -> BootstrapVector:
+def bootstrap_vector(res: UnfoldedResult1D, N: int, base: Literal['raw', 'nu'] = 'nu',
+                     bootstrap_background: bool = True,
+                     background_base: Literal['raw', 'beta'] = 'beta',
+                     **kwargs) -> BootstrapVector:
     A_boots: list[Vector] = []
     unfolded_boot: list[Vector] = []
     best = res.best()
@@ -132,23 +135,39 @@ def bootstrap_vector(res: UnfoldedResult1D, N: int, base: Literal['raw', 'nu'] =
     costs: list[np.ndarray] = []
     bg_boots = None
     if bg is not None:
-        bg_boots = bg.sample()
+        if bootstrap_background:
+            match background_base:
+                case 'raw':
+                    bg_boots = bg.sample(N)
+                case 'beta':
+                    bg_boots = res.beta.sample(N)
+        else:
+            bg_boots = [bg] * N
     std = np.maximum(best / 2, np.median(best) / 2)
     mean = np.maximum(best, np.mean(best))
-    initials = [best.clone(values=np.random.uniform(9, 5 * mean)) for i in range(N)]
+    initials = [best.clone(values=np.random.uniform(0, 5 * mean)) for i in range(N)]
     # for n in range(N):
     # initial = best + np.random.normal(0, std)
     # Redistribute negative values
     # initial[initial < 0] = np.random.poisson(np.abs(initial[initial < 0]))
     # initials.append(initial)
-    res_: UnfoldedResult2D = unfolder.unfold(A_boots, initial=initials, R=R, G=G, background=bg_boots, **kwargs)
+    mask_1d = res.meta.parameters.mask
+    # Stack the mask to match the shape of the unfolded result
+    mask = np.stack([mask_1d]*N)
+    res_: UnfoldedResult2D = unfolder.unfold(A_boots, initial=initials, R=R, G=G, background=bg_boots,
+                                             mask=mask,**kwargs)
     cost = None
     if has_cost(res_):
         cost = res_.cost
     unfolded_boots: list[Vector] = unpack_to_vectors(res_.best())
+    if hasattr(res_, 'beta') and res_.beta is not None:
+        unfolded_betas: list[Vector] = unpack_to_vectors(res_.beta)
+    else:
+        unfolded_betas = None
     bootstraped = BootstrapVector(base=res, bootstraps=A_boots, unfolded=unfolded_boots,  # type: ignore
-                                  backgrounds=bgs, costs=cost, initials=initials, kwargs=kwargs)
-    return bootstraped
+                                  backgrounds=bgs, costs=cost, initials=initials, kwargs=kwargs,
+                                  betas=unfolded_betas)
+    return bootstraped#, bg_boots
 
 
 def bootstrap_matrix(res: UnfoldedResult2D, N: int, base: Literal['raw', 'folded'] = 'folded',
@@ -449,6 +468,7 @@ class BootstrapVector(Bootstrap[Vector]):
     unfolded: list[Vector]
     costs: np.ndarray
     initials: list[Vector]
+    betas: list[Vector] | None = None
     kwargs: dict[str, Any] = field(default_factory=dict)
     ndim: Literal[1] = 1
 
@@ -550,6 +570,17 @@ class BootstrapVector(Bootstrap[Vector]):
         upper = np.percentile(box, 100 * (1 - alpha / 2), axis=0)
         bg = AsymmetricVector.from_CI(b, lower=lower, upper=upper, clip=True)
         return bg
+
+    def beta(self, alpha=0.05, summary=np.median) -> AsymmetricVector | None:
+        if self.betas is None:
+            return None
+        box = np.stack([beta.values for beta in self.betas])
+        b = summary(box, axis=0)
+        b = self.base.background.clone(values=b)
+        lower = np.percentile(box, 100 * alpha / 2, axis=0)
+        upper = np.percentile(box, 100 * (1 - alpha / 2), axis=0)
+        beta = AsymmetricVector.from_CI(b, lower=lower, upper=upper, clip=True)
+        return beta
 
     @property
     def ubox(self) -> np.ndarray:

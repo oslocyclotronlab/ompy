@@ -45,6 +45,22 @@ class Components:
         with path.open('w') as f:
             json.dump(self.to_dict(), f, indent=4)
 
+    def normalize(self, inplace: bool = False) -> Components | None:
+        sum = self.FE + self.SE + self.DE + self.AP + self.compton
+        if inplace:
+            self.FE /= sum
+            self.SE /= sum
+            self.DE /= sum
+            self.AP /= sum
+            self.compton /= sum
+        else:
+            return self / sum
+
+    def __mul__(self, other: float) -> Components:
+        return Components(FE=self.FE * other, SE=self.SE * other, DE=self.DE * other, AP=self.AP * other, compton=self.compton * other)
+
+    def __truediv__(self, other: float) -> Components:
+        return Components(FE=self.FE / other, SE=self.SE / other, DE=self.DE / other, AP=self.AP / other, compton=self.compton / other)
 
 @dataclass
 class ResponseData:

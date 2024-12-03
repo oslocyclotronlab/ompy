@@ -145,17 +145,19 @@ class Matrix(AbstractArray, MatrixProtocol):
         Y_unit = 'keV' if default_Y_unit else Y_unit
         assert X_unit is not None
         assert Y_unit is not None
+        # BUG: The dtype of the values should not be the same as the dtype of the index.
+        dtype_index = None
         self.X_index: Index = make_or_update_index(X, unit=Unit(X_unit), alias=xalias, label=xlabel,
                                                    default_label=default_xlabel,
                                                    default_unit=default_X_unit,
                                                    edge=edge, boundary=boundary,
-                                                   dtype=dtype,
+                                                   dtype=dtype_index,
                                                    **indexkwargs)
         self.Y_index: Index = make_or_update_index(Y, unit=Unit(Y_unit), alias=yalias, label=ylabel,
                                                    default_label=default_ylabel,
                                                    default_unit=default_Y_unit,
                                                    edge=edge, boundary=boundary,
-                                                   dtype=dtype,
+                                                   dtype=dtype_index,
                                                    **indexkwargs)
         if len(self.X_index) != self.values.shape[0]:
             _alias = f' ({xalias})' if xalias else ''
@@ -685,6 +687,8 @@ class Matrix(AbstractArray, MatrixProtocol):
         values = values if values is not None else self.values
         metadata = metadata if metadata is not None else self.metadata
         metadata = metadata.update(**kwargs)
+        if dtype is None:
+            dtype = values.dtype
         return type(self)(X=X, Y=Y, values=values, metadata=metadata, copy=copy,
                           dtype=dtype)
 
@@ -898,7 +902,7 @@ class Matrix(AbstractArray, MatrixProtocol):
         # TODO: Let the index handle the ticks?
         if self.Y_index.is_mid():
             ax.xaxis.set_major_locator(MeshLocator(self.Y))
-            ax.tick_params(axis='x', rotation=40)
+            ax.tick_params(axis='x')
         if self.X_index.is_mid():
             ax.yaxis.set_major_locator(MeshLocator(self.X))
         if hasattr(self.X_index, 'scale'):
@@ -1118,7 +1122,8 @@ class Matrix(AbstractArray, MatrixProtocol):
                 if not self.is_compatible_with_Y(other.X_index):
                     raise ValueError(
                         f"Y index mismatch\n({self.Y_index})\n @\n({other.X_index})")
-                return type(self)(X=self.X_index, Y=other.Y_index, values=self.values @ other.values)
+                arr = self.values @ other.values
+                return type(self)(X=self.X_index, Y=other.Y_index, values=arr, dtype=arr.dtype)
             case Vector():
                 if self.shape[1] != other.shape[0]:
                     raise ValueError(

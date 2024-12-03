@@ -108,7 +108,7 @@ class Detector(ABC):
         if as_array:
             return R
 
-        return self._matrix_from_array(R, E)
+        return self._matrix_from_array(R, E, dtype=array.dtype)
 
     @abstractmethod
     def _get_energy_axis(self, array: Vector | Matrix) -> Vector:
@@ -153,8 +153,8 @@ class EgDetector(Detector):
     def _get_energy_axis(self, array: Vector | Matrix) -> Vector:
         return array.Y_index if hasattr(array, 'Y') else array.X_index
 
-    def _matrix_from_array(self, R: np.ndarray | jnp.ndarray, E: Vector) -> Matrix:
-        matrix = Matrix(X=E, Y=E, values=R)
+    def _matrix_from_array(self, R: np.ndarray | jnp.ndarray, E: Vector, dtype) -> Matrix:
+        matrix = Matrix(X=E, Y=E, values=R, dtype=dtype)
         matrix.xlabel = r"Measured $E_\gamma$"
         matrix.ylabel = r"True $E_\gamma$"
         return matrix
@@ -164,12 +164,12 @@ class ExDetector(Detector):
     def _get_energy_axis(self, array: Vector | Matrix) -> Vector:
         return array.X_index
 
-    def _matrix_from_array(self, R: np.ndarray | jnp.ndarray, E: Vector) -> Matrix:
+    def _matrix_from_array(self, R: np.ndarray | jnp.ndarray, E: Vector, dtype) -> Matrix:
         if JAX_WORKING and isinstance(R, jnp.ndarray):
             R = jnp.transpose(R)
         else:
             R = np.transpose(R)
-        matrix = Matrix(X=E, Y=E, values=R)
+        matrix = Matrix(X=E, Y=E, values=R, dtype=dtype)
         matrix.xlabel = r"Measured $E_x$"
         matrix.ylabel = r"True $E_x$"
         return matrix
@@ -458,7 +458,6 @@ if JAX_WORKING:
 
         if num_points is None:
             num_points = optimal_num_points(sigma, dx)
-            print(num_points)
         
         # Calculate convolved Gaussian distributions for each row
         convolved = jax.vmap(lambda mu, s: convolve_gaussian_uniform(x, mu, s, dmu, num_points))(x, sigma)

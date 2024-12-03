@@ -186,7 +186,6 @@ def interpolate_compton(p: ResponseData, E: Index, sigma: Callable[[np.ndarray],
     E_observed = p.E_observed
     sigma_ = NVector(index=E_observed, values=sigma(E_observed))
     R = _interpolate_compton(compton, E.bins, sigma_, nsigma)
-    print(R.shape)
     Eg = np.asarray(compton.compton_E)
     m = Matrix(true=E, observed=Eg, values=R, xlabel=r"Observed $\gamma$", ylabel=r"True $\gamma$")
     assert is_compton_matrix(m)

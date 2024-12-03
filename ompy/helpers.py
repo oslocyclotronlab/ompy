@@ -346,7 +346,7 @@ class AnnotatedColorbar(Colorbar):
     def __init__(self, mappable, ax, cax=None, lower: bool = True, higher: bool = True, nans: bool = True,
                  use_gridspec=True, linewidth=1, extend=None, color_by: str = 'complement', draw_kde: bool = False,
                  draw_histogram: bool = True, n_hist_bins: int = 100,
-                 hist_norm=np.log10,  **kwargs):
+                 hist_norm=np.log10, adjust_tick_colors: bool = True, direction: str | None = None, **kwargs):
         # Code copied from matplotlib.Figure.colorbar
         if cax is None:
             fig = (  # Figure of first axes; logic copied from make_axes.
@@ -377,6 +377,16 @@ class AnnotatedColorbar(Colorbar):
                 extend = 'max'
         kwargs['extend'] = extend
 
+        # We allow the figure style to override the default settings
+        if hasattr(ax.figure, '_om_style'):
+            style: dict[str, Any] = ax.figure._om_style
+            print(f"has style: {style}")
+            colorbar_style = style.get('colorbar', {})
+            
+            draw_histogram = colorbar_style.get('draw_histogram', draw_histogram)
+            adjust_tick_colors = colorbar_style.get('adjust_tick_colors', adjust_tick_colors)
+            direction = colorbar_style.get('direction', direction)
+
         self.lower = lower
         self.higher = higher
         self.nans = nans
@@ -389,9 +399,17 @@ class AnnotatedColorbar(Colorbar):
         self.do_draw_histogram = draw_histogram
         self.n_hist_bins = n_hist_bins
         self.hist_norm = hist_norm
+        self.adjust_tick_colors = adjust_tick_colors
         # Super can call methods defined later, so the attributed must already be defined
         super().__init__(cax, mappable, **kwargs)
         cb = cbar.Colorbar(cax, mappable, **{k: v for k, v in kwargs.items() if k not in NON_COLORBAR_KEYS})
+        if direction is not None:
+            if isinstance(direction, dict):
+                cb.ax.tick_params(**direction)
+            else:
+                cb.ax.tick_params(direction=direction, which='both')
+        if self.adjust_tick_colors:
+            self._adjust_tick_colors()
         self.annotate(mappable)
         cax.figure.stale = True  # ax.callbacks.connect('xlim_changed', lambda ev: print(ev))  # ax.callbacks.connect('ylim_changed')
 
@@ -535,9 +553,25 @@ class AnnotatedColorbar(Colorbar):
 
         self.ax.figure.stale = True
 
+    def _adjust_tick_colors(self):
+        """Adjust tick colors based on the background color's luminance."""
+        return
+        for tick in self.ax.get_yticklines(minor=True):
+            y_pos = tick.get_ydata()[0]
+            color = self.cmap(self.norm(y_pos))
+            r, g, b, _ = to_rgba(color)
+            luminance = 0.299 * r + 0.587 * g + 0.114 * b
+            tick_color = 'white' if luminance < 0.5 else 'black'
+            print(f"y_pos: {y_pos}, luminance: {luminance}, tick_color: {tick_color}")
+            tick.set_markeredgecolor(tick_color)
+        self.ax.figure.stale = True
+        self.ax.figure.canvas.draw()
+
     def update_normal(self, mappable):
         super().update_normal(mappable)
         # self.set_text(mappable)
+        if self.adjust_tick_colors:
+            self._adjust_tick_colors()
         self.annotate(mappable)
 
 

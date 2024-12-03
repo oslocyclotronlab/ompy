@@ -213,6 +213,7 @@ class Parameters(ABC, Generic[T]):
     R: Matrix
     G: Matrix
     G_ex: Matrix | None = None
+    mask: np.ndarray | None = None
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):

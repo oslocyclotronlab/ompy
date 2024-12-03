@@ -429,6 +429,18 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         else:
             return self.clone(values=np.asarray(self.values))
 
+    @property
+    def aval(self):
+        # Required for JAX because of how it interacts with __array__
+        return _aval(self)
+
+    @property
+    def weak_type(self) -> bool:
+        return False
+
+    def to_jax(self):
+        return _to_jax(self)
+
 
 def to_device(array, device: Device):
     match device:
@@ -458,8 +470,25 @@ def get_default_gpu() -> Device:
 def get_default_cpu() -> Device:
     return 'cpu'
 
+def _aval(array):
+    raise NotImplementedError("JAX is not working on this system.")
+
+def _to_jax(array):
+    raise NotImplementedError("JAX is not working on this system.")
 
 if JAX_WORKING:
+    from jax.core import ShapedArray
+    def _aval(array):
+        return ShapedArray(
+            shape=array.values.shape,
+            dtype=array.values.dtype,
+            weak_type=False,
+        )
+
+    def _to_jax(array):
+        arr = jax.numpy.array(array.values)
+        return arr
+
     def get_default_gpu() -> Device:
         return jax.devices('gpu')[0]
 
@@ -471,7 +500,8 @@ if JAX_WORKING:
             device = get_default_cpu()
 
         if not isinstance(array, ArrayImpl) or not _device(array) == device:
-            return jax.device_put(array, device)
+            arr = jax.device_put(array, device)
+            return arr
         return array
 
     def to_gpu(array, device: Device | None = None):

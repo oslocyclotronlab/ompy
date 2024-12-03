@@ -231,6 +231,7 @@ class Response:
             Whether to pad the rebinned response matrix.
         force_trilu : bool, default True
             Whether to force the rebinned response matrix to be lower triangular.
+            This is physically required. The off-diagonal elements are purely numerical artifacts.
 
         Returns:
         --------
@@ -314,6 +315,9 @@ class Response:
 
         if normalize:
             D.normalize(axis='observed', inplace=True)
+        # Set labels
+        D.xlabel = r'True $E_\gamma$'
+        D.ylabel = r'Measured $E_\gamma$'
         return D
 
     def discrete_like(self, other: Matrix | Vector, **kwargs) -> Matrix:

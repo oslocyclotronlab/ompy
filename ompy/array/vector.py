@@ -147,7 +147,11 @@ class Vector(AbstractArray, VectorProtocol):
                                            **indexkwargs)
         _xalias = '' if not xalias else f' (`{xalias}`)'
         _valias = '' if not valias else f' (`{valias}`)'
-        if len(self._index) != len(self.values):
+        if np.ndim(self._index) != 1:
+            raise ValueError(f"Index must be 1D, got {np.ndim(self._index)}")
+        if np.ndim(self.values) != 1:
+            raise ValueError(f"Values must be 1D, got {np.ndim(self.values)}")
+        if np.size(self._index) != np.size(self.values):
             raise ValueError(
                 f"Length of index{_xalias} and values{_valias} must be the same. Got {len(self._index)} and {len(self.values)}")
         if 'ylabel' in kwargs:
