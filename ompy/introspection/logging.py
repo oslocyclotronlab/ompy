@@ -19,6 +19,12 @@ def get_logger(name: str, level=logging.INFO):
     # logging.basicConfig(level=logging.DEBUG)
     if not name.startswith("ompy"):
         name = "ompy." + name
+
+    # Remove the ompy prefix and check if it is in available loggers
+    available = available_loggers()
+    if name.split('.')[1] not in available:
+        raise ValueError(f"Logger {name} not available.\nAvailable loggers:\n{available}")
+
     logger = logging.getLogger(name)
     if isinstance(level, str):
         level = level.upper()

@@ -8,7 +8,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from .result import Result
 from .result1d import UnfoldedResult1D
-from .bootstrap import BootstrapVector
+from .bootstrapping import BootstrapVector
 from ..helpers import make_combined_legend
 
 @dataclass

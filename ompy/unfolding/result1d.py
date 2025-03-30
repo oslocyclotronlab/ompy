@@ -10,9 +10,12 @@ from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import overload, TypeGuard, TypeVar, Sequence, TypeAlias, Iterable
+from typing import overload, TypeGuard, TypeVar, Sequence, TypeAlias, Iterable, TYPE_CHECKING
 import warnings
+from typing import Any
 
+if TYPE_CHECKING:
+    from .bootstrapping import BootstrapVector
 
 
 @dataclass(kw_only=True)
@@ -26,7 +29,7 @@ class UnfoldedResult1D(Result[Vector]):
     def unfolded(self, *args, **kwargs) -> Vector: ...
 
     def folded(self, *args, **kwargs) -> Vector:
-        return self.R @ self.unfolded(*args, **kwargs)
+        return self.GegD.T @ self.unfolded(*args, **kwargs)
 
     # @make_axes
     def plot_comparison(self, ax: Axes | None = None,
@@ -98,6 +101,10 @@ class UnfoldedResult1D(Result[Vector]):
             lines.append(line)
 
         return ax, lines
+
+    def bootstrap(self, N: int, **kwargs) -> BootstrapVector:
+        from .bootstrapping import bootstrap
+        return bootstrap(self, N=N, **kwargs)
 
 @dataclass(kw_only=True)
 class UnfoldedResult1DSimple(UnfoldedResult1D):
@@ -276,21 +283,32 @@ class Cost1D(Result[T]):
     aux: dict[str, np.ndarray] = field(default_factory=dict)
 
     def plot_cost(self, ax: Axes | None = None, start: int | float = 0, relative: bool = False,
-                  aux: bool | Iterable[str] = True, **kwargs) -> Plot1D:
+                  auxiliary: bool | Iterable[str] = True, **kwargs) -> Plot1D:
         ax = make_ax(ax)
         if isinstance(start, float):
             start = int(start*len(self.cost))
         cost = self.cost[start:]
+
+        # If the Result has auxiliary data, plot the auxiliary data as specified by `auxiliary`
+        if isinstance(auxiliary, str):
+            auxiliary = [auxiliary]
+        aux = {}
         if len(self.aux) > 0:
-            if isinstance(aux, bool):
-                keys = self.aux.keys() if aux else []
+            if isinstance(auxiliary, bool):
+                keys = self.aux.keys() if auxiliary else []
             else:
-                keys = aux
+                keys = auxiliary
             aux = {k: self.aux[k][start:] for k in keys}
+
         if relative:
             cost /= cost[0]
+            aux2 = {}
             for k in aux:
-                aux[k] /= aux[k][0]
+                if aux[k][0] != 0:
+                    aux2[k] = aux[k] / aux[k][0]
+                else:
+                    aux2[k] = aux[k]
+            aux = aux2
             
         x = np.arange(start, len(self.cost))
         lines: list[Lines] = []
@@ -303,15 +321,19 @@ class Cost1D(Result[T]):
         ax.legend()
         return ax, lines
 
-    def _save(self, path: Path, exist_ok: bool = False):
+    def _save(self, path: Path, meta: dict[str, Any], exist_ok: bool = False):
         np.save(path / 'cost.npy', self.cost)
-        if len(self.aux) > 0:
-            warnings.warn("Not saving auxilliary data to disk!")
+        for k, v in self.aux.items():
+            np.save(path / f'{k}.npy', v)
+        meta['aux'] = [k for k in self.aux.keys()]
 
     @classmethod
-    def _load(cls, path: Path) -> dict[str, np.ndarray]:
-        cov = np.load(path / 'cost.npy')
-        return {'cost': cov}
+    def _load(cls, path: Path, meta: dict[str, Any]) -> dict[str, np.ndarray]:
+        cost = np.load(path / 'cost.npy')
+        aux = {}
+        for k in meta['aux']:
+            aux[k] = np.load(path / f'{k}.npy')
+        return {'cost': cost, 'aux': aux}
 
 
 @dataclass(kw_only=True)

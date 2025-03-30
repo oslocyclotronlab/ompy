@@ -10,7 +10,8 @@ import time
 import logging
 from tqdm.auto import tqdm
 from ..version import warn_version
-
+from .vectormetadata import VectorMetadata
+from .matrixmetadata import MatrixMetadata
 LOG = logging.getLogger(__name__)
 
 
@@ -122,31 +123,48 @@ class ArrayList(Sequence[T]):
     @classmethod
     def from_tree(cls, tree, root='/', read_only: int | None = None, **kwargs) -> Self:
         """ Read the arrays from a hdf5 tree """
+        LOG.debug(f"Reading from {root}")
         start = time.time()
         array_type = tree[root].attrs['type']
+        LOG.debug(f"Array type: {array_type}")
         array_cls = ARRAY_CLASSES[array_type]
+        LOG.debug(f"Array class: {array_cls}")
         X_dict= hdf5_to_dict(tree, root + 'X_index/')
+        LOG.debug("Reading X_index")
         X_index = Index.from_dict(X_dict)
+        LOG.debug(f"Length of X_index: {len(X_index)}")
         if array_cls._ndim > 1:
+            LOG.debug("Reading Y_index")
             Y_dict = hdf5_to_dict(tree, root + 'Y_index/')
             Y_index = Index.from_dict(Y_dict)
+            LOG.debug(f"Length of Y_index: {len(Y_index)}")
+        LOG.debug("Reading meta")
         meta = hdf5_to_dict(tree, root + 'meta/')
+        LOG.debug(f"Length of meta: {len(meta)}")
         version = tree[root].attrs['version']
+        LOG.debug(f"Version: {version}")
         warn_version(version)
         array_paths = sorted(tree[root + 'array'], key=int)
+        LOG.debug("Reading arrays")
         arrays = []
         for i, arr_path in enumerate(array_paths):
             if read_only is not None and i >= read_only:
                 break
+            LOG.debug(f"Reading array {i} at {root + 'array/' + arr_path}")
             arrays.append(np.asarray(tree[root + 'array/' + arr_path]))
         LOG.debug(f"Read {len(arrays)} {array_type} in {time.time() - start:.2f} s")
         proto_array = arrays[0]
+        LOG.debug(f"Proto array shape: {proto_array.shape}")
         if array_cls._ndim == 1:
+            meta = VectorMetadata(**meta)
             proto = array_cls(X=X_index, values=proto_array, metadata=meta)
         elif array_cls._ndim == 2:
+            meta = MatrixMetadata(**meta)
             proto = array_cls(X=X_index, Y=Y_index, values=proto_array, metadata=meta)
         else:
             raise NotImplementedError("Only 1D and 2D arrays are supported")
+        LOG.debug(f"Metadata: {meta}")
+        LOG.debug(f"Proto array metadata: {proto.metadata}")
 
         arraylist = cls(proto)
         arraylist.array.extend(arrays)
@@ -163,8 +181,9 @@ class ArrayList(Sequence[T]):
         start = time.time()
         tree.create_group(root + 'X_index')
         dict_to_hdf5(tree, self.prototype.X_index.to_dict(), root + 'X_index/')
-        tree.create_group(root + 'Y_index')
-        dict_to_hdf5(tree, self.prototype.Y_index.to_dict(), root + 'Y_index/')
+        if self.prototype._ndim > 1:
+            tree.create_group(root + 'Y_index')
+            dict_to_hdf5(tree, self.prototype.Y_index.to_dict(), root + 'Y_index/')
         tree.create_group(root + 'meta')
         dict_to_hdf5(tree, asdict(self.prototype.metadata), root + 'meta/')
         tree[root].attrs['version'] = __full_version__

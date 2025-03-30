@@ -2,21 +2,27 @@ from __future__ import annotations
 from collections import Counter
 import numpy as np
 from .. import Vector, Matrix, zeros_like
-from ..array import pack_into_matrix
+from ..array import pack_into_matrix, Array
 from ..response import ResponseName, Response
 from abc import ABC, abstractmethod
-from typing import Literal, TypeAlias, overload, Self
+from typing import Literal, TypeAlias, overload, Self, TYPE_CHECKING, Iterable
 from tqdm.autonotebook import tqdm
-from .result import Parameters2D, ResultMeta2D
+from .result import Parameters2D, ResultMeta2D, Result
 from .result1d import UnfoldedResult1D
 from .result2d import UnfoldedResult2D, UnfoldedResult2DSimple
-from .stubs import Space, UnfoldingMatrix
+from .stubs import Space, Mask, Mask1D, Mask2D
+from ..rendering.html import collapse, table
+import warnings
+
+if TYPE_CHECKING:
+    from ..detector import Detector
 
 
 UNFOLDER_CLASSES: dict[str, type[Unfolder]] = {}
 
+
 class Unfolder(ABC):
-    """ Abstract base class for unfolding algorithms
+    """Abstract base class for unfolding algorithms
 
     Attributes
     ----------
@@ -26,19 +32,155 @@ class Unfolder(ABC):
         The gaussian smoothing matrix
     """
 
-    def __init__(self, R: Matrix, G: Matrix):
-        if R.shape != G.shape:
-            raise ValueError(
-                f"R and G must have the same shape, got {R.shape} and {G.shape}")
-        if not R.X_index.is_compatible_with(R.Y_index):
-            # TODO: Is this necessarily true?
-            raise ValueError("R must be square")
-        if not R.X_index.is_compatible_with(G.X_index):
-            raise ValueError(
-                f"R and G must have the same axes.\n{R.X_index.summary()}\n{G.X_index.summary()}")
-        self.R: Matrix = R
-        self.G: Matrix = G
+    def __init__(
+        self,
+        D: Matrix | None = None,
+        G_eg: Matrix | None = None,
+        G_ex: Matrix | None = None,
+        detector: Detector | None = None,
+        space: Space = "mu",
+        warn_int_data: bool = True,
+    ):
+        # We must transpose D and G_eg because of convention
+        # Better to it here than expecting the user to remember it.
+        self._D: Matrix | None = D
+        self._G_eg: Matrix | None = G_eg
+        self._G_ex: Matrix | None = G_ex
+        self._detector: Detector | None = detector
+        self.cached_array_hash: int | None = None
+        self.space: Space = space
+        self.warn_int_data: bool = warn_int_data
+        if space != "mu":
+            raise NotImplementedError(f"Space {space} is not implemented")
+        self.check_matrices()
 
+    @property
+    def D(self) -> Matrix:
+        if self._D is None:
+            raise ValueError("D is not set")
+        return self._D
+
+    @property
+    def G_eg(self) -> Matrix:
+        if self._G_eg is None:
+            raise ValueError("G_eg is not set")
+        return self._G_eg
+
+    @property
+    def G_ex(self) -> Matrix:
+        if self._G_ex is None:
+            raise ValueError("G_ex is not set")
+        return self._G_ex
+
+    def check_matrices(self) -> None:
+        # The matrices must satisfy y = G_ex @ mat @ D @ G_eg
+        if self._D is not None and self._G_eg is not None:
+            if not self._D.X_index.is_compatible_with(self._G_eg.Y_index):
+                raise ValueError(
+                    "D and G_eg must have compatible axes.\n"
+                    f"D.shape: {self._D.shape} != {self._G_eg.shape} = G_eg.shape"
+                )
+        if self._D is not None and self._G_ex is not None:
+            if not self._D.Y_index.is_compatible_with(self._G_ex.X_index):
+                raise ValueError(
+                    "D and G_ex must have compatible axes.\n"
+                    f"D.shape: {self._D.shape} != {self._G_ex.shape} = G_ex.shape"
+                )
+
+    def set_matrices(self, array: Matrix | Vector, reset: bool = False) -> None:
+        if self.warn_int_data:
+            if np.issubdtype(array.values.dtype, np.integer):
+                warnings.warn(
+                    "You are providing integer data to an unfolding algorithm. "
+                    "This is not recommended because it may lead to unexpected "
+                    "behavior. Recommended to use float data."
+                )
+
+        # Either a detector is set, or all matrices are set
+        if self._detector is None:
+            need_Gex = isinstance(array, Matrix)
+            if (
+                self._D is None
+                or self._G_eg is None
+                or (need_Gex and self._G_ex is None)
+            ):
+                raise ValueError(
+                    "You must either provide all matrices at initialization, or "
+                    "use `from_detector(detector)` to set them from a detector."
+                )
+            # Detector is not set but matrices are set. Ensure they are compatible
+            self.check_array(array)
+            self.cached_array = array
+            return
+
+        # Detector is set. Need to check if the matrices can be reused
+        if not reset and self.cached_array_hash is not None:
+            if self.cached_array_hash == self.hash_array(array):
+                return
+
+        # If we get here, we need to specialize the matrices
+        G_ex, (D, G_eg) = self._detector.specialize_like(array)
+        self._D = D
+        self._G_eg = G_eg
+        self._G_ex = G_ex
+        self.cached_array_hash = self.hash_array(array)
+
+    @staticmethod
+    def hash_array(array: Matrix | Vector) -> int:
+        # We don't care about the values, only the shape and index
+        match array:
+            case Matrix():
+                return hash((array.shape, array.X_index, array.Y_index))
+            case Vector():
+                return hash((array.shape, array.X_index))
+            case _:
+                raise ValueError(f"Invalid array type: {type(array)}")
+
+    def check_array(self, array: Matrix | Vector) -> None:
+        self.check_matrices()
+        # If array is a vector, G_ex is 1, so we can ignore it
+        if isinstance(array, Matrix):
+            if self._G_ex is None:
+                raise ValueError("When unfolding a matrix, G_ex must be provided.")
+            if not self.G_ex.X_index.is_compatible_with(array.Y_index):
+                raise ValueError(
+                    "G_ex must be compatible with the array. "
+                    f"Got {self.G_ex.shape} and {array.shape}"
+                )
+        if not self.D.X_index.is_compatible_with(array.X_index):
+            raise ValueError(
+                "D must be compatible with the array. "
+                f"Got {self.D.shape} and {array.shape}"
+            )
+        # We don't need to check G_eg since check_matrices() already did that
+        # we only need to ensure it exists
+        if self._G_eg is None:
+            raise ValueError("G_eg must be provided.")
+
+    def check_background(
+        self, data: Matrix | Vector, background: Matrix | Vector | None
+    ) -> None:
+        if background is not None:
+            if not self.supports_background():
+                raise ValueError(
+                    "This unfolding algorithm does not support background subtraction."
+                )
+            if not background.is_compatible_with(data):
+                raise ValueError("The background has different indices from the data.")
+
+    @classmethod
+    def from_detector(cls, detector: Detector) -> Self:
+        # A bit verbose, but it is vestigal and fits in the
+        # pattern established by other classes
+        return cls(detector=detector)
+
+    @classmethod
+    def from_result(cls, result: Result) -> Self:
+        return cls(D=result.D, G_eg=result.G_eg, G_ex=result.G_ex)
+
+    @classmethod
+    def from_result_constructor(cls, result: Result) -> Self:
+        return cls.resolve_method(result.meta.method).from_result(result)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -59,172 +201,211 @@ class Unfolder(ABC):
     @abstractmethod
     def supports_background() -> bool: ...
 
-    @classmethod
-    def from_response(cls, response: Response, data: Matrix | Vector, **kwargs) -> Self:
-        R, G = response.specialize_like(data)
-        return cls(R, G, **kwargs)
-
-    @classmethod
-    def from_db(cls, db: ResponseName, data: Matrix | Vector, **kwargs) -> Self:
-        response = Response.from_db(db)
-        return cls.from_response(response, data, **kwargs)
+    @overload
+    def unfold(
+        self, data: Matrix, background: Matrix | None = None, **kwargs
+    ) -> UnfoldedResult2D: ...
 
     @overload
-    def unfold(self, data: Matrix, background: Matrix | None = None, **kwargs) -> UnfoldedResult2D:
-        ...
+    def unfold(
+        self, data: Vector, background: Vector | None = None, **kwargs
+    ) -> UnfoldedResult1D: ...
 
     @overload
-    def unfold(self, data: Vector, background: Vector | None = None, **kwargs) -> UnfoldedResult1D:
-        ...
+    def unfold(
+        self,
+        data: list[Vector],
+        background: list[Vector] | Vector | None = None,
+        **kwargs,
+    ) -> list[UnfoldedResult1D]: ...
 
-    @overload
-    def unfold(self, data: list[Vector], background: list[Vector] | None = None,
-               **kwargs) -> list[UnfoldedResult1D]:
-        ...
-
-    def unfold(self, data: Matrix | Vector | list[Vector],
-               background: Matrix | Vector | list[Vector] | None = None,
-               **kwargs) -> UnfoldedResult2D | UnfoldedResult1D | list[UnfoldedResult1D]:
+    def unfold(
+        self,
+        data: Matrix | Vector | list[Vector],
+        background: Matrix | Vector | list[Vector] | None = None,
+        mask: Mask = "last nonzero",
+        **kwargs,
+    ) -> UnfoldedResult2D | UnfoldedResult1D | list[UnfoldedResult1D]:
         match data, background:
             case Matrix(), Matrix() | None:
-                return self.unfold_matrix(data, background, **kwargs)
+                return self.unfold_matrix(data, background, mask=mask, **kwargs)
             case Vector(), Vector() | None:
-                return self.unfold_vector(data, background, **kwargs)
-            case list(), list() | None:
-                return self.unfold_vectors(data, background, **kwargs)
+                return self.unfold_vector(data, background, mask=mask, **kwargs)
+            case list(), list() | None | Vector():
+                return self.unfold_vectors(data, background, mask=mask, **kwargs)
             case _:
                 raise ValueError(
-                    f"Expected both Matrix, Vector or list of Vectors, got {type(data), type(background)}")
+                    f"Expected both Matrix, Vector or list of Vectors, got {type(data), type(background)}"
+                )
 
-    def unfold_vector(self, data: Vector, background: Vector | None = None, initial: InitialVector = 'raw',
-                      R: UnfoldingMatrix | Matrix = 'D', G: str | Matrix = 'G', **kwargs) -> UnfoldedResult1D:
-        space, R = self._resolve_response(R)
-        if not R.is_compatible_with(data.X_index):
-            raise ValueError("R and data must have the same axes")
-        if background is not None:
-            if not self.supports_background():
-                raise ValueError("This unfolding algorithm does not support background subtraction.")
-            if not R.is_compatible_with(background.X_index):
-                raise ValueError(
-                    "The background has different index from the data.")
-        R = R.T
-        if G == 'G':
-            G = self.G.T
-        elif isinstance(G, str):
-            raise ValueError(f"Unknown G: {G}")
-        else:
-            G = G
+    def unfold_vector(
+        self,
+        data: Vector,
+        background: Vector | None = None,
+        initial: InitialVector = "raw",
+        mask: Mask1D = "last nonzero",
+        **kwargs,
+    ) -> UnfoldedResult1D:
+        self.set_matrices(data)
+        self.check_background(data, background)
 
         initial_: Vector = initial_vector(data, initial)
-        return self._unfold_vector(R=R, data=data, background=background,
-                                   initial=initial_, G=G, space=space, **kwargs)
+        mask: np.ndarray = make_mask(data, mask)
+        return self._unfold_vector(
+            data=data,
+            background=background,
+            initial=initial_,
+            D=self.D,
+            G_eg=self.G_eg,
+            mask=mask,
+            **kwargs,
+        )
 
-
-    def unfold_vectors(self, data: list[Vector],
-                       background: list[Vector] | None = None,
-                       initial: InitialVector | list[InitialVector] = 'raw',
-                       R: UnfoldingMatrix | Matrix = 'D',
-                       G: str | Matrix = 'G', **kwargs) -> list[UnfoldedResult1D]:
-        space, R = self._resolve_response(R)
+    def unfold_vectors(
+        self,
+        data: list[Vector],
+        background: Vector | list[Vector] | None = None,
+        initial: InitialVector | list[InitialVector] = "raw",
+        mask: Mask1D | list[Mask1D] = "last nonzero",
+        **kwargs,
+    ) -> list[UnfoldedResult1D]:
         # All vectors must be the same shape
         if len(data) <= 1:
-            raise ValueError("At least two vectors are required. Use unfold_vector for single vector.")
+            raise ValueError(
+                "At least two vectors are required. Use unfold_vector for single vector."
+            )
         c = Counter([len(v) for v in data])
         if len(c) != 1:
-            raise ValueError("All vectors must have the same length."
-                             f"Got lengths: {c}")
+            raise ValueError(
+                "All vectors must have the same length." f"Got lengths: {c}"
+            )
+        self.set_matrices(data[0])
+        match background:
+            case None:
+                pass
+            case Vector():
+                self.check_background(data[0], background)
+                background = [background for i in range(len(data))]
+            case Iterable():
+                if len(background) != len(data):
+                    raise ValueError(
+                        "`background` must have the same length as `data`."
+                    )
+                for raw, bg in zip(data, background):
+                    self.check_background(raw, bg)
 
-        for i, vec in enumerate(data):
-            if not R.is_compatible_with(vec.X_index):
-                raise ValueError(f"`R` and vector {i} must have compatible axes")
-        if background is not None:
-            #if not self.supports_background():
-            #    raise ValueError("This unfolding algorithm does not support background subtraction.")
-            if len(background) != len(data):
-                raise ValueError("`background` must have the same length as `data`.")
-            for i, vec in enumerate(background):
-                if not R.is_compatible_with(vec.X_index):
-                    raise ValueError(f"`R` and background vector {i} must have compatible axes.")
-        R = R.T
-        if G == 'G':
-            G = self.G.T
-        elif isinstance(G, str):
-            raise ValueError(f"Unknown G: {G}")
-        else:
-            G = G
+        match mask:
+            case Vector() | np.ndarray() | str():
+                mask1d = make_mask(data[0], mask)
+                # The memory is shared
+                masks = [mask1d for i in range(len(data))]
+            case Iterable():
+                if len(mask) != len(data):
+                    raise ValueError("`mask` must have the same length as `data`.")
+                # could share memory here, but i'm lazy
+                masks = [make_mask(data[i], mask[i]) for i in range(len(data))]
 
         if isinstance(initial, list):
-            initials: list[Vector] = [initial_vector(data[i], initial[i])
-                                      for i in range(len(data))]
+            initials: list[Vector] = [
+                initial_vector(data[i], initial[i]) for i in range(len(data))
+            ]
         else:
             initials = [initial_vector(data[i], initial) for i in range(len(data))]
-        return self._unfold_vectors(R=R, data=data, background=background,
-                                   initial=initials, G=G, space=space, **kwargs)
 
-    def unfold_matrix(self, data: Matrix, background: Matrix | None = None,
-                      initial: InitialMatrix = 'raw',
-                      R: str | Matrix | tuple[str, Matrix] = 'R', G: str | Matrix = 'G',
-                      G_ex: Matrix | None = None,
-                      **kwargs) -> UnfoldedResult2D:
-        space, R = self._resolve_response(R)
-        if not self.R.X_index.is_compatible_with(data.Y_index):
-            raise ValueError("R and data must have the same axes."
-                             f"\n\nThe index of R:\n{R.X_index.summary()}"
-                             f"\n\nThe index of data:\n{data.Y_index.summary()}")
-        if background is not None:
-            if not self.supports_background():
-                raise ValueError("This unfolding algorithm does not support background subtraction.")
-            if not background.is_compatible_with(data):
-                raise ValueError(
-                    "The background has different indices from the data.")
-        R = R.T
+        return self._unfold_vectors(
+            D=self.D,
+            G_eg=self.G_eg,
+            data=data,
+            background=background,
+            initial=initials,
+            mask=masks,
+            **kwargs,
+        )
 
-        if G == 'G':
-            G = self.G.T
-        elif isinstance(G, str):
-            raise ValueError(f"Unknown G: {G}")
-        else:
-            G = G
-
-        if G_ex is None:
-            G_ex = Matrix(X=data.X_index, Y=data.X_index, values = np.eye(data.shape[0]))
-
+    def unfold_matrix(
+        self,
+        data: Matrix,
+        background: Matrix | None = None,
+        initial: InitialMatrix = "raw",
+        mask: Mask2D = "last nonzero",
+        **kwargs,
+    ) -> UnfoldedResult2D:
+        self.set_matrices(data)
+        self.check_background(data, background)
         use_previous, initial = initial_matrix(data, initial)
-        return self._unfold_matrix(R, data, background, initial, use_previous,
-                                   space, G, G_ex=G_ex, **kwargs)
+        specialized_mask: np.ndarray = make_mask(data, mask)
+        # Note we transpose D and G_eg because of convention
+        return self._unfold_matrix(
+            data,
+            background,
+            initial,
+            use_previous,
+            D=self.D,
+            G_eg=self.G_eg,
+            G_ex=self.G_ex,
+            mask=specialized_mask,
+            **kwargs,
+        )
 
     @abstractmethod
-    def _unfold_vector(self, R: Matrix, data: Vector, background: Vector | None,
-                       initial: Vector, space: Space, G: Matrix | None = None,
-                       **kwargs) -> UnfoldedResult1D: ...
+    def _unfold_vector(
+        self,
+        data: Vector,
+        background: Vector | None,
+        initial: Vector,
+        D: Matrix,
+        G_eg: Matrix,
+        **kwargs,
+    ) -> UnfoldedResult1D: ...
 
-    def _unfold_vectors(self, R: Matrix, data: list[Vector], background: list[Vector] | None,
-                       initial: list[Vector], space: Space, G: Matrix,
-                       **kwargs) -> list[UnfoldedResult1D]:
+    def _unfold_vectors(
+        self,
+        data: list[Vector],
+        background: list[Vector] | None,
+        initial: list[Vector],
+        D: Matrix,
+        G_eg: Matrix,
+        mask: list[np.ndarray],
+        **kwargs,
+    ) -> list[UnfoldedResult1D]:
         """
-        A default implementation of unfolding a list of vectors 
+        A default implementation of unfolding a list of vectors
 
         Packs the vectors into a matrix and calls unfold_matrix()
         """
+        warnings.warn(
+            "This is the fallback method for `unfold_vectors`."
+            " Depending on the implementation of `unfold_matrix`, "
+            " there might be scaling or row correlation effects, "
+            " giving different results compared to `unfold_vector`.\n"
+            "USE WITH CARE!"
+        )
         mat = pack_into_matrix(data)
         bg = None if background is None else pack_into_matrix(background)
         init = pack_into_matrix(initial)
         result = self.unfold_matrix(mat, bg, init, R=(space, R.T), G=G, **kwargs)
         return result
 
-
-    def _unfold_matrix(self, R: Matrix, data: Matrix,
-                       background: Matrix | None, initial: Matrix,
-                       use_previous: bool, space: Space,
-                       G: Matrix, G_ex: Matrix, **kwargs) -> UnfoldedResult2DSimple:
-        """ A default, simple implementation of unfolding a matrix
-
-         """
+    def _unfold_matrix(
+        self,
+        data: Matrix,
+        G_eg: Matrix,
+        G_ex: Matrix,
+        background: Matrix | None,
+        initial: Matrix,
+        use_previous: bool,
+        **kwargs,
+    ) -> UnfoldedResult2DSimple:
+        """A default, simple implementation of unfolding a matrix"""
+        # This used to be implemented, but as i've learned more about unfolding,
+        # I've realized that it is not a good idea to have a default implementation.
+        # The user *must* provide a mask to mask out the region of interest.
+        raise NotImplementedError("This is not implemented")
         best = np.zeros((data.shape[0], R.shape[1]))
         N = data.shape[0]
         time = np.zeros(N)
         bins = np.zeros(N)
-        #masks = np.zeros_like(data)
+        # masks = np.zeros_like(data)
         pbar = tqdm(range(N))
         for i in pbar:
             vec: Vector = data.iloc[i, :]
@@ -237,7 +418,7 @@ class Unfolder(ABC):
             else:
                 bvec = None
             if use_previous and i > 0:
-                init = best[i-1, :j]
+                init = best[i - 1, :j]
             else:
                 init = initial.iloc[i, :j]
             R_: Matrix = R.iloc[:j, :j]
@@ -249,47 +430,126 @@ class Unfolder(ABC):
             best[i, :j] = res.best()
             time[i] = res.meta.time
             bins[i] = j
-        parameters = Parameters2D(raw=data, background=background, R=R, G=G,
-                                  initial=initial)
-        meta = ResultMeta2D(time=time, space=space, parameters=parameters,
-                            method=res.meta.method)
+        parameters = Parameters2D(
+            raw=data, background=background, R=R, G=G, initial=initial
+        )
+        meta = ResultMeta2D(
+            time=time, space=space, parameters=parameters, method=res.meta.method
+        )
         best = data.clone(values=best)
         return UnfoldedResult2DSimple(meta=meta, u=best)
 
-    def _resolve_response(self, R: UnfoldingMatrix | Matrix | tuple[Space, Matrix]) -> tuple[Space, Matrix]:
-        match R:
-            case Matrix():
-                return 'unknown', R
-            case 'D':
-                return R, self.R
-            case 'G':
-                return R, self.G
-            case 'GD':
-                # Confusingly, since we've defined R as R.T in the code
-                # for fast access pattern, 'GD' corresponds to R@G, which is later
-                # transposed to become G.T@R.T
-                return R, self.R@self.G
-            case 'DG':
-                return R, self.G@self.R
-            case (Space as space, Matrix() as mat):
-                return space, mat
-            case _:
-                raise ValueError(f"Invalid unfolding matrix {R}. \n"
-                                 f"Expected {UnfoldingMatrix.__args__} or (Space, Matrix)")
+    def _repr_html_(self) -> str:
+        """
+        Generate HTML representation for Jupyter notebook display.
+        Provides information about matrices, detector, and space.
+        Uses existing table() and collapse() functions.
+        """
+
+        # Helper function for matrix info
+        def matrix_info(matrix, name):
+            if matrix is None:
+                return f"{name}: None"
+            return f"{name}: {matrix.__class__.__name__} of shape {matrix.shape}"
+
+        # Create the main info table data
+        info_data = [
+            ("Space", self.space),
+            (
+                "Cached Array Hash",
+                (
+                    self.cached_array_hash
+                    if self.cached_array_hash is not None
+                    else "None"
+                ),
+            ),
+        ]
+
+        # Create matrices info
+        matrices_info = []
+
+        if self._D is not None:
+            matrices_info.append(("D Matrix", matrix_info(self._D, "D")))
+            if hasattr(self._D, "_repr_html_"):
+                d_html = collapse(self._D._repr_html_(), "D Matrix Details")
+            else:
+                d_html = ""
+        else:
+            matrices_info.append(("D Matrix", "None"))
+            d_html = ""
+
+        if self._G_eg is not None:
+            matrices_info.append(("G_eg Matrix", matrix_info(self._G_eg, "G_eg")))
+            if hasattr(self._G_eg, "_repr_html_"):
+                g_eg_html = collapse(self._G_eg._repr_html_(), "G_eg Matrix Details")
+            else:
+                g_eg_html = ""
+        else:
+            matrices_info.append(("G_eg Matrix", "None"))
+            g_eg_html = ""
+
+        if self._G_ex is not None:
+            matrices_info.append(("G_ex Matrix", matrix_info(self._G_ex, "G_ex")))
+            if hasattr(self._G_ex, "_repr_html_"):
+                g_ex_html = collapse(self._G_ex._repr_html_(), "G_ex Matrix Details")
+            else:
+                g_ex_html = ""
+        else:
+            matrices_info.append(("G_ex Matrix", "None"))
+            g_ex_html = ""
+
+        # Create detector info
+        detector_info = "None"
+        detector_html = ""
+        if self._detector is not None:
+            detector_info = f"{self._detector.__class__.__name__}"
+            matrices_info.append(("Detector", detector_info))
+            if hasattr(self._detector, "_repr_html_"):
+                detector_html = collapse(
+                    self._detector._repr_html_(), "Detector Details"
+                )
+        else:
+            matrices_info.append(("Detector", "None"))
+
+        # Build the full HTML output
+        html = f"""
+        <div class="matrix-container" style="margin: 10px 0; font-family: sans-serif;">
+            <div class="main-info">
+                <h3>{self.__class__.__name__} Information</h3>
+                {table(info_data, color="#e6f7ff")}
+            </div>
+            
+            <div class="matrices-info" style="margin-top: 15px;">
+                <h3>Matrices and Detector</h3>
+                {table(matrices_info, color="#e6fffa")}
+            </div>
+            
+            <div class="details-section" style="margin-top: 15px;">
+                {d_html}
+                {g_eg_html}
+                {g_ex_html}
+                {detector_html}
+            </div>
+        </div>
+        """
+
+        return html
 
 
-InitialVector: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Vector
-InitialMatrix: TypeAlias = Literal['raw', 'random'] | float | np.ndarray | Matrix
+InitialVector: TypeAlias = Literal["raw", "random"] | float | np.ndarray | Vector
+InitialMatrix: TypeAlias = Literal["raw", "random"] | float | np.ndarray | Matrix
 
 
 def initial_vector(data: Vector, initial: InitialVector) -> Vector:
     match initial:
         case str():
             match initial:
-                case 'raw':
+                case "raw":
                     return data.copy()
-                case 'random':
-                    return data.copy(values=np.random.poisson(np.median(data.values), len(data)))
+                case "random":
+                    return data.copy(
+                        values=np.random.poisson(np.median(data.values), len(data))
+                    )
         case float():
             return data.clone(values=float(initial) + zeros_like(data))
         case np.ndarray():
@@ -302,7 +562,7 @@ def initial_vector(data: Vector, initial: InitialVector) -> Vector:
 
 def initial_matrix(data: Matrix, initial: InitialMatrix) -> tuple[bool, Matrix]:
     match initial:
-        case 'raw':
+        case "raw":
             return False, data.copy()
         case float():
             return False, zeros_like(data) + initial
@@ -310,9 +570,11 @@ def initial_matrix(data: Matrix, initial: InitialMatrix) -> tuple[bool, Matrix]:
             return False, data.copy(values=initial)
         case Matrix():
             return False, initial.copy()
-        case 'random':
-            return False, data.copy(values=np.random.poisson(np.median(data.values), data.shape))
-        case 'previous':
+        case "random":
+            return False, data.copy(
+                values=np.random.poisson(np.median(data.values), data.shape)
+            )
+        case "previous":
             return True, data.copy()
         case _:
             raise ValueError(f"Invalid initial value {initial}")
@@ -321,8 +583,8 @@ def initial_matrix(data: Matrix, initial: InitialMatrix) -> tuple[bool, Matrix]:
 def mask_511(data: Vector) -> np.ndarray:
     mask = np.ones_like(data.values, dtype=bool)
     eps = 50
-    start = 510-eps
-    stop = 510+eps
+    start = 510 - eps
+    stop = 510 + eps
     if stop < data.X_index.leftmost:
         return mask
     if start > data.X_index.rightmost:
@@ -335,14 +597,46 @@ def mask_511(data: Vector) -> np.ndarray:
     return mask
 
 
-def make_mask(data: Vector, mask) -> Vector:
+def make_mask(data: Matrix | Vector, mask: Mask) -> np.ndarray:
+    if isinstance(data, Matrix):
+        return make_mask_matrix(data, mask)
+    else:
+        return make_mask_vector(data, mask)
+
+
+def make_mask_matrix(data: Matrix, mask: Mask2D) -> np.ndarray:
     match mask:
         case np.ndarray():
-            return data.clone(values=mask, dtype=bool)
-        case Vector():
             return mask
-        case None:
-            return data.clone(values=np.ones_like(data.values, dtype=bool),
-                              dtype=bool)
+        case Matrix():
+            if not data.is_compatible_with(mask):
+                raise ValueError("Mask must be compatible with data")
+            return mask.values
+        case "tril":
+            if data.shape[0] != data.shape[1]:
+                raise ValueError("tril mask only works for square matrices")
+            return np.tril(np.ones_like(data.values, dtype=bool))
+        case "last nonzero":
+            mask = np.zeros_like(data, dtype=bool)
+            for i in range(data.shape[0]):
+                j = data.iloc[i, :].last_nonzero()
+                mask[i, :j] = True
+            return mask
         case _:
-            return data.clone(values=mask(data), dtype=bool)
+            raise ValueError(f"Invalid mask {mask}")
+
+
+def make_mask_vector(data: Vector, mask: Mask1D) -> np.ndarray:
+    match mask:
+        case np.ndarray():
+            return mask
+        case Vector():
+            if not data.is_compatible_with(mask):
+                raise ValueError("Mask must be compatible with data")
+            return mask.values
+        case "last nonzero":
+            mask = np.zeros_like(data, dtype=bool)
+            mask[: data.last_nonzero()] = True
+            return mask
+        case _:
+            raise ValueError(f"Invalid mask {mask}")

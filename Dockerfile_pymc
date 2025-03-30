@@ -32,10 +32,10 @@ RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/ja
 
 # Install Jupyter
 RUN pip install jupyter
-RUN pip install termtables
+#RUN pip install termtables
 RUN pip install tqdm
 RUN pip install pint
-RUN pip install nptyping
+#RUN pip install nptyping
 RUN pip install sympy
 RUN pip install pandas
 RUN pip install numpyro
@@ -47,6 +47,7 @@ RUN pip install ipympl
 RUN pip install bambi
 RUN pip install statsmodels
 RUN pip install scikit-learn
+RUN pip install jupyterlab
 
 # Make port 8888 available to the world outside this container
 EXPOSE 8889

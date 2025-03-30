@@ -1,13 +1,19 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Iterable
 from .result import Result, PlotSpace, ResultMeta2D, Parameters2D
 from .. import Matrix, Vector, on_device
 from ..helpers import make_axes
 from ..stubs import Lines, Plots2D, Plot1D, array2D, Axes
 from ..array import ErrorVector, SymmetricVector, ErrorPlotKind, CorrelationMatrix
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from .bootstrapping import BootstrapMatrix
+
 
 def cache(func):
     """Decorator to cache the result of a function call.
@@ -28,7 +34,6 @@ def cache(func):
 class UnfoldedResult2D(Result):
     meta: ResultMeta2D
 
-
     @abstractmethod
     def best(self) -> Matrix: ...
 
@@ -36,25 +41,28 @@ class UnfoldedResult2D(Result):
     def best_folded(self, device='gpu?') -> Matrix:
         best = self.best()
         if self.G_ex is None:
-            with on_device(device, best, self.R, endpoint='numpy'):
-                m = best@self.R.T
+            with on_device(device, best, self.GegD, endpoint='numpy'):
+                m = best@self.GegD.T
         else:
-            with on_device(device, best, self.R, self.G_ex, endpoint='numpy'):
-                m = self.G_ex@best@self.R.T
+            with on_device(device, best, self.GegD, self.G_ex, endpoint='numpy'):
+                m = self.G_ex@best@self.GegD.T
         return self.raw.clone(values=m)  # Fix labels
 
     #@cache
     def best_eta(self, device='gpu?') -> Matrix:
-        if self.meta.space in {'GD', 'DG'}:
-            best = self.best()
-            if self.G_ex is None:
-                with on_device(device, best, self.G, endpoint='numpy'):
-                    m = best@self.G
-            else:
-                with on_device(device, best, self.G, self.G_ex, endpoint='numpy'):
-                    m = self.G_ex.T@best@self.G
-        else:
-            m = self.best()
+        match self.meta.space:
+            case 'eta':
+                best = self.best()
+                if self.G_ex is None:
+                    with on_device(device, best, self.G_eg, endpoint='numpy'):
+                        m = best@self.G_eg
+                else:
+                    with on_device(device, best, self.G_eg, self.G_ex, endpoint='numpy'):
+                        m = self.G_ex.T@best@self.G_eg
+            case 'mu':
+                m = self.best()
+            case _:
+                raise ValueError(f"Cannot map from {self.meta.space} to eta")
         return self.raw.clone(values=m)  # Fix labels
 
 
@@ -164,6 +172,10 @@ class UnfoldedResult2D(Result):
     def plot_comparison_to(self, other: Result, ax: Axes | None = None, space: PlotSpace = 'eta', **kwargs) -> Plot1D | Plots2D:
         raise NotImplementedError()
 
+    def bootstrap(self, N: int, **kwargs) -> BootstrapMatrix:
+        from .bootstrapping import bootstrap
+        return bootstrap(self, N, **kwargs)
+
 
 @dataclass(kw_only=True)
 class UnfoldedResult2DSimple(UnfoldedResult2D):
@@ -171,11 +183,11 @@ class UnfoldedResult2DSimple(UnfoldedResult2D):
     def best(self) -> Matrix:
         return self.u.copy()
 
-    def _save(self, path: Path, exist_ok: bool = False):
+    def _save(self, path: Path, meta: dict[str, Any], exist_ok: bool = False):
         self.u.save(path / 'u.npz', exist_ok=exist_ok)
 
     @classmethod
-    def _load(cls, path: Path) -> dict[str, Matrix]:
+    def _load(cls, path: Path, meta: dict[str, Any]) -> dict[str, Matrix]:
         u = Matrix.from_path(path / 'u.npz')
         return {'u': u}
 
@@ -183,11 +195,17 @@ class UnfoldedResult2DSimple(UnfoldedResult2D):
 @dataclass(kw_only=True)
 class Cost2D(Result):
     cost: array2D
+    aux: dict[str, np.ndarray] = field(default_factory=dict)
 
-    def plot_cost(self, ax: Axes | None = None, **kwargs) -> Plot1D:
+    def plot_cost(self, ax: Axes | None = None, auxiliary: bool | Iterable[str] = True, **kwargs) -> Plot1D:
         if ax is None:
             fig, ax = plt.subplots()
         assert ax is not None
+
+        if isinstance(start, float):
+            start = int(start*len(self.cost))
+        cost = self.cost[start:]
+
         lines = []
         cmap = kwargs.pop('cmap', 'turbo')
         colormap = plt.get_cmap(cmap)
@@ -208,10 +226,16 @@ class Cost2D(Result):
         ax.set_ylabel("Cost")
         return ax, lines
 
-    def _save(self, path: Path, exist_ok: bool = False):
+    def _save(self, path: Path, meta: dict[str, Any], exist_ok: bool = False):
         np.save(path / 'cost.npy', self.cost)
+        for k, v in self.aux.items():
+            np.save(path / f'{k}.npy', v)
+        meta['aux'] = self.aux.keys()
 
     @classmethod
-    def _load(cls, path: Path) -> dict[str, np.ndarray]:
+    def _load(cls, path: Path, meta: dict[str, Any]) -> dict[str, np.ndarray]:
         cost = np.load(path / 'cost.npy')
-        return {'cost': cost}
+        aux = {}
+        for k in meta['aux']:
+            aux[k] = np.load(path / f'{k}.npy')
+        return {'cost': cost, 'aux': aux}

@@ -9,11 +9,14 @@ from .. import Unit, JAX_WORKING
 from ..computation_context import new_context, active_context, ComputationContext, delete_context
 from .abstractarrayprotocol import AbstractArrayProtocol
 #from nptyping import NDArray, Shape, Floating
-from typing import Iterator, Self, Literal, Callable, overload, TypeAlias
-
+from typing import Iterator, Self, Literal, Callable, overload, TypeAlias, Any
+from numpy.typing import NDArray, DTypeLike
 
 LOG = logging.getLogger(__name__)
 logging.captureWarnings(True)
+
+Array: TypeAlias = NDArray[Any]
+NPOrder: TypeAlias = Literal['K', 'A', 'C', 'F']  # Copy of np._OrderKACF
 
 #TODO Implement all of the i-methods and logical methods
 # [ ] __imatmul__
@@ -37,13 +40,13 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     __default_unit: Unit = Unit('keV')
     _ndim = -1
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
         ARRAY_CLASSES[cls.__name__] = cls
 
-    def __init__(self, values: np.ndarray):
+    def __init__(self, values: NDArray[Any]):
         #self.values: NDArray[Shape['*', ...], Floating] = values
-        self.values: np.ndarray = values
+        self.values: NDArray[Any] = values
         # The context in which the array was created
         # only used for internal bookkeeping. Should not be saved
         # or modified by the user.
@@ -64,12 +67,11 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     def __array_interface__(self):
         return self.values.__array_interface__
 
-    def __array__(self, dtype=None) -> np.ndarray:
+    def __array__(self, dtype: None | DTypeLike = None) -> NDArray[Any]:
         return np.asarray(self.values, dtype=dtype)
 
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+    def __array_ufunc__(self, ufunc: np.ufunc, method: str, *inputs: tuple[Any], **kwargs: Any) -> Any:
         # TODO Untested. Might summon demons.
-        cls = type(self)
         # Replace ArrayWrapper instances with their .values attribute
         inputs = tuple(i.values if isinstance(i, AbstractArray) else i for i in inputs)
 
@@ -94,12 +96,12 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     def is_compatible_with(self, other: AbstractArray | Index) -> bool: ...
 
     @abstractmethod
-    def clone(self, **kwargs) -> Self: ...
+    def clone(self, **kwargs: Any) -> Self: ...
 
-    def copy(self, **kwargs) -> Self:
+    def copy(self, **kwargs: Any) -> Self:
         return self.clone(copy=True, **kwargs)
 
-    def check_or_assert(self, other) -> np.ndarray | float:
+    def check_or_assert(self, other: AbstractArray | NDArray[Any] | float) -> NDArray[Any] | float:
         if isinstance(other, AbstractArray):
             if not self.shape == other.shape:
                 raise ValueError(f"Incompatible shapes. {self.shape} != {other.shape}")
@@ -108,111 +110,111 @@ class AbstractArray(AbstractArrayProtocol, ABC):
             other = other.values
         return other
 
-    def __sub__(self, other) -> Self:
+    def __sub__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values - other, name='')
 
-    def __rsub__(self, other) -> Self:
+    def __rsub__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         result = self.clone(values = other - self.values, name='')
         return result
 
-    def __add__(self, other) -> Self:
+    def __add__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values + other, name='')
 
-    def __radd__(self, other) -> Self:
+    def __radd__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         x = self.__add__(other)
         return x
 
-    def __mul__(self, other) -> Self:
+    def __mul__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values * other, name='')
 
-    def __rmul__(self, other) -> Self:
+    def __rmul__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = other * self.values, name='')
 
-    def __truediv__(self, other) -> Self:
+    def __truediv__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values / other, name='')
 
-    def __rtruediv__(self, other) -> Self:
+    def __rtruediv__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = other / self.values, name='')
 
     def __pow__(self, val: float) -> Self:
         return self.clone(values = self.values ** val)
 
-    def __iand__(self, other) -> Self:
+    def __iand__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values &= other
         return self
 
-    def __and__(self, other) -> Self:
+    def __and__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values & other, name='')
 
-    def __or__(self, other) -> Self:
+    def __or__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values | other, name='')
 
-    def __ior__(self, other) -> Self:
+    def __ior__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values |= other
         return self
 
-    def __ixor__(self, other) -> Self:
+    def __ixor__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values ^= other
         return self
 
-    def __xor__(self, other: AbstractArrayProtocol | np.ndarray) -> Self:
+    def __xor__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values = self.values ^ other, name='')
 
-    def __lshift__(self, other) -> Self:
+    def __lshift__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values=self.values << other, name='')
 
-    def __rshift__(self, other) -> Self:
+    def __rshift__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         return self.clone(values=self.values >> other, name='')
 
-    def __ilshift__(self, other) -> Self:
+    def __ilshift__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values <<= other
         return self
 
-    def __irshift__(self, other) -> Self:
+    def __irshift__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values >>= other
         return self
 
-    def __iadd__(self, other) -> Self:
+    def __iadd__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values += other
         return self
 
-    def __isub__(self, other) -> Self:
+    def __isub__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values -= other
         return self
 
-    def __imul__(self, other) -> Self:
+    def __imul__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values *= other
         return self
 
-    def __itruediv__(self, other) -> Self:
+    def __itruediv__(self, other: AbstractArray | NDArray[Any] | float) -> Self:
         other = self.check_or_assert(other)
         self.values /= other
         return self
 
-    def __invert__(self):
+    def __invert__(self) -> Self:
         return self.clone(values=~self.values)
 
     @abstractmethod
-    def __matmul__(self, other) -> AbstractArray: ...
+    def __matmul__(self, other: AbstractArray | NDArray[Any] | float) -> AbstractArray: ...
 
     #def __rmatmul__(self, other) -> AbstractArray:
 
@@ -242,22 +244,22 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     def __len__(self) -> int:
         return len(self.values)
 
-    def __neg__(self):
+    def __neg__(self) -> Self:
         return self.clone(values=-self.values)
 
-    def __lt__(self, other):
+    def __lt__(self, other: AbstractArray | NDArray[Any] | float) -> bool:
         return self.values < other
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         return self.values > other
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         return self.values <= other
 
-    def __ge__(self, other):
+    def __ge__(self, other) -> bool:
         return self.values >= other
 
-    def __abs__(self):
+    def __abs__(self) -> Self:
         return self.clone(values=np.abs(self.values))
 
     @property
@@ -338,12 +340,12 @@ class AbstractArray(AbstractArrayProtocol, ABC):
             yield sample
 
     @overload
-    def to_gpu(self, inplace: Literal[False] = ..., device=...) -> Self: ...
+    def to_gpu(self, inplace: Literal[False] = ..., device: Device | None = ...) -> Self: ...
 
     @overload
-    def to_gpu(self, inplace: Literal[True] = ..., device=...) -> None: ...
-            
-    def to_gpu(self, inplace: bool = False, device=None) -> Self | None:
+    def to_gpu(self, inplace: Literal[True] = ..., device: Device | None = ...) -> None: ...
+
+    def to_gpu(self, inplace: bool = False, device: Device | None = None) -> Self | None:
         """
         Move the .values to the GPU.
 
@@ -361,10 +363,10 @@ class AbstractArray(AbstractArrayProtocol, ABC):
             return self.clone(values=to_gpu(self.values, device))
 
     @overload
-    def to_cpu(self, inplace: Literal[False] = ..., device=...) -> Self: ...
+    def to_cpu(self, inplace: Literal[False] = ..., device: Device | None = ...) -> Self: ...
     
     @overload
-    def to_cpu(self, inplace: Literal[True] = ..., device=...) -> None: ...
+    def to_cpu(self, inplace: Literal[True] = ..., device: Device | None = ...) -> None: ...
 
     def to_cpu(self, inplace: bool = False, device: Device | None = None) -> Self | None:
         """
@@ -429,6 +431,9 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         else:
             return self.clone(values=np.asarray(self.values))
 
+    def to_numpy(self) -> np.ndarray:
+        return np.asarray(self.values)
+
     @property
     def aval(self):
         # Required for JAX because of how it interacts with __array__
@@ -440,6 +445,8 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def to_jax(self):
         return _to_jax(self)
+
+        
 
 
 def to_device(array, device: Device):
@@ -470,10 +477,10 @@ def get_default_gpu() -> Device:
 def get_default_cpu() -> Device:
     return 'cpu'
 
-def _aval(array):
+def _aval(array: Any):
     raise NotImplementedError("JAX is not working on this system.")
 
-def _to_jax(array):
+def _to_jax(array: Any):
     raise NotImplementedError("JAX is not working on this system.")
 
 if JAX_WORKING:
@@ -681,13 +688,14 @@ def to_plot_axis(axis: int | str) -> Literal[1,2,3]:
         raise ValueError(f"Unrecognized axis: {axis}")
 
 
-def fetch(array, dtype, order) -> np.ndarray:
+def fetch(array: Array, dtype: DTypeLike | None, order: NPOrder | None) -> Array:
     order = 'C' if order is None else order
     return np.asarray(array, dtype=dtype, order=order)
 
 if JAX_WORKING:
     import jax.numpy as jnp
-    def fetch(array, dtype, order) -> jnp.ndarray:
+    import jax
+    def fetch(array: Array, dtype: DTypeLike | None, order: NPOrder | None) -> jax.Array:
         if isinstance(array, jnp.ndarray):
             if order is not None:
                 # order != 'K' not supported!

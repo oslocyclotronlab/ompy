@@ -25,11 +25,13 @@ Filetype: TypeAlias = Literal['mama', 'txt', 'tar', 'np', 'npz', 'hdf5', 'csv', 
 Farray: TypeAlias = NDArray[np.float64]
 
 @ensure_path
-def mama_read(filename: Path) -> tuple[Farray, Farray] | tuple[Farray, Farray, Farray]:
+def mama_read(filename: Path, skip_footer: int = 0) -> tuple[Farray, Farray] | tuple[Farray, Farray, Farray]:
     """Read 1d and 2d mama spectra/matrices
 
     Args:
         filename (str): Filename of matrix/spectrum
+        skip_footer (int): Number of lines to skip at the end of the file.
+            Default is 0.
 
     Returns:
         2 or 3 eleement tuple containing
@@ -43,7 +45,7 @@ def mama_read(filename: Path) -> tuple[Farray, Farray] | tuple[Farray, Farray, F
             not as expected.
 
     """
-    counts = np.genfromtxt(filename, skip_header=10, skip_footer=1,
+    counts = np.genfromtxt(filename, skip_header=10, skip_footer=skip_footer,
                            encoding="latin-1")
     cal = {}
     with open(filename, 'r', encoding='latin-1') as datafile:
@@ -611,6 +613,20 @@ if ROOT_IMPORTED:
             arr = np.linspace(hist.GetXaxis().GetXmin(), hist.GetXaxis().GetXmax(), hist.GetNbinsX())
             index = LeftUniformIndex.from_array(arr)
         return cls(X=index, values=values)
+
+
+def save_npz_asymmetric_1d(path: Path, vector, exist_ok: bool = False) -> None:
+    if not exist_ok and path.exists():
+        raise FileExistsError(f"File {path} already exists")
+    
+    index = encode_dict(vector._index.to_dict())
+    meta = encode_dict(asdict(vector.metadata))
+    version = encode_string(__full_version__)
+    mapping = {'index': index, 'values': vector.values,
+               'lerr': vector.lerr, 'uerr': vector.uerr,
+               'meta': meta, 'version': version}
+
+    np.savez(path, **mapping)
 
 
 Suffix: TypeAlias = Literal['.npy', '.tar', '.txt', '.csv', '.m', '.npz', '.h5', 'root']

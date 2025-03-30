@@ -137,3 +137,6 @@ data/**/R.npz
 .DS_Store
 .idea/
 .vscode/
+
+# Ignore ~undo-tree~
+*~undo-tree~

@@ -11,6 +11,12 @@ TODO:
 -[ ] Severe bug in how 2D rebinning handles incongruent arrays, results in a shift.
 """
 
+class RebinningError(ValueError):
+    pass
+
+class RebinningBinWidthError(RebinningError):
+    pass
+
 @njit()
 def overlap(Astart, Aend, Bstart, Bend):
     start = max(Astart, Bstart)
@@ -58,7 +64,7 @@ def _rebin_uniform_left_left(old: np.ndarray, new: np.ndarray, values: np.ndarra
     dOld = old[1] - old[0]
     dNew = new[1] - new[0]
     if dNew < dOld:
-        raise ValueError(f"Rebinning to smaller binwidth is ill defined and not supported: {dNew} < {dOld}")
+        raise RebinningBinWidthError(f"Rebinning to smaller binwidth is ill defined and not supported: {dNew} < {dOld}")
     if not is_close(round(dNew / dOld), dNew / dOld):
         warn("The new step size is not an integral multiple of the old. Induces numerical inaccuracies.")
 
@@ -240,7 +246,7 @@ def _rebin_2D_uniform_left_left(old: np.ndarray, new: np.ndarray,
     if is_close(dNew, dOld):
         return fit_into_2d(old, new, values, axis)
     if dNew < dOld:
-        raise ValueError(f"Rebinning to smaller binwidth is ill defined and not supported: {dNew} < {dOld}")
+        raise RebinningBinWidthError(f"Rebinning to smaller binwidth is ill defined and not supported: {dNew} < {dOld}")
     if not is_close(round(dNew / dOld), dNew / dOld):
         warn("The new step size is not an integral multiple of the old. Induces numerical inaccuracies and/or makes the initial and final bins look wierd.")
     rebinned = np.zeros(shape, dtype=values.dtype)

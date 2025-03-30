@@ -11,9 +11,10 @@ if JAX_AVAILABLE:
     from .rmle import *
     from .rmle_components import JaxerComponents, JaxCResult2D
 
-from .bootstrap import bootstrap, Bootstrap, bootstrap_CI, coverage_ci, BootstrapMatrix, Coverage, BootstrapVector
-from .bootstrap import bca, bca_var, bca_var_2, bca_2
-
+from .bootstrapping import bootstrap, Bootstrap, bootstrap_CI, BootstrapMatrix, Coverage, BootstrapVector
+from .bootstrapping import bca, bca_var, bca_var_2, bca_2
+from . import bootstrapping
+from .result1d import UnfoldedResult1D
 
 
 from .study import Study, Study1D, Study2D, StudyGroup

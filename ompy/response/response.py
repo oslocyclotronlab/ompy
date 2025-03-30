@@ -5,7 +5,7 @@ import warnings
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeGuard, TypeVar, overload, Generic, Iterator
+from typing import TypeGuard, TypeVar, overload, Generic, Iterator, Self
 
 import numpy as np
 from typing_extensions import TypedDict
@@ -19,6 +19,7 @@ from .responsepath import ResponseName, get_response_path
 from .. import Vector, Matrix, NUMBA_CUDA_WORKING, __full_version__, to_index, Index, zeros_like
 from ..helpers import make_ax
 from ..stubs import Pathlike, Unitlike, Axes, Plots1D
+from ..array.rebin import RebinningBinWidthError
 
 if NUMBA_CUDA_WORKING[0]:
     from .comptongpu import interpolate_gpu
@@ -32,6 +33,10 @@ logging.captureWarnings(True)
 # [ ] Interpolate compton down to 0
 # [x] Is the response specialized correctly? We *know* the components at all E
 # [ ] Refactor the specialization
+# [ ] The matrices should only be normalized when it is integrated over the
+#     entire lower domain. R over [3 MeV, 10 MeV] should not be normalized,
+#     but normalized so that R over [0, 10 MeV] is normalized.
+#     Or more precisely, each row of R should be normalized from [0, FP+n*sigma]
 # Note! The gaussian matrix will not be equal to "manual" gaussians, as the mus are taken from
 # the midbin-value, ensuring perfect symmetric distributions.
 
@@ -145,7 +150,7 @@ class Response:
         self.disable_ap = False
 
     @classmethod
-    def from_data(cls, data: ResponseData, **kwargs) -> Response:
+    def from_data(cls, data: ResponseData, **kwargs) -> Self:
         intp = DiscreteInterpolation.from_data(data.normalize(inplace=False), **kwargs)
         return cls(data, intp)
 
@@ -263,7 +268,12 @@ class Response:
             weights = self.components
 
         # We preserve area as we want a mean value, not the sum
-        D = compton.rebin('true', bins=E, preserve='area').to_left()
+        try:
+            D = compton.rebin('true', bins=E, preserve='area').to_left()
+        except RebinningBinWidthError as e:
+            raise ValueError("Error rebinning Compton matrix due to bin width.\nThe Compton energy grid is a strict"
+                             " lower limit to the energy resolution.\nYou must rebin your array to use coarser binning, "
+                             f"or create a Compton matrix with finer binning.\n{e}") from e
         if pad:
             D.rebin('observed', bins=E_all, inplace=True)
         else:
@@ -378,7 +388,7 @@ class Response:
             case _:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
 
-    def specialize(self, E: np.ndarray | Index, **kwargs) -> ResponseMatrices:
+    def specialize(self, E: np.ndarray | Index, **kwargs) -> SelfMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given energy grid.
 
         Parameters
@@ -398,7 +408,7 @@ class Response:
         D = self.discrete(E, **kwargs)
         return ResponseMatrices(D, G)
 
-    def specialize_like(self, other: Matrix | Vector, **kwargs) -> ResponseMatrices:
+    def specialize_like(self, other: Matrix | Vector, **kwargs) -> SelfMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given matrix or vector.
 
         Parameters
@@ -419,7 +429,7 @@ class Response:
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
               compton: ComptonMatrix | None = None, components: Components | None = None,
-              copy: bool = False) -> Response:
+              copy: bool = False) -> Self:
         return Response(data=data or self.data, interpolation=interpolation or self.interpolation,
                         compton=compton or self.compton, components=components or self.components, copy=copy)
 
@@ -427,7 +437,7 @@ class Response:
         return self.clone(copy=True, **kwargs)
 
     @classmethod
-    def from_path(cls, path: Pathlike) -> Response:
+    def from_path(cls, path: Pathlike) -> Self:
         """
         Load a Response object from the given file path.
 
@@ -575,14 +585,14 @@ class Response:
         else:
             return FoldedMatrix.from_dict(x)
 
-    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Response | None:
+    def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> Self | None:
         """ Normalizes the FWHM of the response to the requested value. """
         if inplace:
             self.interpolation.normalize_FWHM(energy, fwhm, inplace=inplace)
         else:
             return self.clone(interpolation=self.interpolation.normalize_FWHM(energy, fwhm, inplace=inplace))
 
-    def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> Response | None:
+    def normalize_sigma(self, energy: Unitlike, sigma: Unitlike, inplace: bool = False) -> Self | None:
         """ Normalizes the sigma of the response to the requested value. """
         if inplace:
             self.interpolation.normalize_sigma(energy, sigma, inplace=inplace)
@@ -590,7 +600,7 @@ class Response:
             return self.clone(interpolation=self.interpolation.normalize_sigma(energy, sigma, inplace=inplace))
 
     @classmethod
-    def from_db(cls, name: ResponseName) -> Response:
+    def from_db(cls, name: ResponseName) -> Self:
         """ Loads a response from the database. """
         obj = cls.from_path(get_response_path(name))
         return obj

@@ -10,6 +10,8 @@ from typing_extensions import TypedDict
 import numpy as np
 from numpy.typing import DTypeLike
 
+from ..rendering.html import collapsible
+
 from .index_fn import _index_left, _index_mid_uniform, is_monotone, is_length_congruent
 from .index_fn import is_uniform as is_uniform_fn
 from .index_fn import _index_mid_nonuniform
@@ -606,6 +608,113 @@ class Index(ABC):
     def to_edge(self, edge: Edges) -> Index: ...
 
     def ticks(self) -> array1D: ...
+
+    def _repr_html_(self) -> str:
+        """HTML representation for Index class in Jupyter notebooks.
+        
+        Displays a summary of the Index properties along with a collapsible view
+        of the underlying bins.
+        
+        Returns:
+            str: HTML representation
+        """
+        # Generate summary information, similar to the summary() method but formatted for HTML
+        edge_type = 'left' if self.is_left() else 'mid'
+        spacing_type = 'uniform' if self.is_uniform() else 'nonuniform'
+        
+        # Start building the HTML content
+        html = f"""
+        <div style="font-family: Arial, sans-serif; margin: 10px 0; padding: 12px; border: 1px solid #e0e0e0; border-radius: 5px; background-color: #f9f9f9; text-align: left;">
+            <h3 style="margin: 0 0 10px 0; color: #2c3e50; text-align: left;">Index Information</h3>
+            
+            <table style="width: 100%; margin-bottom: 10px; border-collapse: collapse; text-align: left;">
+                <tr>
+                    <th style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd; width: 140px;">Property</th>
+                    <th style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">Value</th>
+                </tr>
+                <tr style="background-color: #f2f2f2;">
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;"><strong>Type</strong></td>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;">{edge_type} edge, {spacing_type} spacing</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;"><strong>Bins</strong></td>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;">{len(self)}</td>
+                </tr>
+                <tr style="background-color: #f2f2f2;">
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;"><strong>Unit</strong></td>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;">{self.meta.unit:~}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;"><strong>Range</strong></td>
+                    <td style="padding: 6px; border-bottom: 1px solid #ddd; text-align: left;">
+                        <span style="font-family: monospace;"">X₀ = {self.leftmost:.4g}, Xₙ = {self.rightmost:.4g}</span>
+                    </td>
+                </tr>
+        """
+        
+        # Add spacing information
+        if self.is_uniform():
+            html += f"""
+                <tr style="background-color: #f2f2f2;">
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;"><strong>Bin Width</strong></td>
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">
+                        <span style="font-family: monospace;">ΔX = {self.step(0):.4g}</span>
+                    </td>
+                </tr>
+            """
+        else:
+            # For non-uniform spacing, show step compression
+            de = self.steps()
+            de_formatted = ', '.join(f'{d:.3g}\u00D7{i}' for d, i in compress(de))
+            html += f"""
+                <tr style="background-color: #f2f2f2;">
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;"><strong>Steps</strong></td>
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">
+                        <span style="font-family: monospace;">{de_formatted}</span>
+                    </td>
+                </tr>
+            """
+        
+        # Add label if it exists
+        if self.meta.label:
+            html += f"""
+                <tr>
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;"><strong>Label</strong></td>
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">{self.meta.label}</td>
+                </tr>
+            """
+        
+        # Add alias if it exists
+        if self.meta.alias:
+            html += f"""
+                <tr style="background-color: #f2f2f2;">
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;"><strong>Alias</strong></td>
+                    <td style="text-align: left; padding: 6px; border-bottom: 1px solid #ddd;">{self.meta.alias}</td>
+                </tr>
+            """
+        
+        # Close the table
+        html += """
+            </table>
+        """
+        
+        # Add the bins using the collapsible_array_html function
+        bin_html = collapsible(
+            array=self.bins,
+            name="Bins",
+            description=f"Array of {len(self)} bin edges or centers",
+            precision=6,
+            max_rows_1d=100
+        )
+        
+        html += bin_html
+        
+        # Close the main div
+        html += """
+        </div>
+        """
+        
+        return html
 
 
 class Edge(Index, ABC):

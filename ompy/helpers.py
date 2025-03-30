@@ -47,12 +47,26 @@ def make_ax(ax: Axes | None = None, **kwargs) -> Axes:
     return ax
 
 
-def combine_legend(headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable[Line2D]]]], *misc):
-    """ Combine legend entries from multiple subplots
+def combine_legend(headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable[Line2D]]]], *misc: Line2D | tuple[Line2D, ...] | list[Line2D]) -> tuple[list, list[str]]:
+    """ Combine legend entries from multiple subplots into a single legend.
 
-    The headings have the format
-    [(title1, line1, line2, ...), (title2, line1, line2, ...), optional_untitled_lines]
-    where line_i is a Line2D or a nested iterable of Line2D objects.
+    Args:
+        headings: List of tuples containing legend section titles and associated line objects.
+                 Each tuple has format (title: str, line1, line2, ...) where line_i is either
+                 a Line2D object or a nested iterable of Line2D objects.
+        *misc: Additional Line2D objects or collections of Line2D objects to add without
+               a section heading.
+
+    Returns:
+        tuple containing:
+            - list of handles (Line2D objects and section titles)
+            - list of corresponding labels
+
+    Example:
+        >>> lines1 = [Line2D(...), Line2D(...)]
+        >>> lines2 = [Line2D(...)]
+        >>> headings = [("Section 1", lines1), ("Section 2", lines2)]
+        >>> handles, labels = combine_legend(headings)
     """
     handles = []
     labels = []
@@ -78,11 +92,17 @@ def combine_legend(headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable
     return handles, labels
 
 
-def rec_add(handles, labels, collection):
-    """ Recursively add legend entries to handles and labels
+def rec_add(handles: list, labels: list[str], collection: Iterable[Line2D | Iterable[Line2D]]) -> None:
+    """ Recursively add legend entries to handles and labels lists.
 
-    Walks down nested lists and adds the Line2D objects it finds. Tuples
-    are treated as a single entry.
+    Args:
+        handles: List to store Line2D objects and collections
+        labels: List to store corresponding labels
+        collection: Nested iterable of Line2D objects. Tuples are treated as single entries,
+                   while other iterables are traversed recursively.
+
+    Note:
+        This function modifies the input handles and labels lists in-place.
     """
     for elem in collection:
         if isinstance(elem, tuple):
@@ -96,7 +116,48 @@ def rec_add(handles, labels, collection):
                 rec_add(handles, labels, elem)
 
 
-def make_combined_legend(ax, headings, *misc, **kwargs):
+def make_combined_legend(ax: Axes, 
+                        headings: list[tuple[str, Line2D | Iterable[Line2D | Iterable[Line2D]]]], 
+                        *misc: Line2D | tuple[Line2D, ...] | list[Line2D],
+                        **kwargs) -> Any:
+    """Create a combined legend with section headings on the given axes.
+
+    This function creates a structured legend that can organize plot elements under
+    different sections with underlined headings. It's particularly useful when
+    combining legend entries from multiple subplots or when you want to group
+    related plot elements under descriptive headings.
+
+    Args:
+        ax: The matplotlib Axes object to add the legend to
+        headings: List of tuples containing section titles and associated line objects.
+                 Each tuple should have the format (title, line_objects) where:
+                 - title is a string that will appear as an underlined heading
+                 - line_objects can be a single Line2D, or nested iterables of Line2D objects
+        *misc: Additional Line2D objects to add without section headings
+        **kwargs: Additional keyword arguments passed to ax.legend()
+
+    Returns:
+        The created Legend object
+
+    Example:
+        >>> fig, (ax1, ax2) = plt.subplots(2, 1)
+        >>> # Create some plots
+        >>> line1 = ax1.plot([1, 2, 3], label='First line')[0]
+        >>> line2 = ax1.plot([2, 3, 4], label='Second line')[0]
+        >>> line3 = ax2.plot([3, 4, 5], label='Third line')[0]
+        >>> 
+        >>> # Create combined legend on ax1
+        >>> headings = [
+        ...     ("First Plot", line1, line2),
+        ...     ("Second Plot", line3)
+        ... ]
+        >>> make_combined_legend(ax1, headings, loc='center right')
+
+    Note:
+        - Section titles will appear underlined in the legend
+        - Line objects should have labels set for proper legend entries
+        - The legend can be further customized using standard matplotlib legend kwargs
+    """
     handles, labels = combine_legend(headings, *misc)
     handler_map = {str: LegendTitle()} | kwargs.pop('handler_map', {})
     return ax.legend(handles, labels, handler_map=handler_map, **kwargs)
