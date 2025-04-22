@@ -1,32 +1,46 @@
 from __future__ import annotations
-import numpy as np
-from ..numbalib import njit, prange
-from .. import Vector, Matrix, zeros_like, JAX_AVAILABLE, JAX_WORKING
-from ..response import Response
-from .unfolder import Unfolder
-from .result1d import Cost1D, UnfoldedResult1DMultiple, ResultMeta1D, Parameters1D, UnfoldedResult1D
-from .result2d import Cost2D, UnfoldedResult2D, ResultMeta2D, Parameters2D
-from .stubs import Space
-from ..stubs import array1D, array2D, array3D, Plots1D, Axes
-from dataclasses import dataclass, fields, asdict
-import time
-from typing_extensions import override
-from tqdm.autonotebook import tqdm
+
 import logging
-from ..helpers import readable_time, warn_memory, estimate_memory_usage, make_ax, maybe_set, append_label
-from typing import Iterable, Literal
-import matplotlib.pyplot as plt
+import time
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
+from typing import Iterable, Literal
+
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm.autonotebook import tqdm
+from typing_extensions import override
+
+from ... import JAX_AVAILABLE, JAX_WORKING, Matrix, Vector, zeros_like
+from ...numbalib import njit, prange
+from ...response import Response
+from ...helpers import (
+    append_label,
+    estimate_memory_usage,
+    make_ax,
+    maybe_set,
+    readable_time,
+    warn_memory,
+)
+from ..result1d import (
+    Cost1D,
+    Parameters1D,
+    ResultMeta1D,
+    UnfoldedResult1D,
+    UnfoldedResult1DMultiple,
+)
+from ..result2d import Cost2D, Parameters2D, ResultMeta2D, UnfoldedResult2D
+from ..stubs import Axes, Plots1D, Space, array1D, array2D, array3D
+from ..unfolder import Unfolder
 
 LOG = logging.getLogger(__name__)
 
 if JAX_AVAILABLE:
-    from jax import numpy as jnp
     import jax
+    from jax import numpy as jnp
 else:
     jax = lambda x: x
     jax.jit = lambda x: x
-
 
 
 @dataclass
@@ -41,7 +55,7 @@ class FICSKwargs:
 
 
 class FICS(Unfolder):
-    """ Unfolding algorithm from Guttormsen et al. 1998
+    """Unfolding algorithm from Guttormsen et al. 1998
 
     This algorithm is only valid for 1D histograms with uniform binning.
     The algorithm is described in the paper:
@@ -60,14 +74,16 @@ class FICS(Unfolder):
         The number of iterations to perform
     """
 
-    def __init__(self,
-                 R: Matrix,
-                 G: Matrix,
-                 iterations: int = 10,
-                 weight: float = 1e-3,
-                 use_JAX: bool | None = None,
-                 save_block: bool = False,
-                 enforce_positivity: bool = False):
+    def __init__(
+        self,
+        R: Matrix,
+        G: Matrix,
+        iterations: int = 10,
+        weight: float = 1e-3,
+        use_JAX: bool | None = None,
+        save_block: bool = False,
+        enforce_positivity: bool = False,
+    ):
         super().__init__(R, G)
         self.iterations = iterations
         self.weight = weight  # Fluctuation weight
@@ -76,7 +92,9 @@ class FICS(Unfolder):
         if use_JAX is None:
             self.use_JAX = JAX_AVAILABLE and JAX_WORKING
         elif use_JAX and not JAX_WORKING:
-            raise ValueError("JAX is not working. Cannot use GPU. Specify 'use_JAX=False' to use CPU.")
+            raise ValueError(
+                "JAX is not working. Cannot use GPU. Specify 'use_JAX=False' to use CPU."
+            )
         else:
             self.use_JAX = use_JAX
         self.lr = 1  # Learning rate.
@@ -87,11 +105,13 @@ class FICS(Unfolder):
         supported = [f.name for f in fields(FICSKwargs)]
         described = {k: v for k, v in kwargs.items() if k in supported}
         superfluous = {k: v for k, v in kwargs.items() if k not in supported}
-        defaults = dict(iterations=self.iterations,
-                        weight=self.weight,
-                        lr=self.lr,
-                        save_block=self.save_block,
-                        enforce_positivity=self.enforce_positivity)
+        defaults = dict(
+            iterations=self.iterations,
+            weight=self.weight,
+            lr=self.lr,
+            save_block=self.save_block,
+            enforce_positivity=self.enforce_positivity,
+        )
         kw = FICSKwargs(**(defaults | described))
         LOG.debug(f"Unfolding up to {kw.iterations} iterations")
         LOG.debug(f"Fluctuation weight of {kw.weight}")
@@ -107,17 +127,19 @@ class FICS(Unfolder):
         s = np.linalg.svd(self.R.values, compute_uv=False)
         s_max = s.max()
         s_min = s.min()
-        #return 1 - 2 / (kappa + 1)
+        # return 1 - 2 / (kappa + 1)
         return 2 / (s_max + s_min)
 
-    def _unfold_vector(self,
-                       R: Matrix,
-                       data: Vector,
-                       background: Vector | None,
-                       initial: Vector,
-                       space: Space,
-                       G: Matrix | None = None,
-                       **kwargs) -> GuttormsenResult1D:
+    def _unfold_vector(
+        self,
+        R: Matrix,
+        data: Vector,
+        background: Vector | None,
+        initial: Vector,
+        space: Space,
+        G: Matrix | None = None,
+        **kwargs,
+    ) -> GuttormsenResult1D:
         kw = self.handle_kwargs(kwargs)
         LOG.debug("Unfolding vector with Guttormsen method")
         LOG.debug("Unfolding to space: %s", space)
@@ -127,48 +149,49 @@ class FICS(Unfolder):
             data = data - background
         start = time.time()
 
-
-        data = data.astype('float32')
-        initial = data.astype('float32')
+        data = data.astype("float32")
+        initial = data.astype("float32")
         if kw.enforce_positivity:
             fn = _unfold_vector_pos
         else:
             fn = _unfold_vector
 
         # TODO Abstract this away
-        R = R.as_numpy().astype('float32')
-        data = data.as_numpy().astype('float32')
-        G = G.as_numpy().astype('float32')
-        initial = initial.as_numpy().astype('float32')
-        uall, cost, fluctuations, kl = fn(R.values, data.values,
-                                        initial.values,
-                                        kw.iterations, kw.lr)
+        R = R.as_numpy().astype("float32")
+        data = data.as_numpy().astype("float32")
+        G = G.as_numpy().astype("float32")
+        initial = initial.as_numpy().astype("float32")
+        uall, cost, fluctuations, kl = fn(
+            R.values, data.values, initial.values, kw.iterations, kw.lr
+        )
         elapsed = time.time() - start
         kw_ = asdict(kw)
-        kw_.pop('disable_tqdm')
-        kw_.pop('leave_tqdm')
-        parameters = Parameters1D(raw=data_raw,
-                                  background=background,
-                                  initial=initial,
-                                  G=G,
-                                  R=R,
-                                  kwargs=kw_)
+        kw_.pop("disable_tqdm")
+        kw_.pop("leave_tqdm")
+        parameters = Parameters1D(
+            raw=data_raw, background=background, initial=initial, G=G, R=R, kwargs=kw_
+        )
 
-        meta = ResultMeta1D(time=elapsed,
-                            space=space,
-                            parameters=parameters,
-                            method=self.__class__)
-        return GuttormsenResult1D(meta=meta,
-                                  u=uall,
-                                  cost=cost,
-                                  fluctuations=fluctuations,
-                                  kl=kl)
+        meta = ResultMeta1D(
+            time=elapsed, space=space, parameters=parameters, method=self.__class__
+        )
+        return GuttormsenResult1D(
+            meta=meta, u=uall, cost=cost, fluctuations=fluctuations, kl=kl
+        )
 
     @override
-    def _unfold_matrix(self, R: Matrix, data: Matrix,
-                       background: Matrix | None, initial: Matrix,
-                       use_previous: bool, space: Space, G: Matrix,
-                       G_ex: Matrix, **kwargs) -> GuttormsenResult2DSimple | GuttormsenResult2DMultiple:
+    def _unfold_matrix(
+        self,
+        R: Matrix,
+        data: Matrix,
+        background: Matrix | None,
+        initial: Matrix,
+        use_previous: bool,
+        space: Space,
+        G: Matrix,
+        G_ex: Matrix,
+        **kwargs,
+    ) -> GuttormsenResult2DSimple | GuttormsenResult2DMultiple:
         LOG.debug("Unfolding matrix with Guttormsen method")
         kw = self.handle_kwargs(kwargs)
         LOG.debug("Unfolding to space: %s", space)
@@ -185,48 +208,53 @@ class FICS(Unfolder):
             Gexj = jnp.array(G_ex.values)
             if self.save_block:
                 LOG.debug("Saving block of unfolded matrices")
-                uall, cost, fluctuations, kl_div = _unfold_matrix_jax_block(Rj, dataj, initialj, kw)
+                uall, cost, fluctuations, kl_div = _unfold_matrix_jax_block(
+                    Rj, dataj, initialj, kw
+                )
             else:
-                uall, cost, fluctuations, kl_div = _unfold_matrix_jax(Rj, Gexj, dataj, initialj, kw)
+                uall, cost, fluctuations, kl_div = _unfold_matrix_jax(
+                    Rj, Gexj, dataj, initialj, kw
+                )
         else:
             fn = _unfold_matrix
-            uall, cost, fluctuations = fn(R.values, data.values,
-                                          initial.values, kw.iterations, kw.lr)
+            uall, cost, fluctuations = fn(
+                R.values, data.values, initial.values, kw.iterations, kw.lr
+            )
         elapsed = time.time() - start
         LOG.debug(f"Unfolding took {readable_time(elapsed)} seconds")
 
-        kw_ = asdict(kw) | {'save_block': self.save_block}
-        kw_.pop('disable_tqdm')
-        kw_.pop('leave_tqdm')
-        parameters = Parameters2D(R=R,
-                                  raw=raw,
-                                  background=background,
-                                  initial=initial,
-                                  G=G,
-                                  kwargs=kw_,
-                                  G_ex=G_ex)
-        meta = ResultMeta2D(time=elapsed,
-                            space=space,
-                            parameters=parameters,
-                            method=self.__class__)
+        kw_ = asdict(kw) | {"save_block": self.save_block}
+        kw_.pop("disable_tqdm")
+        kw_.pop("leave_tqdm")
+        parameters = Parameters2D(
+            R=R,
+            raw=raw,
+            background=background,
+            initial=initial,
+            G=G,
+            kwargs=kw_,
+            G_ex=G_ex,
+        )
+        meta = ResultMeta2D(
+            time=elapsed, space=space, parameters=parameters, method=self.__class__
+        )
         if self.save_block:
             rescls = GuttormsenResult2DMultiple
         else:
             rescls = GuttormsenResult2DSimple
-        return rescls(meta=meta,
-                      u=uall,
-                      cost=cost,
-                      fluctuations=fluctuations,
-                      kl=kl_div)
+        return rescls(
+            meta=meta, u=uall, cost=cost, fluctuations=fluctuations, kl=kl_div
+        )
 
     @override
     def supports_background(self) -> bool:
-        return True 
+        return True
 
 
 @njit
-def _unfold_vector(R: array1D, raw: array1D, initial: array1D, iterations: int,
-                   lr: float):
+def _unfold_vector(
+    R: array1D, raw: array1D, initial: array1D, iterations: int, lr: float
+):
     u = initial
     u_all = np.empty((iterations, len(u)))
     cost = np.empty(iterations)
@@ -245,8 +273,9 @@ def _unfold_vector(R: array1D, raw: array1D, initial: array1D, iterations: int,
 
 
 @njit
-def _unfold_vector_pos(R: array1D, raw: array1D, initial: array1D, iterations: int,
-                   lr: float):
+def _unfold_vector_pos(
+    R: array1D, raw: array1D, initial: array1D, iterations: int, lr: float
+):
     assert np.all(initial >= 0), "Initial values must be positive"
     assert np.all(raw >= 0), "Raw values must be positive"
     u = initial
@@ -272,8 +301,9 @@ def _unfold_vector_pos(R: array1D, raw: array1D, initial: array1D, iterations: i
 
 
 @njit
-def _unfold_matrix(R: array2D, raw: array2D, initial: array2D, iterations: int,
-                   lr: float):
+def _unfold_matrix(
+    R: array2D, raw: array2D, initial: array2D, iterations: int, lr: float
+):
     u = initial
     u_all = np.empty((iterations, *raw.shape))
     cost = np.empty(iterations)
@@ -286,20 +316,21 @@ def _unfold_matrix(R: array2D, raw: array2D, initial: array2D, iterations: int,
         f = u @ R
         u_all[i] = u
         cost[i] = chi2_safe(f, raw, mask)
-        #fluctuations[i] = fluctuation_cost(u, 20)
+        # fluctuations[i] = fluctuation_cost(u, 20)
     return u_all, cost, fluctuations, []
 
 
 @njit
 def chi2(a, b):
-    return np.sum((a - b)**2 / a)
+    return np.sum((a - b) ** 2 / a)
+
 
 @njit
 def chi2_safe_1d(a, b, mask):
     s = 0.0
     for i in range(a.shape[0]):
         if mask[i]:
-            s += (a[i] - b[i])**2 / a[i]
+            s += (a[i] - b[i]) ** 2 / a[i]
     return s
 
 
@@ -309,12 +340,13 @@ def chi2_safe(a, b, mask):
     for i in range(a.shape[0]):
         for j in range(a.shape[1]):
             if mask[i, j]:
-                s += (a[i, j] - b[i, j])**2 / a[i, j]
+                s += (a[i, j] - b[i, j]) ** 2 / a[i, j]
     return s
+
 
 @njit
 def kl(nu, n):
-    return nu - n + n * np.log(n / (nu+1e-10) + 1e-10)
+    return nu - n + n * np.log(n / (nu + 1e-10) + 1e-10)
 
 
 def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
@@ -324,6 +356,7 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
         if False:
             raw_sqrt = jnp.sqrt(raw)
             initial = jnp.sqrt(raw)
+
             @jax.jit
             def body(R, u, f):
                 f_sqrt = jnp.sqrt(f)
@@ -333,6 +366,7 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
                 f = jnp.matmul(u, R)
                 return u, f
         else:
+
             @jax.jit
             def body(R, u, f):
                 u = u + lr * (raw - f)
@@ -341,6 +375,7 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
                 return u, f
 
     else:
+
         @jax.jit
         def body(R, Gex, u, f):
             u = u + lr * (raw - f)
@@ -367,19 +402,19 @@ def _unfold_matrix_jax(R, Gex, raw, initial, kw: FICSKwargs):
         u, f = body(R, Gex, u, f)
         cost[i] = chi2_jax(f, raw, mask)
         kl_div[i] = kl_jax(f, raw).sum(axis=1)
-        #fluctuations[i] = fluctuation_cost(u, 20)
+        # fluctuations[i] = fluctuation_cost(u, 20)
     u_all = u
     return u_all, cost, fluctuations, kl_div
 
 
 @jax.jit
 def kl_jax(nu, n):
-    return nu - n + n * jnp.log(n / (nu+1e-10) + 1e-10)
+    return nu - n + n * jnp.log(n / (nu + 1e-10) + 1e-10)
 
 
 @jax.jit
 def chi2_jax(a, b, mask):
-    diff = (a - b)**2 / a
+    diff = (a - b) ** 2 / a
     # Use elementwise multiplication with the mask and then sum
     return jnp.sum(diff * mask, axis=1)
 
@@ -397,8 +432,9 @@ def _unfold_matrix_jax_block(R, raw, initial, kw: FICSKwargs):
     u = initial
     cost = np.empty((iterations, raw.shape[0]))
     fluctuations = np.empty(iterations)
-    warn_memory(estimate_memory_usage((iterations, *raw.shape)),
-                "Cube of unfolded data")
+    warn_memory(
+        estimate_memory_usage((iterations, *raw.shape)), "Cube of unfolded data"
+    )
     u_all = np.empty((iterations, *raw.shape))
     mask = raw > 0
     R = R.T
@@ -407,7 +443,7 @@ def _unfold_matrix_jax_block(R, raw, initial, kw: FICSKwargs):
         u, f = body(R, u, f)
         u_all[i] = u
         cost[i] = chi2_jax(f, raw, mask)
-        #fluctuations[i] = fluctuation_cost(u, 20)
+        # fluctuations[i] = fluctuation_cost(u, 20)
     return u_all, cost, fluctuations, []
 
 
@@ -420,29 +456,33 @@ def fluctuation_cost(x, sigma: float, mask):
             diff += np.abs(((smoothed[i] - x[i]) / smoothed[i]))
     return diff
 
-def compton_subtraction(res: UnfoldedResult1D | UnfoldedResult2D,
-                        response: Response,
-                        space='eta',
-                        use_eff: bool = False) -> Vector | Matrix:
-    if space == 'eta':
+
+def compton_subtraction(
+    res: UnfoldedResult1D | UnfoldedResult2D,
+    response: Response,
+    space="eta",
+    use_eff: bool = False,
+) -> Vector | Matrix:
+    if space == "eta":
         u = res.best_eta()
-    elif space == 'mu':
+    elif space == "mu":
         u = res.best()
     else:
         raise ValueError(f"Invalid space: {space}")
     return compton_subtraction_(u, res.raw, response, use_eff=use_eff)
 
 
-def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
-                         use_eff: bool = False):
+def compton_subtraction_(
+    unfolded: Vector, raw: Vector, response: Response, use_eff: bool = False
+):
     G = response.gaussian_like(unfolded).T
     eff = response.interpolation.Eff(unfolded.observed)
 
     f = response.fold_componentwise(unfolded)
     fe, se, de, ap, compton0 = f.FE, f.SE, f.DE, f.AP, f.compton
-    pfe = response.component_matrices_like(unfolded)['FE'].sum('true')
+    pfe = response.component_matrices_like(unfolded)["FE"].sum("true")
     # Need to smooth AP to correct for commutator
-    ap = G@ap
+    ap = G @ ap
     ap *= 0
 
     # The discrete structures: w
@@ -456,13 +496,13 @@ def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
     # when the unfolding is correct, but if the unfolding were correct, there
     # would be no need for the compton subtraction method to be used!
     compton = raw - v
-    ax, _ = compton0.plot(label='compton 0')
-    compton.plot(ax=ax, label='compton 1')
+    ax, _ = compton0.plot(label="compton 0")
+    compton.plot(ax=ax, label="compton 1")
     # We know the compton is smooth, so smooth it.
-    # Assume this is to correct for the noise, but this is too 
-    # ad-hoc. 
+    # Assume this is to correct for the noise, but this is too
+    # ad-hoc.
     compton = G @ compton
-    compton.plot(ax=ax, label='compton 2')
+    compton.plot(ax=ax, label="compton 2")
     ax.legend()
 
     # The raw spectrum minus the modeled compton, and the folded discrete structures
@@ -474,15 +514,15 @@ def compton_subtraction_(unfolded: Vector, raw: Vector, response: Response,
     if use_eff:
         unf = unf / eff
 
-    ax0, _ = unf.plot(label='unf')
-    compton.plot(ax=ax0, label='compton')
-    fe.plot(ax=ax0, label='fe')
-    se.plot(ax=ax0, label='se')
-    de.plot(ax=ax0, label='de')
-    ap.plot(ax=ax0, label='uap')
-    raw.plot(ax=ax0, label='raw')
-    v.plot(ax=ax0, label='v')
-    unfolded.plot(ax=ax0, label='unfolded')
+    ax0, _ = unf.plot(label="unf")
+    compton.plot(ax=ax0, label="compton")
+    fe.plot(ax=ax0, label="fe")
+    se.plot(ax=ax0, label="se")
+    de.plot(ax=ax0, label="de")
+    ap.plot(ax=ax0, label="uap")
+    raw.plot(ax=ax0, label="raw")
+    v.plot(ax=ax0, label="v")
+    unfolded.plot(ax=ax0, label="unfolded")
     ax0.legend()
 
     return ax, ax0
@@ -508,7 +548,7 @@ def gaussian_filter_1d(x, sigma):
     return y
 
 
-@dataclass(kw_only=True)  #(frozen=True, slots=True)
+@dataclass(kw_only=True)  # (frozen=True, slots=True)
 class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
     fluctuations: array1D
     kl: array1D
@@ -518,8 +558,14 @@ class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
         i = max(min, np.argmin(score))  # type: ignore
         return self.unfolded(i)
 
-    def plot_cost(self, ax: list[Axes] | None = None, start: int | float = 0,
-                  legend: bool = True, yscale: str = 'log', **kwargs) -> Plots1D:
+    def plot_cost(
+        self,
+        ax: list[Axes] | None = None,
+        start: int | float = 0,
+        legend: bool = True,
+        yscale: str = "log",
+        **kwargs,
+    ) -> Plots1D:
         if ax is None:
             fig, ax = plt.subplots(nrows=4, sharex=True, constrained_layout=True)
         else:
@@ -529,23 +575,23 @@ class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
             raise ValueError("Not enough axes. Expected 4.")
 
         if isinstance(start, float):
-            start = int(start*len(self.cost))
+            start = int(start * len(self.cost))
         x = np.arange(start, len(self.cost))
 
-        score = self.score(kwargs.pop('w', None))
+        score = self.score(kwargs.pop("w", None))
         lines = []
-        root_label = kwargs.pop('label', None)
-        label = append_label('cost', root_label)
-        line, = ax[0].plot(x, self.cost[start:], label=label, **kwargs)
-        label = append_label('fluctuations', root_label)
-        line, = ax[1].plot(x, self.fluctuations[start:], label=label, **kwargs)
-        label = append_label('score', root_label)
+        root_label = kwargs.pop("label", None)
+        label = append_label("cost", root_label)
+        (line,) = ax[0].plot(x, self.cost[start:], label=label, **kwargs)
+        label = append_label("fluctuations", root_label)
+        (line,) = ax[1].plot(x, self.fluctuations[start:], label=label, **kwargs)
+        label = append_label("score", root_label)
         ax[2].plot(x, score[start:], label=label, **kwargs)
-        label = append_label('KL divergence', root_label)
+        label = append_label("KL divergence", root_label)
         ax[3].plot(x, self.kl[start:], label=label, **kwargs)
         lines.append(line)
-        fig.supylabel('Cost')
-        fig.supxlabel('Iteration')
+        fig.supylabel("Cost")
+        fig.supxlabel("Iteration")
         if legend:
             for a in ax:
                 a.legend()
@@ -555,25 +601,23 @@ class GuttormsenResult1D(Cost1D, UnfoldedResult1DMultiple):
 
     def score(self, w: float | None = None) -> array1D:
         w = self.get_param("weight") if w is None else w
-        cost = (1-w)*self.cost + w*self.fluctuations
+        cost = (1 - w) * self.cost + w * self.fluctuations
         return cost
 
     def _save(self, path: Path, exist_ok: bool = False):
-        np.save(path / 'cost.npy', self.cost)
-        np.save(path / 'fluctuations.npy', self.fluctuations)
-        np.save(path / 'kl.npy', self.kl)
+        np.save(path / "cost.npy", self.cost)
+        np.save(path / "fluctuations.npy", self.fluctuations)
+        np.save(path / "kl.npy", self.kl)
 
     @classmethod
     def _load(cls, path: Path) -> dict[str, np.ndarray]:
-        cov = np.load(path / 'cost.npy')
-        flu = np.load(path / 'fluctuations.npy')
-        kl = np.load(path / 'kl.npy')
-        return {'cost': cov, 'fluctuations': flu, 'kl': kl}
+        cov = np.load(path / "cost.npy")
+        flu = np.load(path / "fluctuations.npy")
+        kl = np.load(path / "kl.npy")
+        return {"cost": cov, "fluctuations": flu, "kl": kl}
 
 
-
-
-@dataclass(kw_only=True)  #(frozen=True, slots=True)
+@dataclass(kw_only=True)  # (frozen=True, slots=True)
 class GuttormsenResult2DMultiple(Cost2D, UnfoldedResult2D):
     u: array3D
     fluctuations: array2D
@@ -584,13 +628,12 @@ class GuttormsenResult2DMultiple(Cost2D, UnfoldedResult2D):
         x = self.u[i, np.arange(rows)]  # type: ignore
         return self.raw.clone(values=x)
 
-    def best(self, cost: Literal['kl', 'chi2'] = 'kl',
-             **kwargs) -> Matrix:
-        if cost == 'kl':
+    def best(self, cost: Literal["kl", "chi2"] = "kl", **kwargs) -> Matrix:
+        if cost == "kl":
             score = self.kl
-        elif cost == 'chi2':
+        elif cost == "chi2":
             score = self.score(**kwargs)
-        #return self.unfolded(i)
+        # return self.unfolded(i)
         i = np.argmin(score, axis=0)
         return self.raw.clone(values=self.u[-1])
 
@@ -598,25 +641,25 @@ class GuttormsenResult2DMultiple(Cost2D, UnfoldedResult2D):
         if w is None:
             w = self.get_param("weight")
         assert w is not None
-        score = (1 - w)*self.cost + w * self.fluctuations
+        score = (1 - w) * self.cost + w * self.fluctuations
         return score
 
     def _save(self, path: Path, exist_ok: bool = False):
-        np.save(path / 'cost.npy', self.cost)
-        np.save(path / 'fluctuations.npy', self.fluctuations)
-        np.save(path / 'kl.npy', self.kl)
-        np.save(path / 'u.npy', self.u)
+        np.save(path / "cost.npy", self.cost)
+        np.save(path / "fluctuations.npy", self.fluctuations)
+        np.save(path / "kl.npy", self.kl)
+        np.save(path / "u.npy", self.u)
 
     @classmethod
     def _load(cls, path: Path) -> dict[str, np.ndarray]:
-        cov = np.load(path / 'cost.npy')
-        flu = np.load(path / 'fluctuations.npy')
-        kl = np.load(path / 'kl.npy')
-        u = np.load(path / 'u.npy')
-        return {'cost': cov, 'fluctuations': flu, 'kl': kl, 'u': u}
+        cov = np.load(path / "cost.npy")
+        flu = np.load(path / "fluctuations.npy")
+        kl = np.load(path / "kl.npy")
+        u = np.load(path / "u.npy")
+        return {"cost": cov, "fluctuations": flu, "kl": kl, "u": u}
 
 
-@dataclass(kw_only=True)  #(frozen=True, slots=True)
+@dataclass(kw_only=True)  # (frozen=True, slots=True)
 class GuttormsenResult2DSimple(Cost2D, UnfoldedResult2D):
     u: array2D
     fluctuations: array2D
@@ -631,12 +674,12 @@ class GuttormsenResult2DSimple(Cost2D, UnfoldedResult2D):
         assert ax is not None
         ax = np.atleast_1d(ax).ravel()
         lines = []
-        cmap = kwargs.pop('cmap', 'turbo')
+        cmap = kwargs.pop("cmap", "turbo")
         colormap = plt.get_cmap(cmap)
         N = self.cost.shape[1]
         colors = [colormap(i) for i in np.linspace(0, 1, N)]
         for i, c in enumerate(self.cost.T):
-            ax[0].plot(c, color=colors[i],  **kwargs)
+            ax[0].plot(c, color=colors[i], **kwargs)
             ax[1].plot(self.kl[i], color=colors[i], **kwargs)
         # Create a "fake" mappable for the colorbar
         index = self.raw.Y
@@ -645,7 +688,7 @@ class GuttormsenResult2DSimple(Cost2D, UnfoldedResult2D):
         sm.set_array([])
 
         # Add the colorbar
-        cbar = ax[0].figure.colorbar(sm, ax=ax, orientation='vertical')
+        cbar = ax[0].figure.colorbar(sm, ax=ax, orientation="vertical")
         cbar.set_label(self.raw.get_xlabel())
         fig.supxlabel("Iteration")
         ax[0].set_ylabel("Cost")
@@ -653,15 +696,15 @@ class GuttormsenResult2DSimple(Cost2D, UnfoldedResult2D):
         return ax, lines
 
     def _save(self, path: Path, exist_ok: bool = False):
-        np.save(path / 'cost.npy', self.cost)
-        np.save(path / 'fluctuations.npy', self.fluctuations)
-        np.save(path / 'kl.npy', self.kl)
-        np.save(path / 'u.npy', self.u)
+        np.save(path / "cost.npy", self.cost)
+        np.save(path / "fluctuations.npy", self.fluctuations)
+        np.save(path / "kl.npy", self.kl)
+        np.save(path / "u.npy", self.u)
 
     @classmethod
     def _load(cls, path: Path) -> dict[str, np.ndarray]:
-        cov = np.load(path / 'cost.npy')
-        flu = np.load(path / 'fluctuations.npy')
-        kl = np.load(path / 'kl.npy')
-        u = np.load(path / 'u.npy')
-        return {'cost': cov, 'fluctuations': flu, 'kl': kl, 'u': u}
+        cov = np.load(path / "cost.npy")
+        flu = np.load(path / "fluctuations.npy")
+        kl = np.load(path / "kl.npy")
+        u = np.load(path / "u.npy")
+        return {"cost": cov, "fluctuations": flu, "kl": kl, "u": u}

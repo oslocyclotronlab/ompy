@@ -241,7 +241,7 @@ class AsymmetricVector(ErrorVector):
                     eline = ax.fill_between(bins, values - lerr, values + uerr, **kw)
                     lines = (line, eline)
                 else:
-                    raise ValueError(f"Invalid ekind: {ekind}")
+                    raise ValueError(f"Invalid ekind: {ekind}. Must be one of: 'line', 'fill', 'band'")
             case "bar":
                 raise NotImplementedError("Not implemented yet")
                 align = "center" if self._index.is_mid() else "edge"

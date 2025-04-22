@@ -8,7 +8,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from .result import Result
 from .result1d import UnfoldedResult1D
-from .bootstrapping import BootstrapVector
+from .resampling.resampling import Resampling1D
 from ..helpers import make_combined_legend
 
 @dataclass
@@ -38,7 +38,7 @@ class Study1D(AStudy):
         return cls(name, raw=result.raw, unfolded=result.best(), eta=result.best_eta(), folded=result.best_folded())
 
     @classmethod
-    def from_bootstrap(cls, name: str, boot: BootstrapVector) -> Study1D:
+    def from_bootstrap(cls, name: str, boot: Resampling1D) -> Study1D:
         return cls(name, eta=boot.eta(), folded=boot.nu(), mu=boot.mu())
 
 

@@ -10,6 +10,7 @@ if __OMPY_SETUP__:
     import sys
     sys.stderr.write('Running from ompy source directory.\n')
 else:
+    import importlib
 
     import numpy as np
     __DTYPE = np.float32
@@ -97,7 +98,6 @@ else:
         for callback in ROOT_CALLBACKS:
             callback()
 
-    MINUIT_AVAILABLE = is_available("iminuit")
     JAX_AVAILABLE = is_available("jax")
     JAX_WORKING = False
     if JAX_AVAILABLE:
@@ -118,18 +118,7 @@ else:
 
     H5PY_AVAILABLE = is_available("h5py")
 
-    MULTINEST_AVAILABLE = False
-    if is_available("pymultinest", load=False):
-        # Check if MultiNest's LD_LIBRARY_PATH is set
-        if "LD_LIBRARY_PATH" in os.environ:
-            MULTINEST_AVAILABLE = is_available("pymultinest")
-        else:
-            warnings.warn("pymultinest is installed, but LD_LIBRARY_PATH is not set."
-                          "\nSee http://johannesbuchner.github.io/PyMultiNest/install.html#installing-the-python-module"
-                          )
     XARRAY_AVAILABLE = is_available("xarray")
-    GAMBIT_AVAILABLE = is_available("gambit")
-    EMCEE_AVAILABLE = is_available("emcee")
     PYMC_AVAILABLE = is_available("pymc")
     PYRO_AVAILABLE = is_available("pyro")
     SKLEARN_AVAILABLE = is_available("sklearn")
@@ -170,3 +159,19 @@ else:
     from .introspection import logging, hooks
     #if MINUIT_AVAILABLE:
     #    from .clicker import Clicker
+
+def __getattr__(name):
+    def _import(name):
+        return importlib.import_module("." + name, __package__)
+    match name:
+        case "unfolding":
+            return _import("unfolding")
+        case "detector":
+            return _import("detector")
+        case "decomposition":
+            return _import("decomposition")
+        case _:
+            raise AttributeError(f"module {__name__} has no attribute {name}")
+
+def __dir__():
+    return sorted(list(globals().keys()) + ["unfolding", "detector"])

@@ -1,22 +1,33 @@
 from __future__ import annotations
-from . import (ROOT_AVAILABLE, MINUIT_AVAILABLE,
-                JAX_AVAILABLE, H5PY_AVAILABLE, NUMBA_AVAILABLE,
-                GPU_AVAILABLE, NUMBA_CUDA_AVAILABLE,
-                NUMBA_CUDA_WORKING, JAX_WORKING, ROOT_IMPORTED,
-                XARRAY_AVAILABLE, GAMBIT_AVAILABLE, EMCEE_AVAILABLE,
-                PYMC_AVAILABLE, PYRO_AVAILABLE, SKLEARN_AVAILABLE, OPTAX_AVAILABLE)
 
-from .version import get_version_info
 import os
 import platform
 import subprocess
-from importlib import util, metadata
-import warnings
 import sys
+import warnings
+from importlib import metadata, util
+
 import pkg_resources
 
+from . import (
+    GPU_AVAILABLE,
+    H5PY_AVAILABLE,
+    JAX_AVAILABLE,
+    JAX_WORKING,
+    NUMBA_AVAILABLE,
+    NUMBA_CUDA_AVAILABLE,
+    NUMBA_CUDA_WORKING,
+    OPTAX_AVAILABLE,
+    PYMC_AVAILABLE,
+    PYRO_AVAILABLE,
+    ROOT_AVAILABLE,
+    ROOT_IMPORTED,
+    SKLEARN_AVAILABLE,
+    XARRAY_AVAILABLE,
+)
+from .version import get_version_info
 
-#TODO Add version
+# TODO Add version
 
 
 def color_status(status: bool | None) -> str:
@@ -56,6 +67,7 @@ def get_cpu() -> str:
         pass
     return "Unknown"
 
+
 def print_status():
     """Prints a report of the status of the dependencies."""
     full_version, git_version = get_version_info()
@@ -77,7 +89,7 @@ ROOT available:       {color_status(ROOT_AVAILABLE)}"""
         msg += f"""
   + imported:         {color_status(ROOT_IMPORTED)}
 """
-    msg += f"""MINUIT available:     {color_status(MINUIT_AVAILABLE)}
+    msg += f"""
 JAX available:        {color_status(JAX_AVAILABLE)}
 """
     if JAX_AVAILABLE:
@@ -85,8 +97,6 @@ JAX available:        {color_status(JAX_AVAILABLE)}
     msg += f"""
 H5PY available:       {color_status(H5PY_AVAILABLE)}
 XARRAY available:     {color_status(XARRAY_AVAILABLE)}
-GAMBIT available:     {color_status(GAMBIT_AVAILABLE)}
-EMCEE available:      {color_status(EMCEE_AVAILABLE)}
 PYMC available:       {color_status(PYMC_AVAILABLE)}
 PYRO available:       {color_status(PYRO_AVAILABLE)}
 SKLEARN available:    {color_status(SKLEARN_AVAILABLE)}
@@ -98,6 +108,7 @@ CPU:                  {get_cpu()}
   + number:           {availabe_cpus}"""
     try:
         import psutil
+
         virtual_memory = psutil.virtual_memory()
         msg += f"""
   + frequency:        {psutil.cpu_freq().current:.2f} MHz
@@ -108,8 +119,14 @@ Available memory:     {virtual_memory.available / 1024**3:.2f} GB
         pass
 
     if JAX_AVAILABLE:
-        import jax, jaxlib
-        gpus = [device.device_kind for device in jax.devices() if "gpu" in device.platform.lower()]
+        import jax
+        import jaxlib
+
+        gpus = [
+            device.device_kind
+            for device in jax.devices()
+            if "gpu" in device.platform.lower()
+        ]
         msg += f"""
 JAX version:          {jax.__version__}
 JAXlib version:       {jaxlib.__version__}
@@ -126,9 +143,9 @@ Available GPUs:       {len(gpus)}
     print(msg)
 
 
-
-from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+
 
 @dataclass
 class Entry(ABC):
@@ -166,7 +183,6 @@ class InfoEntry(Entry):
         s = s.ljust(pad)
         return f"{self.name}", s
 
-    
 
 class Menu:
     def __init__(self, title: str):
@@ -200,7 +216,9 @@ class Menu:
             html += "<br>"
 
         for submenu in self.submenus:
-            submenu_id = f"{self.title.replace(' ', '_')}_{submenu.title.replace(' ', '_')}"
+            submenu_id = (
+                f"{self.title.replace(' ', '_')}_{submenu.title.replace(' ', '_')}"
+            )
             html += f'<a href="javascript:void(0);" onclick="toggleVisibility(\'{submenu_id}\')">{submenu.title}</a>'
             html += f'<div id="{submenu_id}" style="display:none; margin-left: {20 * (level + 1)}px;">'
             html += submenu.render_html(level + 1)
@@ -234,11 +252,11 @@ class Menu:
 
 
 def is_available(pkg, load=False, suppress_warnings=True) -> tuple[bool, str]:
-    version = ''
+    version = ""
     try:
         exists = util.find_spec(pkg) is not None
         version = metadata.version(pkg)
-    except ImportError: 
+    except ImportError:
         # As usual, ROOT is a special case. It can refuse to
         # import for no particular reason, in which case it
         # throws an exception
@@ -258,8 +276,14 @@ def is_imported(pkg: str) -> bool:
 
 
 class Package(Menu):
-
-    def __init__(self, package: str, available: bool, working: bool | None = None, imported: bool | None = None, version: str = ''):
+    def __init__(
+        self,
+        package: str,
+        available: bool,
+        working: bool | None = None,
+        imported: bool | None = None,
+        version: str = "",
+    ):
         self.package = package
         self.available = available
         self.working = working
@@ -298,7 +322,7 @@ def get_status_menu() -> Menu:
     if JAX_AVAILABLE:
         menu.append(StatusEntry("JAX working", JAX_WORKING))
     menu.append(StatusEntry("H5PY available", H5PY_AVAILABLE))
-    #menu.append(StatusEntry("XARRAY available", XARRAY_AVAILABLE))
+    # menu.append(StatusEntry("XARRAY available", XARRAY_AVAILABLE))
     menu.add_submenu(Package.from_pkg("xarray"))
     menu.append(StatusEntry("GAMBIT available", GAMBIT_AVAILABLE))
     menu.append(StatusEntry("EMCEE available", EMCEE_AVAILABLE))
@@ -311,16 +335,24 @@ def get_status_menu() -> Menu:
         menu.add_submenu(get_jax_menu())
     return menu
 
+
 def get_jax_menu() -> Menu:
     menu = Menu("JAX")
-    import jax, jaxlib
-    gpus = [device.device_kind for device in jax.devices() if "gpu" in device.platform.lower()]
+    import jax
+    import jaxlib
+
+    gpus = [
+        device.device_kind
+        for device in jax.devices()
+        if "gpu" in device.platform.lower()
+    ]
     menu.append(InfoEntry("JAX version", jax.__version__))
     menu.append(InfoEntry("JAXlib version", jaxlib.__version__))
     if gpus:
         menu.append(InfoEntry("Available GPUs", str(len(gpus))))
         menu.append(InfoEntry("GPU kind", str(gpus if len(gpus) > 1 else gpus[0])))
     return menu
+
 
 def get_platform_menu() -> Menu:
     menu = Menu("Platform")
@@ -330,10 +362,17 @@ def get_platform_menu() -> Menu:
     menu.append(InfoEntry("Number of CPUs", str(len(os.sched_getaffinity(0)))))
     try:
         import psutil
+
         virtual_memory = psutil.virtual_memory()
         menu.append(InfoEntry("CPU frequency", f"{psutil.cpu_freq().current:.2f} MHz"))
-        menu.append(InfoEntry("Total memory", f"{virtual_memory.total / 1024**3:.2f} GB"))
-        menu.append(InfoEntry("Available memory", f"{virtual_memory.available / 1024**3:.2f} GB"))
+        menu.append(
+            InfoEntry("Total memory", f"{virtual_memory.total / 1024**3:.2f} GB")
+        )
+        menu.append(
+            InfoEntry(
+                "Available memory", f"{virtual_memory.available / 1024**3:.2f} GB"
+            )
+        )
     except ImportError:
         pass
     return menu
@@ -348,10 +387,20 @@ class GPUMemory:
 
 def get_gpu_memory() -> list[GPUMemory]:
     try:
-        smi_output = subprocess.check_output(['nvidia-smi', '--query-gpu=memory.total,memory.free,memory.used', '--format=csv,nounits,noheader'], encoding='utf-8')
+        smi_output = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.total,memory.free,memory.used",
+                "--format=csv,nounits,noheader",
+            ],
+            encoding="utf-8",
+        )
         # Parse the output
-        gpu_memory_info = [x.split(',') for x in smi_output.strip().split("\n")]
-        gpu_memory_info = [GPUMemory(int(total), int(free), int(used)) for total, free, used in gpu_memory_info]
+        gpu_memory_info = [x.split(",") for x in smi_output.strip().split("\n")]
+        gpu_memory_info = [
+            GPUMemory(int(total), int(free), int(used))
+            for total, free, used in gpu_memory_info
+        ]
         return gpu_memory_info
     except subprocess.CalledProcessError as e:
         return []

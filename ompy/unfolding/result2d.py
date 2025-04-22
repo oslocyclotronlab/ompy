@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 if TYPE_CHECKING:
-    from .bootstrapping import BootstrapMatrix
+    from .resampling.resampling import Resampling2D
 
 
 def cache(func):
@@ -172,8 +172,8 @@ class UnfoldedResult2D(Result):
     def plot_comparison_to(self, other: Result, ax: Axes | None = None, space: PlotSpace = 'eta', **kwargs) -> Plot1D | Plots2D:
         raise NotImplementedError()
 
-    def bootstrap(self, N: int, **kwargs) -> BootstrapMatrix:
-        from .bootstrapping import bootstrap
+    def bootstrap(self, N: int, **kwargs) -> Resampling2D:
+        from .resampling.resampling import bootstrap
         return bootstrap(self, N, **kwargs)
 
 

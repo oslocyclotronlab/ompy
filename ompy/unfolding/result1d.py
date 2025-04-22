@@ -15,7 +15,7 @@ import warnings
 from typing import Any
 
 if TYPE_CHECKING:
-    from .bootstrapping import BootstrapVector
+    from .resampling.resample1d import Resampling1D
 
 
 @dataclass(kw_only=True)
@@ -102,9 +102,9 @@ class UnfoldedResult1D(Result[Vector]):
 
         return ax, lines
 
-    def bootstrap(self, N: int, **kwargs) -> BootstrapVector:
-        from .bootstrapping import bootstrap
-        return bootstrap(self, N=N, **kwargs)
+    def resample(self, N: int, **kwargs) -> Resampling1D:
+        from .resampling.resample1d import resample_vector
+        return resample_vector(self, N, **kwargs)
 
 @dataclass(kw_only=True)
 class UnfoldedResult1DSimple(UnfoldedResult1D):

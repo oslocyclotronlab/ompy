@@ -19,7 +19,7 @@ from .result_classes import RESULT_CLASSES
 from .stubs import PlotSpace, Space
 
 if TYPE_CHECKING:
-    from .bootstrapping import Bootstrap, BootstrapMatrix, BootstrapVector
+    from .resampling.resampling import Resampling
     from .unfolder import Unfolder
 
 if JAX_AVAILABLE:
@@ -113,6 +113,13 @@ class Result(ABC, Generic[T]):
     meta: ResultMeta[T]
     # Contaminant spectra
     xi: list[T] = field(default_factory=list)
+    _ndim: int = 0
+
+    @property
+    def ndim(self) -> int:
+        if self._ndim == 0:
+            self._ndim = self.meta.parameters.raw.ndim
+        return self._ndim
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -321,7 +328,7 @@ class Result(ABC, Generic[T]):
             return self
 
     @abstractmethod
-    def bootstrap(self, N: int, **kwargs) -> Bootstrap: ...
+    def resample(self, N: int, **kwargs) -> Resampling: ...
 
 
 @dataclass(kw_only=True)

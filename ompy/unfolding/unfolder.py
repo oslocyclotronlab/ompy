@@ -336,10 +336,9 @@ class Unfolder(ABC):
         specialized_mask: np.ndarray = make_mask(data, mask)
         # Note we transpose D and G_eg because of convention
         return self._unfold_matrix(
-            data,
-            background,
-            initial,
-            use_previous,
+            data=data,
+            background=background,
+            initial=initial,
             D=self.D,
             G_eg=self.G_eg,
             G_ex=self.G_ex,
