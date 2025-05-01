@@ -3,7 +3,6 @@ from collections import Counter
 import numpy as np
 from .. import Vector, Matrix, zeros_like
 from ..array import pack_into_matrix, Array
-from ..response import ResponseName, Response
 from abc import ABC, abstractmethod
 from typing import Literal, TypeAlias, overload, Self, TYPE_CHECKING, Iterable
 from tqdm.autonotebook import tqdm
@@ -52,7 +51,6 @@ class Unfolder(ABC):
         self.warn_int_data: bool = warn_int_data
         if space != "mu":
             raise NotImplementedError(f"Space {space} is not implemented")
-        self.check_matrices()
 
     @property
     def D(self) -> Matrix:
@@ -74,18 +72,15 @@ class Unfolder(ABC):
 
     def check_matrices(self) -> None:
         # The matrices must satisfy y = G_ex @ mat @ D @ G_eg
+        # yeah, you dingus, you need the matrix
         if self._D is not None and self._G_eg is not None:
-            if not self._D.X_index.is_compatible_with(self._G_eg.Y_index):
+            try:
+                self._D.X_index.is_compatible_with(self._G_eg.Y_index, do_raise=True)
+            except Exception as e:
                 raise ValueError(
                     "D and G_eg must have compatible axes.\n"
-                    f"D.shape: {self._D.shape} != {self._G_eg.shape} = G_eg.shape"
-                )
-        if self._D is not None and self._G_ex is not None:
-            if not self._D.Y_index.is_compatible_with(self._G_ex.X_index):
-                raise ValueError(
-                    "D and G_ex must have compatible axes.\n"
-                    f"D.shape: {self._D.shape} != {self._G_ex.shape} = G_ex.shape"
-                )
+                    f"D.shape: {self._D.shape} ?= {self._G_eg.shape} = G_eg.shape"
+                ) from e
 
     def set_matrices(self, array: Matrix | Vector, reset: bool = False) -> None:
         if self.warn_int_data:
@@ -142,31 +137,36 @@ class Unfolder(ABC):
         if isinstance(array, Matrix):
             if self._G_ex is None:
                 raise ValueError("When unfolding a matrix, G_ex must be provided.")
-            if not self.G_ex.X_index.is_compatible_with(array.Y_index):
+            try: 
+                self.G_ex.X_index.is_compatible_with(array.X_index, do_raise=True)
+            except Exception as e:
                 raise ValueError(
                     "G_ex must be compatible with the array. "
                     f"Got {self.G_ex.shape} and {array.shape}"
-                )
-        if not self.D.X_index.is_compatible_with(array.X_index):
+                ) from e
+        try:
+            self.D.X_index.is_compatible_with(array.Y_index, do_raise=True)
+        except Exception as e:
             raise ValueError(
                 "D must be compatible with the array. "
                 f"Got {self.D.shape} and {array.shape}"
-            )
+            ) from e
         # We don't need to check G_eg since check_matrices() already did that
         # we only need to ensure it exists
         if self._G_eg is None:
             raise ValueError("G_eg must be provided.")
 
     def check_background(
-        self, data: Matrix | Vector, background: Matrix | Vector | None
+        self, data: Matrix | Vector, background: tuple[Matrix, ...] | tuple[Vector, ...] = ()
     ) -> None:
-        if background is not None:
+        if background:
             if not self.supports_background():
                 raise ValueError(
                     "This unfolding algorithm does not support background subtraction."
                 )
-            if not background.is_compatible_with(data):
-                raise ValueError("The background has different indices from the data.")
+            for i, bg in enumerate(background):
+                if not bg.is_compatible_with(data):
+                    raise ValueError(f"The background #{i} has different indices from the data.")
 
     @classmethod
     def from_detector(cls, detector: Detector) -> Self:
@@ -222,16 +222,16 @@ class Unfolder(ABC):
     def unfold(
         self,
         data: Matrix | Vector | list[Vector],
-        background: Matrix | Vector | list[Vector] | None = None,
+        background: tuple[Matrix, ...] | tuple[Vector, ...] | list[tuple[Vector, ...]] = (),
         mask: Mask = "last nonzero",
         **kwargs,
     ) -> UnfoldedResult2D | UnfoldedResult1D | list[UnfoldedResult1D]:
-        match data, background:
-            case Matrix(), Matrix() | None:
+        match data:
+            case Matrix():
                 return self.unfold_matrix(data, background, mask=mask, **kwargs)
-            case Vector(), Vector() | None:
+            case Vector():
                 return self.unfold_vector(data, background, mask=mask, **kwargs)
-            case list(), list() | None | Vector():
+            case list():
                 return self.unfold_vectors(data, background, mask=mask, **kwargs)
             case _:
                 raise ValueError(
@@ -241,7 +241,7 @@ class Unfolder(ABC):
     def unfold_vector(
         self,
         data: Vector,
-        background: Vector | None = None,
+        background: tuple[Vector, ...] = (),
         initial: InitialVector = "raw",
         mask: Mask1D = "last nonzero",
         **kwargs,
@@ -264,7 +264,7 @@ class Unfolder(ABC):
     def unfold_vectors(
         self,
         data: list[Vector],
-        background: Vector | list[Vector] | None = None,
+        background: list[tuple[Vector, ...]] = (),
         initial: InitialVector | list[InitialVector] = "raw",
         mask: Mask1D | list[Mask1D] = "last nonzero",
         **kwargs,
@@ -325,7 +325,7 @@ class Unfolder(ABC):
     def unfold_matrix(
         self,
         data: Matrix,
-        background: Matrix | None = None,
+        background: tuple[Matrix, ...] = (),
         initial: InitialMatrix = "raw",
         mask: Mask2D = "last nonzero",
         **kwargs,
@@ -334,12 +334,10 @@ class Unfolder(ABC):
         self.check_background(data, background)
         use_previous, initial = initial_matrix(data, initial)
         specialized_mask: np.ndarray = make_mask(data, mask)
-        # Note we transpose D and G_eg because of convention
         return self._unfold_matrix(
-            data,
-            background,
-            initial,
-            use_previous,
+            data=data,
+            background=background,
+            initial=initial,
             D=self.D,
             G_eg=self.G_eg,
             G_ex=self.G_ex,

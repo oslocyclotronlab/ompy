@@ -5,10 +5,6 @@ import os
 import builtins
 import platform
 
-
-# build me (i.e. compile Cython modules) for testing in this directory using
-# python setup.py build_ext --inplace
-
 # Version routine taken from numpy
 MAJOR = 2
 MINOR = 1
@@ -150,7 +146,8 @@ install_requires = [
     "pint",
   #  "nptyping",  # No longer maintained :(
     "pandas",
-    "sympy"
+    "sympy",
+    "ipywidgets",
 ]
 
 setup(name='OMpy',
@@ -169,10 +166,10 @@ setup(name='OMpy',
       zip_safe=False,
       install_requires=install_requires,
       extras_require={
-      'full': ['numba', 'jax', 'xarray', 'h5py'],
+      'full': ['numba', 'jax', 'xarray', 'h5py', 'jax-tqdm', 'optax'],
       'emcee': ['emcee'],
       'multinest': ['pymultinest'],
-      'jax': ['jax'],
+      'jax': ['jax', 'jax-tqdm'],
       'numba': ['numba'],
       'recommended': ['numba', 'jax']
       }

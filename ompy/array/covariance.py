@@ -1,14 +1,14 @@
-from .matrix import Matrix
-from ..stubs import Axes, Figure, QuadMesh, Colorbar
-from typing import Any
 import matplotlib.pyplot as plt
-import numpy as np
+
+from ..stubs import Axes, Colorbar, QuadMesh
+from .matrix import Matrix
 
 
 class CorrelationMatrix(Matrix):
-    def plot(self, ax: Axes | None = None,
-             **kwargs) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
-        """ Plots the matrix with the energy along the axis
+    def plot(
+        self, ax: Axes | None = None, **kwargs
+    ) -> tuple[Axes, tuple[QuadMesh, Colorbar | None]]:
+        """Plots the matrix with the energy along the axis
 
         Args:
             ax: A matplotlib axis to plot onto
@@ -29,5 +29,5 @@ class CorrelationMatrix(Matrix):
         """
         if ax is None:
             fig, ax = plt.subplots()
-        kw = dict(cmap='RdBu_r', vmin=-1, vmax=1) | kwargs
+        kw = dict(cmap="RdBu_r", vmin=-1, vmax=1) | kwargs
         return super().plot(ax=ax, **kw)

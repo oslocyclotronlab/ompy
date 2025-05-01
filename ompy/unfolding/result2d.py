@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 if TYPE_CHECKING:
-    from .bootstrapping import BootstrapMatrix
+    from .resampling.resampling import Resampling2D
 
 
 def cache(func):
@@ -42,24 +42,25 @@ class UnfoldedResult2D(Result):
         best = self.best()
         if self.G_ex is None:
             with on_device(device, best, self.GegD, endpoint='numpy'):
-                m = best@self.GegD.T
+                m = best@self.GegD
         else:
             with on_device(device, best, self.GegD, self.G_ex, endpoint='numpy'):
-                m = self.G_ex@best@self.GegD.T
+                m = self.G_ex@best@self.GegD
         return self.raw.clone(values=m)  # Fix labels
+    best_nu = best_folded
 
     #@cache
     def best_eta(self, device='gpu?') -> Matrix:
         match self.meta.space:
-            case 'eta':
+            case 'mu':
                 best = self.best()
                 if self.G_ex is None:
                     with on_device(device, best, self.G_eg, endpoint='numpy'):
                         m = best@self.G_eg
                 else:
                     with on_device(device, best, self.G_eg, self.G_ex, endpoint='numpy'):
-                        m = self.G_ex.T@best@self.G_eg
-            case 'mu':
+                        m = self.G_ex@best@self.G_eg
+            case 'eta':
                 m = self.best()
             case _:
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
@@ -172,9 +173,9 @@ class UnfoldedResult2D(Result):
     def plot_comparison_to(self, other: Result, ax: Axes | None = None, space: PlotSpace = 'eta', **kwargs) -> Plot1D | Plots2D:
         raise NotImplementedError()
 
-    def bootstrap(self, N: int, **kwargs) -> BootstrapMatrix:
-        from .bootstrapping import bootstrap
-        return bootstrap(self, N, **kwargs)
+    def resample(self, N: int, **kwargs) -> Resampling2D:
+        from .resampling.resample2d import resample_matrix 
+        return resample_matrix(self, N, **kwargs)
 
 
 @dataclass(kw_only=True)

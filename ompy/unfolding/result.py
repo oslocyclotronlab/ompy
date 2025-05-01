@@ -19,7 +19,7 @@ from .result_classes import RESULT_CLASSES
 from .stubs import PlotSpace, Space
 
 if TYPE_CHECKING:
-    from .bootstrapping import Bootstrap, BootstrapMatrix, BootstrapVector
+    from .resampling.resampling import Resampling
     from .unfolder import Unfolder
 
 if JAX_AVAILABLE:
@@ -113,6 +113,13 @@ class Result(ABC, Generic[T]):
     meta: ResultMeta[T]
     # Contaminant spectra
     xi: list[T] = field(default_factory=list)
+    _ndim: int = 0
+
+    @property
+    def ndim(self) -> int:
+        if self._ndim == 0:
+            self._ndim = self.meta.parameters.raw.ndim
+        return self._ndim
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -151,12 +158,13 @@ class Result(ABC, Generic[T]):
     @abstractmethod
     def best(self) -> T: ...
 
-    @alias("best_nu")
     def best_folded(self, device="gpu?") -> T:
         best = self.best()
         with on_device(device, self.GegD, best, endpoint="numpy"):
             nu = best @ self.GegD
         return nu
+
+    best_nu = best_folded
 
     def best_eta(self, device="gpu?") -> T:
         best = self.best()
@@ -321,7 +329,7 @@ class Result(ABC, Generic[T]):
             return self
 
     @abstractmethod
-    def bootstrap(self, N: int, **kwargs) -> Bootstrap: ...
+    def resample(self, N: int, **kwargs) -> Resampling: ...
 
 
 @dataclass(kw_only=True)

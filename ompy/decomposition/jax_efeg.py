@@ -22,6 +22,23 @@ Instead of solving P(Ex, Eg) \propto rho(Ex-Eg)*T(Eg),
 we can solve P(Ef, Eg) \propto rho(Ef)*T(Eg), making the multiplication
 much more friendly to vectorization. Equivalent to going from (Ex, Eg) -> (Ef, Eg)
 and solving the problem there. This works very well.
+A tripwire is that under the coordinate transform, P is no longer row-normalized. While
+rho*T becomes an outer product, the normalization becomes diagonal and no longer
+computer friendly. To avoid this, the data is row-normalized before hand. Note
+that since rho*T is a rank 1 approximation to P, it is not exactly row-normalized.
+It may be row-normalized after the fact, but a small error will remain.
+No, i think this is false. What we require is for P to be row-normalized, we do not
+require rho*T to be row-normalized. Making them row-normalized might be too constraining.
+Only escape is if the normalization is in the degenerate solution space of the Lie group.
+No, I think enforcing the row-normalization  on the data destroys the gauge freedoms.
+
+What we are doing is a non-negative matrix factorization into a rank 1 matrix.
+This is almost as taking the largest singular value of P, the difference being
+SVD does not enforce non-negativity. And, SVD ensures the optimal rank 1 approximation under
+the Frobenius norm, while we are doing KL-divergence. 
+
+The deviance we are seeing is (i think!) just because P is not exactly rank 1.
+
 Convergence within ~500 steps, taking a fraction of a second in gpu and a second or two on cpu.
 TODO:
     -[ ] Bookkeeping for bootstraps
@@ -258,12 +275,16 @@ def setup(FG: Matrix) -> tuple[array2D, array1D, array1D, array1D]:
     return P.values, P.Ef, P.Eg, FG.Ex
 
 
+def row_normalize(FG: Matrix) -> Matrix:
+    return FG / FG.sum(axis=1, keepdims=True)
+
+
 # Begin the optimization
 def optimize(FG: Matrix, N: int = 500, optimizer=optax.rmsprop(1e-5),
              normalize: bool = True, disable_tqdm: bool = False):
+    
     if normalize:
-        FG = FG / FG.sum()
-    #FG = row_normalize(FG)  # type: ignore
+        FG = row_normalize(FG)  # type: ignore
 
     P, Ef, Eg, Ex = setup(FG)
     #imap = jnp.array(index_map(Ex, Eg, Ef)).T

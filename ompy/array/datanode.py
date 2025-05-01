@@ -1,5 +1,15 @@
 from __future__ import annotations
-from typing import Any, TypeAlias, TypeVar, TypeGuard, overload, Self, Literal, Sequence, Iterable
+from typing import (
+    Any,
+    TypeAlias,
+    TypeVar,
+    TypeGuard,
+    overload,
+    Self,
+    Literal,
+    Sequence,
+    Iterable,
+)
 from collections import deque
 import numpy as np
 from abc import ABC, abstractmethod
@@ -15,8 +25,9 @@ from enum import Enum, unique, auto
 
 
 Primitive: TypeAlias = int | float | np.number | np.ndarray | str | bool | None
-SimpleComposite: TypeAlias = dict[Any,
-                                  Primitive] | list[Primitive] | tuple[Primitive] | set[Primitive]
+SimpleComposite: TypeAlias = (
+    dict[Any, Primitive] | list[Primitive] | tuple[Primitive] | set[Primitive]
+)
 ComplexComposite: TypeAlias = dict | list | tuple | set
 
 VERSION = "0.0.1"
@@ -43,26 +54,29 @@ tree.accept(visitor) -> visitor.visit(tree) -> visitor.process_node(tree) -> tre
 
 @unique
 class DataType(Enum):
-    """ To tag a node about the structure of the data it contains
+    """To tag a node about the structure of the data it contains"""
 
-    """
-    Primitive = auto()           # Can be simply saved
-    TreeConvertable = auto()     # Is transversable
+    Primitive = auto()  # Can be simply saved
+    TreeConvertable = auto()  # Is transversable
     PrimitiveComposite = auto()  # Can be tranversed, but contains only primitives
-    TreeComposite = auto()       # Can be transversed, and contains TreeConvertables
-    Unsupported = auto()         # Leftover
+    TreeComposite = auto()  # Can be transversed, and contains TreeConvertables
+    Unsupported = auto()  # Leftover
     # Element = auto()             # A single element of a composite
-    Root = auto()                # The root node
-    Array = auto()               # An arraylike
+    Root = auto()  # The root node
+    Array = auto()  # An arraylike
 
 
 class DataNode:
     """Intermediate representation of a structure to be saved"""
 
-    def __init__(self, name: str | None = None, data: Any = None,
-                 children: list[DataNode] | None = None,
-                 parent: DataNode | None = None,
-                 dtype: DataType = DataType.Root):
+    def __init__(
+        self,
+        name: str | None = None,
+        data: Any = None,
+        children: list[DataNode] | None = None,
+        parent: DataNode | None = None,
+        dtype: DataType = DataType.Root,
+    ):
         if data is not None and (name is None or name == ""):
             raise ValueError("DataNode must have a name if it has data")
         if data is not None and dtype == DataType.Root:
@@ -92,10 +106,11 @@ class DataNode:
     def is_leaf(self) -> bool:
         return len(self.children) == 0
 
-    def set_parent(self, parent: DataNode | None = None, overwrite: bool = False) -> None:
+    def set_parent(
+        self, parent: DataNode | None = None, overwrite: bool = False
+    ) -> None:
         if not overwrite and self.parent is not None:
-            raise ValueError(
-                "Cannot set parent of node that already has a parent")
+            raise ValueError("Cannot set parent of node that already has a parent")
         self.parent = parent
 
     def print(self) -> None:
@@ -104,15 +119,16 @@ class DataNode:
     def identifier(self) -> str:
         if self.is_root():
             if self.name == "":
-                return '/'
+                return "/"
             else:
-                return '/[' + self.name + ']/'
+                return "/[" + self.name + "]/"
         else:
-            return self.parent.identifier() + self.name + '/'
+            return self.parent.identifier() + self.name + "/"
 
 
 class DataVisitor(ABC):
     """Visitor pattern for DataNode"""
+
     @abstractmethod
     def process_node(self, node: DataNode, depth: int) -> None: ...
 
@@ -166,20 +182,25 @@ class JSONWriter(DFS):
 
     def _dfs(self, node: DataNode) -> dict:
         node_dict = {
-            'name': node.name,
-            'data': node.data,
-            'class': node.data.__class__.__name__
+            "name": node.name,
+            "data": node.data,
+            "class": node.data.__class__.__name__,
         }
         if not node.is_leaf():
-            node_dict['children'] = [
-                self._dfs(child) for child in node.children]
-        if node.is_root() or is_composite(node.data) or isinstance(node.data, TreeConvertable):
+            node_dict["children"] = [self._dfs(child) for child in node.children]
+        if (
+            node.is_root()
+            or is_composite(node.data)
+            or isinstance(node.data, TreeConvertable)
+        ):
             if not is_composite(node.data):
-                node_dict['version'] = VERSION
+                node_dict["version"] = VERSION
         else:
             if False and not node.is_root() and len(node.children) > 0:
-                raise TreeError("Primitive nodes cannot have children.\n"
-                                f"Node {node.identifier()} has children {node.children}")
+                raise TreeError(
+                    "Primitive nodes cannot have children.\n"
+                    f"Node {node.identifier()} has children {node.children}"
+                )
         return node_dict
 
     def get_json(self) -> str:
@@ -193,6 +214,7 @@ class JSONWriter(DFS):
 
 class TreeConvertable(ABC):
     """Interface for serializing into a tree"""
+
     @abstractmethod
     def dendrify(self) -> DataNode: ...
 
@@ -221,25 +243,27 @@ class TreeConvertableDC(TreeConvertable):
                 tree.insert(label, value, dtype=DataType.Primitive)
             case list() | set() | tuple():
                 if is_primitive_composite(value):
-                    tree.insert(
-                        label, value, dtype=DataType.PrimitiveComposite)
+                    tree.insert(label, value, dtype=DataType.PrimitiveComposite)
                     return
 
-                branch = DataNode(label, {'type': type(
-                    value).__name__}, dtype=DataType.TreeComposite)
+                branch = DataNode(
+                    label, {"type": type(value).__name__}, dtype=DataType.TreeComposite
+                )
                 for i, x in enumerate(value):
                     if not isinstance(x, TreeConvertable):
                         raise TreeError(
-                            f"Cannot serialize into a tree, too nested. {value}")
+                            f"Cannot serialize into a tree, too nested. {value}"
+                        )
                     twig = x.dendrify()
-                    twig.name = 'item_' + str(i)
+                    twig.name = "item_" + str(i)
                     branch.append(x.dendrify())
                 tree.append(branch)
             case TreeConvertable():
                 tree.append(value.dendrify())
             case x:
                 raise TreeError(
-                    f"Cannot serialize into tree, unsupported type: {type(x)}{x}")
+                    f"Cannot serialize into tree, unsupported type: {type(x)}{x}"
+                )
 
 
 class Writer(ABC):
@@ -262,7 +286,7 @@ class Writer(ABC):
     def close(self) -> None:
         self.cleanup()
         if self.file:
-            if hasattr(self.file, 'Close'):
+            if hasattr(self.file, "Close"):
                 self.file.Close()
             else:
                 self.file.close()
@@ -285,7 +309,7 @@ class Writer(ABC):
 class ROOTWriter(DFS, Writer):
     def __init__(self, path: str | Path):
         DFS.__init__(self)
-        Writer.__init__(self, Path(path).with_suffix('.root'))
+        Writer.__init__(self, Path(path).with_suffix(".root"))
         self.current_dir: ROOT.TDirectory | None = None
         self.trees: dict[int, ROOT.TTree] = {}
         self.dir_names: list[str] = []
@@ -300,7 +324,7 @@ class ROOTWriter(DFS, Writer):
         if not node.is_leaf():  # If the node is a branch
             # Create a new directory for the branch
             dir_name = node.identifier()
-            dir_name = dir_name.replace('/', '_')
+            dir_name = dir_name.replace("/", "_")
             if dir_name in self.dir_names:
                 dir_name += str(len(self.dir_names))
             self.dir_names.append(dir_name)
@@ -318,11 +342,11 @@ class ROOTWriter(DFS, Writer):
             # Assuming node.data is a float for simplicity
             match node.data:
                 case int():
-                    val = ROOT.std.vector('int')()
+                    val = ROOT.std.vector("int")()
                 case float():
-                    val = ROOT.std.vector('float')()
+                    val = ROOT.std.vector("float")()
                 case str():
-                    val = ROOT.std.vector('string')()
+                    val = ROOT.std.vector("string")()
                 case x:
                     print(f"Skipping {node.name}: {x}")
                     return
@@ -373,9 +397,9 @@ class DirectoryWriter(DFS):
 
         if node.data is None:
             # New directory
-            if node.name == '':
+            if node.name == "":
                 if node.is_root():
-                    name = ''
+                    name = ""
                 else:
                     name = node.parent.name
             else:
@@ -391,8 +415,7 @@ class DirectoryWriter(DFS):
             self.cwd = cwd
             print(cwd, " is directory")
         else:
-            print(self.cwd / node.name, " is file data",
-                  len(node.children), node.data)
+            print(self.cwd / node.name, " is file data", len(node.children), node.data)
 
     def __enter__(self):
         self._original_path = Path.cwd()
@@ -480,7 +503,9 @@ def render_tree(root):
 
 def check(tree: DataNode):
     for child in tree.children:
-        assert child.parent == tree, f"Parent of {child.identifier()} is not {tree.identifier()}"
+        assert (
+            child.parent == tree
+        ), f"Parent of {child.identifier()} is not {tree.identifier()}"
         check(child)
 
 
@@ -488,13 +513,29 @@ if __name__ == "__main__":
     d = DataNode()
     d.insert("a", 1)
     d.insert("b", 2)
-    d.insert("c", 3).insert("d", {'a': 3, 'y': 6.7})
+    d.insert("c", 3).insert("d", {"a": 3, "y": 6.7})
     # d.print()
-    p = Parameters(np.array([1, 2, 3]), np.array(
-        [4, 5, 6]), 0.1, 1, (0.1, 0.2), "test", ["comment1", "comment2"], [])
+    p = Parameters(
+        np.array([1, 2, 3]),
+        np.array([4, 5, 6]),
+        0.1,
+        1,
+        (0.1, 0.2),
+        "test",
+        ["comment1", "comment2"],
+        [],
+    )
     # other values than for p
-    p2 = Parameters(np.array([1, 2, 3])+2, 3*np.array([4, 5, 6]),
-                    2.1, 2, (0.2, 22), "test2", ["c2omment1", "2comment2"], [p, p])
+    p2 = Parameters(
+        np.array([1, 2, 3]) + 2,
+        3 * np.array([4, 5, 6]),
+        2.1,
+        2,
+        (0.2, 22),
+        "test2",
+        ["c2omment1", "2comment2"],
+        [p, p],
+    )
     check(p2.dendrify())
     tree = p2.dendrify()
     writer = JSONWriter()

@@ -379,8 +379,8 @@ class ExDetector(Detector):
         else:
             R = np.transpose(R)
         matrix = Matrix(X=E, Y=E, values=R, dtype=dtype)
-        matrix.ylabel = r"Measured $E_x$"
-        matrix.xlabel = r"True $E_x$"
+        matrix.ylabel = r"Measured $E_{\mathrm{in}}$"
+        matrix.xlabel = r"True $E_{\mathrm{in}}$"
         return matrix
 
 

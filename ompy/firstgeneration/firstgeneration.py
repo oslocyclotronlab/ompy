@@ -6,7 +6,7 @@ from typing import TypeAlias, Literal
 from tqdm.auto import tqdm
 from ..numbalib import njit, prange, jitclass, float32
 from dataclasses import dataclass, asdict
-from ..unfolding import BootstrapMatrix
+from ..unfolding import Resampling2D
 
 """
 TODO:
@@ -131,7 +131,7 @@ class FirstGenerationResult:
     parameters: FirstGenerationParameters
 
 
-def first_generation(AG: Matrix | list[Matrix] | BootstrapMatrix,
+def first_generation(AG: Matrix | list[Matrix] | Resampling2D,
                      params: FGP = FGP(),
                      multiplicity: Vector | None = None,
                      population_norm: Matrix | None = None,
@@ -142,7 +142,7 @@ def first_generation(AG: Matrix | list[Matrix] | BootstrapMatrix,
             return first_generation_matrix(AG, params, multiplicity, population_norm, disable_tqdm, **kwargs)
         case list():
             return first_generation_list(AG, params, multiplicity, population_norm, disable_tqdm, **kwargs)
-        case BootstrapMatrix():
+        case Resampling2D():
             AGs = [AG.get_eta(i) for i in range(len(AG))]
             return first_generation(AGs, params, multiplicity, population_norm, disable_tqdm, **kwargs)
         case x:

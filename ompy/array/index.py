@@ -429,24 +429,40 @@ class Index(ABC):
     def alias(self) -> str:
         return self.meta.alias
 
-    def is_compatible_with(self, other: Index, rtol: float = 1e-4, **kwargs) -> bool:
+    def is_compatible_with(self, other: Index, rtol: float = 1e-4, do_raise: bool = False,**kwargs) -> bool:
         if not self.unit.is_compatible_with(other.unit):
+            if do_raise:
+                raise DimensionalityError(self.unit, other.unit)
             return False
         if not len(self) == len(other):
+            if do_raise:
+                raise ValueError("Incompatible index lengths. "
+                                 f"{len(self)} != {len(other)}")
             return False
         if self.is_uniform():
             if not other.is_uniform():
+                if do_raise:
+                    raise ValueError("Incompatible index types. "
+                                     f"{self.__class__.__name__} != {other.__class__.__name__}")
                 return False
             factor = 1 / \
                 self.meta.unit.from_(Quantity(1, other.unit)).magnitude
             if not np.isclose(self.step(0) * factor, other.step(0), rtol=rtol, **kwargs):
+                if do_raise:
+                    raise ValueError("Incompatible index steps. "
+                                     f"{self.step(0) * factor} != {other.step(0)}")
                 return False
             if not np.isclose(self.leftmost * factor, other.leftmost, rtol=rtol, **kwargs):
+                if do_raise:
+                    raise ValueError("Incompatible index leftmost. "
+                                     f"{self.leftmost * factor} != {other.leftmost}")
                 return False
             return True
         else:
             other = other.to_same(self)
             if not np.allclose(self.bins, other.bins, rtol=rtol, **kwargs):
+                if do_raise:
+                    raise ValueError("Incompatible index bins")
                 return False
             return True
 
