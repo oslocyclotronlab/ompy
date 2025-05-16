@@ -4,12 +4,13 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Iterable
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 from ... import Index, Vector
-from .stubs import PenaltyFn, PenaltyTarget
-
+from .stubs import LossSpace, LossFn, ExpectationParameter
+from .utils import pytree_dataclass
 
 class Penalty(ABC):
     """Abstract base class for penalty terms in the unfolding.
@@ -24,14 +25,12 @@ class Penalty(ABC):
     """
 
     @abstractmethod
-    def closure(self) -> PenaltyFn:
+    def __call__(self, *args, **kwargs) -> tuple[float, float]:
         pass
 
-    @property
-    def target(self) -> PenaltyTarget:
-        return self._target
 
 
+@pytree_dataclass
 class Entropy(Penalty):
     """Entropy penalty term for regularizing the unfolding.
 
@@ -49,20 +48,12 @@ class Entropy(Penalty):
         _target: Set to 'eta_normalized' since entropy is only meaningful for
                 normalized probability distributions.
     """
+    alpha: float
+    target: LossSpace = "eta_normalized"
 
-    def __init__(self, alpha: float):
-        self.alpha = alpha
-        self._target = "eta_normalized"
-
-    def closure(self) -> PenaltyFn:
-        alpha = self.alpha
-
-        def fn(mu, eta, p, axis=None):
-            penalty = jnp.sum(entropy(p), axis=axis)
-            return alpha * penalty, penalty
-
-        return fn
-
+    def __call__(self, eta: ExpectationParameter, axis: int | None = None) -> tuple[float, float]:
+        penalty = jnp.sum(entropy(eta), axis=axis)
+        return self.alpha * penalty, penalty
 
 class Sobolev(Penalty):
     """Sobolev penalty term for regularizing the unfolding.
@@ -100,9 +91,9 @@ class Sobolev(Penalty):
         D1_mask: jnp.ndarray | None = None,
         D2_mask: jnp.ndarray | None = None,
         fit_masks: bool = True,
-        target: PenaltyTarget = "eta",
+        target: LossSpace = "eta",
         step: float | Index | Vector | np.ndarray | None = None,
-    ) -> PenaltyFn:
+    ) -> LossFn:
         if mask is None:
             mask = 1
         else:
@@ -154,35 +145,38 @@ class Sobolev(Penalty):
             raise ValueError(
                 f"Invalid target: {target}. Must be one of 'eta_normalized' or 'eta'."
             )
-        self._target = target
+        self.target = target
 
-    def closure(self) -> PenaltyFn:
+    def __call__(self, x: ExpectationParameter) -> tuple[float, float]:
         alpha = self.alpha
         step = self.step
         D1_mask = self.D1_mask
         D2_mask = self.D2_mask
 
-        match self.target:
-            case "eta_normalized":
+        # Take the Sobolev norm of the distribution
+        # Much faster than using finite difference matrices
+        D1p = ((x[:-1] - x[1:]) / step) ** 2 * D1_mask
+        D2p = ((x[:-2] - 2 * x[1:-1] + x[2:]) / step**2) ** 2 * D2_mask
+        penalty = jnp.sum(D1p) + jnp.sum(D2p)
+        return alpha * penalty, penalty
 
-                def fn(mu, eta, p):
-                    # Take the Sobolev norm of the distribution
-                    # Much faster than using finite difference matrices
-                    D1p = ((p[:-1] - p[1:]) / step) ** 2 * D1_mask
-                    D2p = ((p[:-2] - 2 * p[1:-1] + p[2:]) / step**2) ** 2 * D2_mask
-                    penalty = jnp.sum(D1p) + jnp.sum(D2p)
-                    return alpha * penalty, penalty
-            case "eta":
+def tree_flatten(obj):
+    children = (obj.alpha, obj.step, obj.mask, obj.D1_mask, obj.D2_mask)
+    aux_data = {"target": obj.target}
+    return children, aux_data
 
-                def fn(mu, eta, p):
-                    D1eta = ((eta[:-1] - eta[1:]) / step) ** 2 * D1_mask
-                    D2eta = (
-                        (eta[:-2] - 2 * eta[1:-1] + eta[2:]) / step**2
-                    ) ** 2 * D2_mask
-                    penalty = jnp.sum(D1eta) + jnp.sum(D2eta)
-                    return alpha * penalty, penalty
+def tree_unflatten(aux_data, children):
+    alpha, step, mask, D1_mask, D2_mask = children
+    return Sobolev(
+        alpha=alpha,
+        step=step,
+        mask=mask,
+        D1_mask=D1_mask,
+        D2_mask=D2_mask,
+        target=aux_data["target"]
+    )
 
-        return fn
+jax.tree_util.register_pytree_node(Sobolev, tree_flatten, tree_unflatten)
 
 
 class Sparsity(Penalty):
@@ -205,14 +199,14 @@ class Sparsity(Penalty):
         alpha: float,
         threshold: float = 0.1,
         smoothing: float = 100,
-        target: PenaltyTarget = "mu_normalized",
+        target: LossSpace = "mu_normalized",
     ):
         self.alpha = alpha
         self.threshold = threshold
         self.smoothing = smoothing
         self._target = target
 
-    def closure(self) -> PenaltyFn:
+    def closure(self) -> LossFn:
         alpha = self.alpha
         threshold = self.threshold
         smoothing = self.smoothing
@@ -244,9 +238,9 @@ class SobolevGauss(Penalty):
         D1_mask: jnp.ndarray | None = None,
         D2_mask: jnp.ndarray | None = None,
         fit_masks: bool = True,
-        target: PenaltyTarget = "eta",
+        target: LossSpace = "eta",
         step: float | Index | Vector | np.ndarray | None = None,
-    ) -> PenaltyFn:
+    ) -> LossFn:
         if mask is None:
             mask = 1
         else:
@@ -301,7 +295,7 @@ class SobolevGauss(Penalty):
             )
         self._target = target
 
-    def closure(self) -> PenaltyFn:
+    def closure(self) -> LossFn:
         alpha = self.alpha
         step = self.step
         D1_mask = self.D1_mask
@@ -329,6 +323,12 @@ class SobolevGauss(Penalty):
                     return alpha * penalty, penalty
 
         return fn
+
+        
+class IdPenalty(Penalty):
+    @staticmethod
+    def closure() -> LossFn:
+        return lambda *args, **kwargs: (0.0, 0.0)
 
 
 def slog(x):
@@ -382,7 +382,7 @@ def onecost(mu, C, D=100, axis=None):
     return jnp.sum(0.5 * (1 + 2 / 3.141592 * jnp.arctan((mu - C) / (C / D))), axis=axis)
 
 
-def total_penalty(penalties: tuple[PenaltyFn, ...],
+def total_penalty(penalties: tuple[LossFn, ...],
                   mu: jnp.ndarray,
                   eta: jnp.ndarray,
                   p: jnp.ndarray,

@@ -80,10 +80,12 @@ else:
     # ROOT messes with the version of system libraries, so it is not imported
     # unless the user explicitly requests it.
     # TODO: This is not working yet. ROOT is currently imported:?
+    # UPRoot is easier to work with, but not as complete, but probably all you need.
     __load_root = False
     ROOT_AVAILABLE = is_available("ROOT", load=__load_root)
     ROOT_IMPORTED = __load_root and ROOT_AVAILABLE
     ROOT_CALLBACKS = []
+    UPROOT_AVAILABLE = is_available("uproot")
 
     def import_ROOT() -> None:
         global ROOT_IMPORTED, ROOT_CALLBACKS

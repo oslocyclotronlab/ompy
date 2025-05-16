@@ -20,6 +20,46 @@ except ImportError:
 
         return decorator
 
+        
+from dataclasses import dataclass, fields
+from jax import tree_util
+
+def pytree_dataclass(_cls=None, *, frozen=True):
+    """
+    Combines @dataclass with JAX PyTree registration.
+    Usage:
+        @pytree_dataclass
+        class My:
+            a: float
+            b: jnp.ndarray
+    """
+    def wrap(cls):
+        # 1) apply dataclass
+        cls = dataclass(frozen=frozen)(cls)
+
+        # 2) implement the PyTree flatten/unflatten methods
+        def tree_flatten(self):
+            # all fields become children; no static aux
+            vals = tuple(getattr(self, f.name) for f in fields(self))
+            return vals, None
+
+        @classmethod
+        def tree_unflatten(cls_, aux, children):
+            return cls_(*children)
+
+        cls.tree_flatten = tree_flatten
+        cls.tree_unflatten = tree_unflatten
+
+        # 3) register with JAX
+        return tree_util.register_pytree_node_class(cls)
+
+    # support both with and without parentheses
+    if _cls is None:
+        return wrap
+    else:
+        return wrap(_cls)
+
+
 
 def sigmoid(x, start, stop, midpoint, sigma):
     """Compute a sigmoid function with customizable start, stop, midpoint and width.

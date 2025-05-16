@@ -114,7 +114,12 @@ class Unfolder(ABC):
                 return
 
         # If we get here, we need to specialize the matrices
-        G_ex, (D, G_eg) = self._detector.specialize_like(array)
+        try:
+            G_ex, (D, G_eg) = self._detector.specialize_like(array)
+        except ValueError as e:
+            raise ValueError(f"Detector {self._detector} does not implement specialize_like() as expected.\n"
+                             "It probably doesn't have a discrete component.\n"
+                             "Check that you provided the correct detector.") from e
         self._D = D
         self._G_eg = G_eg
         self._G_ex = G_ex
@@ -247,7 +252,7 @@ class Unfolder(ABC):
         **kwargs,
     ) -> UnfoldedResult1D:
         self.set_matrices(data)
-        self.check_background(data, background)
+        #self.check_background(data, background)
 
         initial_: Vector = initial_vector(data, initial)
         mask: np.ndarray = make_mask(data, mask)

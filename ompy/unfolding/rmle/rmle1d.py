@@ -1,82 +1,41 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Iterable
+import time
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-
+import optax
+from jaxtyping import Array, Float
+from functools import partial
 from ... import Vector
 from ...stubs import Path
 from ..result1d import Cost1D, UnfoldedResult1DSimple
-from .contaminant1d import Contaminant1D, setup_contaminants
-from .loss import kl
-from .penalty import total_penalty
-from .stubs import Closureable, LossFn, PenaltyFn
-from .tau import from_tau, to_tau
-from ..utils import closure_unpack, loop_tqdm, richardson_rate
-
+from ..utils import loop_tqdm, richardson_rate
+from .contaminant1d import Contaminant1D
+from .stubs import Optimizer, Background1D, Mu1D, Tau1D
+from .stubs import Beta1D as Beta
+from .stubs import Contaminants1D as Contaminants
+from .stubs import Data1D as Data
+from .stubs import ExpectationParameter1D as ExpectationParameter
+from .stubs import Nu1D, DMatrix, GegMatrix, GegDMatrix
+from .stubs import State1D as State
+from .tau import TAU_MAP, TauMap
+from .utils import pytree_dataclass
+from jaxtyping import Bool
+from .lossmodel import ModelLoss
 if TYPE_CHECKING:
-    from .contaminant1d import Contaminant1D
-    from .penalty import Penalty
+    from .contaminant1d import Contaminant1D, ContaminantModel1D
 
+"""
+User can supply the background either as array, iterable of arrays, or as a
+BackgroundModel object.
 
-def cost(
-    tau: jnp.ndarray,
-    GegD: jnp.ndarray,
-    y: jnp.ndarray,
-    G_eg: jnp.ndarray,
-    unpacker: Callable[[jnp.ndarray], tuple[jnp.ndarray, jnp.ndarray]],
-    contaminants: tuple[Callable[[jnp.ndarray], tuple[jnp.ndarray, float]]],
-    penalties: tuple[PenaltyFn, ...],
-    loss: LossFn,
-    bg=None,
-) -> tuple[jnp.ndarray, dict]:
-    aleph = from_tau(tau)
-    mu, mu_contaminants = unpacker(aleph)
-
-    def xi_nop(_):
-        return mu, mu, 0.0
-
-    def handle_contaminants(_):
-        if (
-            len(contaminants) == 0
-        ):  # If contaminants is empty, return defaults to make jax jit happy
-            return mu, mu, 0.0
-        xi_mu_list, penalty_list = zip(
-            *[c(x, G_eg, GegD) for c, x in zip(contaminants, mu_contaminants)]
-        )
-
-        # Sum over all contaminants
-        xi_mu_sum = mu + sum(xi_mu_list)
-        xi_penalty = sum(penalty_list)
-        return mu, xi_mu_sum, xi_penalty
-
-    mu, xi_mu_sum, xi_penalty = jax.lax.cond(
-        len(contaminants) > 0, handle_contaminants, xi_nop, None
-    )
-
-    nu = xi_mu_sum @ GegD
-    likelihood_body = loss(nu, y)
-    loglike = jnp.sum(likelihood_body)
-
-    # We only compute eta if needed
-    def eta_nop(_):
-        return 0.0, 0.0
-
-    def eta_body(_):
-        # Map to eta space
-        eta = mu @ G_eg
-        # Rescale to get a proper probability distribution
-        prop = eta / jnp.sum(eta + 1e-10)
-
-        total, partial = total_penalty(penalties, mu, eta, prop)
+        #total, partial = total_penalty(penalties, mu, eta, prop)
         # penalty = penalty + 5e-12*(jnp.sum(eta[659:809]))  # 5e-12
 
-        return total, partial
-
-    penalty, partial = jax.lax.cond(len(penalties) > 0, eta_body, eta_nop, None)
 
     # Rescaling seems to make the optimization much slower
     # penalty = alpha*onecost(mu, alpha_c)**2
@@ -98,12 +57,113 @@ def cost(
 
     # Orthogonality penalty
     # ortho_penalty = 1e-12*jnp.sum(eta @ xi_eta)**2
+"""
 
-    cost = loglike + penalty + xi_penalty  # + ortho_penalty
+
+
+
+@pytree_dataclass
+class BackgroundModel:
+    loss: ModelLoss = ModelLoss()
+    backgrounds: tuple[Background1D, ...] = ()
+
+    def cost(self, beta: Beta) -> tuple[float, float, tuple[float, ...]]:
+        loss = sum(jnp.sum(self.loss.loss(beta, bg)) for bg in self.backgrounds)
+        penalty_terms = tuple(jnp.sum(penalty(beta)[0]) for penalty in self.loss.penalty)
+        penalty = sum(penalty_terms)
+        return loss, penalty
+
+
+def cost_contaminants(
+    nu: Nu1D,
+    contaminants: Contaminants,
+    models: tuple[ContaminantModel1D, ...],
+) -> tuple[Nu1D, float]:
+    # This path will not run, but JAX needs it
+    if not contaminants:
+        return nu, 0.0
+
+    xi_nu, cost_list = zip(
+        *[model.cost(tau) for tau, model in zip(contaminants, models)]
+    )
+    nu_sum = nu + sum(xi_nu)
+    cost_sum = sum(cost_list)
+    return nu_sum, cost_sum
+
+
+def cost(
+    state: State,
+    GegD: Float[Array, "Eg_true Eg_observed"],
+    G_eg: Float[Array, "Eg_true Eg_measured"],
+    y: Data,
+    contaminant_models: tuple[ContaminantModel1D, ...],
+    loss: ModelLoss,
+    background: BackgroundModel,
+    tau_map: TauMap[Mu1D, Tau1D],
+) -> tuple[jnp.ndarray, dict]:
+    tau, beta_tau, contaminants = state
+    mu = tau_map.from_tau(tau)
+    nu = mu @ GegD
+
+    if background.backgrounds:
+        beta = tau_map.from_tau(beta_tau)
+        loss_bg, penalty_bg = background.cost(beta)
+        nu = nu + beta
+    else:
+        loss_bg, penalty_bg = (0.0, 0.0)
+
+    nu, xi_penalty = (nu, 0.0)
+    likelihood_body = loss.loss(nu, y)
+    loglike = jnp.sum(likelihood_body)
+
+
+    eta_penalties = ()
+    eta_normalized_penalties = ()
+    mu_penalties = ()
+    mu_normalized_penalties = ()
+    for penalty in loss.penalty:
+        if penalty.target == "eta":
+            eta_penalties = eta_penalties + (penalty,)
+        elif penalty.target == "eta_normalized":
+            eta_normalized_penalties = eta_normalized_penalties + (penalty,)
+        elif penalty.target == "mu":
+            mu_penalties = mu_penalties + (penalty,)
+        elif penalty.target == "mu_normalized":
+            mu_normalized_penalties = mu_normalized_penalties + (penalty,)
+        else:
+            raise ValueError(f"Unknown penalty target: {penalty.target}")
+
+    total_penalty = 0.0
+    total_penalty_magnitude = 0.0
+    if mu_penalties:
+        total_penalty += sum(penalty(mu) for penalty in mu_penalties)
+        total_penalty_magnitude += sum(penalty(mu) for penalty in mu_penalties)
+
+    if mu_normalized_penalties:
+        mu_norm = mu / jnp.sum(mu + 1e-10)
+        total_penalty += sum(penalty(mu_norm) for penalty in mu_normalized_penalties)
+        total_penalty_magnitude += sum(penalty(mu_norm) for penalty in mu_normalized_penalties)
+
+    if eta_penalties or eta_normalized_penalties:
+        # Map to eta space
+        eta = mu @ G_eg
+        if eta_penalties:
+            penalty, penalty_magnitude = zip(*[penalty(eta) for penalty in eta_penalties])
+            total_penalty += sum(penalty)
+            total_penalty_magnitude += sum(penalty_magnitude)
+        if eta_normalized_penalties:
+            # Rescale to get a proper probability distribution
+            eta_norm = eta / jnp.sum(eta + 1e-10)
+
+            penalty, penalty_magnitude = zip(*[penalty(eta_norm) for penalty in eta_normalized_penalties])
+            total_penalty += sum(penalty)
+            total_penalty_magnitude += sum(penalty_magnitude)
+
+    cost = loglike + total_penalty + xi_penalty + loss_bg + penalty_bg
 
     aux = {
         "loglike": loglike,
-        "penalty": partial,
+        "penalty": total_penalty_magnitude,
         "xi_penalty": xi_penalty,
     }
 
@@ -111,58 +171,76 @@ def cost(
 
 
 def unfold(
-    components: OptimComponents,
-    value_and_grad,
-    optim_params: OptimParams,
-    data_params: DataParams,
-    **kwargs,
+    dynamic: DynamicData,
+    settings: Settings,
+    static: StaticData,
 ) -> OptimResult1D:
-    # Combine the prompt and the background
-    tau = to_tau(components.initial)
     # if bg is not None:
     #    mask = jnp.concatenate([mask, jnp.zeros_like(bg, dtype=bool)])
     #    u = jnp.concatenate([u, 1.0 + jnp.zeros_like(bg)])
 
     # Set up Xi for contamination
-    x, mask = setup_contaminants(data_params.contaminants, tau, components.mask)
+    # x, mask = setup_contaminants(data_params.contaminants, tau, components.mask)
 
-    # We have used all kwargs as we can. The rest are probably misspelled
-    if len(kwargs) > 0:
-        raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
 
     # The optimization function is created from a closure of all constants
     # that we never vmap over.
     lower = make_lower(
-        value_and_grad,
-        optim_params,
-        data_params,
+        settings,
+        static,
+        dynamic,
     )
 
-    # Mask must be a concrete type for the jax.jit to work
-    mask = jnp.where(mask)
+    if dynamic.background.backgrounds:
+        # Mean is the best guess
+        beta = sum(dynamic.background.backgrounds)/len(dynamic.background.backgrounds)
+    else:
+        beta = None
 
-    x, total_cost, loglike, penalty, xi_penalty = lower(
-        x, components.raw, components.background, mask
+    if static.contaminants:
+        contaminants = tuple(c.initial for c in static.contaminants)
+    else:
+        contaminants = ()
+
+    state = (
+        dynamic.initial,
+        beta,
+        contaminants,
     )
-    aleph = from_tau(x)
-    mu, contaminants = closure_unpack(data_params.contaminants, data_params.E)(aleph)
+
+    if settings.profile:
+        print("Profiling...")
+        print("Doing a warmup")
+        lower(state)
+        print("Starting profile")
+        start = time.time()
+        with jax.profiler.trace(
+            "/tmp/jax-trace-unfold-vec", create_perfetto_link=True
+        ):
+            state, total_cost, loglike, penalty= lower(state)
+        print(f"Profiling took {time.time() - start} seconds")
+    else:
+        state, total_cost, loglike, penalty= lower(state)
+
+    mu, beta, contaminants = state
 
     result = OptimResult1D(
-        prototype=data_params.prototype,
+        prototype=static.prototype,
         mu=mu,
         total_cost=total_cost,
         loglike=loglike,
         penalty=penalty,
-        xi_penalty=xi_penalty,
+        beta=beta,
+        xi_penalty=0,
         xi=contaminants,
     )
     return result
 
 
 def make_lower(
-    value_and_grad,
-    optim_params: OptimParams,
-    data_params: DataParams,
+    settings: Settings,
+    data: StaticData,
+    dynamic: DynamicData,
 ):
     """Create a closure for the optimization loop that unfolds the spectrum.
 
@@ -171,7 +249,6 @@ def make_lower(
     change during optimization.
 
     Args:
-        value_and_grad: Function that computes both value and gradient of the cost function
         optim_params: Optimization parameters like learning rate, iterations etc.
         data_params: Data parameters including response matrices and prototype vector
 
@@ -185,69 +262,81 @@ def make_lower(
     """
     # The outer scope captures constants
     # The inner scope captures variables that can be vmaped over
-    iterations = optim_params.iterations
-    lr = optim_params.lr
-    beta1 = optim_params.beta1
-    beta2 = optim_params.beta2
-    eps = optim_params.eps
-    G_eg = data_params.G_eg
-    GegD = data_params.D @ G_eg
-    unpacker = closure_unpack(data_params.contaminants, data_params.E)
-    contaminant_closures = tuple(into_closure(c) for c in data_params.contaminants)
-    leave_tqdm = optim_params.leave_tqdm
-    penalties = tuple(into_closure(p) for p in optim_params.penalties)
-    loss = into_closure(optim_params.loss)
+    iterations = settings.iterations
+    G_eg = data.G_eg
+    GegD = data.D @ G_eg
+    # Contaminant models that have its matrices unspecified inherit the main matrices
+    contaminants = tuple(model.set_matrices(G_eg, GegD) for model in data.contaminants)
+    # no the user must provide the contaminant models
+    leave_tqdm = settings.leave_tqdm
+    tau_map = settings.tau_map
+
+
+
+    cost_closure = partial(
+        cost,
+        GegD=GegD,
+        G_eg=G_eg,
+        contaminant_models=0,#contaminants,
+        loss=data.loss,
+        background=dynamic.background,
+        tau_map=tau_map,
+        y=dynamic.raw,
+    )
+    value_and_grad = jax.jit(jax.value_and_grad(cost_closure, has_aux=True))
+
+    if settings.print_jaxpr:
+        jaxpr = jax.make_jaxpr(cost_closure)((dynamic.initial, dynamic.initial, ()))
+        print(jaxpr)
+
+    optimizer = settings.optimizer
+    mask = jnp.asarray(dynamic.mask)
+
+    type LoopState = tuple[State, optax.OptState, jnp.ndarray, jnp.ndarray]
 
     @jax.jit
-    def lower(initial, y, bg, mask):
-        mean = jnp.zeros_like(initial)
-        var = jnp.zeros_like(initial)
-
+    def lower(
+        initial: State,
+    ) -> tuple[State, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         loglike = jnp.zeros(iterations)
         penalty = jnp.zeros(iterations)
-        xi_penalty = jnp.zeros(iterations)
+        # Map into tau
+        mu_tau = tau_map.to_tau(initial[0])
+        beta_tau = tau_map.to_tau(initial[1]) if initial[1] is not None else None
+        initial = (mu_tau, beta_tau, initial[2])
+
+        opt_state_init = optimizer.init(initial)
 
         @loop_tqdm(iterations, leave=leave_tqdm)
         @jax.jit
-        def body_fun(i, state):
-            x, mean, var, loglike, penalty, xi_penalty = state
-            (tloss, aux), g = value_and_grad(
-                x,
-                GegD=GegD,
-                y=y,
-                bg=bg,
-                G_eg=G_eg,
-                unpacker=unpacker,
-                contaminants=contaminant_closures,
-                penalties=penalties,
-                loss=loss,
-            )
-            mean = beta1 * mean + (1 - beta1) * g
-            var = beta2 * var + (1 - beta2) * jnp.square(g)
-            mean_cor = mean / (1 - beta1 ** (i + 1))  # i + 1 because i starts from 0
-            var_cor = var / (1 - beta2 ** (i + 1))
-            v = lr * mean_cor / (jnp.sqrt(var_cor) + eps)
-            x = x - v
-            x = x.at[mask].set(0)
+        def body_fun(i: int, state: LoopState) -> LoopState:
+            params, opt_state, loglike, penalty = state
+            (_, aux), g = value_and_grad(params)
+            updates, opt_state = optimizer.update(g, opt_state)
+            params = optax.apply_updates(params, updates)
+            # Everything that is masked is zeroed out now to prevent
+            # gradients from being applied
+            unfolded = params[0].at[mask].set(0)
+            params = (unfolded, params[1], params[2])
+
             loglike = loglike.at[i].set(aux["loglike"])
             penalty = penalty.at[i].set(aux["penalty"])
-            xi_penalty = xi_penalty.at[i].set(aux["xi_penalty"])
-            return x, mean, var, loglike, penalty, xi_penalty
+            return params, opt_state, loglike, penalty
 
-        state = (initial, mean, var, loglike, penalty, xi_penalty)
-        state = jax.lax.fori_loop(0, iterations, body_fun, state)
-        x, mean, var, loglike, penalty, xi_penalty = state
+        loop_state: LoopState = (initial, opt_state_init, loglike, penalty)
+        res = jax.lax.fori_loop(0, iterations, body_fun, loop_state)
+        state, _, loglike, penalty = res
         total_cost = loglike + penalty
-        return x, total_cost, loglike, penalty, xi_penalty
+
+        # The states are in tau space, so we need to map them back
+        mu = tau_map.from_tau(state[0])
+        beta = tau_map.from_tau(state[1]) if state[1] is not None else None
+
+        return (mu, beta, state[2]), total_cost, loglike, penalty
+
 
     return lower
 
-
-def into_closure[**P, T](x: Callable[P, T] | Closureable[P, T]) -> Callable[P, T]:
-    if hasattr(x, "closure"):
-        return x.closure()
-    else:
-        return x
 
 
 @dataclass(kw_only=True)
@@ -262,8 +351,6 @@ class RMLEResult1D(Cost1D, UnfoldedResult1DSimple):
     Attributes:
         beta: Optional background component vector
     """
-
-    beta: Vector | None = None
 
     def _save(self, path: Path, meta: dict[str, Any], exist_ok: bool = False):
         UnfoldedResult1DSimple._save(self, path, meta, exist_ok)
@@ -343,10 +430,12 @@ class OptimResult1D:
 
 
 @dataclass(kw_only=True)
-class OptimComponents:
+class DynamicData:
     """A dataclass for storing optimization components.
 
-    This class holds the raw data, initial guess, mask, and optional background for
+    This class holds data that would be resampled during the
+    MC unceratinty procedure, and hence vmaped over during
+    the unfolding. It contains the raw data, initial guess, mask, and optional background for
     optimization. All arrays must have the same length as the raw data.
 
     Attributes:
@@ -357,10 +446,10 @@ class OptimComponents:
         _run_checks: Whether to run validation checks in __post_init__
     """
 
-    raw: jnp.ndarray
-    initial: jnp.ndarray
-    mask: jnp.ndarray
-    background: jnp.ndarray | None = None
+    raw: Data
+    initial: ExpectationParameter
+    mask: Bool[Array, "Eg"]
+    background: BackgroundModel = BackgroundModel()
     _run_checks: bool = True
 
     def __post_init__(self):
@@ -377,22 +466,28 @@ class OptimComponents:
         # Here we flip the mask because jax.set uses the opposite convention
         if self._run_checks:
             self.mask = ~jnp.asarray(self.mask)
-        else:
-            self.mask = self.mask
+            
 
-        if self.background is not None:
-            if len(self.background) != N:
-                raise ValueError(
-                    f"Background must be of length of data, got {len(self.background)}"
-                )
-            self.background = jnp.asarray(self.background)
+        if not isinstance(self.background, BackgroundModel):
+            if not isinstance(self.background, Iterable):
+                self.background = BackgroundModel(backgrounds=(jnp.asarray(self.background),))
+            else:
+                self.background = BackgroundModel(backgrounds=tuple(jnp.asarray(bg) for bg in self.background))
+
+        if self._run_checks:
+            for i, bg in enumerate(self.background.backgrounds):
+                if len(bg) != N:
+                    raise ValueError(
+                        f"Background must be of length of data, got {len(bg)}"
+                        + (f"for number {i}." if len(bg) > 1 else "")
+                    )
 
     def __len__(self):
         return len(self.raw)
 
 
 @dataclass(kw_only=True)
-class OptimParams:
+class Settings:
     """Parameters for optimization using Adam optimizer.
 
     This class holds parameters for the Adam optimizer and other optimization settings.
@@ -408,55 +503,44 @@ class OptimParams:
         penalties: Tuple of penalty functions to apply during optimization
     """
 
-    # Optimisation parameters
+    optimizer: Optimizer = optax.adam(1e-3)
+    tau_map: TauMap = TAU_MAP
     iterations: int = 100
-    lr: float = 0.001
-    # - Adam parameters
-    beta1: float = 0.9
-    beta2: float = 0.999
-    eps: float = 1e-8
+
     # Hyper-hyper parameters
     leave_tqdm: bool = True
     disable_tqdm: bool = False
-    # Penalties to use in the loop
-    penalties: tuple[PenaltyFn | Penalty, ...] = ()
-    loss: LossFn = kl
+    print_jaxpr: bool = False
+    profile: bool = False
 
     def __post_init__(self):
         self.iterations = int(self.iterations)
-        if not isinstance(self.penalties, Iterable):
-            self.penalties = (self.penalties,)
-        self.penalties = tuple(self.penalties)
 
     @classmethod
-    def from_kwargs(cls, R_cb, kwargs):
-        if "lr" in kwargs and kwargs["lr"] == "auto":
-            kwargs["lr"] = richardson_rate(R_cb())
+    def from_kwargs(cls, kwargs):
         # We pop all keys from the dict, ensuring they do not remain in kwargs
         keys = {
-            "iterations",
-            "lr",
-            "beta1",
-            "beta2",
-            "eps",
-            "alpha",
             "leave_tqdm",
             "disable_tqdm",
-            "penalties",
-            "loss",
+            "iterations",
+            "optimizer",
+            "print_jaxpr",
+            "tau_map",
+            "profile",
         }
         values = {k: kwargs.pop(k) for k in keys if k in kwargs}
         return cls(**values)
 
 
 @dataclass(kw_only=True)
-class DataParams:
-    D: jnp.ndarray
-    G_eg: jnp.ndarray
-    G_ex: jnp.ndarray | None = None
+class StaticData:
+    D: DMatrix
+    G_eg: GegMatrix
+    G_ex: GegDMatrix | None = None
     prototype: Vector
-    E: jnp.ndarray = None
-    contaminants: list[Contaminant1D] = field(default_factory=list)
+    E: jnp.ndarray | None = None
+    contaminants: tuple[Contaminant1D, ...] = ()
+    loss: ModelLoss = ModelLoss()
 
     def __post_init__(self):
         self.D = jnp.asarray(self.D)
@@ -467,10 +551,12 @@ class DataParams:
 
         N = len(self.prototype)
 
-        if self.contaminants is None:
-            self.contaminants = []
+        if not isinstance(self.contaminants, Iterable):
+            self.contaminants = (self.contaminants,)
+
         for i, contaminant in enumerate(self.contaminants):
             if len(contaminant) != N:
                 raise ValueError(
                     f"Contaminant must be of length of data, got {len(contaminant)} for number {i}."
                 )
+

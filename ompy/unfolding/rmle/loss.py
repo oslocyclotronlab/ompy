@@ -1,37 +1,11 @@
 from __future__ import annotations
+import jax
 import jax.numpy as jnp
-from abc import ABC, abstractmethod
-from .stubs import LossFn
+from .stubs import LossFn, ExpectationParameter, Data, LossSpace
+from abc import ABC
+from .utils import pytree_dataclass
 
-
-class Loss(ABC):
-    @abstractmethod
-    def closure(self) -> LossFn:
-        pass
-
-
-class KullbackLeibler(Loss):
-    def closure(self) -> LossFn:
-        return kl
-
-
-class L2(Loss):
-    def closure(self) -> LossFn:
-        def fn(nu, n):
-            return jnp.sum((nu - n) ** 2)
-
-        return fn
-
-
-class L1(Loss):
-    def closure(self) -> LossFn:
-        def fn(nu, n):
-            return jnp.sum(jnp.abs(nu - n))
-
-        return fn
-
-
-def kl(nu, n):
+def kl(nu: ExpectationParameter, n: Data) -> jnp.ndarray:
     """Compute the Kullback-Leibler divergence between two distributions.
 
     The KL divergence is a measure of the difference between two probability distributions.
@@ -47,3 +21,33 @@ def kl(nu, n):
     """
     eps = 1e-10
     return nu - n + n * jnp.log(n / (nu + eps) + eps)
+
+class Loss(ABC):
+    space: LossSpace
+    fn: LossFn
+
+    def __call__(self, alpha: ExpectationParameter, x: Data) -> jnp.ndarray:
+        return self.fn(alpha, x)
+
+@pytree_dataclass
+class KullbackLeibler(Loss):
+    space = 'nu'
+    fn = staticmethod(jax.jit(kl))
+
+
+def l2(nu: ExpectationParameter, n: Data) -> jnp.ndarray:
+    return (nu - n) ** 2
+
+@pytree_dataclass
+class L2(Loss):
+    space = 'nu'
+    fn = l2
+
+
+def l1(nu: ExpectationParameter, n: Data) -> jnp.ndarray:
+    return jnp.abs(nu - n)
+
+@pytree_dataclass
+class L1(Loss):
+    pace = 'nu'
+    fn = l1

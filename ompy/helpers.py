@@ -404,7 +404,7 @@ class AnnotatedColorbar(Colorbar):
         The colorbar should update when the user zooms on the main matrix.
     """
 
-    def __init__(self, mappable, ax, cax=None, lower: bool = True, higher: bool = True, nans: bool = True,
+    def __init__(self, mappable, ax, cax=None, lower: bool = True, greater: bool = True, nans: bool = True,
                  use_gridspec=True, linewidth=1, extend=None, color_by: str = 'complement', draw_kde: bool = False,
                  draw_histogram: bool = True, n_hist_bins: int = 100,
                  hist_norm=np.log10, adjust_tick_colors: bool = True, direction: str | None = None, **kwargs):
@@ -449,7 +449,7 @@ class AnnotatedColorbar(Colorbar):
             direction = colorbar_style.get('direction', direction)
 
         self.lower = lower
-        self.higher = higher
+        self.higher = greater
         self.nans = nans
         self.linewidth = linewidth
         self.lower_text = None

@@ -2,7 +2,6 @@ from __future__ import annotations
 from typing_extensions import override
 import time
 import jax
-import jax.numpy as jnp
 import numpy as np
 from dataclasses import asdict
 from typing import TYPE_CHECKING
@@ -10,13 +9,13 @@ import optax
 from typing import Any
 from .rmle1d import (
     RMLEResult1D,
-    OptimComponents,
-    OptimParams,
-    DataParams,
+    DynamicData as DynamicData1D,
+    Settings as Settings1D,
+    StaticData as StaticData1D,
     cost as cost1d,
     unfold as unfold1d,
 )
-from .rmlelist import unfold as unfold_list, OptimComponentsList
+from .rmlelist import unfold as unfold_list, DynamicDataList
 from .rmle2d import (
     unfold as unfold_matrix,
     OptimizationSettings,
@@ -24,6 +23,7 @@ from .rmle2d import (
     OptimizationData,
     RMLEResult2D,
 )
+from .lossmodel import ModelLoss
 from ..unfolder import Unfolder
 from ..result1d import Parameters1D, ResultMeta1D
 from ..result2d import Parameters2D, ResultMeta2D
@@ -33,7 +33,6 @@ from ... import Vector, Matrix
 if TYPE_CHECKING:
     from .contaminant1d import Contaminant1D
     from .contaminant2d import Contaminant2D
-    from .penalty import PenaltyFn
 
 def jit_cost1d() -> jax.core.Callable:
     return jax.jit(
@@ -59,8 +58,8 @@ class RMLE(Unfolder):
         D: Matrix,
         G_eg: Matrix,
         mask: np.ndarray,
-        contaminants: list[Contaminant1D] | None = None,
-        profile: bool = False,
+        contaminants: tuple[Contaminant1D, ...] = (),
+        loss: ModelLoss = ModelLoss(),
         **kwargs,
     ) -> RMLEResult1D:
         """
@@ -68,47 +67,35 @@ class RMLE(Unfolder):
         then unpacks and packs the results into a RMLEResult1D.
         """
 
-        value_and_grad = jit_cost1d()
-
         # These are simple structs that contain the data and the parameters
         # Turns out we got a lot to keep track of
-        components = OptimComponents(
+        dynamic = DynamicData1D(
             raw=data, initial=initial, mask=mask, background=background
         )
-        optim_params = OptimParams.from_kwargs(lambda: G_eg @ D, kwargs)
-        data_params = DataParams(
+        settings = Settings1D.from_kwargs(kwargs)
+        static = StaticData1D(
             D=D,
             G_eg=G_eg,
             prototype=data,
             contaminants=contaminants,
+            loss=loss,
         )
 
+        # We have used all kwargs as we can. The rest are probably misspelled
+        if len(kwargs) > 0:
+            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
+
         start = time.time()
-        if profile:
-            print("Profiling...")
-            with jax.profiler.trace(
-                "/tmp/jax-trace-unfold-vec", create_perfetto_link=True
-            ):
-                result = unfold1d(
-                    components,
-                    value_and_grad=value_and_grad,
-                    optim_params=optim_params,
-                    data_params=data_params,
-                    **kwargs,
-                )
-            print(f"Profiling took {time.time() - start} seconds")
-        else:
-            result = unfold1d(
-                components,
-                value_and_grad=value_and_grad,
-                optim_params=optim_params,
-                data_params=data_params,
-                **kwargs,
-            )
+        result = unfold1d(
+            dynamic,
+            settings=settings,
+            static=static,
+            **kwargs,
+        )
 
         elapsed = time.time() - start
         kwargs = (
-            asdict(optim_params)
+            asdict(settings)
             | {"contaminants": contaminants}
         )
         parameters = Parameters1D(
@@ -141,26 +128,30 @@ class RMLE(Unfolder):
         D: Matrix,
         G_eg: Matrix,
         mask: list[np.ndarray],
-        profile: bool = False,
-        contaminants: list[Contaminant1D] | None = None,
+        contaminants: tuple[Contaminant1D, ...] = (),
+        loss: ModelLoss = ModelLoss(),
         **kwargs,
     ) -> list[RMLEResult1D]:
-        value_and_grad = jit_cost1d()
-        components = OptimComponentsList.from_data(data, initial, mask, background)
-        optim_params = OptimParams.from_kwargs(lambda: G_eg @ D, kwargs)
-        data_params = DataParams(
+        components = DynamicDataList.from_data(data, initial, mask, background)
+        settings = Settings1D.from_kwargs(kwargs)
+
+        # We have used all kwargs as we can. The rest are probably misspelled
+        if len(kwargs) > 0:
+            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
+
+        static = StaticData1D(
             D=D,
             G_eg=G_eg,
             prototype=data[0],
             contaminants=contaminants,
+            loss=loss,
         )
 
         start = time.time()
         optim_results = unfold_list(
-            components=components,
-            value_and_grad=value_and_grad,
-            optim_params=optim_params,
-            data_params=data_params,
+            dynamic=components,
+            settings=settings,
+            static=static,
             **kwargs,
         )
 
@@ -174,7 +165,7 @@ class RMLE(Unfolder):
                 raw=data[i],
                 background=background[i] if background is not None else None,
                 initial=initial[i],
-                kwargs=asdict(optim_params) | {"contaminants": contaminants},
+                kwargs=asdict(settings) | {"contaminants": contaminants},
                 mask=np.asarray(mask),
             )
             meta = ResultMeta1D(
@@ -209,8 +200,8 @@ class RMLE(Unfolder):
         contaminants: tuple[Contaminant2D, ...] = (),
         loss: LossFn | Loss = KullbackLeibler(),
         loss_background: LossFn | Loss = KullbackLeibler(),
-        penalties: tuple[PenaltyFn, ...] = (),
-        penalties_background: tuple[PenaltyFn, ...] = (),
+        penalties: tuple[LossFn, ...] = (),
+        penalties_background: tuple[LossFn, ...] = (),
         **kwargs,
     ) -> RMLEResult2D:
 

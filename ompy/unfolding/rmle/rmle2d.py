@@ -5,20 +5,24 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 import numpy as np
-from typing import Any, Callable, Self
+from typing import Any, Self
 
 from .tau import from_tau, to_tau
 from ... import Matrix
 from ...stubs import Path
 from ..result1d import Cost1D
 from ..result2d import UnfoldedResult2DSimple
-from .loss import kl, Loss, LossFn, KullbackLeibler
+from .loss import Loss, LossFn, KullbackLeibler
 from .penalty import total_penalty
-from .stubs import PenaltyFn, Optimizer
+from .stubs import Optimizer
 from jaxtyping import Float, Array
 from ..utils import scan_tqdm
 from functools import partial
-import optax
+
+try:
+    import optax
+except ImportError:
+    pass
 
 type Data = Float[Array, "Ein Eg"]
 type ExpectationParameter = Float[Array, "Ein Eg"]
@@ -27,8 +31,7 @@ type Beta = ExpectationParameter
 type Contaminants = tuple[ExpectationParameter, ...]
 type Empty = tuple[()]
 type State = tuple[Mu, Beta | Empty, Contaminants | Empty]
-
-type LossFn = Callable[[ExpectationParameter, Data], jnp.ndarray]
+type PenaltyFn = Any
 
 def cost(
     state: State,

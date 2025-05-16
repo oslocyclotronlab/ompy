@@ -1,382 +1,160 @@
 from __future__ import annotations
-
 import os
 import platform
 import subprocess
 import sys
 import warnings
+from dataclasses import dataclass, field
 from importlib import metadata, util
+from typing import Optional, List, Tuple
 
-import pkg_resources
+try:
+    import colorama
+    colorama.init(autoreset=True)
+except ImportError:
+    colorama = None
 
-from . import (
-    GPU_AVAILABLE,
-    H5PY_AVAILABLE,
-    JAX_AVAILABLE,
-    JAX_WORKING,
-    NUMBA_AVAILABLE,
-    NUMBA_CUDA_AVAILABLE,
-    NUMBA_CUDA_WORKING,
-    OPTAX_AVAILABLE,
-    PYMC_AVAILABLE,
-    PYRO_AVAILABLE,
-    ROOT_AVAILABLE,
-    ROOT_IMPORTED,
-    SKLEARN_AVAILABLE,
-    XARRAY_AVAILABLE,
-)
-from .version import get_version_info
+try:
+    from IPython.display import display, HTML
+    _IN_JUPYTER = True
+except ImportError:
+    _IN_JUPYTER = False
 
-# TODO Add version
+def colored(text: str, code: str) -> str:
+    if colorama:
+        color_map = {"green": colorama.Fore.GREEN, "red": colorama.Fore.RED, "yellow": colorama.Fore.YELLOW}
+        return f"{color_map.get(code, '')}{text}{colorama.Style.RESET_ALL}"
+    return f"\033[{code}m{text}\033[0m"
 
+def status_label(ok: Optional[bool]) -> str:
+    if ok is True:
+        return colored("OK", "green")
+    if ok is False:
+        return colored("NO", "red")
+    return colored("Unknown", "yellow")
 
-def color_status(status: bool | None) -> str:
-    """Returns a string with the status in color."""
-    match status:
-        case None:
-            return "\033[93mUnknown\033[0m"
-        case True:
-            return "\033[92mOK\033[0m"
-        case False:
-            return "\033[91mNO\033[0m"
-        case _:
-            raise ValueError(f"Invalid status: {status}")
-
-
-def get_cpu() -> str:
-    """Returns the CPU name."""
-    cpu = platform.processor()
-    if cpu:
-        return cpu
-    # Branch on the platform
+def is_available(pkg: str, import_it: bool = False) -> Tuple[bool, str]:
     try:
-        if platform.system() == "Linux":
-            cpu = os.popen("cat /proc/cpuinfo | grep 'model name' | uniq").read()
-            if cpu:
-                return cpu.split(":")[1].strip()
-        elif platform.system() == "Darwin":
-            cpu = os.popen("sysctl -n machdep.cpu.brand_string").read()
-            if cpu:
-                return cpu.strip()
-        elif platform.system() == "Windows":
-            cpu = os.popen("wmic cpu get name").read()
-            if cpu:
-                return cpu.split("\n")[2].strip()
+        spec = util.find_spec(pkg)
+        if not spec:
+            return False, ""
+        version = metadata.version(pkg)
+        if import_it:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                __import__(pkg)
+        return True, version
     except Exception:
-        # A lot can go wrong, so just give up at any resistance
+        return False, ""
+
+def get_cpu_name() -> str:
+    name = platform.processor()
+    if name:
+        return name
+    try:
+        sys_plat = platform.system()
+        if sys_plat == "Linux":
+            line = os.popen("grep 'model name' /proc/cpuinfo | uniq").read()
+            return line.split(":", 1)[1].strip()
+        if sys_plat == "Darwin":
+            return os.popen("sysctl -n machdep.cpu.brand_string").read().strip()
+        if sys_plat == "Windows":
+            out = os.popen("wmic cpu get name").read().strip().splitlines()
+            return out[1].strip() if len(out) > 1 else ""
+    except Exception:
         pass
     return "Unknown"
 
-
-def print_status():
-    """Prints a report of the status of the dependencies."""
-    full_version, git_version = get_version_info()
-    availabe_cpus = len(os.sched_getaffinity(0))
-    msg = f"""
-                OMpy Status
-==============================================
-Version:              {full_version}
-Git version:          {git_version}
-GPU available:        {color_status(GPU_AVAILABLE)}
-NUMBA available:      {color_status(NUMBA_AVAILABLE)}
-"""
-    if NUMBA_AVAILABLE:
-        msg += f"""  + CUDA available:   {color_status(NUMBA_CUDA_AVAILABLE)}
-  + CUDA working:     {color_status(NUMBA_CUDA_WORKING[0])}"""
-    msg += f"""
-ROOT available:       {color_status(ROOT_AVAILABLE)}"""
-    if ROOT_AVAILABLE:
-        msg += f"""
-  + imported:         {color_status(ROOT_IMPORTED)}
-"""
-    msg += f"""
-JAX available:        {color_status(JAX_AVAILABLE)}
-"""
-    if JAX_AVAILABLE:
-        msg += f"""  + working:          {color_status(JAX_WORKING)}"""
-    msg += f"""
-H5PY available:       {color_status(H5PY_AVAILABLE)}
-XARRAY available:     {color_status(XARRAY_AVAILABLE)}
-PYMC available:       {color_status(PYMC_AVAILABLE)}
-PYRO available:       {color_status(PYRO_AVAILABLE)}
-SKLEARN available:    {color_status(SKLEARN_AVAILABLE)}
-OPTAX available:      {color_status(OPTAX_AVAILABLE)}
-
-Platform:             {platform.platform()}
-CPU:                  {get_cpu()}
-  + architecture:     {platform.architecture()[0]}
-  + number:           {availabe_cpus}"""
+def get_gpu_memory() -> List[GPUMemory]:
     try:
-        import psutil
+        out = subprocess.check_output([
+            "nvidia-smi",
+            "--query-gpu=memory.total,memory.free,memory.used",
+            "--format=csv,nounits,noheader"
+        ], encoding="utf-8")
+        rows = [row.split(",") for row in out.strip().splitlines()]
+        return [GPUMemory(int(t), int(f), int(u)) for t, f, u in rows]
+    except Exception:
+        return []
 
-        virtual_memory = psutil.virtual_memory()
-        msg += f"""
-  + frequency:        {psutil.cpu_freq().current:.2f} MHz
-Total memory:         {virtual_memory.total / 1024**3:.2f} GB
-Available memory:     {virtual_memory.available / 1024**3:.2f} GB
-        """
-    except ImportError:
-        pass
-
-    if JAX_AVAILABLE:
-        import jax
-        import jaxlib
-
-        gpus = [
-            device.device_kind
-            for device in jax.devices()
-            if "gpu" in device.platform.lower()
-        ]
-        msg += f"""
-JAX version:          {jax.__version__}
-JAXlib version:       {jaxlib.__version__}
-"""
-        if gpus:
-            msg += f"""
-Available GPUs:       {len(gpus)}
-  + kind:             {gpus if len(gpus) > 1 else gpus[0]}
-"""
-        memory = get_gpu_memory()
-        for mem in memory:
-            msg += f"""  + memory:           {mem.free}/{mem.total} MB
-"""
-    print(msg)
-
-
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-
+def cpu_count() -> int:
+    return os.cpu_count() or 1
 
 @dataclass
-class Entry(ABC):
-    name: str
-
-    @abstractmethod
-    def render_parts(self, pad: int = 0) -> tuple[str, str]:
-        pass
-
-    def render(self, pad: int = 0) -> str:
-        name, info = self.render_parts(pad)
-        return f"{name}: {info}"
-
-    def __len__(self) -> int:
-        a, b = self.render_parts()
-        return len(a) + len(b)
-
+class Entry:
+    label: str
+    def render_text(self, width: int) -> str:
+        raise NotImplementedError
+    def render_html(self) -> str:
+        raise NotImplementedError
 
 @dataclass
 class StatusEntry(Entry):
-    status: bool | None
-
-    def render_parts(self, pad: int = 0) -> tuple[str, str]:
-        s = color_status(self.status)
-        s = s.ljust(pad)
-        return f"{self.name}", s
-
+    ok: Optional[bool]
+    def render_text(self, width: int) -> str:
+        return f"{self.label.ljust(width)}: {status_label(self.ok)}"
+    def render_html(self) -> str:
+        color = {True: "green", False: "red", None: "orange"}[self.ok]
+        txt = {True: "OK", False: "NO", None: "Unknown"}[self.ok]
+        return f"<tr><td style='padding:2px 6px; text-align:left'>{self.label}</td><td style='padding:2px 6px; text-align:left; color:{color}'>{txt}</td></tr>"
 
 @dataclass
 class InfoEntry(Entry):
     info: str
+    def render_text(self, width: int) -> str:
+        return f"{self.label.ljust(width)}: {self.info}"
+    def render_html(self) -> str:
+        return f"<tr><td style='padding:2px 6px; text-align:left'>{self.label}</td><td style='padding:2px 6px; text-align:left'>{self.info}</td></tr>"
 
-    def render_parts(self, pad: int = 0) -> tuple[str, str]:
-        s = self.info
-        s = s.ljust(pad)
-        return f"{self.name}", s
+@dataclass
+class Section:
+    title: str
+    entries: List[Entry] = field(default_factory=list)
+    subsections: List[Section] = field(default_factory=list)
+    collapsed: bool = True
 
-
-class Menu:
-    def __init__(self, title: str):
-        self.title = title
-        self.entries = []
-        self.submenus = []
-
-    def append(self, Entry: Entry) -> None:
-        self.entries.append(Entry)
-
-    def add_submenu(self, menu: Menu) -> None:
-        self.submenus.append(menu)
-
-    def render_text(self, level=0):
-        indent = "  " * level
-        text = f"{indent}{self.title}\n"
-        text += f"{indent}{'=' * len(self.title)}\n"
-
-        pad = self.pad_length()
-        for entry in self.entries:
-            text += f"{indent}{entry.render(pad)}"
-            text += "\n"
-        for submenu in self.submenus:
-            text += submenu.render_text(level + 1)
-        return text
-
-    def render_html(self, level=0):
-        html = f"<div><strong>{self.title}</strong><br>"
-        for entry in self.entries:
-            html += entry.render()
-            html += "<br>"
-
-        for submenu in self.submenus:
-            submenu_id = (
-                f"{self.title.replace(' ', '_')}_{submenu.title.replace(' ', '_')}"
-            )
-            html += f'<a href="javascript:void(0);" onclick="toggleVisibility(\'{submenu_id}\')">{submenu.title}</a>'
-            html += f'<div id="{submenu_id}" style="display:none; margin-left: {20 * (level + 1)}px;">'
-            html += submenu.render_html(level + 1)
-            html += "</div>"
-
-        html += "</div>"
-        return html
-
-    def pad_length(self) -> int:
-        i = max(len(entry) for entry in self.entries)
-        for submenu in self.submenus:
-            i = max(i, submenu.pad_length())
-        return i
-
+    def add_entry(self, e: Entry) -> None:
+        self.entries.append(e)
+    def add_section(self, sec: Section) -> None:
+        self.subsections.append(sec)
+    def _text_width(self) -> int:
+        widths = [len(e.label) for e in self.entries] + [sub._text_width() for sub in self.subsections]
+        return max(widths) if widths else 0
+    def render_text(self, indent: int = 0) -> str:
+        pad = self._text_width()
+        indent_s = "  " * indent
+        lines = [f"{indent_s}{self.title}", f"{indent_s}{'=' * len(self.title)}"]
+        for e in self.entries:
+            lines.append(f"{indent_s}{e.render_text(pad)}")
+        for sub in self.subsections:
+            lines.append(sub.render_text(indent + 1))
+        return "\n".join(lines)
+    def render_html(self) -> str:
+        status_html = ""
+        if self.entries and isinstance(self.entries[0], StatusEntry):
+            ok = self.entries[0].ok
+            color = {True: "green", False: "red", None: "orange"}[ok]
+            txt = {True: "OK", False: "NO", None: "Unknown"}[ok]
+            status_html = f" <span style='color:{color}'>({txt})</span>"
+        rows = ["<table style='border-collapse:collapse;'>"]
+        for e in self.entries:
+            rows.append(e.render_html())
+        rows.append("</table>")
+        inner = "".join(rows)
+        for sub in self.subsections:
+            inner += sub.render_html()
+        details = '<details>' if self.collapsed else '<details open>'
+        return f"{details}<summary><strong>{self.title}</strong>{status_html}</summary><div style='margin-left:1em'>{inner}</div></details>"
     def _repr_html_(self):
-        script = """
-        <script>
-        function toggleVisibility(id) {
-            var x = document.getElementById(id);
-            if (x.style.display === "none") {
-                x.style.display = "block";
-            } else {
-                x.style.display = "none";
-            }
-        }
-        </script>
-        """
+        return self.render_html()
 
-        html_content = self.render_html()
-        return html_content + script
-
-
-def is_available(pkg, load=False, suppress_warnings=True) -> tuple[bool, str]:
-    version = ""
+def get_version_info() -> Tuple[str, str]:
     try:
-        exists = util.find_spec(pkg) is not None
-        version = metadata.version(pkg)
-    except ImportError:
-        # As usual, ROOT is a special case. It can refuse to
-        # import for no particular reason, in which case it
-        # throws an exception
-        exists = False
-    if exists and load:
-        if suppress_warnings:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                __import__(pkg)
-        else:
-            __import__(pkg)
-    return exists, version
-
-
-def is_imported(pkg: str) -> bool:
-    return pkg in sys.modules
-
-
-class Package(Menu):
-    def __init__(
-        self,
-        package: str,
-        available: bool,
-        working: bool | None = None,
-        imported: bool | None = None,
-        version: str = "",
-    ):
-        self.package = package
-        self.available = available
-        self.working = working
-        self.imported = imported
-        self.version = version
-        super().__init__(package)
-        self.entries.append(StatusEntry("Available", available))
-        if available:
-            self.entries.append(StatusEntry("Working", working))
-            self.entries.append(StatusEntry("Imported", imported))
-        if version:
-            self.entries.append(InfoEntry("Version", version))
-
-    @classmethod
-    def from_pkg(cls, package: str) -> Package:
-        available, version = is_available(package)
-        imported = is_imported(package)
-        return cls(package, available, imported=imported, version=version)
-
-
-def get_status_menu() -> Menu:
-    menu = Menu("OMpy Status")
-    full_version, git_version = get_version_info()
-    menu.append(InfoEntry("Version", full_version))
-    menu.append(InfoEntry("Git version", git_version))
-    menu.append(StatusEntry("GPU available", GPU_AVAILABLE))
-    menu.append(StatusEntry("NUMBA available", NUMBA_AVAILABLE))
-    if NUMBA_AVAILABLE:
-        menu.append(StatusEntry("CUDA available", NUMBA_CUDA_AVAILABLE))
-        menu.append(StatusEntry("CUDA working", NUMBA_CUDA_WORKING[0]))
-    menu.append(StatusEntry("ROOT available", ROOT_AVAILABLE))
-    if ROOT_AVAILABLE:
-        menu.append(StatusEntry("ROOT imported", ROOT_IMPORTED))
-    menu.append(StatusEntry("MINUIT available", MINUIT_AVAILABLE))
-    menu.append(StatusEntry("JAX available", JAX_AVAILABLE))
-    if JAX_AVAILABLE:
-        menu.append(StatusEntry("JAX working", JAX_WORKING))
-    menu.append(StatusEntry("H5PY available", H5PY_AVAILABLE))
-    # menu.append(StatusEntry("XARRAY available", XARRAY_AVAILABLE))
-    menu.add_submenu(Package.from_pkg("xarray"))
-    menu.append(StatusEntry("GAMBIT available", GAMBIT_AVAILABLE))
-    menu.append(StatusEntry("EMCEE available", EMCEE_AVAILABLE))
-    menu.append(StatusEntry("PYMC available", PYMC_AVAILABLE))
-    menu.append(StatusEntry("PYRO available", PYRO_AVAILABLE))
-    menu.append(StatusEntry("SKLEARN available", SKLEARN_AVAILABLE))
-
-    menu.add_submenu(get_platform_menu())
-    if JAX_AVAILABLE:
-        menu.add_submenu(get_jax_menu())
-    return menu
-
-
-def get_jax_menu() -> Menu:
-    menu = Menu("JAX")
-    import jax
-    import jaxlib
-
-    gpus = [
-        device.device_kind
-        for device in jax.devices()
-        if "gpu" in device.platform.lower()
-    ]
-    menu.append(InfoEntry("JAX version", jax.__version__))
-    menu.append(InfoEntry("JAXlib version", jaxlib.__version__))
-    if gpus:
-        menu.append(InfoEntry("Available GPUs", str(len(gpus))))
-        menu.append(InfoEntry("GPU kind", str(gpus if len(gpus) > 1 else gpus[0])))
-    return menu
-
-
-def get_platform_menu() -> Menu:
-    menu = Menu("Platform")
-    menu.append(InfoEntry("Platform", platform.platform()))
-    menu.append(InfoEntry("CPU", get_cpu()))
-    menu.append(InfoEntry("Architecture", platform.architecture()[0]))
-    menu.append(InfoEntry("Number of CPUs", str(len(os.sched_getaffinity(0)))))
-    try:
-        import psutil
-
-        virtual_memory = psutil.virtual_memory()
-        menu.append(InfoEntry("CPU frequency", f"{psutil.cpu_freq().current:.2f} MHz"))
-        menu.append(
-            InfoEntry("Total memory", f"{virtual_memory.total / 1024**3:.2f} GB")
-        )
-        menu.append(
-            InfoEntry(
-                "Available memory", f"{virtual_memory.available / 1024**3:.2f} GB"
-            )
-        )
-    except ImportError:
-        pass
-    return menu
-
+        v = metadata.version("your-package-name")
+    except metadata.PackageNotFoundError:
+        v = "dev"
+    sha = os.popen("git rev-parse --short HEAD").read().strip() or "n/a"
+    return v, sha
 
 @dataclass
 class GPUMemory:
@@ -384,23 +162,93 @@ class GPUMemory:
     free: int
     used: int
 
-
-def get_gpu_memory() -> list[GPUMemory]:
+def status() -> Section:
+    root = Section("OMpy Status", collapsed=False)
+    full_ver, git_sha = get_version_info()
+    root.add_entry(InfoEntry("Version", full_ver))
+    root.add_entry(InfoEntry("Git SHA", git_sha))
+    from . import (
+        GPU_AVAILABLE,
+        NUMBA_AVAILABLE,
+        NUMBA_CUDA_AVAILABLE,
+        NUMBA_CUDA_WORKING,
+        ROOT_AVAILABLE,
+        ROOT_IMPORTED,
+        UPROOT_AVAILABLE,
+        JAX_AVAILABLE,
+        JAX_WORKING,
+        H5PY_AVAILABLE,
+    )
+    capability_specs = [
+        ("GPU", GPU_AVAILABLE, []),
+        ("NUMBA", NUMBA_AVAILABLE, [("CUDA available", NUMBA_CUDA_AVAILABLE),("CUDA working", NUMBA_CUDA_WORKING[0])]),
+        ("ROOT", ROOT_AVAILABLE, [("imported", ROOT_IMPORTED)]),
+        ("UPROOT", UPROOT_AVAILABLE, []),
+        ("JAX", JAX_AVAILABLE, [("working", JAX_WORKING)]),
+        ("h5py", H5PY_AVAILABLE, []),
+    ]
+    for label, avail, subs in capability_specs:
+        sec = Section(label)
+        sec.add_entry(StatusEntry("available", avail))
+        for sub_label, sub_status in subs:
+            sec.add_entry(StatusEntry(sub_label, sub_status))
+        if label == "ROOT":
+            if ROOT_IMPORTED:
+                import ROOT
+                ver = ROOT.__version__
+            else:
+                # This doesn't work, but a hail mary
+                _, ver = is_available("ROOT")
+        else:
+            label = label.lower()
+            _, ver = is_available(label)
+        if ver:
+            sec.add_entry(InfoEntry("version", ver))
+        root.add_section(sec)
+    for pkg in ("xarray", "pymc", "pyro", "scikit-learn", "optax"):
+        avail, ver = is_available(pkg)
+        sec = Section(pkg)
+        sec.add_entry(StatusEntry("installed", avail))
+        if avail:
+            sec.add_entry(InfoEntry("version", ver))
+        root.add_section(sec)
+    plat = Section("Platform")
+    plat.add_entry(InfoEntry("OS", platform.platform()))
+    plat.add_entry(InfoEntry("CPU", get_cpu_name()))
+    plat.add_entry(InfoEntry("CPUs", str(cpu_count())))
     try:
-        smi_output = subprocess.check_output(
-            [
-                "nvidia-smi",
-                "--query-gpu=memory.total,memory.free,memory.used",
-                "--format=csv,nounits,noheader",
-            ],
-            encoding="utf-8",
-        )
-        # Parse the output
-        gpu_memory_info = [x.split(",") for x in smi_output.strip().split("\n")]
-        gpu_memory_info = [
-            GPUMemory(int(total), int(free), int(used))
-            for total, free, used in gpu_memory_info
-        ]
-        return gpu_memory_info
-    except subprocess.CalledProcessError as e:
-        return []
+        import psutil
+        freq = psutil.cpu_freq().current
+        mem = psutil.virtual_memory()
+    except ImportError:
+        freq = None
+        mem = None
+    if freq is not None:
+        plat.add_entry(InfoEntry("CPU freq (MHz)", f"{freq:.2f}"))
+    if mem is not None:
+        plat.add_entry(InfoEntry("Total RAM (GB)", f"{mem.total/1024**3:.2f}"))
+        plat.add_entry(InfoEntry("Avail RAM (GB)", f"{mem.available/1024**3:.2f}"))
+    root.add_section(plat)
+    if JAX_AVAILABLE:
+        try:
+            import jax
+            import jaxlib
+            jax_sec = Section("JAX Details")
+            jax_sec.add_entry(InfoEntry("jax version", jax.__version__))
+            jax_sec.add_entry(InfoEntry("jaxlib version", jaxlib.__version__))
+            gmem = get_gpu_memory()
+            for i, m in enumerate(gmem):
+                g = Section(f"GPU#{i}")
+                g.add_entry(InfoEntry("total MB", str(m.total)))
+                g.add_entry(InfoEntry("free MB", str(m.free)))
+                g.add_entry(InfoEntry("used MB", str(m.used)))
+                jax_sec.add_section(g)
+            root.add_section(jax_sec)
+        except Exception:
+            pass
+    return root
+
+def print_status():
+    sec = get_status_section()
+    print(sec)
+

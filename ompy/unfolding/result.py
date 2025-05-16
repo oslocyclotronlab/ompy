@@ -112,7 +112,8 @@ def add_aliases(cls):
 class Result(ABC, Generic[T]):
     meta: ResultMeta[T]
     # Contaminant spectra
-    xi: list[T] = field(default_factory=list)
+    xi: tuple[T, ...] = ()
+    beta: T | None = None
     _ndim: int = 0
 
     @property
@@ -211,6 +212,8 @@ class Result(ABC, Generic[T]):
         nu = self.best_folded(device=device)
         for i in range(len(self.xi)):
             nu = nu + self.best_xi_folded(i, device=device)
+        if self.beta is not None:
+            nu = nu + self.beta
         return nu
 
     def resolve_spaces(self, target: PlotSpace) -> tuple[T, str]:

@@ -1,14 +1,18 @@
-
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from typing import Self
 
 from .tau import from_tau, to_tau
+from .utils import pytree_dataclass
 
+from .stubs import  ExpectationParameter1D, Xi1D, Nu1D, GegMatrix, GegDMatrix, ContaminantLossFn1D
 from ... import Index
+
 
 @dataclass(kw_only=True)
 class Contaminant1D:
@@ -65,7 +69,7 @@ class Contaminant1D:
                     "amplitude_nu_bounds must be a tuple of two numbers, the lower and upper bounds of the amplitude of nu"
                 )
 
-    def closure(self) -> Callable[[jnp.ndarray], tuple[jnp.ndarray, float]]:
+    def closure(self) -> Callable[[Xi1D], tuple[Nu1D, float]]:
         lower, upper = self.central_bounds
         T = self.temperature
         amplitude_mu_penalty = self.amplitude_mu_penalty
@@ -95,10 +99,10 @@ class Contaminant1D:
 
         @jax.jit
         def func(
-            mu: jnp.ndarray,  # mu of xi, not of the data
-            G_eg: jnp.ndarray,
-            G_egD: jnp.ndarray,
-        ) -> tuple[jnp.ndarray, float]:
+            mu: ExpectationParameter1D,  # mu of xi, not of the data
+            G_eg: GegMatrix,
+            G_egD: GegDMatrix,
+        ) -> tuple[Nu1D, float]:
             # Enforce the central bounds
             mu = mu.at[:lower].set(0.0)
             mu = mu.at[upper:].set(0.0)
@@ -106,6 +110,8 @@ class Contaminant1D:
             amplitude_mu = jnp.max(mu)
             # One-hot encoding ensures a single non-zero element
             mu = amplitude_mu * relaxed_one_hot(mu, temperature=T)
+            # Nu is always needed
+            nu = mu @ G_egD
 
             def identity_penalty(_):
                 return 0.0
@@ -123,7 +129,6 @@ class Contaminant1D:
                 )
 
             def nu_penalty(_):
-                nu = mu @ G_egD
                 # Here we only care about the amplitude within FE,
                 # which is equivalent to being within the bounds
                 amplitude_nu = jnp.max(nu[lower:upper])
@@ -143,7 +148,7 @@ class Contaminant1D:
                 amplitude_nu_penalty == 0.0, identity_penalty, nu_penalty, None
             )
 
-            return mu, mu_cost + eta_cost + nu_cost
+            return nu, mu_cost + eta_cost + nu_cost
 
         return func
 
@@ -295,3 +300,24 @@ def relaxed_one_hot(logits, temperature=0.01):
         A tensor of the same shape as logits containing probabilities that sum to 1.
     """
     return jax.nn.softmax(logits / temperature)
+
+    
+
+@pytree_dataclass
+class ContaminantModel1D:
+    # TODO: Elide common foldings
+    loss: ContaminantLossFn1D
+    G_eg: GegMatrix | None = None
+    GegD: GegDMatrix | None = None
+
+    @jax.jit
+    def cost(self, tau: ExpectationParameter1D) -> tuple[Nu1D, float]:
+        mu = from_tau(tau)
+        return self.loss(mu, self.G_eg, self.GegD)
+    
+    def set_matrices(self, G_eg: GegMatrix, GegD: GegDMatrix) -> Self:
+        if self.G_eg is None:
+            self.G_eg = G_eg
+        if self.GegD is None:
+            self.GegD = GegD
+        return self

@@ -54,6 +54,7 @@ from .filehandling import (
     save_numpy_2D,
     save_tar,
     save_txt_2D,
+    load_root_2D,
 )
 from .index import Edges, Index, make_or_update_index
 from .matrixmetadata import MatrixMetadata
@@ -293,6 +294,8 @@ class Matrix(AbstractArray, MatrixProtocol):
                 return cls.from_mama(path)
             case "hdf5":
                 return cls.from_hdf5(path, **kwargs)
+            case "root":
+                return cls.from_root(path, **kwargs)
             case _:
                 raise ValueError(f"Unknown filetype: {filetype}")
 
@@ -333,6 +336,11 @@ class Matrix(AbstractArray, MatrixProtocol):
     @ensure_path
     def from_hdf5(cls, path: Path, **kwargs) -> Self:
         return load_hdf5_2D(path, cls, **kwargs)
+
+    @classmethod
+    @ensure_path
+    def from_root(cls, path: Path, what: str, **kwargs) -> Self:
+        return load_root_2D(path, what, cls, **kwargs)
 
     @ensure_path
     def save(self, path: Path, filetype: Filetype | None = None, **kwargs) -> None:
