@@ -10,7 +10,7 @@ from typing import Any
 from .rmle1d import (
     RMLEResult1D,
     DynamicData as DynamicData1D,
-    Settings as Settings1D,
+    Settings as Settings,
     StaticData as StaticData1D,
     cost as cost1d,
     unfold as unfold1d,
@@ -18,7 +18,6 @@ from .rmle1d import (
 from .rmlelist import unfold as unfold_list, DynamicDataList
 from .rmle2d import (
     unfold as unfold_matrix,
-    OptimizationSettings,
     OptimizationComponents,
     OptimizationData,
     RMLEResult2D,
@@ -133,7 +132,7 @@ class RMLE(Unfolder):
         **kwargs,
     ) -> list[RMLEResult1D]:
         components = DynamicDataList.from_data(data, initial, mask, background)
-        settings = Settings1D.from_kwargs(kwargs)
+        settings = Settings.from_kwargs(kwargs)
 
         # We have used all kwargs as we can. The rest are probably misspelled
         if len(kwargs) > 0:
@@ -196,12 +195,7 @@ class RMLE(Unfolder):
         G_eg: Matrix,
         G_ex: Matrix | None,
         mask: np.ndarray,
-        optimizer: Optimizer = optax.adam(0.001),
         contaminants: tuple[Contaminant2D, ...] = (),
-        loss: LossFn | Loss = KullbackLeibler(),
-        loss_background: LossFn | Loss = KullbackLeibler(),
-        penalties: tuple[LossFn, ...] = (),
-        penalties_background: tuple[LossFn, ...] = (),
         **kwargs,
     ) -> RMLEResult2D:
 
@@ -209,16 +203,15 @@ class RMLE(Unfolder):
         components = OptimizationComponents(
             initial=initial,
             mask=mask,
-            loss=loss,
-            loss_background=loss_background,
-            penalties=penalties,
-            penalties_background=penalties_background,
         )
 
-        settings = OptimizationSettings.from_kwargs(optimizer=optimizer, **kwargs)
+        settings = Settings.from_kwargs(kwargs)
+
+        if len(kwargs) > 0:
+            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
         optim_data = OptimizationData(
             raw=data,
-            backgrounds=background,
+            background=background,
             D=D,
             G_eg=G_eg,
             G_ex=G_ex,
@@ -241,10 +234,11 @@ class RMLE(Unfolder):
             initial=initial,
             G_eg=G_eg,
             G_ex=G_ex,
-            kwargs=kwargs | {"optimizer": optimizer},
+            kwargs=kwargs,
             mask=mask,
         )
         meta = ResultMeta2D(
             time=elapsed, space=self.space, parameters=parameters, method=self.__class__
         )
-        return RMLEResult2D(meta=meta, cost=result.total_cost, u=result.mu, aux={})
+        return RMLEResult2D(meta=meta, cost=result.aux['loglike'], u=result.mu, aux=result.aux,
+                            beta=result.beta)

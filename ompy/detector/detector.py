@@ -487,7 +487,7 @@ class CompoundDetector:
         sigma_eg = sigma_eg.astype(dtype_map(mat.values.dtype))
         Ex = mat.Ex.astype(dtype_map(mat.values.dtype))
         Eg = mat.Eg.astype(dtype_map(mat.values.dtype))
-        cut_at_resolution(values, Ex, Eg, sigma_ex, sigma_eg, ex_sigma, eg_sigma)
+        values = cut_at_resolution(values, Ex, Eg, sigma_ex, sigma_eg, ex_sigma, eg_sigma)
         if not inplace:
             return mat.clone(values=values)
 
@@ -694,3 +694,39 @@ if JAX_WORKING:
         convolved /= jnp.sum(convolved, axis=1, keepdims=True)
 
         return np.asarray(convolved)
+
+    @jax.jit
+    def cut_at_resolution(mat: jnp.ndarray,
+                        Ex: jnp.ndarray,
+                        Eg: jnp.ndarray,
+                        sigma_ex: jnp.ndarray,
+                        sigma_eg: jnp.ndarray,
+                        ex_sigma: float,
+                        eg_sigma: float) -> jnp.ndarray:
+        """
+        For each row i and column j of `mat`, if Eg[j] >= Ex[i], scale mat[i,j] by
+        sqrt(ngaussian(Ex[i]-Eg[j], 0, ex_sigma*sigma_ex[i]) *
+            ngaussian(Eg[j]-Ex[i], 0, eg_sigma*sigma_eg[j]))
+        Otherwise leave mat[i,j] unchanged.
+        """
+        # compute Eg[j] - Ex[i] for all (i,j)
+        d_eg = Eg[None, :] - Ex[:, None]         # shape (n_i, n_j)
+        mask = d_eg >= 0                         # only these get modified
+
+        # distances for the two gaussians
+        d_ex = -d_eg                             # Ex[i] - Eg[j] = -(Eg-Ex)
+
+        # build the σ matrices
+        std_ex = (ex_sigma * sigma_ex)[:, None]  # shape (n_i, 1)
+        std_eg = (eg_sigma * sigma_eg)[None, :]  # shape (1, n_j)
+
+        # gaussian factors
+        gauss_ex = jnp.exp(-d_ex**2 / (2 * std_ex**2))
+        gauss_eg = jnp.exp(-d_eg**2 / (2 * std_eg**2))
+
+        # combined factor, defaulting to 1.0 when mask is False
+        factor = jnp.where(~mask,
+                        jnp.sqrt(gauss_ex * gauss_eg),
+                        1.0)
+
+        return mat * factor.T

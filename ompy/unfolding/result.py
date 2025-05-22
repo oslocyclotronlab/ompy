@@ -201,6 +201,17 @@ class Result(ABC, Generic[T]):
         with on_device(device, self.GegD, xi_mu, endpoint="numpy"):
             return xi_mu @ self.GegD
 
+    @alias("beta_nu")
+    def beta_folded(self, device="gpu?") -> T:
+        if self.beta is None:
+            raise ValueError("No beta to fold")
+        if self.G_ex is None:
+            with on_device(device, self.GegD, self.beta, endpoint="numpy"):
+                return self.beta @ self.GegD
+        else:
+            with on_device(device, self.G_ex, self.GegD, self.beta, endpoint="numpy"):
+                return self.Gex @ self.beta @ self.GegD
+
     def best_mu(self) -> T:
         if not self.meta.space == "mu":
             raise ValueError(

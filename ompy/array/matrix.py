@@ -14,7 +14,7 @@ from matplotlib import ticker
 from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 from numpy.typing import DTypeLike
 
-from .. import ROOT_IMPORTED, XARRAY_AVAILABLE, Unit, JAX_AVAILABLE
+from .. import ROOT_IMPORTED, XARRAY_AVAILABLE, Unit, JAX_AVAILABLE, JAX_WORKING
 from ..helpers import (
     AnnotatedColorbar,
     IQR_range,
@@ -1649,3 +1649,25 @@ def last_nonzeros(x: np.ndarray, eps: float = 0.0) -> np.ndarray:
                 mask[i, :j] = True
                 break
     return mask
+
+
+if JAX_WORKING:
+    import jax
+    import jax.numpy as jnp
+    @jax.jit
+    def last_nonzeros(x: jnp.ndarray, eps: float = 0.0) -> jnp.ndarray:
+        """
+        Returns a boolean mask of the same shape as `x`, where for each row
+        all columns before the last element whose absolute value exceeds `eps`
+        are True, and the rest are False.
+        """
+        n_cols = x.shape[1]
+        # For entries with |x|>eps use their column index, else -1
+        idx = jnp.where(jnp.abs(x) > eps, jnp.arange(n_cols), -1)
+        # Find the last index > eps in each row (or -1 if none)
+        last = jnp.max(idx, axis=1)        # shape (n_rows,)
+        # Column indices 0,1,...,n_cols-1
+        cols = jnp.arange(n_cols)          # shape (n_cols,)
+        # For each row i, cols < last[i] gives True up to (but excluding) the last non-zero
+        mask = cols < last[:, None]        # shape (n_rows, n_cols), dtype=bool
+        return mask

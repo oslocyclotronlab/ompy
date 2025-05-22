@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import Counter
 import numpy as np
-from .. import Vector, Matrix, zeros_like
+from .. import Vector, Matrix, zeros_like, JAX_AVAILABLE
 from ..array import pack_into_matrix, Array
 from abc import ABC, abstractmethod
 from typing import Literal, TypeAlias, overload, Self, TYPE_CHECKING, Iterable
@@ -164,6 +164,7 @@ class Unfolder(ABC):
     def check_background(
         self, data: Matrix | Vector, background: tuple[Matrix, ...] | tuple[Vector, ...] = ()
     ) -> None:
+        return
         if background:
             if not self.supports_background():
                 raise ValueError(
@@ -620,14 +621,41 @@ def make_mask_matrix(data: Matrix, mask: Mask2D) -> np.ndarray:
                 raise ValueError("tril mask only works for square matrices")
             return np.tril(np.ones_like(data.values, dtype=bool))
         case "last nonzero":
-            mask = np.zeros_like(data, dtype=bool)
-            for i in range(data.shape[0]):
-                j = data.iloc[i, :].last_nonzero()
-                mask[i, :j] = True
-            return mask
+            return last_nonzero_matrix(data)
         case _:
             raise ValueError(f"Invalid mask {mask}")
 
+def last_nonzero_matrix(data: Matrix) -> np.ndarray:
+    # Number of columns
+    n_cols = data.shape[1]
+    # For each element, give its column index if non-zero, else –1
+    idx = np.where(data != 0, np.arange(n_cols), -1)
+    # Find the last non-zero index in each row
+    last = idx.max(axis=1)              # shape (n_rows,)
+    # Build a row of column indices 0,1,…,n_cols-1
+    cols = np.arange(n_cols)            # shape (n_cols,)
+    # Broadcast compare: for each row i, cols <= last[i]
+    mask = cols <= last[:, None]        # shape (n_rows, n_cols)
+    return mask
+
+if JAX_AVAILABLE:
+    import jax
+    import jax.numpy as jnp
+    @jax.jit
+    def last_nonzero_matrix(data: jnp.ndarray) -> jnp.ndarray:
+        """
+        For each row in `data`, returns a boolean mask where columns up to
+        (and including) the last non-zero element are True.
+        """
+        n_cols = data.shape[1]
+        # Replace non-zero entries with their column index, zeros → -1
+        idx = jnp.where(data != 0, jnp.arange(n_cols), -1)
+        # Find last non-zero index per row
+        last = jnp.max(idx, axis=1)          # shape (n_rows,)
+        # Compare every column index against each row’s last index
+        cols = jnp.arange(n_cols)            # shape (n_cols,)
+        mask = cols <= last[:, None]         # broadcasts to (n_rows, n_cols)
+        return mask
 
 def make_mask_vector(data: Vector, mask: Mask1D) -> np.ndarray:
     match mask:

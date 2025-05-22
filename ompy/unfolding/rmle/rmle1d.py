@@ -503,7 +503,7 @@ class Settings:
         penalties: Tuple of penalty functions to apply during optimization
     """
 
-    optimizer: Optimizer = optax.adam(1e-3)
+    optimizer: Optimizer = optax.adam(1e-1)
     tau_map: TauMap = TAU_MAP
     iterations: int = 100
 

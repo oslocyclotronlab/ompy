@@ -60,7 +60,7 @@ def unfold(
         #None if dynamic.same_mask else 0,  # The mask
     )
     lower_vmap = jax.vmap(lower, in_axes=in_axes)
-    states, total_costs, loglikes, penalties = lower_vmap(state, dynamic.)
+    #states, total_costs, loglikes, penalties = lower_vmap(state, dynamic.)
 
     results: list[OptimResult1D] = []
     for i in range(len(states)):

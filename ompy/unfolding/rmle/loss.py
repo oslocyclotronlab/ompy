@@ -26,8 +26,9 @@ class Loss(ABC):
     space: LossSpace
     fn: LossFn
 
-    def __call__(self, alpha: ExpectationParameter, x: Data) -> jnp.ndarray:
-        return self.fn(alpha, x)
+    def __call__(self, alpha: ExpectationParameter, x: Data,
+                 *args, **kwargs) -> jnp.ndarray:
+        return self.fn(alpha, x, *args, **kwargs)
 
 @pytree_dataclass
 class KullbackLeibler(Loss):

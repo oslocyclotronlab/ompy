@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-from typing import Any, Self
+from typing import Any, Self, TYPE_CHECKING, Iterable
 
 from .tau import from_tau, to_tau
 from ... import Matrix
@@ -18,32 +18,52 @@ from .stubs import Optimizer
 from jaxtyping import Float, Array
 from ..utils import scan_tqdm
 from functools import partial
+from .stubs import Background2D, Beta2D, Mu2D, Tau2D, GegDMatrix, GexMatrix, State2D, Data2D
+from .lossmodel import ModelLoss
+from .utils import pytree_dataclass
+from .tau import TauMap, TAU_MAP
 
 try:
     import optax
 except ImportError:
     pass
 
-type Data = Float[Array, "Ein Eg"]
-type ExpectationParameter = Float[Array, "Ein Eg"]
-type Mu = ExpectationParameter
-type Beta = ExpectationParameter
-type Contaminants = tuple[ExpectationParameter, ...]
-type Empty = tuple[()]
-type State = tuple[Mu, Beta | Empty, Contaminants | Empty]
 type PenaltyFn = Any
 
+if TYPE_CHECKING:
+    from .rmle1d import Settings
+
+@pytree_dataclass
+class BackgroundModel2D:
+    loss: Loss = ModelLoss()
+    backgrounds: tuple[Background2D, ...] = ()
+    do_fold: bool = True
+
+
+    def cost(self, beta: Beta2D) -> tuple[float, float, tuple[float, ...]]:
+        row_wise_loss = sum(tuple(jnp.sum(self.loss.loss(beta, bg), axis=1) for bg in self.backgrounds))
+        loss = jnp.mean(row_wise_loss)
+        # Penalties here
+        #penalty, penalty_term = zip(*[penalty(beta) for penalty in penalties_background])
+        #loss = jnp.mean(jnp.sum(loss, axis=1))
+        return loss
+
+    def __len__(self) -> int:
+        return len(self.backgrounds)
+
+    def __getitem__(self, idx: int) -> Background2D:
+        return self.backgrounds[idx]
+
+
 def cost(
-    state: State,
+    state: State2D,
     GegD: Float[Array, "Eg_true Eg_observed"],
     G_ex: Float[Array, "Ein_true Ein_observed"],
     G_eg: Float[Array, "Eg_true Eg_measured"],
-    y: Data,
-    loss: LossFn,
-    loss_background: LossFn,
-    penalties: tuple[PenaltyFn, ...],
-    penalties_background: tuple[PenaltyFn, ...],
-    backgrounds: tuple[jnp.ndarray, ...] = ()
+    y: Data2D,
+    loss: ModelLoss,
+    background: BackgroundModel2D,
+    tau_map: TauMap[Mu2D, Tau2D]
 ) -> tuple[float, dict]:
     """
 
@@ -74,45 +94,34 @@ def cost(
     tmp = G_ex@mu
     nu = tmp@GegD
 
-    def background_body(_) -> tuple[jnp.ndarray, float, float, float]:
-        print("We have backgrounds: ", backgrounds)
-        if not backgrounds:
-            # We need this path to make JAX happy
-            return nu, 0.0, 0.0, 0.0
-    
-        # Beta is shared for all backgrounds
+    if len(background) > 0:
+        print("has background")
         beta = from_tau(beta_tau)
-        # loss_bg: num_bg x Ex x Eg -> Ex x Eg
-        loss_bg = jnp.sum(loss_background(beta, bg) for bg in backgrounds)
-        # penalty: num_bg, num_bg
-        penalty, penalty_term = zip(*[penalty(beta) for penalty in penalties_background])
-        alpha = nu + beta
-        # loss_bg: Ex x Eg -> Ex -> ()
-        loss_bg = jnp.mean(jnp.sum(loss_bg, axis=1))
-        penalty_bg = jnp.mean(jnp.sum(penalty, axis=1))
-        penalty_terms = jnp.mean(jnp.sum(penalty_term, axis=1))
-        return alpha, loss_bg, penalty_bg, penalty_terms
-
-    nu, loss_bg, penalty_bg, penalty_bg_terms = jax.lax.cond(len(backgrounds) > 0, background_body, lambda _: (nu, 0.0, 0.0, 0.0), None)
+        if background.do_fold:
+            beta = G_ex@beta@G_eg
+        loss_bg = background.cost(beta)
+        nu = nu + beta
+    else:
+        print("no background")
+        loss_bg = 0.0
 
     likelihood_body = loss(nu, y)
     loglike_per_instance = jnp.sum(likelihood_body, axis=1)
     loglike = jnp.mean(loglike_per_instance)
 
-    def eta_nop(_):
-        return 0.0, 0.0
+    #def eta_body(_):
+    #    print("We have penalties: ", penalties)
+    #    eta = tmp@G_eg
+    #    distribution = eta / (jnp.sum(eta, axis=1, keepdims=True) + 1e-10)
+    #    # Penalties must be taken for each row, then summarized by e.g. the mean
+    #    total, partial = total_penalty(penalties, mu, eta, distribution, axis=1)
+    #    return total, partial
 
-    def eta_body(_):
-        print("We have penalties: ", penalties)
-        eta = tmp@G_eg
-        distribution = eta / (jnp.sum(eta, axis=1, keepdims=True) + 1e-10)
-        # Penalties must be taken for each row, then summarized by e.g. the mean
-        total, partial = total_penalty(penalties, mu, eta, distribution, axis=1)
-        return total, partial
+    #penalty, penalty_terms = jax.lax.cond(len(penalties) > 0, eta_body, eta_nop, None)
+    penalty_terms = 0.0
+    penalty_bg = 0.0
 
-    penalty, penalty_terms = jax.lax.cond(len(penalties) > 0, eta_body, eta_nop, None)
-
-    cost = loglike + loss_bg + penalty_bg + penalty
+    cost = loglike + loss_bg + penalty_terms
 
     aux = {"loglike": loglike, "penalty": penalty_terms, "penalty_bg": penalty_bg, "loss_bg": loss_bg}
 
@@ -121,25 +130,20 @@ def cost(
 def unfold(*,
     data: OptimizationData,
     components: OptimizationComponents,
-    settings: OptimizationSettings,
+    settings: Settings,
 ) -> OptimizationResult:
 
     run_optimization = make_lower(data, components, settings)
 
-    params, loss_state = run_optimization()
+    params, aux = run_optimization()
     # Convert back from tau
-    tau, beta_tau, contaminants = params
-    loglike, penalty, total_cost = loss_state
-    mu = from_tau(tau)
-    beta = from_tau(beta_tau) if beta_tau else None
+    mu, beta, contaminants = params
 
     result = OptimizationResult(
         prototype=data.prototype,
         mu=mu,
         beta=beta,
-        total_cost=total_cost,
-        loglike=loglike,
-        penalty=penalty,
+        aux=aux
     )
 
     return result
@@ -147,7 +151,7 @@ def unfold(*,
 def make_lower(
         data: OptimizationData,
         components: OptimizationComponents,
-        settings: OptimizationSettings,
+        settings: Settings,
 ):
     iterations = settings.iterations
 
@@ -155,24 +159,23 @@ def make_lower(
     G_ex = data.G_ex
     D = data.D
     raw = data.raw
-    backgrounds = tuple(background for background in data.backgrounds)
     GegD = D@G_eg
 
     mask = components.mask
-    loss = components.loss
-    if hasattr(loss, "closure"):
-        loss = loss.closure()
 
-    loss_background = components.loss_background
-    if hasattr(loss_background, "closure"):
-        loss_background = loss_background.closure()
+    mu_initial = settings.tau_map.to_tau(components.initial)
 
-    penalties = components.penalties
-    penalties_background = components.penalties_background
+    if data.has_background:
+        # Mean of the backgrounds is the best estimate
+        if len(data.background) == 1:
+            beta_initial = data.background[0]
+        else:
+            beta_initial = jnp.mean(data.background.backgrounds, axis=0)
+        beta_initial = settings.tau_map.to_tau(beta_initial)
+    else:
+        beta_initial = ()
 
-    mu_initial = to_tau(components.initial)
     
-    beta_initial = mu_initial if backgrounds else ()
     contaminant_initial = ()
 
     params_init = (mu_initial, beta_initial, contaminant_initial)
@@ -181,21 +184,22 @@ def make_lower(
 
     opt_state_init = optimizer.init(params_init)
     cost_closure = partial(cost, GegD=GegD, G_eg=G_eg, G_ex=G_ex, y=raw,
-                            loss=loss, loss_background=loss_background,
-                            penalties=penalties,
-                            penalties_background=penalties_background,
-                            backgrounds=backgrounds)
+                            loss=components.loss,
+                            background=data.background,
+                            tau_map=settings.tau_map)
 
     value_and_grad = jax.jit(jax.value_and_grad(cost_closure, has_aux=True))
 
     #@jax.jit
     def lower(params_init, opt_state_init, iterations: int):
-        print(iterations)
 
-        #@jax.jit
+        @jax.jit
         @scan_tqdm(iterations, leave=settings.leave_tqdm)
         def body(state, i):
             params, opt_state, loss_state = state
+
+            #jax.debug.print(opt_state[0])
+            
             (loss, aux), grads = value_and_grad(params)
             updates, opt_state = optimizer.update(grads, opt_state)
             params = optax.apply_updates(params, updates)
@@ -205,27 +209,27 @@ def make_lower(
             params = (u, params[1], params[2])
 
             # Update loss state
-            loglike, penalty, total_cost = loss_state
-            total_cost = total_cost.at[i].set(loss)
-
-            loglike = loglike.at[i].set(aux["loglike"])
-            penalty = penalty.at[i].set(aux["penalty"])
-            loss_state = (loglike, penalty, total_cost)
+            loss_state = jax.tree.map(
+                lambda state, val: state.at[i].set(val),
+                loss_state,
+                {k: v for k, v in aux.items() if k in loss_state}
+            )
 
             return (params, opt_state, loss_state), loss
 
-        loglike = jnp.zeros(iterations)
-        penalty = jnp.zeros(iterations)
-        total_cost = jnp.zeros(iterations)
-
-        loss_state = (loglike, penalty, total_cost)
+        # TODO Need a way to get all losses to construct the arrays
+        losses = ('loglike', 'penalty', 'loss_bg')
+        loss_state = {loss: jnp.zeros(iterations) for loss in losses}
 
         (params, opt_state, loss_state), loss = jax.lax.scan(
             body,
             (params_init, opt_state_init, loss_state),
             xs=jnp.arange(iterations)
         )
-        return params, loss_state
+        mu_tau, beta_tau, contaminants = params
+        mu = settings.tau_map.from_tau(mu_tau)
+        beta = settings.tau_map.from_tau(beta_tau) if len(beta_tau) > 0 else ()
+        return (mu, beta, contaminants), loss_state
     return lambda : lower(params_init, opt_state_init, iterations)
 
 
@@ -257,10 +261,7 @@ class OptimizationComponents:
     initial: Float[Array, "Ein Eg"]
     # The mask of the data to optimize
     mask: Float[Array, "Ein Eg"]
-    loss: LossFn | Loss = KullbackLeibler()
-    loss_background: LossFn | Loss = KullbackLeibler()
-    penalties: tuple[PenaltyFn, ...] = ()
-    penalties_background: tuple[PenaltyFn, ...] = ()
+    loss: ModelLoss = ModelLoss()
 
     def __post_init__(self):
         self.initial = into_array(self.initial)
@@ -272,39 +273,12 @@ class OptimizationComponents:
     def __len__(self):
         return len(self.initial)
 
-@dataclass(kw_only=True)
-class OptimizationSettings:
-    """
-    Settings for optimization using Adam optimizer and other optimization settings.
-
-    This class holds parameters for the Adam optimizer and other optimization settings.
-    """
-    # Optimisation parameters
-    optimizer: Optimizer
-    iterations: int = 10
-    # General parameters
-    leave_tqdm: bool = True
-    disable_tqdm: bool = False
-
-    def __post_init__(self):
-        self.iterations = int(self.iterations)
-
-    @classmethod
-    def from_kwargs(cls, optimizer: Optimizer, **kwargs) -> Self:
-        # We pop all keys from the dict, ensuring they do not remain in kwargs
-        keys = {
-            "iterations",
-            "leave_tqdm",
-            "disable_tqdm",
-        }
-        values = {k: kwargs.pop(k) for k in keys if k in kwargs}
-        return cls(optimizer=optimizer, **values)
 
 @dataclass(kw_only=True)
 class OptimizationData:
     # Input data
-    raw: Float[Array, "Ein Eg"]
-    backgrounds: tuple[Float[Array, "Ein Eg"], ...] = ()
+    raw: Data2D
+    background: BackgroundModel2D = BackgroundModel2D()
     # Model of the folding process
     D: Float[Array, "Ein Eg"]
     G_eg: Float[Array, "Ein Eg"]
@@ -319,25 +293,35 @@ class OptimizationData:
         self.G_eg = into_array(self.G_eg)
         self.G_ex = into_array(self.G_ex)
         self.raw = into_array(self.raw)
-        self.backgrounds = tuple(into_array(background) for background in self.backgrounds)
 
-        for i, background in enumerate(self.backgrounds):
+        if not isinstance(self.background, BackgroundModel2D):
+            if not isinstance(self.background, Iterable):
+                self.background = BackgroundModel2D(backgrounds=(into_array(self.background),))
+            else:
+                self.background = BackgroundModel2D(backgrounds=tuple(into_array(bg) for bg in self.background))
+
+        for i, background in enumerate(self.background.backgrounds):
             if self.raw.shape != background.shape:
                 raise ValueError(f"Raw and background #{i} must have the same shape")
+
+    @property
+    def has_background(self) -> bool:
+        return len(self.background.backgrounds) > 0
 
 @dataclass(kw_only=True)
 class OptimizationResult:
     prototype: Matrix
     mu: Matrix
     beta: Matrix | None = None
-    total_cost: jnp.ndarray
-    loglike: jnp.ndarray
-    penalty: jnp.ndarray
+    aux: dict[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self):
         self.mu = self.prototype.clone(values=self.mu)
         if self.beta is not None:
             self.beta = self.prototype.clone(values=self.beta)
+
+        for key, value in self.aux.items():
+            self.aux[key] = np.asarray(value)
 
 
 @dataclass(kw_only=True)
