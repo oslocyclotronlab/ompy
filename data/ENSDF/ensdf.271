@@ -1,0 +1,121 @@
+271SG    ADOPTED LEVELS                                          22NDS    202205
+267SG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271SG  Q -1242     SY 4885   SY 5069   SY 8748    SY   2021WA16                 
+271SG cQ $|DQ(|b{+-})=705, |DS(n)=748, |DS(p)=824, |DQ(|a)=138 (2021Wa16)       
+271SG cQ $S(2n)=11218 syst {I696} (2021Wa16)                                    
+271SG c  $ {+271}Sg has been observed as the |a-decay daughter of {+275}Hs at   
+271SG2c  JINR (2004Og12,2006Og05) and GSI (2012Ho12).  Chains of |a-decaying    
+271SG3c  nuclei were observed which terminated in spontaneous fission.  The     
+271SG4c  properties of these chains were compared to the literature in order    
+271SG5c  to assign individual decays to specific nuclei.                        
+271SG c  $ 2016Ho09 revises chain #1 in 2012Ho12 to begin with {+291}Lv.  An    
+271SG2c  additional |a decay was also identified, such that the decay labeled   
+271SG3c  as {+277}Hs is actually {+271}Sg.                                      
+271SG c  $ Half-lives, branching ratios, and |a-decay energies in this          
+271SG2c  evaluation have been computed from the individual events listed in     
+271SG3c  the references above.  Half-life uncertainties have been computed      
+271SG4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+271SG5c  uncertainty is assumed for the |a-decay energies, which is added in    
+271SG6c  quadrature to the averaged statistical uncertainty.                    
+271SG  XA275HS A DECAY (0.20 S)                                                 
+271SG  L 0                              96 S     +88-31                         
+271SGX L XREF=A                                                                 
+271SG2 L %A=50$%SF=50                                                           
+271SG cL E$Assumed ground state.                                                
+271SG cL T$From four events.                                                    
+
+271SG    275HS A DECAY (0.20 S)                                  22NDS    202205
+267SG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271SG c  $ References: 2004Og12,2006Og05,2012Ho12,2016Ho09.                     
+275HS  P 0                              0.20 S    +19-7          9.45E+3  5     
+275HS cP T$From Adopted Levels.                                                 
+275HS cP QP$From 2021Wa16                                                       
+271SG  N                        1.0                                             
+271SG  L 0                              96 S     +88-31                         
+271SG2 L %A=50$%SF=50                                                           
+271SG  A 9.31E3    2                                                            
+271SG cA E$Weighted average of four events.                                     
+271SG cA $Assumed g.s. to g.s. transition.                                      
+
+271BH    ADOPTED LEVELS                                          22NDS    202205
+267BH  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271BH  Q -1832     SY 6442   SY 2861   SY 9.42E+3 9    2021WA16                 
+271BH cQ $|DQ(|b{+-})=473, |DS(n)=486, |DS(p)=598 (2021Wa16)                    
+271BH cQ $S(2n)=11761 syst {I536},  S(2p)=7867 syst {I732} (2021Wa16)           
+271BH c  $ {+271}Bh has been observed as the |a-decay daughter of {+275}Mt at   
+271BH2c  JINR (2004Og03,2013Og01) and GSI (2013Ru11).  Chains of correlated |a  
+271BH3c  decays terminated by spontaneous fission were observed, and            
+271BH4c  comparison of their properties to previously observed chains allowed   
+271BH5c  individual decays to be assigned to specific nuclei.                   
+271BH c  $ Half-lives, branching ratios, and |a-decay energies in this          
+271BH2c  evaluation have been computed from the individual events listed in     
+271BH3c  the references above.  Half-life uncertainties have been computed      
+271BH4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+271BH5c  uncertainty is assumed for the |a-decay energies, which is added in    
+271BH6c  quadrature to the averaged statistical uncertainty.                    
+271BH  XA275MT A DECAY (20 MS)                                                  
+271BH  L 0                              1.5 S     +28-6                         
+271BHX L XREF=A                                                                 
+271BH2 L %A=100$%SF LE 25                                                       
+271BH cL E$Assumed ground state.                                                
+271BH cL T$From two events.                                                     
+
+271BH    275MT A DECAY (20 MS)         2004OG03,2013OG01,2013RU1122NDS    202205
+267BH  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+275MT  P 0                              20 MS     +24-7          1.048E+4 5     
+275MT cP T$From Adopted Levels.                                                 
+275MT cP QP$From 2021Wa16                                                       
+271BH  N                        1.0                                             
+271BH  L 0                              1.5 S     +28-6                         
+271BH2 L %A=100$%SF LE 25                                                       
+271BH  A 10.33E3   1                                                            
+271BH cA $Assumed g.s. to g.s. transition.                                      
+271BH cA E$Weighted average of three events.                                    
+
+271HS    ADOPTED LEVELS                                          22NDS    202205
+267HS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271HS  Q -3409     SY 5492   SY 3828   SY 9460    SY   2021WA16                 
+271HS cQ $|DQ(|b{+-})=430, |DS(n)=371, |DS(p)=406, |DQ(|a)=87 (2021Wa16)        
+271HS cQ $S(2n)=12945 syst {I305},  S(2p)=6579 syst {I460} (2021Wa16)           
+271HS c  $ {+271}Hs has been observed in gas-phase chemistry experiments at GSI 
+271HS2c  (2006Dv01,2008Dv02).  Events were identified based on the observation  
+271HS3c  of chains of |a-decaying nuclei correlated in time and position.       
+271HS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+271HS2c  evaluation have been computed from the individual events listed in     
+271HS3c  the references above.  Half-life uncertainties have been computed      
+271HS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+271HS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+271HS6c  quadrature to the averaged statistical uncertainty.                    
+271HS  L 0                                                                      
+271HS2 L %A=100$%SF<15                                                          
+271HS cL E$Assumed ground state.                                                
+
+271DS    ADOPTED LEVELS                                          22NDS    202205
+267DS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271DS  Q              6800   SY 2046   SY 10870   18   2021WA16                 
+271DS cQ $|DS(n)=105, |DS(p)=214 (2021Wa16)                                     
+271DS cQ $S(2n)=15025 syst {I102},  S(2p)=3119 syst {I163},  Q(|ep)=3551 syst   
+271DS2cQ {I266} (2021Wa16)                                                      
+271DS c  $ {+271}Ds has been observed in the {+208}Pb({+64}Ni,n) reaction at    
+271DS2c  GSI (1998Ho13,2011Ho10), LBNL (2003Gi05,2004Fo08), RIKEN (2004Mo40),   
+271DS3c  and HIRFL (2012Zh04).  Events were identified based on the             
+271DS4c  observation of chains of |a decays correlated in time and position.    
+271DS5c  Comparison of the properties of these chains with the literature       
+271DS6c  allowed individual decays to be assigned to speciifc nuclei.           
+271DS c  $ Evidence for the existence of an isomer in {+271}Ds comes from the   
+271DS2c  observation of |a decays with similar energies but very different      
+271DS3c  lifetimes.  2004Mo40 suggests that this isomer is much longer lived    
+271DS4c  than the ground state, to which it decays by internal transition.      
+271DS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+271DS2c  evaluation have been computed from the individual events listed in     
+271DS3c  the references above.  Half-life uncertainties have been computed      
+271DS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+271DS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+271DS6c  quadrature to the averaged statistical uncertainty.                    
+271DS  L 0                              1.6 MS    +4-3                          
+271DS2 L %A=100                                                                 
+271DS cL E$Assumed ground state.                                                
+271DS cL T$From 30 events.                                                      
+271DS  L 0+x                            69 MS    +45-20                         
+271DS cL T$From six events.                                                     
+

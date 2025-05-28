@@ -66,6 +66,26 @@ class UnfoldedResult2D(Result):
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
         return self.raw.clone(values=m)  # Fix labels
 
+    def beta_eta(self, device='gpu?') -> Matrix:
+        if self.beta is None:
+            raise ValueError("No beta to fold")
+        if self.do_fold_beta:
+            m = self.G_ex@self.beta@self.G_eg
+        else:
+            return self.beta
+        return self.raw.clone(values=m, name='beta (eta)')  # Fix labels
+
+    def beta_nu(self, device='gpu?') -> Matrix:
+        if self.beta is None:
+            raise ValueError("No beta to fold")
+        if self.do_fold_beta:
+            m = self.G_ex@self.beta@self.GegD
+        else:
+            return self.beta
+        return self.raw.clone(values=m, name='beta (nu)')  # Fix labels
+
+    beta_folded = beta_nu
+
 
     def plot_comparison(self, ax: Axes | None = None, raw: bool = True, unfolded: bool = True,
                         initial: bool = False, folded: bool = True,

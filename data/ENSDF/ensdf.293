@@ -1,0 +1,55 @@
+293LV    ADOPTED LEVELS                                          22NDS    202205
+269LV  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+293LV  Q -3860     SY 5636   SY 3321   SY1.068E+4 6    2021WA16                 
+293LV cQ $|DQ(|b{+-})=933, |DS(n)=920, |DS(p)=869 (2021Wa16)                    
+293LV cQ $S(2n)=12819 syst {I808},  S(2p)=5510 syst {I869} (2021Wa16)           
+293LV c  $ Four publications have reported the production of {+293}Lv through   
+293LV2c  the {+248}Cm({+48}Ca,3n) reaction, two using DGFRS at JINR             
+293LV3c  (2001Og01,2002Og09), one using SHIP at GSI (2012Ho12), and one using   
+293LV4c  GARIS at RIKEN (2017Ka66).  In the DGFRS experiments, {+293}Lv was     
+293LV5c  originally identified as {+292}Lv, but the assignment was later        
+293LV6c  revised.  Evaporation residues from the reaction were implanted into   
+293LV7c  position-sensitive silicon detectors, and identified by the            
+293LV8c  observation of subsequent time- and position-correlated |a-decay       
+293LV9c  chains terminated by spontaneous fission.  Comparison of the decay     
+293LVac  chains with the properties of the known daughter nuclei allowed        
+293LVbc  assignment of the evaporation residues to {+293}Lv.  A total of seven  
+293LVcc  events were positively identified, with another three events being     
+293LVdc  considered tentative.                                                  
+293LV c  $ Half-lives, branching ratios, and |a-decay energies in this          
+293LV2c  evaluation have been computed from the individual events listed in     
+293LV3c  the references above.  Half-life uncertainties have been computed      
+293LV4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+293LV5c  uncertainty is assumed for the |a-decay energies, which is added in    
+293LV6c  quadrature to the averaged statistical uncertainty.                    
+293LV  L 0                              95 MS    +63-27                         
+293LV2 L %A=100$%SF LE 12.5                                                     
+293LV cL E$Assumed ground state.                                                
+293LV cL T$From six events.                                                     
+
+293TS    ADOPTED LEVELS                                          22NDS    202205
+269TS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+293TS  Q -4374     SY 7264   SY 994    SY1.132E+4 5    2021WA16                 
+293TS cQ $|DQ(|b{+-})=1053, |DS(n)=1026, |DS(p)=1090 (2021Wa16)                 
+293TS cQ $S(2n)=13368 syst {I980},  S(2p)=4330 syst {I1070},  Q(|ep)=539 syst   
+293TS2cQ {I1046} (2021Wa16)                                                     
+293TS c  $ Four publications have reported the production of {+293}Ts through   
+293TS2c  the {+249}Bk({+48}Ca,4n) reaction, one using TASCA at GSI (2019Kh04)   
+293TS3c  and three using DGFRS at JINR (2012Og06,2013Og04,2011Og04).            
+293TS4c  Evaporation residues were implanted into position-sensitive silicon    
+293TS5c  detectors, and identified based on the observation of time- and        
+293TS6c  position-correlated |a-decay chains terminated by spontaneous          
+293TS7c  fission, with properties matching those of the known daughter nuclei.  
+293TS8c  Eighteen such chains have been observed in total, with two missing     
+293TS9c  the |a-decay of {+293}Ts.                                              
+293TS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+293TS2c  evaluation have been computed from the individual events listed in     
+293TS3c  the references above.  Half-life uncertainties have been computed      
+293TS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+293TS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+293TS6c  quadrature to the averaged statistical uncertainty.                    
+293TS  L 0                              21 MS     +7-4                          
+293TS2 L %A=100$%SF<6                                                           
+293TS cL E$Assumed ground state.                                                
+293TS cL T$From 16 events.                                                      
+

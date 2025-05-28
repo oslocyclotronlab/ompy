@@ -20,9 +20,8 @@ else:
     def get_global_dtype():
         return __DTYPE
 
-    import os
     from pint import UnitRegistry
-    from pint.errors import DimensionalityError
+    from pint import DimensionalityError
     ureg = UnitRegistry(system='SI')
     ureg.setup_matplotlib()
     u = ureg
@@ -166,14 +165,10 @@ def __getattr__(name):
     def _import(name):
         return importlib.import_module("." + name, __package__)
     match name:
-        case "unfolding":
-            return _import("unfolding")
-        case "detector":
-            return _import("detector")
-        case "decomposition":
-            return _import("decomposition")
+        case "unfolding" | "detector" | "external" | "decomposition" | "nuclear":
+            return _import(name)
         case _:
             raise AttributeError(f"module {__name__} has no attribute {name}")
 
 def __dir__():
-    return sorted(list(globals().keys()) + ["unfolding", "detector"])
+    return sorted(list(globals().keys()) + ["unfolding", "detector", "nuclear", "external"])

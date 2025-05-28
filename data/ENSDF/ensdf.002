@@ -1,0 +1,119 @@
+  2      COMMENTS                                                ENSDF    200309
+  2   C  TITL$COMMENTS DATASET FOR A=2                                          
+  2   c  AUTH$J.H. KELLEY AND J.L. GODWIN                                       
+  2   c  INST$Triangle Universities Nuclear Laboratory                          
+  2  #c       Durham, North Carolina 27708-0308                                 
+  2   c  ABST$Compilation of energy levels of A=2 nuclei, with emphasis on the  
+  2  2c  structure of the A=2 system.                                           
+  2   c  CUT$MAY 1, 2003                                                        
+  2   c  FUND$This work is supported by the US Department of Energy, office of  
+  2  xc  high energy and nuclear physics, under: contract no.                   
+  2  xc  DEFGO2-97-ER41042 (NORTH CAROLINA STATE University); contract no.      
+  2  xc  DEFGO2-97-ER41033 (DUKE University)                                    
+
+  2      REFERENCES                                              ENSDF    200309
+  2    R 1972RE08 JOUR PRLTA 29 494                                             
+  2    R 1973RE08 JOUR NUPAB A208 574                                           
+  2    R 1978AM08 JOUR PRVCA 17 403                                             
+  2    R 1979BI14 JOUR PLRAA 20 381                                             
+  2    R 1979CO12 JOUR PRLTA 43 572                                             
+  2    R 1980GR02 JOUR PRVCA C21 498                                            
+  2    R 1980GR06 JOUR PYLBB 92B 279                                            
+  2    R 1980IS02 JOUR CJPHA 58 168                                             
+  2    R 1982BO06 JOUR PYLBB 109 262                                            
+  2    R 1982GO20 JOUR PYLBB 118 241                                            
+  2    R 1982VA13 JOUR NUPAB 380 261                                            
+  2    R 1983LO03 JOUR PYLBB 120 270                                            
+  2    R 1985KA05 JOUR NUPAB 435 502                                            
+  2    R 1986GR01 JOUR PRLTA 56 819                                             
+  2    R 1986HO07 JOUR PYLBB 172 1                                              
+  2    R 1987CO39 JOUR RMPHA 59 1121                                            
+  2    R 1990RO02 JOUR PRVCA 41 898                                             
+  2    R 1990WA22 JOUR NIMAE 292 671                                            
+  2    R 1993GO37 JOUR PLRAA 47 3433                                            
+  2    R 1993HA33 JOUR PRVCA 48 2190                                            
+  2    R 1993VAZY JOUR BAPSA 38 947,C9 11,Van Dyck                              
+  2    R 1994KI27 JOUR NIMAE 353 285                                            
+  2    R 1995AU04 JOUR NUPAB 595 409                                            
+  2    R 1996FIZY BOOK Table of Isotopes, 8th Ed., John Wiley and Sons          
+  2    R 1997AU04 JOUR NUPAB 624 1                                              
+  2    R 1997BR44 JOUR HYIND 108 227                                            
+  2    R 1997RO26 JOUR IEIMA 46 560                                             
+  2    R 2000GR22 JOUR ZCCNE 15 1                                               
+
+  2H     ADOPTED LEVELS                                          ENSDF    200309
+  2H   H TYP=FUL$AUT=J.H. KELLEY, J.L. GODWIN$CUT=1-May-2003$                   
+  2H   Q             2224.566 12224.566  1             2012WA38                 
+  2H  cQ $Note: Current evaluation has used the following Q record              
+  2H 2cQ             2224.573 {I22224}.573 {I2}              1997Au04,1997Br44  
+  2H  cQ $The deuteron mass excess is 13135.720 {I1} keV (1997Au04).            
+  2H  t                                                                         
+  2H  t            Deuteron binding energy from capture |g wavelength =         
+  2H 2t   2224.5890 {I22} keV (1986Gr01); revised to 2224.5756 {I22} keV by upda
+  2H +t  te of                                                                  
+  2H 3t   fundamental constants (1990Wa22).                                     
+  2H  t                                                                         
+  2H  t            Other measured values related to the deutron mass are:       
+  2H  t                                                                         
+  2H  t            Mass                               comment                   
+  2H  t  -----------------------   -------------------------------------------  
+  2H  t   2.01410177795 {I60} U (amu)  from n+p ground state transition (1997Ro2
+  2H +t  6)                                                                     
+  2H  t   1875.612762 {I75} MeV/c{+2}     (2000Gr22).                           
+  2H  t   2.013553214 {I24} U (amu)    (1987Co39).                              
+  2H  t   2.014101764 {I13} U (amu)    from Fourier-transform ion-cyclotron-    
+  2H 2t                            resonance mass spectrometry (1993Go37). Also 
+  2H 3t                            deduce S(n)=2224.579 {I13} keV.              
+  2H  t   2.01410177403 {I86} U (amu)  from Penning trap mass spectrometry      
+  2H 2t                            (1993VaZY).                                  
+  2H  t   2.0141017779 {I5} U (amu)    from Penning trap ion cyclotron resonance
+  2H 2t                            method (1997Br44).                           
+  2H  t                                                                         
+  2H   L 0           1+                STABLE                                   
+  2H 2 L MOMM1=+0.857438230 24 (1987Co39,1996FiZY)                              
+  2H 3 L MOME2=0.002860 15 (1996FiZY)                                           
+  2H  cL MOME2     The authors of (1972Re08) used measurements of the quadrupole
+  2H 2cL interaction constant for D{-2} and HD molecules to calculate the       
+  2H 3cL deuteron quadrupole moment. Errors in the original value               
+  2H 4cL (0.2875 {I20} E-26 cm{+2}) were corrected in an erratum to yield       
+  2H 5cL the presently accepted value 0.2860 {I15} E-26 cm{+2}. For other values
+  2H 6cL in the literature, see Table 1 of (1972Re08). See (1979Bi14) who       
+  2H 7cL confirm (1973Re08) based on improved computation techniques. See       
+  2H 8cL (1993Ha33) who cite 0.2859 {I3} E-26 cm{+2} based on (1979Bi14),       
+  2H 9cL however this value does not appear in the text of (1979Bi14). Also see 
+  2H AcL (1985Ka05) who measured T{-20} in {+208}Pb({+2}H,{+2}H) and deduced    
+  2H BcL 0.282 {I19} E-26 cm{+2}.                                               
+  2H  cL MOMM1     From (1987Co39): "The adjustment of the fundamental physical 
+  2H 2cL constants".                                                            
+  2H  tL $                                                                      
+  2H 2tL     Values for the asymtotic D/S-State ratio for the deuteron          
+  2H 2tL     are summarized below (as given in (1990Ro02))                      
+  2H 2tL                                                                        
+  2H 2tL    D/S                         Comment                                 
+  2H 2tL ---------    --------------------------------------------------        
+  2H 2tL 0.0256 {I4}       from sub-Coulomb (d,p) (1990Ro02).                   
+  2H 2tL 0.0271 {I8}       from sub-Coulomb (d,p) (1982Go20).                   
+  2H 2tL 0.0270 {I6}       from (d,p) elastic scattering (1986Ho07).            
+  2H 2tL 0.0259 {I7}       from (d,p) elastic scattering (1980Gr06).            
+  2H 2tL 0.0263 {I13}      from (d,p) elastic scattering (1979Co12).            
+  2H 2tL 0.027 {I5}        from (d,p) elastic scattering (1978Am08).            
+  2H 2tL 0.0272 {I4}       from {+2}H(d,p) (1982Bo06).                          
+  2H 2tL 0.0264 {I14}      from (d,p) elastic scattering (1983Lo03).            
+
+  2H     1H(N,G) E=THERMAL             1994KI27,1982VA13,1980IS02ENSDF    200309
+  2H   H TYP=FUL$AUT=J.H. KELLEY, J.L. GODWIN$CUT=1-May-2003$                   
+  2H  c  Target J|p=1/2+.                                                       
+  2H  c  Measured E|g and I|g, deduced S(n)                                     
+  2H xc  (1994Ki27,1982Va13,1980Is02,1980Gr02).                                 
+  2H  c  Evaluated S(n)=2224.57 keV (1995Au04).                                 
+  2H  cL E(A),J(A)$From (1996FiZY)                                              
+  2H  cG RI        Intensity per 100 neutron captures                           
+  2H   N 1                                                                      
+  2H  PN                                                                        
+  2H   L 0.0         1+                STABLE                                   
+  2H 3 L FLAG=A$                                                                
+  2H   L  2224.5725220+,1+                                                     S
+  2H  cL J         from s-wave neutron capture                                  
+  2H   G 2223.245  3 100                                                        
+  2H  cG E         from level-energies difference                               
+

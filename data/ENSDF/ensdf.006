@@ -1,0 +1,1755 @@
+  6      COMMENTS                                                02NP     200212
+  6   C  TITL$ABSTRACT FOR A=6                                                  
+  6   c  AUTH$D.R. Tilley, J.H. Kelley                                          
+  6   c  INST$Triangle Universities Nuclear Laboratory                          
+  6  #c       Durham, NC 27708 and Dept. of Physics, North Carolina             
+  6  #c       State University, Raleigh, |a(N) 27695                            
+  6   c  AUTH$C.M. Cheves, J.L. Godwin, G. Sheu,H.R. Weller                     
+  6   c  INST$Triangle Universities Nuclear Laboratory                          
+  6  #c       Durham, NC 27708 and Dept. of Physics, Duke University            
+  6  #c       Durham, NC 27708                                                  
+  6   c  AUTH$G.M. Hale                                                         
+  6   c  INST$Los Alamos National Laboratory, Los Alamos, NM 87545              
+  6   c  AUTH$H.M. Hoffmann                                                     
+  6   c  INST$Universiteat Erlangen-Neurenberg, Germany                         
+  6   c  ABST$Compilation of energy levels of A=6 nuclei, with emphasis on the  
+  6  2c  review of material leading to information about structure of the A=6   
+  6  3c  system. This work is a summary of 2002Ti10, D.R. Tilley, c.m. Cheves,  
+  6  4c  J.L. Godwin, G.M. Hale, H.M. Hofmann, J.H. Kelley, G. Sheu and H.R.    
+  6  5c  Weller, Nuclear Physics A 708 (2002) 3.                                
+  6   c  CUT$August 23, 2001.                                                   
+  6   c  FUND$This work is supported by the US Department of Energy, Office of  
+  6  xc  High Energy and Nuclear Physics, under: contract no. DEFGO2-97-ER41042 
+  6  xc  (North Carolina State University); contract no. DEFGO2-97-ER41033      
+  6  xc  (Duke University)                                                      
+  6   C  CIT$NP A708, 3 (2002)                                                  
+
+  6      REFERENCES                                                       201209
+  6    R 1964MA26 JOUR NUPHA 55 433                                             
+  6    R 1964SE07 JOUR NUPHA 57 624                                             
+  6    R 1965BR28 JOUR NUPHA 72 194                                             
+  6    R 1965FO07 JOUR NUPHA 67 517                                             
+  6    R 1965ZU02 JOUR NUPHA 72 225                                             
+  6    R 1966BE22 JOUR NUPHA 82 52                                              
+  6    R 1966EC01 JOUR PHLTA 20 190                                             
+  6    R 1966GU09 JOUR YAFIA 4 93                                               
+  6    R 1966LA20 JOUR NUPHA 88 411                                             
+  6    R 1966MA36 JOUR NUPHA 88 137                                             
+  6    R 1966RA29 JOUR PHRVA 144 859                                            
+  6    R 1967AC01 JOUR NUCUA 5 1252                                             
+  6    R 1967HI13 JOUR BTITA No76 159                                           
+  6    R 1967HO01 JOUR NUPAB A90 545                                            
+  6    R 1967KU10 JOUR PHRVA 163 1066                                           
+  6    R 1967PA03 JOUR NUPAB A96 476                                            
+  6    R 1967YO01 JOUR NUPAB A90 41                                             
+  6    R 1968BA41 JOUR NUPAB A120 297                                           
+  6    R 1968BE72 JOUR ANPHA 3 213                                              
+  6    R 1968CO07 JOUR NUPAB A110 321                                           
+  6    R 1968GE04 JOUR NUPAB A116 209                                           
+  6    R 1968IV01 JOUR NUPAB A110 441                                           
+  6    R 1968LE01 JOUR NUPAB A106 357                                           
+  6    R 1968LU02 JOUR NUPAB A109 676                                           
+  6    R 1968MA03 JOUR NUPAB A107 624                                           
+  6    R 1968ME25 JOUR JPRAA 29 969                                             
+  6    R 1968SI07 JOUR YAFIA 7 950                                              
+  6    R 1968WA11 JOUR NUPAB A114 561                                           
+  6    R 1969BA05 JOUR NUPAB A126 60                                            
+  6    R 1969BL14 JOUR PYLBB 30B 100                                            
+  6    R 1969DE04 JOUR NUPAB A126 261                                           
+  6    R 1969LI02 JOUR NUPAB A123 147                                           
+  6    R 1969LI06 JOUR JPRAA 30 17                                              
+  6    R 1969MA13 JOUR JUPSA 26 1344                                            
+  6    R 1969NA16 JOUR YAFIA 10 705                                             
+  6    R 1969OG01 JOUR JUPSA 26 852                                             
+  6    R 1969OR01 JOUR NUPAB A139 226                                           
+  6    R 1969PR04 JOUR NUPAB A131 679                                           
+  6    R 1969RA20 JOUR PHRVA 183 918                                            
+  6    R 1969TA05 JOUR NUPAB A126 615                                           
+  6    R 1970AB12 JOUR IANFA 34 1724                                            
+  6    R 1970DE12 JOUR NUPAB A147 488                                           
+  6    R 1970FR06 JOUR NUPAB A153 277                                           
+  6    R 1970GU06 JOUR NCIAA 67A 407                                            
+  6    R 1970HU13 JOUR NUPAB A154 261                                           
+  6    R 1970JE02 JOUR PRVCA C1 1622                                            
+  6    R 1970KE17 JOUR NUPAB A156 465                                           
+  6    R 1970KO25 JOUR YAFIA 11 711                                             
+  6    R 1970MI05 JOUR NUPAB A148 312                                           
+  6    R 1970NA02 JOUR PRLTA 24 675                                             
+  6    R 1970OR03 JOUR JUPSA 29 533                                             
+  6    R 1970PO03 JOUR NUPAB A147 65                                            
+  6    R 1971AR37 JOUR YAFIA 14 1105                                            
+  6    R 1971BI11 JOUR NUPAB A173 265                                           
+  6    R 1971CHYH JOUR JPQCA 6 163                                              
+  6    R 1971CO22 JOUR NUPAB A172 417                                           
+  6    R 1971DE08 JOUR PYLBB 34B 497                                            
+  6    R 1971DW01 JOUR PRVCA C4 1532                                            
+  6    R 1971GU07 JOUR NUPAB A165 240                                           
+  6    R 1971LI10 JOUR NUPAB A162 583                                           
+  6    R 1971ST05 JOUR PRVCA C3 984                                             
+  6    R 1971ZA07 JOUR NUPAB A173 273                                           
+  6    R 1972AR22 JOUR YAFIA 15 1102                                            
+  6    R 1972AZ03 JOUR NUPAB A195 581                                           
+  6    R 1972BA89 JOUR NUPAB A195 361                                           
+  6    R 1972BO42 JOUR NUPAB A195 241                                           
+  6    R 1972BR20 JOUR NUPAB A189 35                                            
+  6    R 1972BU01 JOUR PRVCA C5 391                                             
+  6    R 1972DE01 JOUR NUPAB A178 417                                           
+  6    R 1972GI07 JOUR NUPAB A187 490                                           
+  6    R 1972HA64 JOUR NUPAB A195 250                                           
+  6    R 1972JA07 JOUR NUPAB A184 615                                           
+  6    R 1972KA08 JOUR NUPAB A179 725                                           
+  6    R 1972ME05 JOUR NUPAB A182 428                                           
+  6    R 1972YO02 JOUR NUPAB A184 563                                           
+  6    R 1973AR05 JOUR YAFIA 17 225                                             
+  6    R 1973BA62 JOUR PRVCA C8 2029                                            
+  6    R 1973BR20 JOUR PRVCA C8 881                                             
+  6    R 1973CH35 JOUR NUPAB A212 189                                           
+  6    R 1973GR34 JOUR ZEPYA 265 411                                            
+  6    R 1973HA45 JOUR PRVCA C8 1226                                            
+  6    R 1973LI02 JOUR NUPAB A199 513                                           
+  6    R 1973MA59 JOUR IANFA 37 1729                                            
+  6    R 1973SA21 JOUR JUPSA 35 1                                               
+  6    R 1973SC26 JOUR NUPAB A212 573                                           
+  6    R 1973VO08 JOUR PRLTA 31 724                                             
+  6    R 1974AJ01 JOUR NUPAB A227 1                                             
+  6    R 1974AR05 JOUR YAFIA 19 25                                              
+  6    R 1974BI04 JOUR PRVCA C9 2154                                            
+  6    R 1974DE52 JOUR YAFIA 20 1106                                            
+  6    R 1974DU08 JOUR PZETA 19 531                                             
+  6    R 1974DW01 JOUR PRVCA C9 805                                             
+  6    R 1974KA28 JOUR PYLBB 52B 313                                            
+  6    R 1974MI05 JOUR PRLTA 32 684                                             
+  6    R 1974PE06 JOUR NUPAB A227 330                                           
+  6    R 1974VE01 JOUR NUPAB A219 157                                           
+  6    R 1974WI13 JOUR PRVCA C10 1762                                           
+  6    R 1975BE11 JOUR NUPAB A242 149                                           
+  6    R 1975BR21 JOUR AUJPA 28 235                                             
+  6    R 1975SC31 JOUR JPHGB G1 L57                                             
+  6    R 1975VI04 JOUR NUPAB A248 518                                           
+  6    R 1975VO08 JOUR APNYA 95 326                                             
+  6    R 1976AB11 JOUR IANFA 40 842                                             
+  6    R 1976DA24 JOUR NCLTA 15 563                                             
+  6    R 1976DE30 JOUR PRVCA C14 1659                                           
+  6    R 1976FA03 JOUR PHSTB 13 101                                             
+  6    R 1976IR02 JOUR NUPAB A265 349                                           
+  6    R 1976KI17 JOUR IANFA 40 800                                             
+  6    R 1976MA50 JOUR PRVCA C14 2037                                           
+  6    R 1976SH14 JOUR PRVCA C13 2122                                           
+  6    R 1976SM02 JOUR NUPAB A257 397                                           
+  6    R 1976WO11 JOUR PRVCA C14 815                                            
+  6    R 1977BR17 JOUR PRVCA C16 31                                             
+  6    R 1977DEYM CONF Tokyo(Nucl Struct),Proc,Vol1,P18,de Jong                 
+  6    R 1977FE05 JOUR CJPHA 55 428                                             
+  6    R 1977GE02 JOUR PRVCA C15 1835                                           
+  6    R 1977GU14 JOUR IANFA 41 2214                                            
+  6    R 1977HA17 JOUR PRVCA C15 1613                                           
+  6    R 1977HA34 JOUR NUPAB A287 237                                           
+  6    R 1977HA42 JOUR PRVCA C16 2151                                           
+  6    R 1977KA10 JOUR JPHGB G3 571                                             
+  6    R 1977KI08 JOUR NUIMA 143 371                                            
+  6    R 1977MC10 JOUR NUPAB A288 529                                           
+  6    R 1977RI07 JOUR PYLBB 68B 217                                            
+  6    R 1977RO01 JOUR NUPAB A275 453                                           
+  6    R 1977WA05 JOUR NUPAB A281 418                                           
+  6    R 1978AJ02 JOUR PRVCA C17 1283                                           
+  6    R 1978DE13 JOUR YAFIA 27 882                                             
+  6    R 1978DY01 JOUR PRVCA C18 2316                                           
+  6    R 1978RE05 JOUR PRLTA 41 1279                                            
+  6    R 1978RI02 JOUR PRVCA C17 1881                                           
+  6    R 1978SA26 JOUR PYLBB 79B 363                                            
+  6    R 1978VL01 JOUR NUPAB A303 368                                           
+  6    R 1979BA30 JOUR YAFIA 29 1137                                            
+  6    R 1979EG01 JOUR PYLBB 84B 176                                            
+  6    R 1979GA20 JOUR IJOPA 17 385                                             
+  6    R 1979HA19 JOUR NUPAB A321 71                                            
+  6    R 1979LA14 JOUR NUPAB A329 25                                            
+  6    R 1979MO16 JOUR PRLTA 43 910                                             
+  6    R 1980BA02 JOUR PRVCA C21 757                                            
+  6    R 1980BA62 JOUR IANFA 44 2421                                            
+  6    R 1980FU06 JOUR PYLBB 97 209                                             
+  6    R 1980ST01 JOUR PRVCA C21 44                                             
+  6    R 1980YE02 JOUR YTHLD 2 147                                              
+  6    R 1981AN24 JOUR FZKAA 13 31                                              
+  6    R 1981BA37 JOUR NUPAB 368 74                                             
+  6    R 1981BA38 JOUR NUPAB 368 93                                             
+  6    R 1981HE21 JOUR NUPAB 372 117                                            
+  6    R 1981KO34 JOUR NUPAB 372 109                                            
+  6    R 1981RO02 JOUR PRVCA 23 973                                             
+  6    R 1981SH06 JOUR PYLBB 101 124                                            
+  6    R 1981WA15 JOUR NUPAB 365 142                                            
+  6    R 1982AL17 JOUR PRVCA 26 252                                             
+  6    R 1982BR04 JOUR PRLTA 48 860                                             
+  6    R 1982PE06 JOUR NUPAB 383 355                                            
+  6    R 1983AR05 JOUR NCLTA 36 135                                             
+  6    R 1983CE01 JOUR PRVCA 27 6                                               
+  6    R 1983DE14 JOUR PRVCA 27 1876                                            
+  6    R 1983DE15 JOUR PRVCA 27 1887                                            
+  6    R 1983DO10 JOUR IANFA 47 943                                             
+  6    R 1983JE03 JOUR NUPAB 397 61                                             
+  6    R 1983KI10 JOUR NUPAB 405 159                                            
+  6    R 1983NO08 JOUR PRVCA 28 1140                                            
+  6    R 1983OT02 JOUR ZPAAD 311 303                                            
+  6    R 1983SE07 JOUR PRLTA 50 1831                                            
+  6    R 1983WA09 JOUR NUPAB 401 521                                            
+  6    R 1984BO49 JOUR PZETA 40 204                                             
+  6    R 1984KI16 JOUR PRVCA 30 1643                                            
+  6    R 1984SM04 JOUR PRVCA 30 593                                             
+  6    R 1985CU04 JOUR NCIAA 85 343                                             
+  6    R 1985DA29 JOUR CJPHA 63 1438                                            
+  6    R 1985FR01 JOUR NUPAB 433 351                                            
+  6    R 1985KR13 JOUR PRVCA 32 1083                                            
+  6    R 1985MI05 JOUR NUPAB 435 621                                            
+  6    R 1985PO10 JOUR PYLBB 157 120                                            
+  6    R 1985SA36 JOUR ZPAAD 322 627                                            
+  6    R 1985SE17 JOUR NUPAB 442 215                                            
+  6    R 1986AN04 JOUR NUPAB 451 741                                            
+  6    R 1986BE35 JOUR NUPAB 460 352                                            
+  6    R 1986BR31 JOUR YAFIA 44 312                                             
+  6    R 1986HA27 JOUR NUPAB 456 253                                            
+  6    R 1986KI12 JOUR PYLBB 175 279                                            
+  6    R 1986PE05 JOUR NUPAB 453 542                                            
+  6    R 1986SH14 JOUR PRVCA 33 2179                                            
+  6    R 1986SI18 JOUR NUPAB 458 387                                            
+  6    R 1987AB09 JOUR IANFA 51 930                                             
+  6    R 1987AL23 JOUR YAFIA 46 385                                             
+  6    R 1987BO39 JOUR YAFIA 46 12                                              
+  6    R 1987BO40 JOUR RRPQA 32 497                                             
+  6    R 1987BR02 JOUR PRVCA 35 383                                             
+  6    R 1987BU27 JOUR IANFA 51 615                                             
+  6    R 1987GA20 JOUR NCIAA 97 639                                             
+  6    R 1987GLZW CONF Yurmala,P383,Glukhov                                     
+  6    R 1987LA25 JOUR ZPAAD 328 497                                            
+  6    R 1988AJ01 JOUR NUPAB 490 1                                              
+  6    R 1988AR20 JOUR JUPSA 57 3773                                            
+  6    R 1988BO38 JOUR PZETA 48 124                                             
+  6    R 1988BU25 JOUR YAFIA 48 913                                             
+  6    R 1988BUZH CONF Baku,P362,Buranov                                        
+  6    R 1988ENZZ REPT Univ Birmingham Nucl Phys Group Ann Rept,P1,England      
+  6    R 1988JA01 JOUR PYLBB 201 25                                             
+  6    R 1988KA09 JOUR NUPAB 480 323                                            
+  6    R 1988LA11 JOUR ZPAAD 330 183                                            
+  6    R 1988PA27 JOUR UFZHA 33 976                                             
+  6    R 1988WA24 JOUR PRVCA 38 2478                                            
+  6    R 1989BO42 JOUR NUPAB 505 215                                            
+  6    R 1989CO22 JOUR RAACA 46 13                                              
+  6    R 1989GI01 JOUR NIMAE 276 169                                            
+  6    R 1989GU05 JOUR YAFIA 49 3                                               
+  6    R 1989KA30 JOUR NUPAB 501 108                                            
+  6    R 1989LI09 JOUR PYLBB 219 394                                            
+  6    R 1989RA17 JOUR ADNDA 42 189                                             
+  6    R 1989TA21 JOUR PRLTA 63 1784                                            
+  6    R 1990AM04 JOUR PZETA 51 607                                             
+  6    R 1990GL04 JOUR PRVCA 41 2487                                            
+  6    R 1990LE05 JOUR ZPAAD 335 183                                            
+  6    R 1990MI10 JOUR PRVCA 42 732                                             
+  6    R 1990OAZY REPT Univ Colorado Nucl Phys Lab Tech Prog,P13,Oakley         
+  6    R 1990PA25 JOUR PYLBB 251 483                                            
+  6    R 1990RA08 JOUR PRVCA 41 1920                                            
+  6    R 1990RI01 JOUR PYLBB 235 31                                             
+  6    R 1990TR02 JOUR PRVCA 41 2134                                            
+  6    R 1991AR19 JOUR FBSYE 10 187                                             
+  6    R 1991BO31 JOUR ZPAAD 340 255                                            
+  6    R 1991GL03 JOUR NUPAB 534 349                                            
+  6    R 1991RI01 JOUR PRVCA 43 745                                             
+  6    R 1992BO25 JOUR YAFIA 55 1729                                            
+  6    R 1992GO21 JOUR BRSPE 56 439                                             
+  6    R 1992KO19 JOUR BRSPE 56 448                                             
+  6    R 1992PE12 JOUR PRVCA 46 2354                                            
+  6    R 1992SA01 JOUR PRVCA 45 1757                                            
+  6    R 1992SO02 JOUR PRVCA 45 R500                                            
+  6    R 1993BO24 JOUR NUPAB 560 664                                            
+  6    R 1993KO33 JOUR BRSPE 57 148                                             
+  6    R 1993MA48 JOUR BRSPE 57 889                                             
+  6    R 1993SA35 JOUR EULEE 22 511                                             
+  6    R 1994DO32 JOUR BRSPE 58 1910                                            
+  6    R 1994HE11 JOUR NUPAB 571 541                                            
+  6    R 1994RE15 JOUR PRVCA 50 2917                                            
+  6    R 1994RI06 JOUR PRVCA 49 3117                                            
+  6    R 1994SA32 JOUR PRVCA 50 1226                                            
+  6    R 1994SH38 JOUR JUPSA 63 478                                             
+  6    R 1995AR14 JOUR YAFIA 58,No 2,215                                        
+  6    R 1995BU20 JOUR YAFIA 58,No 4,596                                        
+  6    R 1995CA26 JOUR NUPAB 591 349                                            
+  6    R 1995KE10 JOUR PRVCA 52 1924                                            
+  6    R 1995SA18 JOUR NUPAB 587 355                                            
+  6    R 1995WA16 JOUR PRVCA 51 R2871                                           
+  6    R 1995YA12 JOUR PRVCA 52 2535                                            
+  6    R 1996AR16 JOUR PYLBB 389 452                                            
+  6    R 1996BB23 JOUR NIMAE 381 4                                              
+  6    R 1996BU06 JOUR YAFIA 59,No 1,33                                         
+  6    R 1996GA29 JOUR PRVCA 54 3273                                            
+  6    R 1996JA11 JOUR PRVCA 54 1070                                            
+  6    R 1996KE09 JOUR PRVCA 54 1267                                            
+  6    R 1996RU13 JOUR NUPAB 609 147                                            
+  6    R 1997AU07 JOUR PRBMD 56 11294                                           
+  6    R 1997FA17 JOUR NUPAB 624 370                                            
+  6    R 1998BR10 JOUR PRVCA 57 3437                                            
+  6    R 1998CE04 JOUR PLRAA 57 2539                                            
+  6    R 1998HA24 JOUR NIMAE 401 345                                            
+  6    R 1998JU03 JOUR PRVCA 57 2700                                            
+  6    R 1999AN13 JOUR NUPAB 648 3                                              
+  6    R 1999BO23 JOUR PRLTA 82 5205                                            
+  6    R 1999DM02 JOUR BRSPE 63 169                                             
+  6    R 1999LA13 JOUR PRLTA 82 4404                                            
+  6    R 1999WA08 JOUR PRVCA 59 3177                                            
+  6    R 2000NA22 JOUR PRLTA 85 262                                             
+  6    R 2000NA35 JOUR PYLBB 493 209                                            
+  6    R 2000SC11 JOUR ZAANE 7 367                                              
+  6    R 2001BO38 JOUR PRVCA 64 031601                                          
+  6    R 2001FU14 JOUR PRVCA 64 034608                                          
+  6    R 2001MU30 JOUR PRVCA 64 068801                                          
+  6    R 2001NA19 JOUR NUPAB 687 97c                                            
+  6    R 2002TI10 JOUR NUPAB 708 3                                              
+
+  6NN    ADOPTED LEVELS                                          ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN  XA14C(7LI,6N)                                                            
+  6NN  XB48CA(12C,6N),40CA(12C,6N)                                              
+  6NN  XCW(P,6N)                                                                
+  6NN  XD238U(P,6N)                                                             
+  6NN  XE238U(A,6N)                                                             
+  6NN  XF252CF SF DECAY                                                         
+  6NN c  Searches for bound multi-neutron systems are motivated by the discovery
+  6NN2c  of neutron stars and by uncertainty in the multi-nucleon forces. So    
+  6NN3c  far, there is no convincing evidence supporting observation of bound   
+  6NN4c  di-neutron, tri-neutron or tetra-neutron clusters, see for example     
+  6NN5c  (1974Ce06, 1984Un02, 1988Al11, 1990Al11, 1998Al16, 2005Al15).          
+  6NN6c  A variety of theoretical works give a mixed bag of results,            
+  6NN7c  most often excluding A<4 and                                           
+  6NN8c  favoring A>100 with the addition of gravitational forces               
+  6NN9c  (1972Ba45, 1986Be02, 1987Be45, 1989Go18, 1997Sm07,                     
+  6NNac  2003Ti03, 2003Pi09) and (Satpathy and Nayak, J Phys G 4 (1978) L161).  
+  6NN c  In 2012No11 and 2013No10, two completely separate experiments provide  
+  6NN2c  evidence for bound multi-neutron systems.                              
+  6NN3c  In these works, analysis of fission                                    
+  6NN4c  products from {+238}U(|a,F) suggests the existence of                  
+  6NN5c  a bound multi-neutron cluster.                                         
+  6NN6c  Discussion within the texts                                            
+  6NN7c  argue that six or more neutrons are bound in the cluster.              
+  6NN8c  The argument is based on {+8}He being more tighly bound than {+6}He or 
+  6NN9c  {+10}He; this is used to suggest a new N=6 magic number. Hence {+6}n is
+  6NNac  suggested for the observed particle bound species.                     
+  6NN  L 0                                                                     ?
+  6NN2 L XREF=E                                                                 
+  6NN cL $Decay mode not specified.                                             
+
+  6NN    14C(7LI,6N)                   1990AL40                  ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  1990Al40:                                                              
+  6NN c  Evidence of {+x}n stable neutron nuclei were searched for in fission   
+  6NN2c  products by analyzing samples that were activated in the vicinity of a 
+  6NN3c  {+252}Cf spontaneous fission source. A secondary search for {+6}n was  
+  6NN4c  carried out in this work by activating one of the samples ({+24}Mg)    
+  6NN5c  with target ejecta produced in the {+14}C({+7}Li,X) reaction. It was   
+  6NN6c  thought that stable neutron nuclides could be produced in this         
+  6NN7c  reaction. No convincing evidence of {+x}n bound neutron nuclides was   
+  6NN8c  observed.                                                              
+
+  6NN    48CA(12C,6N),40CA(12C,6N)     1964BR17                  ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  The authors separately bombarded {+48}Ca and {+40}Ca targets with 72   
+  6NN2c  MeV {+12}C ions. Evidence of neutral and stable neutron nuclei was     
+  6NN3c  searched for by evaluating events from a 20 cm by 20 cm plastic        
+  6NN4c  scintillator that measured the pulse height and time-of-flight of      
+  6NN5c  reaction ejectiles. An additional measurement of {+48}Ca({+3}He,{+6}n) 
+  6NN6c  reactions is discussed in the text.                                    
+  6NN c  No evidence for a bound multi-neutron configuration was found. Upper   
+  6NN2c  limits on {+6}n production are given in the text.                      
+
+  6NN    W(P,6N)                       1977DE08                  ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  1977De08:                                                              
+  6NN c  A beam of 24 GeV protons, from the CERN synchrotron, impinged on a 10  
+  6NN2c  cm thick {+nat}W target. Either 7 mm or 17 mm thick aluminum plates    
+  6NN3c  were positioned near the spallation target to stop any charged         
+  6NN4c  reaction products that were ejected from the target. An neutral        
+  6NN5c  products are believed to freely penetrate the Al plate; after which    
+  6NN6c  they could induce ({+A}n,xn) reactions on a natural zinc target (A<70).
+  6NN7c  After roughly 60 hours of irradiation, the zinc activation target was  
+  6NN8c  transported to IPN-Orsay for radiochemical analysis in a search for    
+  6NN9c  {+72}Ga activity (daughter of {+72}Zn decay). The observations suggest 
+  6NNac  roughly 6|*10{+6} {+72}Ga atoms were present. Since prior evidence     
+  6NNbc  suggests no bound states exist for |<5                                 
+  6NNcc  multi-neutron species, the authors claim evidence for                  
+  6NNdc  Zn({+A}n,xn){+72}Zn reactions where A|>6. Comments are given suggesting
+  6NNec  that transfer reactions and target target impurities are not           
+  6NNfc  responsible for the observation. In 1977Tu03 a private communication   
+  6NNgc  from Detraz is cited, which give a plausible explanation for a false   
+  6NNhc  positive identification published in this work.                        
+
+  6NN    238U(P,6N)                    1977TU02,1977TU03         ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  1977Tu02:                                                              
+  6NN c  A beam of 800 MeV protons impinged on a 90 g/cm{+2} {+238}U target.    
+  6NN2c  Roughly 4 kg of special purity {+208}Pb was shielded from the target   
+  6NN3c  with 3/8 inch plates of aluminum that could stop any charged particles 
+  6NN4c  that were produced in the bombardment, while any neutral species       
+  6NN5c  produced in the uranium should be free to react in the lead material.  
+  6NN6c  Following 10 hours of activation, the lead samples were radiochemically
+  6NN7c  analyzed in search of evidence of {+212}Bi and {+212}Po that would     
+  6NN8c  suggest multi-neutron reactions with the {+208}Pb. An upper limit of   
+  6NN9c  |s<10{+-3} |mb was established for production of 6n in this reaction.  
+  6NN c  1977Tu03:                                                              
+  6NN c  A beam of 400 GeV protons impinged on a 0.42 g/cm{+2} uranium target.  
+  6NN2c  The target was surrounded by a 1kg sample of specially purified lead   
+  6NN3c  that was cylindrically shaped. Multi-neutron species produced in       
+  6NN4c  bombardment could interact with the lead cylinder and would lead to    
+  6NN5c  production of {+212}Bi and  {+212}Po. No positive evidence for         
+  6NN6c  multi-neutron production was observed, though a high background was    
+  6NN7c  observed. References in this article include a private communication   
+  6NN8c  from Detraz that give a plausible explanation for a false positive     
+  6NN9c  identification published in 1977De08.                                  
+
+  6NN    238U(A,6N)                    2012NO11,2013NO10         ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  2012No11:                                                              
+  6NN c  A 160 |mm  thick {+238}U target was bombarded with 62 MeV |a particles 
+  6NN2c  from the Kurchatov Institute cyclotron. Since there is no clear        
+  6NN3c  detection method for identifying bound multi-neutron clusters, a       
+  6NN4c  secondary target was placed in the scattering chamber. In this case, a 
+  6NN5c  powder SrCO{-3} target, enriched to 99.2% in Sr, was positioned at     
+  6NN6c  |q{-lab}=30|'. The elastically scattered |a particles, as well as      
+  6NN7c  charged fission products, were stopped in a 0.1 mm thick Kapton window 
+  6NN8c  and 1 mm thick {+nat}Be foil that were between the {+238}U target and  
+  6NN9c  the SrCO{-3} target. After sufficient activation, the target was       
+  6NNac  transported to a low-background counting area where the induced        
+  6NNbc  activity was characterized.                                            
+  6NN c  Within the activity, the an E{-|g}=1384 keV transition was observed    
+  6NN2c  with a lifetime consistent with the known T{-1/2}=2.66 hour half-life  
+  6NN3c  of {+92}Sr. This observation implies reactions of the                  
+  6NN4c  {+88}Sr({+x}n,(x-4)n){+92}Sr type occured. In addition, the {+x}n      
+  6NN5c  species must be effectively particle stable with a lifetime long enough
+  6NN6c  to travel the few cm between the production target and the activation  
+  6NN7c  target. The estimated cross section for production of {+6}n was        
+  6NN8c  d|s/d|w|?6|*10{+-2} mb/sr.                                             
+  6NN c  A comparative argument with the binding energies of heavy He is        
+  6NN2c  used to suggest x=6 as the most likely case for a bound multi-neutron  
+  6NN3c  cluster.                                                               
+  6NN c  2013No10:                                                              
+  6NN c  Similar to 2012No11, the authors bombarded a {+238}U foil with 62 MeV  
+  6NN2c  |a particles from the Kurchatov Institute cyclotron. In this case a    
+  6NN3c  99.99 chemically pure Al target was positioned at |q{-lab}=20|'. The   
+  6NN4c  elastically scattered |a particles, as well as charged fission         
+  6NN5c  products, were stopped in a 0.1 mm thick Kapton window and 1 mm thick  
+  6NN6c  {+nat}Be foil that were between the {+238}U target and the Al target.  
+  6NN7c  After sufficient activation, the target was transported to a           
+  6NN8c  low-background counting area where the induced activity was            
+  6NN9c  characterized.                                                         
+  6NN c  Within the activity, the E{-|g}=1324 and 1779 keV transitions          
+  6NN2c  corresponding to {+28}Mg decay were observed  This observation         
+  6NN3c  implies reactions of the {+27}Al({+x}n,p(x-n)n){+28}Mg type occured.   
+  6NN4c  The estimated total cross section for production of {+6}n was |s|?0.8  
+  6NN5c  mb.                                                                    
+  6NN  L 0                                                                     ?
+
+  6NN    252CF SF DECAY                1990AL40                  ENSDF    201903
+  6NN  H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=15-March-2017$CIT=ENSDF$        
+  6NN c  The authors expressed caution that all prior searches for stable       
+  6NN2c  neutron nuclei had produced results that were either negative, or that 
+  6NN3c  were shown to have erronious results that could be otherwise explained.
+  6NN c  The authors used a 19 |mg {+252}Cf source that produced roughly        
+  6NN2c  10{+7} fission events/sec to activate {+19}F, {+25,26}Mg, {+103}Rh,    
+  6NN3c  {+110}Pd and {+208}Pb samples. After exposure, the samples were        
+  6NN4c  transported to a low-background counting facility where the induced    
+  6NN5c  activity was analyzed for evidence of multi-neutron exchange reactions 
+  6NN6c  that could provide evidence for emission of particle stable neutron    
+  6NN7c  nuclei in the fission products; i.e. {+A}Z({+x}n,(x-k)n){+A+k}Z where  
+  6NN8c  x|>6 and k>2 are expected.                                             
+  6NN c  No evidence was observed for such fission products.                    
+  6NN c  The article includes reference to (1985AlZH) and other                 
+  6NN2c  unpublished conference proceeding results.                             
+252CF  P 0            0+               2.645 Y   8                              
+  6NN  N                       0.0                                              
+
+  6H     ADOPTED LEVELS                                          ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H   Q 24.28E3   25-9.1E2  27                        2017WA10                 
+  6H  c  In the NUBASE2016 evaluation of nuclear properties (2017Au03), the     
+  6H 2c  ground state of {+6}H is listed as having a mass defect of 41880 keV   
+  6H 3c  {I250}, a half-life of 2.90|*10{+-22} s {I70} and an estimated         
+  6H 4c  J{+|p} of 2-. This corresponds to a resonance energy in the {+3}H+3n   
+  6H 5c  system of 2.72 MeV {I25} and a resonance width of 1.57 MeV {I38}.      
+  6H  c  Calculations reported in (1985Po10,1989Go24) obtained the {+6}H ground 
+  6H 2c  state to have J{+|p}=2-. However, a calculation reported in (1986Be02) 
+  6H 3c  gives J{+|p}=1+ for the ground state.                                  
+  6H  c  Three particle transfer experiments, cited in the articles             
+  6H 2c  (1984Al08,1986Be35,2008Ca22), produced {+6}H in the final state and    
+  6H 3c  observed a resonance reasonably consistent with the NUBASE2016         
+  6H 4c  evaluation. However, a pion double charge exchange reaction on {+6}Li, 
+  6H 5c  reported in (1990Pa25), which led to {+6}H in the final state, showed  
+  6H 6c  no sign of a {+6}H resonance. Also, experiments with stopped pions     
+  6H 7c  reported in (2003Gu17,2009Gu17) observed {+6}H resonances at higher    
+  6H 8c  excitation energies than the one given in the NUBASE2016 evaluation.   
+  6H 9c  Earlier experiments with stopped pions by the same group               
+  6H ac  (1987Go25,1990Am04) saw no evidence of {+6}H states, but, as stated in 
+  6H bc  (2003Gu17), that might have been due to poor statistics and energy     
+  6H cc  resolution.                                                            
+  6H  c                                                                         
+  6H  c  {I{BTheory:}}                                                          
+  6H  c  A shell model calculation with (0+1)~h|w model space for {+6}H is      
+  6H 2c  reported in (1985Po10). From Fig. 1 in that article, the ground state  
+  6H 3c  energy of the p+5n system is about -3 MeV. From Table 1, the four      
+  6H 4c  lowest calculated states (using the ground state as E=0.0) are         
+  6H 5c  0.0(2-),1.78(1-),2.80(0-),4.79(1+) MeV. These would correspond to      
+  6H 6c  resonant states in the {+3}H+3n system at approximately                
+  6H 7c  E({+3}H+3n)=5.5(2-),7.3(1-),8.3(0-),10.3(1+) MeV, taking into account  
+  6H 8c  the {+3}H binding energy of 8.5 MeV. In the same article, a shell      
+  6H 9c  model calculation with (0+2)~h|w model space is also reported.         
+  6H  c  A shell model calculation for A=6 nuclei is reported in (1986Be02). For
+  6H 2c  {+6}H, the calculated ground state has J{+|p}=1+ and the binding energy
+  6H 3c  is calculated to be 7.144 MeV in p+5n system which corresponds to a    
+  6H 4c  resonance at E=1.34 MeV in the {+3}H+3n system.                        
+  6H  c  A calculation of H and He isotopes using the method of angular         
+  6H 2c  potential functions is reported in (1989Go24). For the {+6}H ground    
+  6H 3c  state, an energy of 6.3 MeV in {+3}H+3n system and J{+|p}=2- were      
+  6H 4c  obtained.                                                              
+  6H  c  A study of H and He isotopes using the anti-symmetrized molecular      
+  6H 2c  dynamics method is reported in (2004Ao05).                             
+  6H  c                                                                         
+  6H  c  {I{BPositive experimental results: (See reaction data sets)}}          
+  6H  c                                                                         
+  6H  c  {I{BNegative experimental results:}}                                   
+  6H  c  {B{+9}Be(|p{+-},pd)X,{+7}Li(|p{+-},p)X:}                               
+  6H  c  1987Go25,1990Am04: Studies of the reactions {+9}Be(|p{+-},pd)X and     
+  6H 2c  {+7}Li(|p{+-},p)X with stopped pions were reported in                  
+  6H 3c  (1987Go25,1990Am04). An analysis of the outgoing particle spectra      
+  6H 4c  showed no evidence of {+6}H states.                                    
+  6H  c  Note: The comment was made in (2003Gu17) that the failure to observe   
+  6H 2c  {+6}H states in either of the reactions reported in (1987Go25,1990Am04)
+  6H 3c  may have been due to poor statistics and energy resolution.            
+  6H  c                                                                         
+  6H  c  {B{+6}Li(|p{+-},|p{++})X:}                                             
+  6H  c  1990Pa25: E(|p{+-})=220 MeV beam from the Los Alamos meson physics     
+  6H 2c  facility was incident on a {+6}LiH target and a missing mass |p{++}    
+  6H 3c  spectrum obtained. No evidence for {+6}H was found in the energy range 
+  6H 4c  -10 MeV to +30 MeV in the {+3}H+3n scale, thus casting doubt on the    
+  6H 5c  existence of {+6}H.                                                    
+  6H  c  Also see (2007Fo05).                                                   
+  6H   XA7LI(7LI,8B)                                                            
+  6H   XB9BE(PI-,PD)                                                            
+  6H   XC9BE(11B,14O)                                                           
+  6H   XD11B(PI-,P4HE)                                                          
+  6H   XE12C(8HE,6H)                                                            
+  6H  cL DICT$(|p{+-},p4he)=(|p{+-},p{+4}He)                                    
+  6H   L 0                             1.55 MEV  44                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=2.72 {I25}                                     
+  6H  cL E$E({+3}H+3n)=2.72 MeV {I25} from (2017Wa17).                          
+  6H 2cL The weighted average of reported values is  E({+3}H+3n)=2.72 MeV       
+  6H 3cL {I+31}{I-23} from E({+3}H+3n)=2.70 MeV {I40} (1984Al08),               
+  6H 4cL 2.60 MeV {I50} (1986Be35),                                             
+  6H 5cL 2.91 MeV {I+77}{I-35} (2008Ca22).                                      
+  6H  cL $|G=1.55 MeV {I+44}{I-18}, from the weighted average of                
+  6H 2cL 1.80 MeV {I50} (1984Al08),                                             
+  6H 3cL 1.30 MeV {I50} (1986Be35), and                                         
+  6H 4cL 1.5 MeV {I+18}{I-4} (2008Ca22).                                        
+  6H X L XREF=+                                                                 
+  6H  cL WIDTH$|G=1.57 MeV {I38}, from (2017Au03).                              
+  6H  cL J$J{+|p}=2- is predicted in (1985Po10) and (1989Go24); see also        
+  6H 2cL J{+|p}=1+ predicted in (1986Be02).                                     
+  6H   L 4.1E3     6                   5.6 MEV   15                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=6.8 {I6}                                       
+  6H X L XREF=BD                                                                
+  6H  cL E$From weighted average of                                             
+  6H 2cL E({+3}H+3n)=6.6 MeV {I7} {+9}Be(|p{+-},pd) and                         
+  6H 3cL 7.3 MeV {I10} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).              
+  6H  cL WIDTH$From weighted average of                                         
+  6H 2cL |G=5.5 MeV {I20}  {+9}Be(|p{+-},pd) and                                
+  6H 3cL 5.8 MeV {I20} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).              
+  6H   L 8.0E3     8                   4 MEV     2                              
+  6H  cL $E{-res}({+3}H+3n)(MeV)=10.7 {I7}                                      
+  6H X L XREF=B                                                                 
+  6H  cL E,WIDTH$From {+9}Be(|p{+-},pd) (2003Gu17,2009Gu17).                    
+  6H   L 12.3E3    7                   4.2 MEV   15                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=15.0 {I6}                                      
+  6H X L XREF=BD                                                                
+  6H  cL E$From weighted average of                                             
+  6H 2cL E({+3}H+3n)=15.3 MeV {I7} {+9}Be(|p{+-},pd) and                        
+  6H 3cL 14.5 MeV {I10} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).             
+  6H  cL WIDTH$From weighted average of                                         
+  6H 2cL |G=3 MeV {I2}  {+9}Be(|p{+-},pd) and                                   
+  6H 3cL 5.5 MeV {I20} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).              
+  6H   L 18.7E3    5                   3.9 MEV   9                              
+  6H  cL $E{-res}({+3}H+3n)(MeV)=21.4 {I4}                                      
+  6H X L XREF=BD                                                                
+  6H  cL E$From weighted average of                                             
+  6H 2cL E({+3}H+3n)=21.3 MeV {I4} {+9}Be(|p{+-},pd) and                        
+  6H 3cL 22.0 MeV {I10} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).             
+  6H  cL WIDTH$From weighted average of                                         
+  6H 2cL |G=3.5 MeV {I10}  {+9}Be(|p{+-},pd) and                                
+  6H 3cL 5.5 MeV {I20} {+11}B(|p{+-},p{+4}He) (2003Gu17,2009Gu17).              
+
+  6H     7LI(7LI,8B)                   1984Al08                  ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H  c  The nucleus {+6}H is first reported in this reaction (1984Al08);       
+  6H 2c  see (2012Th01). At                                                     
+  6H 3c  E({+7}Li)=82 MeV from Kurchatov Institute cyclotron, the spectrum of   
+  6H 4c  the outgoing {+8}B was measured at |q{-lab}=10|'; the cross section    
+  6H 5c  was about 60 nb/sr. The energy of the {+6}H was deduced and the mass   
+  6H 6c  defect of the resonant state, which is assumed to be the {+6}H ground  
+  6H 7c  state, was found to be 41.9 MeV {I4}, from which it follows that {+6}H 
+  6H 8c  is unstable against the decay {+6}H|){+3}H+3n by 2.7 MeV {I4}, and the 
+  6H 9c  width is |G=1.8 MeV {I5}, which gives for the {+6}H lifetime a value   
+  6H ac  3.7|*10{+-22} s (1984Al08,2012Th01).                                   
+  6H   L 0                             1.8 MEV   5                              
+  6H  cL $E{-res}({+3}H+3n)(MeV)=2.7 {I4}                                       
+
+  6H     9BE(PI-,PD)                   2003GU17,2009GU17         ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H  c  Resonances in {+6}H were observed at LAMPF by measuring the {+3}He+3n  
+  6H 2c  missing mass spectrum following the capture of stopped |p{+-} on a     
+  6H 3c  {+9}Be target, via {+9}Be(|p{+-},pd). Measurements were also carried   
+  6H 4c  out on a {+11}B target. Also see (2005Gu07,2007Gu24).                  
+  6H   L 3.4E3     8                   5.5 MEV   20                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=6.6 {I7}                                       
+  6H   L 8.0E3     8                   4 MEV     2                              
+  6H  cL $E{-res}({+3}H+3n)(MeV)=10.7 {I7}                                      
+  6H   L 12.6E3    8                   3 MEV     2                              
+  6H  cL $E{-res}({+3}H+3n)(MeV)=15.3 {I7}                                      
+  6H   L 18.6E3    5                   3.5 MEV   10                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=21.3 {I4}                                      
+
+  6H     9BE(11B,14O)                  1986BE35                  ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H  c  E({+11}B)=88 MeV from Dubna U-300 cyclotron; the {+14}O ejectile       
+  6H 2c  energy spectrum was analyzed in the 52 to 58 MeV region. A broad       
+  6H 3c  enhancement was observed near 53 MeV which was attributed to an        
+  6H 4c  unbound state of {+6}H at 2.6 MeV {I5} above the {+3}H+3n threshold    
+  6H 5c  with a width of 1.3 MeV {I5}. The cross section at the peak was found  
+  6H 6c  to be about 16 nb/sr at a |q{-lab}|?8|'.                               
+  6H   L 0                             1.3 MEV    5                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=2.6 {I5}                                       
+
+  6H     11B(PI-,P4HE)                 2003GU17,2009GU17         ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H  c  Resonances in {+6}H were observed at LAMPF by measuring the {+3}H+3n   
+  6H 2c  missing mass spectrum following the capture of stopped |p{+-} on a     
+  6H 3c  {+11}B target, via {+11}B(|p{+-},p|a). Measurements were also carried  
+  6H 4c  out on a {+9}Be target. Also see (2005Gu07,2007Gu24).                  
+  6H  cL DICT$(|p{+-},p4he)=(|p{+-},p{+4}He)                                    
+  6H   L 4.1E3     7                   5.8 MEV   20                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=7.3 {I10}                                      
+  6H   L 12.3E3    7                   5.5 MEV   20                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=14.5 {I10}                                     
+  6H   L 18.7E3    5                   5.5 MEV   20                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=22.0 {I10}                                     
+
+  6H     12C(8HE,6H)                   2008CA22                  ENSDF    201903
+  6H   H TYP=FUL$AUT=J.E. Purcell, C.G. Sheu$CUT=23-March-2017$CIT=ENSDF$       
+  6H  c  A E({+8}He)=15.4 MeV/nucleon beam from the GANIL-SPIRAL facility,      
+  6H 2c  produced via the {+12}C({+13}C,{+8}He) reaction, impinged on a         
+  6H 3c  C{-4}H{-10} gas target. In {+12}C({+8}He,{+6}H){+14}N reactions, the   
+  6H 4c  {+6}H decays into {+3}H+3n. Events with {+14}N and {+3}H detected in   
+  6H 5c  coincidence were analyzed, and a resonance was observed at 2.91 MeV    
+  6H 6c  {I+85}{I-95} above the {+3}H+3n threshold with a width of 1.5 MeV      
+  6H 7c  {I+18}{I-4}. The cross section was found to be 19 |mb/sr {I+62}{I-13}  
+  6H 8c  over the range of angles from 8.7|' to 48.2|'.                         
+  6H   L 0                             1.52 MEV  AP                             
+  6H  cL $E{-res}({+3}H+3n)(MeV)=2.91 {IAP}                                     
+  6H  cL E$From E{-res}({+3}H+3n)=2.91 MeV {I+85}{I-95}                         
+  6H  cL WIDTH$From |G=1.5 MeV {I+18}{I-4}                                      
+
+  6HE    ADOPTED LEVELS                2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-Aug-2001$                                                       
+  6HE  Q 3505.22   6 1710    202.259E4 9               2012WA38                 
+  6HE cQ $Note: Current evaluation has used the following Q record              
+  6HE2cQ 3507.8    111867.   5026.52E3 95              1997Au07                 
+  6HE  XA4HE(T,P)                                                               
+  6HE  XB6LI(PI-,G)                                                             
+  6HE  XC6LI(N,P)                                                               
+  6HE  XD6LI(T,3HE)                                                             
+  6HE  XE6LI(7LI,7BE)                                                           
+  6HE  XF7LI(N,D)                                                               
+  6HE  XG7LI(T,A)                                                               
+  6HE  XH7LI(3HE,P3HE)                                                          
+  6HE  XI7LI(6LI,7BE), 7LI(7LI,8BE)                                             
+  6HE  XJ9BE(N,A)                                                               
+  6HE  XK11B(7LI,12C)                                                           
+  6HE  XL6LI(E,PI+)                                                             
+  6HE  XM7LI(G,P), 7LI(E,E'P)                                                   
+  6HE cL E(A)$Decay mode not specified                                          
+  6HE  L 0.0          0+               806.7 MS  15                             
+  6HE2 L %B-=100 $ ISPIN=1 $XREF=ABCDEFGIJKLM                                   
+  6HE  L 1797      25 2+               113 KEV   20                             
+  6HE2 L %N=? $ %A=? $ ISPIN=1 $XREF=ABCDEFGIJKLM                               
+  6HE  L 5.6E3      3 (2+, 1-, 0+)     12.1 MEV  11                         A   
+  6HE2 L ISPIN=1 $XREF=DE                                                       
+  6HE  L 13.9E3     2 (1-,2-)          7.4 MEV   10                         A  ?
+  6HE cL E         average of 13.6 MeV {I5} (1988Aj01) and 14.6 MeV {I7}        
+  6HExcL (1996Ja11).                                                            
+  6HE2 L ISPIN=1 $XREF=DEFGIL                                                   
+  6HE  L 15.5E3     5                  4 MEV      2                         A  ?
+  6HE2 L XREF=BCFIM                                                             
+  6HE  L 24.2E3     7                  10.9 MEV  15                         A   
+  6HE2 L XREF=BCEF                                                              
+  6HE cL E         average of 25. MeV {I1} (1988Aj01) and 23.3 MeV {I10}        
+  6HExcL (1996Ja11).                                                            
+  6HE cL WIDTH     Average of 8 MeV {I2} (1988Aj01) and 14.8 MeV {I23}          
+  6HExcL (1996Ja11).                                                            
+  6HE  L 32.E3                         2 MEV     LE                         A  ?
+  6HE2 L XREF=H                                                                 
+  6HE  L 36.E3                         2 MEV     LE                         A  ?
+  6HE2 L XREF=H                                                                 
+
+  6HE    4HE(T,P)                      2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1971St05: {+4}He(t,p) E<22 MeV, measured |s(|q). {+6}He level deduced  
+  6HE2c  J, |p. {+6}He deduced no levels>1.8 MeV.                               
+  6HE c  1978Aj02: {+4}He(t,p) E=23 MeV, measured |s(E{-p},|q). {+6}He deduced  
+  6HE2c  levels, J, |p |g.                                                      
+  6HE c  1992Go21: {+3}H(|a,|a) E=27.2 MeV, measured |s(|q).                    
+  6HE  L 0.0                                                                    
+  6HE  L 1.8E+3                                                                 
+
+  6HE    6LI(E,PI+)                                              02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1981Sh06: {+6}Li(e,|p{++}) E=180 MeV, measured |s(|q, E(|p+)). {+6}He  
+  6HE2c  levels - deduced relative M1 transition strength.                      
+  6HE c  1986Sh14: {+6}Li(e,|p{++}) E=202 MeV, measured |s(|q, E(|p+)). {+6}He  
+  6HE2c  deduced spin-dipole isovector resonances.                              
+  6HE c  1994Sh38: {+6}Li(e,|p{++}) E=200 MeV, measured |s(|q, E(|p+)).         
+  6HE  L 7.E3                                                                  ?
+  6HE  L 9.E3                                                                  ?
+  6HE  L 12.E3                                                                 ?
+  6HE  L 13.6E3      1-,2-                                                      
+  6HE  L 17.7E3      1-,2-                                                     ?
+  6HE  L 24.0E3      1-,2-                                                     ?
+
+  6HE    6LI(PI-,G)                    2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1973Ba62: {+6}Li(|p{+-},|g) E=5-150 MeV, measured |s(E{-|g}). {+6}He   
+  6HE2c  levels deduced level-|G, |g-branching.                                 
+  6HE c  1978Re05: {+6}Li(|p{+-},|g) E=0, measured X-rays, X- |g-coin, deduced  
+  6HE2c  partial capture rates.                                                 
+  6HE c  1986Pe05: {+6}Li(|p{+-},|g) E at rest, measured E{-|g}, I{-gammma}.    
+  6HE2c  {+6}He deduced IAS transition isovector M1 character, branching ratios.
+  6HE  L 0.0                                                                    
+  6HE  L 1.8E+3                                                                 
+  6HE  L 15.6E+3    5                                                           
+  6HE  L 23.2E+3    7                                                           
+  6HE  L 29.7E+3   13                                                           
+
+  6HE    6LI(N,P)                      2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1969Pr04: {+6}Li(n,p) E=3.1 to 9.0 MeV, measured |s(E). {+7}Li deduced 
+  6HE2c  levels, J, |p, L, T, |G, |g{+2}.                                       
+  6HE c  1972Me05: {+6}Li(n,p) E=14 MeV, measured |s(|q=0-150|').               
+  6HE c  1977Ri07: {+6}Li(n,p) E=800 MeV, measured |s.                          
+  6HE c  1977Ro01: {+6}Li(n,p) E=4.4-7.25 MeV, measured |s(E) at forward angles,
+  6HE2c  E=4.71, 5.24, 6.77 MeV, measured |s(|q).                               
+  6HE c  1982Br04: {+6}Li(n,p) E=60 MeV, measured |s(E{-p}), |s(|q),            
+  6HE2c  deduced effective isovector spin-flip nucleon-nucleon interaction.     
+  6HE3c  {+6}He levels deduced Gamow-Teller transition strength.                
+  6HE c  1988Ja01: {+6}Li(n,p) E=198 MeV, measured |s(|q{-p}).                  
+  6HE c  1988Wa24: {+6}Li(n,p) E=118 MeV, measured |s(|q), deduced              
+  6HE2c  Gamow-Teller resonance, sum rule. DWBA analyses.                       
+  6HE c  1990Mi10: {+6}Li(n,p) E=280 MeV, measured |s(|q), |s(E{-p}),           
+  6HE2c  deduced isospin symmetry test.                                         
+  6HE c  1992So02: {+6}Li(n,p) E=60-260 MeV, measured |s(|q,E), deduced unit    
+  6HE2c  |s, effective interaction volume integrals.                            
+  6HE c  1996Bb23: {+6}Li(n,p) E=0.88 GeV, measured A{-y}(|q). Polarized,       
+  6HE2c  unpolarized targets.                                                   
+  6HE c  1998Ha24: {+6}Li(n,p) E=118 MeV, measured proton spectra.              
+  6HE  L 0            0+                                                        
+  6HE2 L   ISPIN=1                                                              
+  6HE  L 1800         2+                                                        
+  6HE  L 15.5E3     5                  4. MEV    2                              
+  6HE  L 25.E3      1                  8. MEV    2                              
+
+  6HE    6LI(T,3HE)                    2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1971St05: {+6}Li(t,{+3}He) E<22 MeV, measured |s(|q). {+6}He level     
+  6HE2c  deduced J, |p.                                                         
+  6HE c  1976Sh14: {+6}Li(t,{+3}He) E=17 MeV, measured |s(|q).                  
+  6HE c  2000Na35, 2001Na19: {+6}Li(t,{+3}He) E=336 MeV, measured |s(E,|q).     
+  6HE2c  {+6}He deduced excited states features.                                
+  6HE  L 0.0                                                                    
+  6HE  L 1800                                                                   
+  6HE  L 5000                                                                  ?
+  6HE  L 14.6E+3                                                               ?
+
+  6HE    6LI(7LI,7BE)                  1996JA11                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1993Sa35: {+6}Li({+7}Li,{+7}Be) E=78, 82 MeV, measured |s(|q),         
+  6HE2c  |s(E({+7}Be)). {+6}He deduced soft dipole response evidence.           
+  6HE c  1995Sa18: {+6}Li({+7}Li,{+7}Be) E=78 MeV, measured |s(|q). DWBA,       
+  6HE2c  coupled reaction channels analysis.                                    
+  6HE c  1996Ja11: {+6}Li({+7}Li,{+7}Be) E=350 MeV, measured |s(|q). {+6}He     
+  6HE2c  deduced resonances, J, |p. Microscopic finite-range DWBA.              
+  6HE c  1999An13: {+6}Li({+7}Li,{+7}Be) E=350 MeV, measured particle spectra,  
+  6HE2c  angular distributions, E{-|g}, I{-|g}(|q). {+6}He deduced resonance    
+  6HE3c  features, spin-flip ratios, spin-flip enhancement, effective number of 
+  6HE4c  participating protons.                                                 
+  6HE c  2000Na22: {+6}Li({+7}Li,{+7}Be) E=65 MeV/nucleon, measured |s(E,|q),   
+  6HE2c  (particle)|g-coin. {+6}He deduced soft dipole resonance.               
+  6HE c  Energy:projectile:350 MeV                                              
+  6HE c  d|s/d|W at |q{-c.m.}|?4.5|'                                            
+  6HE  L 0.0          0+                                                        
+  6HE cL $d|s/d|W=0.72 {I8}                                                     
+  6HE  L 1.92E3    17 2+                                                        
+  6HE cL $d|s/d|W=0.25 {I4}                                                     
+  6HE  L 5.6E3      3 (2+,1-,0+)       12.1 MEV  11                             
+  6HE cL $d|s/d|W=4.56 {I48}                                                    
+  6HE  L 14.6E3     7 (1,2)-           7.4 MEV   10                             
+  6HE cL $d|s/d|W=2.11 {I23}                                                    
+  6HE  L 23.3E3    10                  14.8 MEV  23                             
+  6HE cL $d|s/d|W=1.75 {I19}                                                    
+
+  6HE    7LI(G,P), 7LI(E,E'P)                                    02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1974De52: {+7}Li(|g,p) E<35.5 MeV, measured |s(E,E{-p}). {+6}He        
+  6HE2c  deduced resonances.                                                    
+  6HE c  2001Bo38: {+7}Li(|g,p) E=50-70 MeV, measured proton spectra,           
+  6HE2c  |s(|q). {+6}He deduced resonance energy, |G.                           
+  6HE c  1999La13: {+7}Li(E,E' p) E=329.7, 454.7 MeV, measured |s(E, |q).       
+  6HE2c  {+6}He levels deduced spectroscopic factors, radii.                    
+  6HE  L 0.                                                                     
+  6HE cL           Unresolved                                                   
+  6HE  L 1.8E3                                                                  
+  6HE cL           Unresolved                                                   
+  6HE  L 5.E3       1                  3.0 MEV   10                             
+  6HE  L 18.0E3     3                                                           
+
+  6HE    7LI(N,D)                      2002TI10,1977BR17         02NP     200212
+  6HE  H TYP=ERR$AUT=J. Tuli$DAT=3-Jul-2007$COM=Minor typo/syntex fix$          
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-Aug-2001$                                                       
+  6HE c  1970Mi05: {+7}Li(n,d) E=14.4 MeV, measured |s(E{-d},|q), {+6}He        
+  6HE2c  deduced S.                                                             
+  6HE c  1973Li02: {+7}Li(n,d) E=14.8 MeV, measured |s(E{-d},|q).               
+  6HE c  1977Br17: {+7}Li(n,d) E=53.6 MeV, measured |s(E{-d},|q),               
+  6HE2c  |q{-c.m.}=7-60|'. {+6}He levels deduced S.                             
+  6HE c  1978Ri02: {+7}Li(n,d) E=800 MeV, measured |s.                          
+  6HE c  1989Co22: {+7}Li(n,d) E=10-30 MeV, measured yield, |s(E).              
+  6HE  L 0                                                                      
+  6HE cL           S(1p3/2)=0.62                                                
+  6HE  L 1.8E3                                                                  
+  6HE cL           S(1p3/2)=0.37, S(1p1/2)=0.32.                                
+  6HE  L 13.6E3     5                                                           
+  6HE  L 15.4E3     5                                                           
+  6HE  L 17.7E3     5                                                           
+  6HE  L 23.7E3                                                                 
+
+  6HE    7LI(T,A)                      2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1970Ab12: {+7}Li(t,|a) E=2 MeV, measured |s(E{-|a}), deduced n-n       
+  6HE2c  scattering |G. {+6}He level deduced |a-decay |G.                       
+  6HE c  1971St05: {+7}Li(t,|a) E<22 MeV, measured |s(|q). {+6}He level         
+  6HE2c  deduced J, |p. {+6}He deduced no levels >1.80 MeV.                     
+  6HE c  1983Ce01: {+7}Li(t,|a) E=70-110 keV, measured thick targets yields,    
+  6HE2c  deduced |s(|q,E), astrophysics S-factor vs |q, E.                      
+  6HE c  1987Ab09: {+7}Li(t,|a) E=151, 272 MeV, measured |s(|q), deduced        
+  6HE2c  angular distribution parameters, S-matrix elements.                    
+  6HE c  1987Al23: {+3}H({+7}Li,|a) E=31 MeV, measured |s(E{-|a},|q{-|a}),      
+  6HE2c  |s(|q). {+6}He deduced levels.                                         
+  6HE c                                                                         
+  6HE  L 0            0+                                                        
+  6HE  L 1797      25 2+               113 KEV   20                             
+  6HE cL           |G{-|g}/|G{-|a}|<2.0|*10{+-6}                                
+  6HE cL           |G{-|g}|<0.23 eV                                             
+  6HE  L 13.6E3                                                                 
+
+  6HE    7LI(3HE,P3HE)                 1985FR01                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1985Fr01: {+7}Li({+3}He,p{+3}He) E=120 MeV, measured |s(E{-1},E{-2},   
+  6HE2c  |q{-1},|q{-2}), deduced residual missing mass spectra.                 
+  6HE  L 0                                                                      
+  6HE  L 1.8E3                                                                  
+  6HE  L 16.E3                                                                 ?
+  6HE  L 32.E3                         2 MEV     LE                             
+  6HE  L 35.7E3                        2 MEV     LE                             
+
+  6HE    7LI(6LI,7BE), 7LI(7LI,8BE)    2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1987GlZW: {+7}Li({+6}Li,{+7}Be) E=93 MeV, measured |s, {+6}He deduced  
+  6HE2c  levels, |g.                                                            
+  6HE c  1988BuZH: {+7}Li({+6}Li,{+7}Be) E=93 MeV, measured |s(E({+7}Be),|q).   
+  6HE2c  {+6}He deduced levels.                                                 
+  6HE  L 0                                                                      
+  6HE  L 1.8E3                                                                  
+  6HE  L 14.E3                         5.5 MEV                                  
+  6HE  L 15.5E3                                                                ?
+
+  6HE    9BE(N,A)                      2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE c  1967Pa03: {+9}Be(n,|a) E=14.4 MeV, measured |s(E{-|a},|q),             
+  6HE2c  |s(E({+6}He),|q).                                                      
+  6HE c  1969Og01: {+9}Be(n,|a) E=15 MeV, measured |a|a-coin. {+6}He deduced    
+  6HE2c  levels.                                                                
+  6HE c  1974Pe06: {+9}Be(n,|a) E=13.99 MeV, measured |s(E{-|a},|q). {+6}He     
+  6HE2c  deduced levels.                                                        
+  6HE c  1976Sm02: {+9}Be(n,|a) E=12.2-18.0 MeV, measured |s(E,E{-|a},|q),      
+  6HE2c  deduced reaction mechanism.                                            
+  6HE c  1983Ot02: {+9}Be(n,|a) E=fast, measured E{-|g}, I{-|g}, deduced {+28}Mg
+  6HE2c  production rate, mechanism. {+6}He level deduced dineutron bound state 
+  6HE3c  production rate upper limit.                                           
+  6HE  L 0                                                                      
+  6HE  L 1.8E3                                                                  
+
+  6HE    11B(7LI,12C)                  2002TI10                  02NP     200212
+  6HE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6HE2 H CUT=23-AUG-2001$                                                       
+  6HE  L 0                                                                      
+  6HE  L 1.8E3     3                                                            
+  6HE cL           |G|<0.2 MeV                                                  
+
+  6LI    ADOPTED LEVELS, GAMMAS        2002TI10,1988AJ01         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-Aug-2001$                                                       
+  6LI  Q -4288     6 5.66E3  5 4433    20-1474         2012WA38                 
+  6LI cQ $Note: Current evaluation has used the following Q record              
+  6LI2cQ -4287.7   505665.   504593.   50-1474.3350    1997Au07                 
+  6LI  XA6HE B- DECAY                                                           
+  6LI  XB3HE(3H,X)                                                              
+  6LI  XC4HE(D,D)                                                               
+  6LI  XD6LI(E,E')                                                              
+  6LI  XE6LI(PI+,PI+'),6LI(PI-,PI-')                                            
+  6LI  XF6LI(P,P')                                                              
+  6LI  XG6LI(D,D)                                                               
+  6LI  XH6LI(3HE,3HE)                                                           
+  6LI  XI6LI(A,A)                                                               
+  6LI  XJ6LI(6LI,X)                                                             
+  6LI  XK6LI(12C,12C)                                                           
+  6LI  XL7LI(G,N),7LI(G,PPI-)                                                   
+  6LI  XM7LI(P,D),7LI(P,PN)                                                     
+  6LI  XN7LI(D,T)                                                               
+  6LI  XO7LI(3HE,A),7LI(3HE,DA)                                                 
+  6LI  XP9BE(P,A)                                                               
+  6LI  XQ9BE(T,6HE)                                                             
+  6LI  XR9BE(3HE,6LI)                                                           
+  6LI  XS10B(D,6LI)                                                             
+  6LI  XT10B(3HE,7BE)                                                           
+  6LI  XU12C(A,10B),12C(A,DA)                                                   
+  6LI  XV10B(A,8BE)                                                             
+  6LI  XW6LI(G,G')                                                              
+  6LI  L 0.0          1+               STABLE                                   
+  6LI2 L MOMM1=+0.82205667 26$MOME2=-0.818E-3 17                                
+  6LI3 L ISPIN=0 $XREF=ABDEFGHIJKLMNOQRSTUVW                                    
+  6LI cL MOMM1     From nuclear magnetic resonance (1989Ra17)                   
+  6LI2cL other:+0.82204728 {I55} from atomic beam magnetic resonance            
+  6LI3cL (direct moment determination)(1989Ra17).                               
+  6LI cL MOME2     From 1998Ce04.                                               
+  6LI  L  2186      2 3+               24 KEV    2                              
+  6LI2 L %IT=? $ %A=? $ ISPIN=0 $XREF=BCDEFGHIJKLMNOPQRSTUV                     
+  6LI  G 2186                  E2                                               
+  6LI2 G WIDTHG=4.40E-4 EV 34$BE2W=16.5 13                                      
+  6LI  L 3562.88   10 0+               8.2 EV    2                              
+  6LI2 L %IT=? $ ISPIN=1 $XREF=BDEFGHJLMNOPQW                                   
+  6LI  G 3561.75               M1                                               
+  6LI2 G WIDTHG=8.19 EV 17$BM1W=8.62 18                                         
+  6LI  L 4312      22 2+               1.30 MEV  10                             
+  6LI2 L %IT=? $ %A=? $ ISPIN=0 $XREF=BCDEFGKMNOPU                              
+  6LI  G 4310                  E2                                               
+  6LI2 G WIDTHG=5.4E-3 EV 28$BE2W=6.8 35                                        
+  6LI  L 5366      15 2+               541 KEV   20                             
+  6LI2 L %IT=? $ %N=? $ %P=? $ %A=? $ ISPIN=1 $XREF=BDFMNOPR                    
+  6LI  G 5363                  M1                                               
+  6LI2 G WIDTHG=0.27 EV 5$BM1W=8.3E-2 15                                        
+  6LI  L 5.65E3     5 1+               1.5 MEV   2                              
+  6LI2 L %A=? $ ISPIN=0 $XREF=CFKOPR                                            
+  6LI  L 15.8E3       3+               17.8 MEV  8                             ?
+  6LI2 L %A=? $ ISPIN=0 $XREF=B                                                 
+  6LI cL           From 1988Aj01                                                
+  6LI  L 17985     25 2-               3.012 MEV 7                              
+  6LI2 L %IT=? $ %3H=? $ ISPIN=1 $ XREF=B                                       
+  6LI cL           Previously reported as E{-x}=21.0 MeV (1988Aj01)             
+  6LI  L 21.5E3       0-                                                       ?
+  6LI2 L ISPIN=1 $ %3H=? $XREF=B                                                
+  6LI cL WIDTH     Broad                                                        
+  6LI cL           From 1988Aj01                                                
+  6LI  L 23.E3      2 4+               12. MEV   2                             ?
+  6LI2 L %A=? $ ISPIN=0 $ XREF=BC                                               
+  6LI cL           From 1988Aj01                                                
+  6LI  L 24779     54 3-               6.75 MEV  11                             
+  6LI2 L %IT=? $ %N=? $ %3H=? $ ISPIN=1 $XREF=B                                 
+  6LI cL           Previously reported as E{-x}=26.6 MeV {I4}, T=0(1988Aj01)    
+  6LI  L 24890     55 4-               5.32 MEV  11                             
+  6LI2 L %IT=? $ %N=? $ %3H=? $ ISPIN=1 $XREF=B                                 
+  6LI  L 26590     65 2-               8.68 MEV  13                             
+  6LI2 L %IT=? $ %N=? $ %3H=? $ %A=? $ ISPIN=1 $XREF=B                          
+  6LI  L 31.E3        (3+)                                                     ?
+  6LI2 L %3H=? $ %A=? $XREF=B                                                   
+  6LI cL WIDTH     Broad                                                        
+
+  6LI    6HE B- DECAY                  2002TI10                  02NP     200212
+  6LI  H TYP=ERR$AUT=J. Tuli$DAT=9-Sep-08$COM=Corrected IB, ran LOGFT$          
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-Aug-2001$                                                       
+  6LI c  1979Ga20: {+6}He [from {+6,7}Li(n,d),(n,p),{+9}Be(n,|a) E=14.7 MeV],   
+  6LI2c  measured |b-decay T{-1/2}.                                             
+  6LI c  1982Al17: {+6}He [from {+9}Be(n,|a)], measured |b-decay T{-1/2}.       
+  6LI c  1990Ri01: {+6}He(|b-), measured |ad-coin following |b-delayed          
+  6LI2c  deuteron emission, deduced branching ratio. {+6}Li levels deduced      
+  6LI3c  Gamow-Teller transition strength.                                      
+  6LI c  1991Bo31: {+6}He [from U, TH(p,x) E=600 MeV], measured continuum       
+  6LI2c  particle spectra following |b-decay, deduced log ft, Gamow-Teller      
+  6LI3c  transition strength, level |G, di-neutron, neutron halo roles.         
+  6LI c  1993Bo24: {+6}He(|b-), measured |b-delayed deuteron spectrum, deduced  
+  6LI2c  branching ratio.                                                       
+  6LI  N 1                     1         1                                      
+  6HE  P 0            0+               806.7 MS  1               3507.8   11    
+  6LI  L 0            1+                                                        
+  6LI  B              100                 2.9059  7                             
+  6LIS B EAV=1567.62 54                                                         
+
+  6LI    3HE(3H,X)                     2002TI10,1988AJ01         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1969Na16: {+3}He(t,d) E=1-1.5 MeV, measured |s(E,|q), deduced          
+  6LI2c  isospin conservation.                                                  
+  6LI c  1977Ha17: {+3}He(pol t,t) E=9-17 MeV, measured |s(E,|q),               
+  6LI2c  A(E,|q).                                                               
+  6LI c  1977DeYM: {+3}He(t,n) E=600, 720 MeV, measured |s in kinematically     
+  6LI2c  complete experiment.                                                   
+  6LI c  1977Ha42: {+3}He(pol t,d) E=9.02-17.27 MeV, measured A(E,|q).          
+  6LI c  1988EnZZ: {+3}He(t,t),(t,d) E=17-37 MeV, measured |s(|q).              
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+  6LI  L 3.56E3                                                                 
+  6LI  L 4.31E3                                                                 
+  6LI  L 5.36E3                                                                 
+  6LI  L 15.8E3       3+               17.8 MEV  8                             ?
+  6LI2 L ISPIN=0                                                                
+  6LI  L 17985     25 2-               3.012 MEV 7                              
+  6LI2 L ISPIN=1                                                                
+  6LI cL           Previously reported as E{-x}=21.0 MeV (1988Aj01)             
+  6LI  L 23.E3      2 4+               12. MEV   2                             ?
+  6LI2 L ISPIN=0                                                                
+  6LI  L 24779     54 3-               6.75 MEV  11                             
+  6LI2 L ISPIN=1                                                                
+  6LI cL           Previously reported as E{-x}=26.6 MeV {I4}, T=0(1988Aj01)    
+  6LI  L 24890     55 4-               5.32 MEV  11                             
+  6LI2 L ISPIN=1                                                                
+  6LI  L 26590     65 2-               8.68 MEV  13                             
+  6LI2 L ISPIN=1                                                                
+  6LI  L 29.5E3       (5-)                                                     ?
+  6LI  L 31.5E3       (3+)                                                     ?
+
+  6LI    4HE(D,D)                      2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1964Se07: {+4}He(d,d) E=2.9-11.5 MeV measured |s(E,|q), deduced        
+  6LI2c  |s, phase shifts, polarization tensor. {+6}Li deduced levels, J, |p,   
+  6LI3c  reduced |G(|l).                                                        
+  6LI c  1967Yo01: {+4}He(d,d) E=2.8-6.7 MeV, measured tensor polarization      
+  6LI2c  T{-20}(E,|q), T{-21}(E,|q), T{-22}(E,|q).                              
+  6LI c  1968Ma03: {+4}He(d,d) E=3-14 MeV, measured |s(|q), phase shift         
+  6LI2c  analysis. {+6}Li deduced levels, J, |p.                                
+  6LI c  1970Ke17: {+4}He(pol d,d) E=3-11 MeV, measured vector analyzing power  
+  6LI2c  iT{-11}(|q), deduced phase shifts. {+6}Li deduced resonances.          
+  6LI c  1973Ch35: {+4}He(pol d,d) E=11.5-17 MeV, measured vector analyzing     
+  6LI2c  power iT{-11}(E,|q).                                                   
+  6LI c  1974Wi13: {+4}He(d,d) E=29.8, 32.3, 34.8, 37.3, 39.8 MeV, measured     
+  6LI2c  |s(E,|q).                                                              
+  6LI c  1977Ha34: {+4}He(pol d,d) E=6.04-7.05 MeV, measured |s(|q),            
+  6LI2c  A(|q), deduced phase shifts. {+6}Li deduced resonance parameters.      
+  6LI c  1979Ba30: {+4}He(d,d) E=870-1430 keV, measured |s(|q). {+6}Li          
+  6LI2c  resonances deduced parameters. Phase shift analysis.                   
+  6LI c  1980St01: {+4}He(d,d) E=17-45 MeV, measured |s(|q), tensor             
+  6LI2c  analyzing power.                                                       
+  6LI c  1983Je03: {+4}He(pol d,d) E=8-13 MeV, measured |s(|q,E),               
+  6LI2c  iT{-11}(E,|q), T{-20}(E,|q), T{-21}(E,|q), T{-22}(E,|q).               
+  6LI3c  {+6}Li deduced levels, J, |p, L, |G.                                   
+  6LI  L 2186      2 3+                20.0 KEV  28                             
+  6LI2 L ISPIN=0                                                                
+  6LI cL E         average of 2187 keV {I3} and 2185 keV {I3} in 2002Ti10 table 
+  6LIxcL 6.12                                                                   
+  6LI  L 4.36E3    4 2+                1.32 MEV   4                             
+  6LI cL $|G{-d}/|G=0.967                                                       
+  6LI3 L ISPIN=0                                                                
+  6LI  L 5.3E3     1 1+                1.9 MEV    1                            ?
+  6LI cL E$the resonance energy corresponds to the 2+ level at 5.3 MeV, however 
+  6LI2cL the J|p corresponds to the 1+ level at 5.65 MeV (2002Ti10).            
+  6LI  L 5.65E3     5                  1.9 MEV    1                             
+  6LI cL $|G{-d}/|G=0.74                                                        
+  6LI3 L ISPIN=0                                                                
+  6LI  L 14.3E3    13 3+               26.7 MEV  10                            ?
+  6LI cL $|G{-d}/|G=0.34                                                        
+  6LI3 L ISPIN=0                                                                
+  6LI  L 15.8E3    11 3+               17.8 MEV   8                            ?
+  6LI cL $|G{-d}/|G=0.76                                                        
+  6LI3 L ISPIN=0                                                                
+  6LI  L 23.E3      2 4+               12 MEV     2                             
+  6LI cL $|G{-d}/|G=0.15                                                        
+  6LI  L 24E3       5 3-               16 MEV     3                             
+  6LI cL $|G{-d}/|G=0.30                                                        
+  6LI  L 27E3         2-               22 MEV     7                             
+  6LI cL $|G{-d}/|G=0.43                                                        
+
+  6LI    6LI(G,G')                     2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1969Ra20: {+6}Li(|g,|g') E<3.8 MeV, measured |s(E |g', |q).            
+  6LI2c  {+6}Li levels deduced |G.                                              
+  6LI c  1973Sa21: {+6}Li(|g,|g') E=5 MeV, measured |s(E |g').                  
+  6LI2c  {+6}Li levels deduced |G.                                              
+  6LI c  1981Ro02: {+6}Li(|g,|g') E=7 MeV bremsstrahlung, measured              
+  6LI2c  E |g'. {+6}Li levels deduced energy.                                   
+  6LI  L 0                                                                      
+  6LI  L 3562.88   10 0+                                                        
+  6LI2 L WIDTHG=8.1 EV 5                                                        
+
+  6LI    6LI(E,E')                     2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1966Ra29: {+6}Li(e,e) E<230 MeV, measured |s(E), deduced magnetic      
+  6LI2c  form factor.                                                           
+  6LI c  1971Li10: {+6}Li(e,e),(e,e') E=200, 500 MeV, measured |s(|q),          
+  6LI2c  deduced form factors. {+6}Li deduced rms nulear radius.                
+  6LI c  1972Bu01: {+6}Li(e,e) E=23-97 MeV, measured |s(E). {+6}Li deduced rms  
+  6LI2c  nuclear radii.                                                         
+  6LI c  1988Bu25: {+6}Li(e,e') E=90-260 MeV, measured |s(E,|q).                
+  6LI c  1989Li09: {+6}Li(e,e),(e,e') E=80-680 MeV, measured longitudinal,      
+  6LI2c  transverse form factors.                                               
+  6LI  L 0                                                                      
+  6LI  L 2183       9 3+                                                        
+  6LI2 L ISPIN=0 $ WIDTHG0=4.40E-4 EV 34                                        
+  6LI  L 3562.88   10 0+                                                        
+  6LI2 L ISPIN=1 $ WIDTHG0=8.19 EV 17                                           
+  6LI  L 4270      40 2+                                                        
+  6LI2 L ISPIN=0 $ WIDTHG0=5.4E-3 EV 28                                         
+  6LI  L 5379      17 2+               540 KEV   20                             
+  6LI2 L ISPIN=1 $ WIDTHG0=0.27 EV 5                                            
+
+  6LI    6LI(PI+,PI+'),6LI(PI-,PI-')   2002TI10,1984KI16         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1978Dy01: {+6}Li(|p{++},|p{++}) E=50 MeV, measured |s(|q), deduced     
+  6LI2c  isotopic effects.                                                      
+  6LI c  1984Ki16: {+6}Li(|p{++},|p{++}),(|p{++},|p{++}') E=100-260 MeV,        
+  6LI2c  measured |s(|q). {+6}Li levels deduced.                                
+  6LI c  1986An04: {+6}Li(|p{++},|p{++}),(|p{++},|p{++}'),(|p{+-},|p{+-}),      
+  6LI2c  \(|p{+-},|p{+-}') E=100, 180, 240 MeV, measured |s(|q).                
+  6LI c  1989Ta21: {+6}Li(|p{++},|p{++}),(|p{++},|p{++}') E=134, 164 MeV,       
+  6LI2c  measured |s(|q), vector, tensor analyzing power vs. |q. Polarized      
+  6LI3c  targets.                                                               
+  6LI c  1990OaZY: {+6}Li(|p{++},|p{++}') E=40-65 MeV, measured |s(E(|p)),      
+  6LI2c  |s(|q).                                                                
+  6LI c  1991Ri01: {+6}Li(|p{++},|p{++}),(|p{++},|p{++}') E=100-219 MeV,        
+  6LIxc  measured |s(|q).                                                       
+  6LI c  1994Ri06: {+6}Li(|p{++},|p{++}),(|p{++},|p{++}') E=120-194 MeV,        
+  6LI2c  measured |s(|q), iT{-11}(|q), T{-22}(|q), T{-20}(|q). Polarized target.
+  6LI c  2001Fu14: {+6}Li(|p{+-},|p{+-}),(|p{+-},|p{+-}') E at 950 MeV/c,       
+  6LI2c  measured |s(E), |s(|q), deduced |s vs. Momentum transfer, shift of     
+  6LI3c  quasielastic peak.                                                     
+  6LI  L 0            1+                                                        
+  6LI  L 2.19E3       3+                                                        
+  6LI  L 3.56E3       0+                                                        
+  6LI  L 4.25E3       2+                                                        
+
+  6LI    6LI(P,P')                     2002TI10,1990GL04         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1967Hi13: {+6}Li(p,p),(p,p') E=15.3 MeV, measured |s(|q). {+6}Li       
+  6LI2c  deduced levels, wave functions.                                        
+  6LI c  1968Ge04: {+6}Li(p,p),(p,p') E=155 MeV, measured |s(|q), p(|q).        
+  6LI c  1968Me25: {+6}Li(p,p),(p,p') E=14-16 MeV, measured |s(E{-p'},|q).      
+  6LI c  1970Hu13: {+6}Li(p,p),(p,p') E=185 MeV, measured |s(E{-p'},|q).        
+  6LI c  1972Br20: {+6}Li(p,p),(p,p') E=25-45 MeV, measured |s(E,|q).           
+  6LI c  1972Ja07: {+6}Li(p,p) E=144 MeV, measured |s(|q).                      
+  6LI c  1977Ki08: {+6}Li(p,p'|g) E=4.9-5 MeV, measured |g-spectra. {+6}Li      
+  6LI2c  deduced levels.                                                        
+  6LI c  1981He21: {+6}Li(p,p),(p,p') E=136 MeV, measured |s(|q).               
+  6LI c  1982Pe06: {+6}Li(p,p),(p,p') E=24.4 MeV, measured |s(E{-p'}),          
+  6LI2c  |s(|q). {+6}Li(p,p),(p,p') E=24-25 MeV, analyzed data.                 
+  6LI c  1990Gl04: {+6}Li(pol p,p),(pol p,p') E=200 MeV, measured |s(|q),       
+  6LI2c  A{-y}(|q).                                                             
+  6LI c  1994He11: {+6}Li(pol p,p) E=72 MeV, measured depolarization parameter. 
+  6LI  L 0.0          1+                                                        
+  6LI  L 2.19E3       3+                                                        
+  6LI  L 3.56E3       0+                                                        
+  6LI  L 4.40E3    12                  1.49 MEV  15                             
+  6LI  L 5.33E3     8                  0.56 MEV  34                             
+  6LI  L 5.7E3                         1.0 MEV    6                             
+
+  6LI    6LI(D,D)                      2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1968Lu02: {+6}Li(d,d) E=11.8 MeV, measured |s(E,|q).                   
+  6LI c  1969Bl14: {+6}Li(d,d) E=6.33-7.14 MeV, measured |s(E,|q).              
+  6LI c  1969Ma13: {+6}Li(d,d),(d,d') E=14.7 MeV, measured |s(|q). {+6}Li levels
+  6LI2c  deduced.                                                               
+  6LI c  1970Po03: {+6}Li(d,d) E=4.5-5.5 MeV, measured |s(E,|q).                
+  6LI c  1971Bi11: {+6}Li(d,d{-0}) E=8-12 MeV, measured |s(E,|q),               
+  6LI2c  {+6}Li(d,d{0}) E=8-12 MeV, measured absolute |s.                       
+  6LI c  1971ChYH: {+6}Li(d,d) E=20 MeV cms, measured |s(|q).                   
+  6LI c  1975Br21: {+6}Li(d,d') E=20, 25 MeV, measured |s(E{-d'}), {+6}Li       
+  6LI2c  deduced level parameters.                                              
+  6LI c  1976Ab11: {+6}Li(d,d) E=3-10 MeV, measured |s(E,|q).                   
+  6LI  L 0.0                                                                    
+  6LI  L 2.19E3                                                                 
+  6LI  L 3.56E3                                                                 
+  6LI  L 4.32E3    40                  1.82 MEV  11                             
+
+  6LI    6LI(3HE,3HE)                  2002TI10,1974AJ01         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1968Lu02: {+6}Li({+3}He,{+3}He) E=8 to 20 MeV, measured |s(E,|q).      
+  6LI2c  Deduced optical parameters. DWBA calculations, deduced ratio of S.     
+  6LI c  1972Gi07: {+6}Li({+3}He,{+3}He),{+6}Li({+3}He,{+3}He') E=24.6 MeV, 27  
+  6LI2c  MeV. Measured |s(E({+3}He),|q).                                        
+  6LI c  1981Ba37: {+6}Li(pol {+3}He,{+3}He),(pol {+3}He,{+3}He') E=33.3 MeV,   
+  6LI2c  measured |s(|q), A(|q), deduced optical-model parameters, reaction     
+  6LI3c  mechanism.                                                             
+  6LI c  1986Br31: {+6}Li({+3}He,{+3}He) E=34,50,60,72 MeV, measured |s(|q),    
+  6LI2c  deduced cluster transfer mechanism contribution.                       
+  6LI c  1994Do32: {+6}Li({+3}He,{+3}He) E=93 MeV, measured {+3}He yields vs |q,
+  6LI2c  |s(|q,E), deduced breakup mechanism dominance.                         
+  6LI c  1995Bu20: {+6}Li({+3}He,{+3}He),({+3}He,{+3}He') E=50-72 MeV, measured 
+  6LI2c  |s(|q), deduced model parameters, cluster transfer features. {+6}Li    
+  6LI3c  level deduced spectroscopic factors. DWBA analysis.                    
+  6LI  L 0.0                                                                    
+  6LI  L 2.185E3      3+                                                        
+  6LI  L 3.56E3                                                                 
+  6LI  L 4.53E3                                                                 
+  6LI  L 5.37E3                                                                 
+
+  6LI    6LI(A,A)                      2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1972Ba89: {+6}Li(|a,|a) E{-|a}=166 MeV, measured angular distribution  
+  6LI2c  |s(|q), analyzed pick-up contribution.                                 
+  6LI c  1975Be11: {+6}Li(|a,|a),(|a,|a') E=34.75, 39.75, 45 MeV, measured      
+  6LI2c  angular distributions from 20|' to 160|' (c.m.).                       
+  6LI c  1979Eg01: {+4}He(pol {+6}Li,{+6}Li) E=15.1-22.7 MeV, measured |s(|q),  
+  6LI2c  A(|q); deduced spin orbit effects in optical model.                    
+  6LI c  1987Bu27: {+6}Li(|a,|a') E=50.5 MeV, measured |s.                      
+  6LI c  1992Ko19: {+6}Li(|a,|a') E=80 MeV, measured target tensor polarization.
+  6LI2c  Realistic nucleon-nucleon interaction, DWBA.                           
+  6LI c  1992Sa01: {+6}Li(|a,|a),(|a,|a') E=50 MeV, measured |s(|q),            
+  6LI2c  |s(|q{-|a},E{-|a}), deduced breakup cluster recombination              
+  6LI3c  role in exit channel. DWBA analysis.                                   
+  6LI c  1993Ko33: {+6}Li(|a,|a') E=80 MeV, measured tensor polarization vs |q  
+  6LI2c  following target breakup. DWBA, shell model analyses.                  
+  6LI c  1994Sa32: {+6}Li(|a,|a') E=40 MeV, measured continuum |s(E{-|a},       
+  6LI2c  |q{-|a}), deduced onset of Coulomb dissociation, {+6}Li breakup        
+  6LI3c  critical momentum transfer value features.                             
+  6LI c  1996Bu06: {+6}Li(|a,|a),(|a,|a') E=50.5 MeV, measured |s(|q), {+6}Li   
+  6LI2c  deduced |ad-,|at- cluster spectroscopic factors, DWBA models           
+  6LI3c  analyses.                                                              
+  6LI c  1999Dm02: {+6}Li(|a,|a') E=27.2 MeV, measured charged particle         
+  6LI2c  energies, angular correlations and polarization tensors,               
+  6LI3c  coupled-channel calculations.                                          
+  6LI  L 0.0                                                                    
+  6LI  L 2.185E3      3+                                                        
+
+  6LI    6LI(6LI,X)                    2002TI10,1970NA02,1985SA3602NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1964Ma26: {+6}Li({+6}Li,|a) E=2-4.4 MeV, measured |s(|q,E).            
+  6LI c  1966Be22: {+6}Li({+6}Li,|a) E=2.75 MeV, measured                       
+  6LI2c  |a|a{}(|q,E{-|a}).                                                     
+  6LI c  1970Fr06: {+6}Li({+6}Li,|a)2|a E=4-24 MeV, measured |s(E,|q).          
+  6LI c  1970Na02: {+6}Li({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=28, 32, 33 MeV,     
+  6LI2c  measured |s(|q), deduced spin-isospin-flip mechanism.                  
+  6LI c  1973Gr34: {+6}Li({+6}Li,{+6}Li) E=2-10 MeV, measured |s(E,|q).         
+  6LI c  1981Wa15: {+6}Li({+6}Li,2|a),({+6}Li,2d) E=36-47 MeV, measured         
+  6LI2c  |s(|q{-1},|q{-2},E{-1},E{-2}), deduced reaction mechanism.             
+  6LI c  1983No08: {+6}Li({+6}Li,{+6}Li) E=2-5.5 MeV, measured |s(|q),          
+  6LI2c  |s(E({+6}Li)), total |s(reaction).                                     
+  6LI c  1983Wa09: {+6}Li({+6}Li,2|a),{+6}Li({+6}Li,2d) E=97.5 MeV, measured    
+  6LI2c  |s(|q{-1},|q{-2},E{-1},E{-2}) for 2|a, 3|a breakup.                    
+  6LI c  1985Mi05: {+6}Li({+6}Li,{+6}Li) E=156 MeV, measured |s(E({+6}Li),|q),  
+  6LI2c  |s(|q).                                                                
+  6LI c  1985Sa36: {+6}Li({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=156 MeV, measured   
+  6LIxc  |s(|q).                                                                
+  6LI c  1987La25: {+6}Li({+6}Li,2|a) E=2.4-6.7 MeV, measured quasifree reaction
+  6LI2c  |s(E), |a|a{}(|q), |s(|q{-1},|q{-2},E).                                
+  6LI c  1988La11: {+6}Li({+6}Li,2|a) E=4.2 MeV, measured two quasi-free process
+  6LI2c  |s(|q{-1},|q{-2},E{-1}), deduced mechanism, energy dependence.         
+  6LI c  1990Le05: {+6}Li({+6}Li,|a) E=2-16 MeV, measured |s(|q).               
+  6LI2c  I{-|g}(|q), deduced fusion |s(E).                                      
+  6LI c  2001Mu30: {+6}Li({+6}Li,2|a) E{-c.m.}=10-800 keV, measured |s.         
+  6LI  L 0                                                                      
+  6LI  L 2.19E3       3+                                                        
+  6LI  L 3.56E3       0+                                                        
+
+  6LI    6LI(12C,12C)                  2002TI10,1996KE09         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1973Sc26: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=34, 36 MeV,         
+  6LIxc  measured |s(|q).                                                       
+  6LI c  1974Bi04: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=36.4, 40.0 MeV,     
+  6LI2c  measured |s(|q).                                                       
+  6LI c  1980Fu06: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=20-36 MeV, measured 
+  6LI2c  |s(E({+6}Li),|q).                                                      
+  6LI c  1985Cu04: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=34 MeV, measured    
+  6LI2c  |s(|q). {+6}Li deduced elastic to inelastic breakup ratio.             
+  6LI c  1988Ka09: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E=123.5, 168.6 MeV,   
+  6LI2c  measured |s(|q).                                                       
+  6LI c  1989Gi01: {+12}C({+6}Li,{+6}Li) E=158 MeV, measured {+6}Li spectra.    
+  6LI2c  {+12}C({+6}Li,{+6}Li') E=156 MeV, measured |s(|q),                     
+  6LIxc  |s(|q({+6}Li),E({+6}Li)).                                              
+  6LI c  1990Tr02: {+12}C({+6}Li,{+6}Li) E=20, 50 MeV, measured |s(|q).         
+  6LI2c  {+12}C({+6}Li,{+6}Li') E=50 MeV, measured |s(|q).                      
+  6LI c  1994Re15: {+12}C(pol {+6}Li,{+6}Li),(pol {+6}Li,{+6}Li') E=30 MeV,     
+  6LI2c  measured |s(|q), {+6}Li, {+12}C levels deduced deformation lengths.    
+  6LI c  1995Ca26: {+12}C({+6}Li,{+6}Li),({+6}Li,{+6}Li') E{-c.m.}=2-16 MeV,    
+  6LI2c  measured |s(|q,E). {+6}Li levels deduced deformation lengths.          
+  6LI c  1995Ke10: {+12}C(pol {+6}Li,{+6}Li) E=30, 50 MeV, measured |s(|q).     
+  6LI c  1996Ga29: {+12}C(pol {+6}Li,{+6}Li),(pol {+6}Li,{+6}Li') E=30 MeV,     
+  6LI2c  measured |s(|q).                                                       
+  6LI c  1996Ke09: {+12}C(pol {+6}Li,{+6}Li),(pol {+6}Li,{+6}Li') E=30, 50 MeV, 
+  6LI2c  measured iT{-11}(|q), T{-20}(|q), T{-21}(|q), T{-22}(|q),              
+  6LI3c  |s(|q), {+6}Li({+12}C,{+12}C) E=100 MeV, measured |s(|q), {+6}Li,      
+  6LI4c  {+12}C levels deduced deformation length parameters.                   
+  6LI c  2000Sc11: {+12}C({+6}Li,{+6}Li) E=600 MeV, measured elastic and breakup
+  6LI2c  |s(|q).                                                                
+  6LI  L 0            1+                                                        
+  6LI  L 2.186E3      3+                                                        
+  6LI  L 4.31E3       (2+)                                                      
+  6LI  L 5.65E3                                                                 
+
+  6LI    7LI(G,N),7LI(G,PPI-)          2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1977Fe05: {+7}Li(|g,n) E=13-25 MeV bremsstrahlung, measured |s(E).     
+  6LI c  1978De13: {+7}Li(|g,n) E|<30 MeV; {+7}Li(|g,n) E|<55 MeV; measured     
+  6LI2c  integral |s.                                                           
+  6LI c  1983Se07: {+7}Li(|g,n) E=60-120 MeV, measured |s(|q), ratios,          
+  6LI2c  deduced reaction mechanism. Modified quasideuteron, quasifree knockout 
+  6LI3c  models.                                                                
+  6LI c  1985Se17: {+7}Li(|g,n) E=60-130 MeV bremsstrahlung, measured |s(E)     
+  6LI2c  |s(|q). Magnetic spectrometer, quasideuteron, direct knockout          
+  6LI3c  models.                                                                
+  6LI c  1986Si18: {+7}Li(|g,n) E=7.25-19.5 MeV bremsstrahlung, measured        
+  6LI2c  photoneutron yield curve, deduced neutron production |s.               
+  6LI c  1989Ka30: {+7}Li(|g,n) E=7-9 MeV, measured bremsstrahlung yield,       
+  6LI2c  deduced |s(E), solar neutrino implications.                            
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+  6LI  L 3.56E3                                                                 
+
+  6LI    7LI(P,D),7LI(P,PN)            2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1967Ku10: {+7}Li(p,d) E=33.6 MeV, measured |s(|q), {+6}Li levels       
+  6LI2c  deduced, DWBA analysis.                                                
+  6LI c  1968Be72: {+7}Li(p,d) E=156 MeV, measured |s(E{-d},|q). {+6}Li levels  
+  6LI2c  deduced S.                                                             
+  6LI c  1968Le01: {+7}Li(p,d) E=100 MeV, measured |s(E{-d},|q). {+6}Li deduced 
+  6LI2c  levels, relative S.                                                    
+  6LI c  1969Ba05: {+7}Li(p,d) E=155.6 MeV, measured |s(E{-d},|q). {+6}Li       
+  6LI2c  deduced levels, J, |p, L, S.                                           
+  6LI c  1969De04: {+7}Li(p,d) E=30.3 MeV, measured |s(E{-d},|q).               
+  6LI c  1969Li02: {+7}Li(p,d) E=100 MeV, measured |s(E{-d},|q), {+6}Li levels  
+  6LI2c  deduced S.                                                             
+  6LI c  1972Az03: {+7}Li(p,d) E=670 MeV, measured |s(E{-d}), analyzed reaction 
+  6LI2c  mechanism.                                                             
+  6LI c  1974Ka28: {+7}Li(p,d) E=185 MeV, measured |s(E{-d},|q). {+6}Li levels  
+  6LI2c  deduced S.                                                             
+  6LI c  1976Fa03: {+7}Li(p,d) E=185 MeV, measured |s(E{-d},|q). {+6}Li deduced 
+  6LI2c  levels, S.                                                             
+  6LI c  1977Gu14: {+7}Li(p,d) E=16.7, 17.7 MeV, measured |s(E{-d},|q).         
+  6LI c  1980Ba02: {+7}Li(p,d) E=800 MeV, measured |s(|q). DWBA analysis.       
+  6LI c  1984Sm04: {+7}Li(p,d) E=800 MeV, measured |s(|q), |s(E{-d}),           
+  6LI2c  deduced reaction mechanism. {+6}Li deduced high-spin state population  
+  6LI3c  enhancement. DWBA analysis.                                            
+  6LI c  1985Kr13: {+7}Li(p,d) E=200, 400 MeV, measured |s(E{-d}), |s(|q),      
+  6LI2c  {+6}Li levels deduced spectroscopic factor ratio. DWBA analysis.       
+  6LI CL S$LABEL=C{+2}^S                                                        
+  6LI  L 0            1+                                        0.87            
+  6LI  L 2186.        3+                                        0.67            
+  6LI  L 3.56E3       0+                                        0.24            
+  6LI  L 4.31E3                                                 0.05            
+  6LI  L 5.37E3                                                 0.14            
+
+  6LI    7LI(D,T)                      2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1971De08: {+7}Li(d,t) E=23.6 MeV, measured |s(E{-t}). {+6}Li levels    
+  6LI2c  deduced high isospin purity.                                           
+  6LI c  1971Za07: {+7}Li(d,t) E{-d}=10-12 MeV, measured |s(E,|q), compared     
+  6LI2c  with zero-range finite-range DWBA.                                     
+  6LI c  1980Ye02: {+7}Li(d,t) E=9.05 MeV, measured |s(|q), deduced reaction    
+  6LI2c  mechanism. Optical model, zero-range DWBA analysis.                    
+  6LI c  1987Bo39: {+7}Li(d,t) E=30.7 MeV, measured                             
+  6LI2c  |s(E{-t},|q{-t},|q{-|a}),                                              
+  6LI3c  |s(E{-|a},|q{-|a},|q), |s(E{-|a}).                                     
+  6LI4c  {+6}Li decay IAS 2+ state.                                             
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+  6LI  L 3.56E3                                                                 
+  6LI  L 4.31E3       2+                                                        
+  6LI2 L  ISPIN=0                                                               
+  6LI  L 5.37E3                                                                 
+
+  6LI    7LI(3HE,A),7LI(3HE,DA)        2002TI10,1971CO22         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1965Fo07: {+7}Li({+3}He,|a) E=1.3-5.5 MeV, measured |s(E,E{-|a},|q).   
+  6LI c  1968Co07: {+7}Li({+3}He,|a) E=0.9-12 MeV, measured |s(E{-|a},|q),      
+  6LI2c  {+6}Li deduced levels, |G.                                             
+  6LI c  1969Li06: {+7}Li({+3}He,|a) E=1-12 MeV, measured |s(E,|q), deduced     
+  6LI2c  reaction mechanism. {+6}Li deduced levels, J, |p, |G, T.               
+  6LI c  1969Or01: {+7}Li({+3}He,|a) E=2.0-4.2 MeV, measured |s(E,|q), deduced  
+  6LI2c  cluster reduced widths. PWBA with exchange analysis.                   
+  6LI c  1970Or03: {+7}Li({+3}He,|a) E=6.0, 7.5 MeV, 5-8 MeV, measured |s(E,    
+  6LI2c  |q). {+6}Li deduced cluster structure.                                 
+  6LI c  1971Ar37: {+7}Li({+3}He,|a) E=32, 16 MeV, measured                     
+  6LI2c  |s(E(|a{-1}), E(|a{-2})). {+6}Li levels deduced |G, J, |p.             
+  6LI c  1971Co22: {+7}Li({+3}He,|a) E=1.2 MeV, measured |ad-, |a|a-coin.       
+  6LI2c  {+6}Li deduced branching ratios, partial width |G{-d}.                 
+  6LI c  1971Za07: {+7}Li({+3}He,|a) E({+3}He)=16-18 MeV, measured |s(E,|q),    
+  6LI2c  compared with zero-range, finite-range DWBA.                           
+  6LI c  1972Ka08: {+7}Li({+3}He,|a) E=1.5 MeV, measured                        
+  6LI2c  |s(E{-|a},E({+6}Li),|q(|a),|q({+6}Li)). {+7}Li({+3}He,|a)              
+  6LI3c  complete kinematics E=1.5 MeV, {+6}Li deduced levels, decay modes,     
+  6LI4c  isospins.                                                              
+  6LI c  1973Ar05: {+7}Li({+3}He,|a) measured (particle)(particle)-coin. {+6}Li 
+  6LI2c  levels deduced decay modes.                                            
+  6LI c  1973Br20: {+7}Li({+3}He,|a),({+3}He,|ad) E=1.45 MeV, measured          
+  6LI2c  |ad-coin. {+6}Li levels deduced d-branching, isospin mixing.           
+  6LI c  1975Sc31: {+7}Li({+3}He,|ad) E=1.8 MeV, measured |ad-coin. {+6}Li      
+  6LI2c  deduced levels, |g.                                                    
+  6LI c  1976Da24: {+7}Li({+3}He,|ad) E=4.7 MeV, measured |ad(|q), |s.          
+  6LI c  1981An24: {+7}Li({+3}He,|a) E=42.9 MeV, measured |s(E{-|a},|q),        
+  6LI2c  deduced target breakup incident channel dependence.                    
+  6LI c  1981Ba38: {+7}Li(pol {+3}He, |a) E=33.3 MeV, measured |s(|q),          
+  6LI2c  A(|q). {+6}Li levels deduced S. DWBA, coupled-channels analysis.       
+  6LI c  1983Ar05: {+7}Li({+3}He,|ad) E=2.5 MeV, measured                       
+  6LI2c  |s(|q{-d},|q{-|a}) vs arc length. {+6}Li levels deduced |G.            
+  6LI c  1985Da29: {+7}Li({+3}He,2|a) E=5 MeV measured |a|a-, |ad-coin,         
+  6LI2c  |s(|q{-1},|q{-2}), deduced reaction mechanism, channel                 
+  6LI3c  competition.                                                           
+  6LI c  1985Fr01: {+7}Li({+3}He,|ad) E=120 MeV, measured                       
+  6LI2c  |s(E{-1},E{-2},|q{-1},|q{-2}), deduced residual missing                
+  6LI3c  spectra.                                                               
+  6LI c  1988Ar20: {+7}Li({+3}He,|ad) E=11.5 MeV, measured                      
+  6LI2c  |s(|q{-d},|q{-|a}) vs arc length. {+6}Li levels deduced |g.            
+  6LI c  1991Ar19: {+7}Li({+3}He,|ad) E=5 MeV, measured                         
+  6LI2c  |s(|q{-d},|q{-|a}) vs arc length. {+6}Li levels deduced                
+  6LI3c  spectroscopic parameters.                                              
+  6LI c  1995Ar14: {+7}Li({+3}He,|ad) E=4.5, 6 MeV, measured |ad-coin. {+6}Li   
+  6LI2c  level deduced |G.                                                      
+  6LI  L 0                                                                      
+  6LI  L 2.17E3     2                                                           
+  6LI  L 3.55E3     2                                                           
+  6LI  L 4.30E3     9                  1.05 MEV   7                             
+  6LI cL E         average of 4.3 MeV {I1} and 4.3 MeV {I2} (2002Ti10) table    
+  6LIxcL 6.12                                                                   
+  6LI cL WIDTH     Average of 1.6 MeV {I3}, 1.60 MeV {I12} and 0.6 MeV {I1} from
+  6LI2cL (2002Ti10) table 6.12                                                  
+  6LI  L 5.34E3     2 2+               560 KEV   40                             
+  6LI cL           No evidence for d decay, widthd/|G<0.02.                     
+  6LI2 L ISPIN=1 $ WIDTHP/WIDTH=0.35 10                                         
+  6LI cL           |G{-p+n}/ |G=0.65 {I10}                                      
+  6LI  L 5.65E3    20                  1.65 MEV   3                             
+  6LI  L 28.5E3                                                                 
+  6LI  L 32.9E3                                                                 
+
+  6LI    9BE(P,A)                      2002TI10,1976DE30,1992PE1202NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1965Br28: {+9}Be(p,|a) E=3.0-4.5 MeV, measured Q.                      
+  6LI c  1966La20: {+9}Be(p,|a) E=7.0, 8.0, 9.0 MeV, measured |s(E,E{-d}),      
+  6LI2c  |s(E,E{-|a}). {+6}Li deduced levels, |G.                               
+  6LI c  1967Ac01: {+9}Be(p,|a) E=38 MeV, measured |s(E{-|a},|q).               
+  6LI c  1968Si07: {+9}Be(p,|a) E=2-2.1 MeV, measured |s(E,|q) for              
+  6LI2c  elastic scattering.                                                    
+  6LI c  1970Gu06: {+9}Be(p,|a) E=26.7 MeV, measured |s(|q),                    
+  6LI2c  |s(E,|q).                                                              
+  6LI c  1970Ko25: {+9}Be(p,|a) E=665 MeV, measured |s.                         
+  6LI c  1971Ar37: {+9}Be(p,|a) E=32, 16 MeV, measured                          
+  6LI2c  |s(E(|a{-1}),E(|a{-2})). {+6}Li levels deduced,|G, J,                  
+  6LI3c  |p.                                                                    
+  6LI c  1972De01: {+9}Be(p,|a) E{-p}=45.0 MeV, measured                        
+  6LI2c  |s(|q=20-160|' c.m.).                                                  
+  6LI c  1973Ar05: {+9}Be(p,|a) measured (particle)(particle)-coin. {+6}Li      
+  6LI2c  levels deduced decay modes.                                            
+  6LI c  1973Ma59: {+9}Be(p,|a) E=2.2-2.8 MeV measured |s(E,|q).                
+  6LI c  1974Du08: {+9}Be(p,|a) E=30 MeV, measured |s(E{-|a}). {+6}Li deduced   
+  6LI2c  levels.                                                                
+  6LI c  1976De30: {+9}Be(p,|a) E=30-75 MeV, measured |s(E,E{-|a},|q).          
+  6LI2c  {+6}Li deduced levels. Phase-space analysis.                           
+  6LI c  1976Ki17: {+9}Be(p,|a), measured |s(E{-|a},|q).                        
+  6LI c  1977Ki08: {+9}Be(p,|a) E=4.9-5 MeV, measured |g-spectra. {+6}Li deduced
+  6LI2c  levels.                                                                
+  6LI c  1983De15: {+9}Be(p,|a) E=30, 50 MeV, measured |s(E{-|a}), {+6}Li       
+  6LI2c  deduced resonance energies, |G. Phase space model.                     
+  6LI c  1986Ha27: {+9}Be(p,|a) E=18-45 MeV, measured |s(E,|q). {+6}Li levels   
+  6LI2c  deduced spectroscopic factors.                                         
+  6LI c  1989Gu05: {+9}Be(p,|a) E=50 MeV, measured |s(|q), deduced model        
+  6LI2c  parameters, structure effects.                                         
+  6LI c  1992Pe12: {+9}Be(p,|a) E=25, 30 MeV, measured |s(|q), deduced          
+  6LI2c  |s(E), model parameters. {+6}Li levels deduced, DWBA analysis.         
+  6LI c  1997Fa17: {+9}Be(p,|a) E=40 MeV, measured |s(|q),                      
+  6LI2c  |a|a{}(|q), |ad(|q) following {+6}Li breakup, deduced                  
+  6LI3c  {+6}Li tensor polarization. EFR-DWBA analysis.                         
+  6LI c  1998Br10: {+9}Be(pol p,|a) E=77-321 keV, measured |s(|q),              
+  6LI2c  A(y)(|q); deduced reaction mechanism. R-matrix, DWBA analysis.         
+  6LI  L 0.0          1+                                                        
+  6LI2 L   ISPIN=0                                                              
+  6LI  L 2203       6 3+                                                        
+  6LI2 L   ISPIN=0                                                              
+  6LI  L 3562.2     8 0+                                                        
+  6LI2 L   ISPIN=1                                                              
+  6LI  L 4300      10 2+               746 KEV   42                             
+  6LI2 L   ISPIN=0                                                              
+  6LI cL WIDTH     Average of 850 keV {I50} and 480 keV {I80} from (2002Ti10)   
+  6LI2cL table 6.12                                                             
+  6LI  L 5325       5 2+               270 KEV   12                             
+  6LI2 L   ISPIN=1                                                              
+  6LI  L 5650      40 1+               972 KEV   53                             
+  6LI2 L ISPIN=0                                                                
+  6LI cL WIDTH     Average of 900 keV {I60} and 1260 keV {I120} from (2002Ti10) 
+  6LI2cL table 6.12                                                             
+  6LI  L 8.2E3      2                  2200 KEV  200                           ?
+  6LI2 L ISPIN=1                                                                
+
+  6LI    9BE(T,6HE)                    2002TI10,1975VO08         02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1973Vo08: {+9}Be(t,{+6}He) E=23.5 MeV, measured |s(|q).                
+  6LI c  1975Vo08: {+9}Be(t,{+6}He) E=23.5, 21.5 MeV, measured |s(E({+6}Li),|q).
+  6LI2c  {+6}Li supermultiplet deduced spatial symmetry.                        
+  6LI  L 0            1+                                                        
+  6LI2 L   ISPIN=0                                                              
+  6LI  L 2.19E3       3+                                                        
+  6LI  L 3.56E3       0+                                                        
+  6LI2 L   ISPIN=1                                                              
+
+  6LI    9BE(3HE,6LI)                  2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1969Ta05: {+9}Be({+3}He,{+6}Li) E=4.0-10.0 MeV, measured |s(E,|q),     
+  6LI2c  deduced orbital angular momentum transfer.                             
+  6LI c  1972Yo02: {+9}Be({+3}He,{+6}Li) E=6.0-9.25 MeV, measured |s(E,|q).     
+  6LI c  1993Ma48: {+9}Be({+3}He,{+6}Li) E=60 MeV, measured |s(|q).             
+  6LI c  1996Ru13: {+9}Be({+3}He,{+6}Li) E=60 MeV, measured |s(|q).             
+  6LI  L 0                                                                      
+  6LI  L 2185         3+                                                        
+  6LI  L 5.37E3       2+                                                        
+  6LI  L 5.65E3       1+                                                        
+
+  6LI    10B(D,6LI)                    2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1971Gu07: {+10}B(d,{+6}Li) E=19.5 MeV, measured |s(E({+6}Li),|q).      
+  6LI c  1983Do10: {+10}B(d,{+6}Li) E=13.6 MeV, measured |s(|q), deduced optical
+  6LI2c  parameters. tof fragment identification. Distorted wave analysis.      
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+
+  6LI    10B(3HE,7BE)                  2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1970De12: {+10}B({+3}He,{+7}Be) E=30 MeV, measured |s(E({+7}Be),|q).   
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+
+  6LI    10B(A,8BE)                    2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1976Wo11: {+10}B(|a,{+8}Be) E=65-72.5 MeV, measured |s(E({+8}Be),|q).  
+  6LI2c  {+6}Li levels deduce absolute S{-|a}, L. DWBA analysis.                
+  6LI  L 0                                                                      
+  6LI  L 2190                                                                   
+  6LI cL $S{-|a}=0.4                                                            
+
+  6LI    12C(A,10B),12C(A,DA)          2002TI10                  02NP     200212
+  6LI  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6LI2 H CUT=23-AUG-2001$                                                       
+  6LI c  1976Ma50: {+12}C(|a,{+6}Li) E=46 MeV, measured |s(E({+6}Li),|q).       
+  6LI2c  Finite-range DWBA analysis with microscopic wave functions.            
+  6LI c  1978Sa26: {+12}C(|a,{+6}Li') E=65 MeV/C, measured relative energy      
+  6LI2c  distribution of correlated decay products.                             
+  6LI c  1987Ga20: {+12}C(|a,{+6}Li) E=33.8 MeV, measured |s(|q=35|').          
+  6LI c  1991Gl03: {+12}C(|a,{+6}Li) E=90 MeV, measured |s(|q). Finite range    
+  6LI2c  DWBA analysis.                                                         
+  6LI  L 0                                                                      
+  6LI  L 2.19E3                                                                 
+  6LI  L 4.31E3                                                                 
+
+  6BE    ADOPTED LEVELS                2002TI10                  02NP     200212
+  6BE  H TYP=ERR$AUT=J. KELLEY$DAT=23-Jul-2015$COM=Fixed decay mode$            
+  6BE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6BE2 H CUT=23-Aug-2001$                                                       
+  6BE  Q -2.89E4   SY2.68E4  SY5.9E2   5               2012WA38                 
+  6BE cQ $Note: Current evaluation has used the following Q record              
+  6BE2cQ                       595.    50              1997Au07                 
+  6BE  XA3HE(3HE,X)                                                             
+  6BE  XB4HE(3HE,N)                                                             
+  6BE  XC6LI(P,N),6LI(P,PN)                                                     
+  6BE  XD6LI(3HE,T)                                                             
+  6BE  L 0.0          0+               92 KEV    6                              
+  6BE2 L %2P=100 $ %A=100 $ ISPIN=1 $XREF=BCD                                   
+  6BE  L 1670      50 (2)+             1.16 MEV  6                              
+  6BE2 L %P=? $ %A=? $ ISPIN=1 $XREF=ABCD                                       
+  6BE  L 23.E3        4-                                                        
+  6BE cL T         |G=BROAD                                                     
+  6BE2 L %IT=? $ %3HE=? $ XREF=AC                                               
+  6BE  L 26.E3        2-                                                        
+  6BE cL T         |G=BROAD                                                     
+  6BE2 L %3HE=? $ XREF=AC                                                       
+  6BE  L 27.E3        3-                                                        
+  6BE cL T         |G=BROAD                                                     
+  6BE2 L %3HE=? $ XREF=A                                                        
+
+  6BE    3HE(3HE,X)                    2002TI10                  02NP     200212
+  6BE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6BE2 H CUT=23-AUG-2001$                                                       
+  6BE c  1965Zu02: {+3}He({+3}He,2p) E=15 MeV, measured p{+4}He-coin(E{-p}).    
+  6BE c  1968Iv01: {+3}He({+3}He,{+3}He) E=3-11 MeV, measured |s(E,|q).         
+  6BE c  1970Je02: {+3}He({+3}He,{+3}He) E=17.9-32 MeV, measured |s(E,|q).      
+  6BE2c  {+6}Be deduced resonance.                                              
+  6BE c  1971Dw01: {+3}He({+3}He,2p) E=0.08-1.1 MeV c.m., measured |s{-tot}(E), 
+  6BE2c  |s(E,|q).                                                              
+  6BE c  1972Bo42: {+3}He({+3}He,{+3}He) E=4.33-9.83 MeV, measured polarization 
+  6BE2c  analyzing power.                                                       
+  6BE c  1972Ha64: {+3}He({+3}He,{+3}He) E=9.3-17.5 MeV, measured polarization  
+  6BE2c  analyzing power.                                                       
+  6BE c  1974Dw01: {+3}He({+3}He,2p) E=30-150 keV, measured |s(E). {+6}Be       
+  6BE2c  deduced no resonance.                                                  
+  6BE c  1974Ve01: {+3}He({+3}He,|g) E=12-27 MeV, measured |s(E,|q). {+6}Be     
+  6BE2c  deduced resonances, J, |p, L.                                          
+  6BE c  1976Ir02: {+3}He({+3}He,p) E=14 MeV, measured |s(|q), proton           
+  6BE2c  polarization.                                                          
+  6BE c  1977Ka10: {+3}He(pol {+3}He,{+3}He) E=33.3 MeV, measured A(|q).        
+  6BE c  1978Vl01: {+3}He(pol {+3}He,{+3}He) E=18-33 MeV, measured A(E,|q).     
+  6BE2c  Phase shift analysis, excitation in {+6}Be.                            
+  6BE c  1979La14: {+3}He({+3}He,p) E=50, 60, 78 MeV, measured breakup          
+  6BE2c  |s(E,|q{-|a 1},|q{-|a 2}), deduced Fourier transforms,                 
+  6BE3c  energy, angle dependence. PWIA analysis.                               
+  6BE c  1981Ko34: {+3}He({+3}He,p), E=14 MeV, measured A(|q).                  
+  6BE c  1983Ki10: {+3}He({+3}He,p) E=17-30 MeV, measured |s(|q), A(E,|q).      
+  6BE2c  Polarization target.                                                   
+  6BE c  1987Br02: {+3}He({+3}He,2p),({+3}He,pd),({+3}He,X) E=17.9, 21.7, 24    
+  6BE2c  MeV, measured |s.                                                      
+  6BE c  1996Ar16: {+3}He({+3}He,2p) E=20.7-91.7 keV, measured astrophysical    
+  6BE2c  S-factor vs E, deduced no evidence for hypothetical resonance.         
+  6BE c  1998Ju03: {+3}He({+3}He,2p) E=20.76-91.70 keV, measured |s, deduced    
+  6BE2c  astrophysical S factor, electron screening effect, no evidence for     
+  6BE3c  low-energy resonance.                                                  
+  6BE c  1999Bo23: {+3}He({+3}He,2p) E{-c.m.}=16.5-24.4 keV, measured |s,       
+  6BE2c  astrophysical S-factor, deduced electron screening effect, no narrow   
+  6BE3c  resonance.                                                             
+  6BE  L 1.7E3                                                                  
+  6BE  L 23.0E3     5 4-               5 MEV     AP                             
+  6BE  L 26.E3        2-                                                        
+  6BE  L 27.E3        3-                                                        
+
+  6BE    4HE(3HE,N)                    2002TI10                  02NP     200212
+  6BE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6BE2 H CUT=23-AUG-2001$                                                       
+  6BE c  1966Ec01: {+4}He({+3}He,n), deduced nuclear properties.                
+  6BE c  1966Gu09: {+4}He({+3}He,n), deduced nuclear properties.                
+  6BE c  1975Vi04: {+4}He({+3}He,np) E=36.20 MeV, measured                      
+  6BE2c  |s(E{-n},E{-p},|q{-n}=0|',|q{-p}=50|'). {+6}Be deduced no              
+  6BE3c  narrow resonance near {+3}He-{+3}He threshold.                         
+  6BE c  1977Mc10: {+4}He({+3}He,n) E=38.61 MeV, measured |s(|q), neutron tof.  
+  6BE  L 0                                                                      
+  6BE  L 1.67E03   7                   1.28 MEV  17                             
+  6BE cL E         average of 1.6 MeV {I1} and 1.73 MeV {I10} (1974Aj01) table  
+  6BExcL 6.8                                                                    
+  6BE cL WIDTH     Average of 1.1 MeV {I2} and 1.7 MeV {I3} (1974Aj01) table 6.8
+
+  6BE    6LI(P,N),6LI(P,PN)            2002TI10,1990RA08         02NP     200212
+  6BE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6BE2 H CUT=23-AUG-2001$                                                       
+  6BE c  1967Ho01: {+6}Li(p,n) E=1.8-11 MeV, measured |s(E). {+6}Be deduced     
+  6BE2c  ground-state level-|G.                                                 
+  6BE c  1968Ba41: {+6}Li(p,n) E=30, 50 MeV, measured |s(E,E{-n},|q). {+6}Be    
+  6BE2c  deduced level.                                                         
+  6BE c  1968Wa11: {+6}Li(p,n) E=8-18 MeV, measured |s(E,E{-n},|q). {+6}Be      
+  6BE2c  deduced level.                                                         
+  6BE c  1972Ar22: {+6}Li(p,n) E=17.8 MeV, measured |s(E{-n}). {+6}Be deduced   
+  6BE2c  level-|G.                                                              
+  6BE c  1974Ar05: {+6}Li(p,n) E=14.9, 17.8 MeV, measured |s.                   
+  6BE c  1974Mi05: {+6}Li(p,pn) E=46 MeV, measured |s(E{-p},|q).                
+  6BE c  1977Ri07: {+6}Li(p,n) E=800 MeV, measured |s.                          
+  6BE c  1977Wa05: {+6}Li(p,pn) E=45, 47 MeV, measured excitation energy, energy
+  6BE2c  sharing spectra. PWIA, DWIA calculation.                               
+  6BE c  1979Mo16: {+6}Li(p,n) E=144 MeV, measured |s(|q).                      
+  6BE c  1980Ba62: {+6}Li(p,n) E=14.9, 17.8 MeV, measured |s(|q). Triangle      
+  6BE2c  diagram analysis.                                                      
+  6BE c  1986Ki12: {+6}Li(p,n) E=800 MeV, measured |s(|q), |s(|q) vs            
+  6BE2c  neutron momentum. 6Be deduced Gamow-Teller, Fermi transition strengths.
+  6BE c  1988Pa27: {+6}Li(p,pn) E=70 MeV, measured                              
+  6BE2c  |s(|q{-p},|q{-n},E{-p},E{-n}), deduced neutron separation              
+  6BE3c  energy.                                                                
+  6BE c  1990Mi10: {+6}Li(p,n) E=280 MeV, measured |s(|q), deduced isospin      
+  6BE2c  symmetry test.                                                         
+  6BE c  1990Ra08: {+6}Li(p,n),(pol p,n) E=60-200 MeV measured |s(|q). {+6}Be   
+  6BE2c  deduced Gamow-Teller transition strength. DWIA analysis.               
+  6BE c  1995Wa16: {+6}Li(pol p,n) E=295 MeV, measured |s(|q), polarization     
+  6BE2c  coefficient vs excitation energy, deduced spin-flip strength, effective
+  6BE3c  tensor interactions related features.                                  
+  6BE c  1995Ya12: {+6}Li(p,n) E=186 MeV, measured |s(|q,E{-n}), deduced        
+  6BE2c  quasifree reaction contribution in giant resonance, |DL=1              
+  6BE3c  transitions energy spectra.                                            
+  6BE c  1999Wa08: {+6}Li(pol p,n) E=346 MeV, measured |s,                      
+  6BE2c  |s(E{-n},|q=22|'), analyzing power, induced polarization,              
+  6BE3c  polarization transfer coefficients, deduced longitudinal and transverse
+  6BE4c  spin response function.                                                
+  6BE  L 0            0+               95 KEV    28                             
+  6BE2 L   ISPIN=1                                                              
+  6BE  L 1.69E3     5                  1.15 MEV   6                             
+  6BE cL E         average of 1.82 MeV {I12}, 1.63 MeV {I16} and 1.67 MeV {I5}  
+  6BE2cL (1974Aj01) table 6.8.                                                  
+  6BE cL WIDTH     Average of 1.16 MeV {I21}, 1.18 MeV {I7} and 0.85 MeV {I20}  
+  6BE2cL (1974Aj01) table 6.8.                                                  
+  6BE  L 15.5E3    2                                                            
+  6BE  L 24E3      2                                                            
+
+  6BE    6LI(3HE,T)                    2002TI10,1989BO42         02NP     200212
+  6BE  H TYP=FUL$AUT=HU, TILLEY, KELLEY et al.$CIT=NP A708, 3 (2002)$           
+  6BE2 H CUT=23-AUG-2001$                                                       
+  6BE c  1966Ma36: {+6}Li({+3}He,t) E=30, 40 MeV, measured |s(E{-t},|q). {+6}Be 
+  6BE2c  deduced levels, |G.                                                    
+  6BE c  1972Gi07: {+6}Li({+3}He,t) E=24.6, 27.0 MeV, measured |s(E({+3}He)).   
+  6BE2c  Measured |s{-inel}(|q)/|s{-({+3}He-t)}(|q).                            
+  6BE c  1973Ha45: {+6}Li({+3}He,t) E=46.3 MeV, measured |s(E{-t},|q=5|').      
+  6BE2c  Deduced no {+3}He-{+3}He resonance.                                    
+  6BE c  1977Ge02: {+6}Li({+3}He,t), {+6}Be->|a + 2p, measured t|a-coin, {+6}Be 
+  6BE2c  deduced particle decay.                                                
+  6BE c  1979Ha19: {+6}Li({+3}He,t{+3}He) E=45 MeV, measured |s for symmetric   
+  6BE2c  angle pairs. Faddeev calculations, Coulomb corrections.                
+  6BE c  1981Ba37: {+6}Li(pol {+3}He,t) E=33.3 MeV, measured |s(|q), A(|q).     
+  6BE c  1983De14: {+6}Li({+3}He,t) E=40 MeV, measured inclusive |s(|q, E{-t}), 
+  6BE2c  deduced exit channel dependence, competing mechanisms role.            
+  6BE c  1984Bo49: {+6}Li({+3}He,t) E=40 MeV, measured                          
+  6BE2c  |s(|q{-t},|q{-|a},E{-|a}), |at-coin. {+6}Be                            
+  6BE3c  levels deduced two-proton emission decay characteristics.              
+  6BE c  1987Bo39: {+6}Li({+3}He,t) E=38.7 MeV, measured                        
+  6BE2c  |s(E{-|a},|q{-|a},|q{-t}), |s(E{-|a}). {+6}Be                          
+  6BE3c  deduced 2{++} state three-body decay.                                  
+  6BE c  1988Bo38: {+6}Li({+3}He,t) E=40 MeV, measured |s(E{-|a},|q{-|a},       
+  6BE2c  |q{-p}). {+6}Be deduced exotic decay evidence. Kinematically complete  
+  6BE3c  experiment.                                                            
+  6BE c  1989Bo42: {+6}Li({+3}He,t) E=40 MeV, measured |s(|q{-t}), |s(E{-t},    
+  6BE2c  |q{-t}), t|a-, tp-, t|ap-coin, |s(E{-t},|q{-t},                        
+  6BE3c  E{-|a},|q{-|a}), |s(E{-t},|q{-t},E{-p},|q{-p}),                        
+  6BE4c  |s(E{-t},|q{-t},E{-|a},|q{-|a},E{-p},|q{-p}). {+6}Be                   
+  6BE5c  levels deduced decay characteristics.                                  
+  6BE c  1992Bo25: {+6}Li({+3}He,t) E=40 MeV, measured |a-, proton-spectra,     
+  6BE2c  |a-coin following {+6}Be decay. {+6}Be levels deduced decay mechanism. 
+  6BE3c  Kinematically complete experiments. Three-body K-harmonic method.      
+  6BE  L 0            0+               89 KEV    6                              
+  6BE  L 1.7E3        (2+)                                                      
+
+  6B     ADOPTED LEVELS:UNOBSERVED                               ENSDF    202205
+  6B   H TYP=FUL$AUT=J.H. Kelley, G.C. Sheu$CUT=1-May-2022$CIT=ENSDF$           
+  6B   H TYP=UPD$AUT=E.A. MCCUTCHAN$COM=updated cut-off-date$DAT=31-May-2022    
+  6B   Q                       -2.9E3  SY              2021WA16                 
+  6B  c  The nucleus {+6}B is particle unbound, and so far no resonances have   
+  6B 2c  been observed in any reactions.                                        
+  6B  c  In 1989Gr06, the (|p+,|p-) pion double charge exchange reaction        
+  6B 2c  was studied on {+6}Li at E(|p+)=180 and 240 MeV. A subsequent study    
+  6B 3c  was carried out at E(|p+)=120, 180, 240 MeV by 2007Fo05. Results       
+  6B 4c  from either study are consistent with production of the final          
+  6B 5c  system in a multi-body phase-space with no evidence of contributions   
+  6B 6c  from a {+6}B resonance.                                                
+  6B  c  See mass calculations in (1986Be02, 1993Po11, 2013Ti01).               
+

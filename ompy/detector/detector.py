@@ -4,7 +4,7 @@ from ..stubs import Unitlike, Axes
 from ..stubs import array as Array
 from ..library import from_unit, into_unit
 from .. import u, Vector, Matrix, empty, Index
-from ..response import DiscreteInterpolation, Response, ResponseMatrices
+from ..response import DiscreteInterpolation, Response, ResponseMatrices, Components
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import overload, Literal, Callable, TypeAlias, Self, Type
@@ -338,13 +338,14 @@ class Detector(ABC, metaclass=CombinedMeta):
     ) -> ResponseMatrices: ...
 
     def specialize_like(
-        self, array: Vector | Matrix, *, drop_eye: bool = True
+        self, array: Vector | Matrix, *, drop_eye: bool = True,
+        components: Components | None = None
     ) -> Matrix | ResponseMatrices:
         if drop_eye and not self.implements_discrete_response():
             return self.resolution_like(array)
         else:
             return ResponseMatrices(
-                D=self.discrete_like(array), G=self.resolution_like(array)
+                D=self.discrete_like(array, components=components), G=self.resolution_like(array)
             )
 
 

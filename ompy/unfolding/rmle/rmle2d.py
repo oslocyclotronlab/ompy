@@ -201,7 +201,7 @@ def make_lower(
             #jax.debug.print(opt_state[0])
             
             (loss, aux), grads = value_and_grad(params)
-            updates, opt_state = optimizer.update(grads, opt_state)
+            updates, opt_state = optimizer.update(grads, opt_state, params)
             params = optax.apply_updates(params, updates)
             # Apply mask
             u = params[0]

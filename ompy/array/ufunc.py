@@ -8,7 +8,7 @@ from typing import Tuple, overload, Literal, Callable, TypeVar
 import numpy as np
 from ..stubs import array
 from .. import ureg, Quantity
-
+from .. import JAX_WORKING
 M = TypeVar('M', bound=MatrixProtocol)
 #V = TypeVar('V', bound=VectorProtocol)
 A = TypeVar('A', bound=AbstractArrayProtocol)
@@ -287,7 +287,11 @@ def transition_matrix(mat, binwidth='min', cut=False) -> Matrix:
     return Matrix(Ei=mat.Ex, Ef=Ef, values=val, xlabel='$E_i$', ylabel='$E_f$')
 
 def exeg_to_efeg(mat, cut=False) -> Matrix:
-    Ef, val = compute_EfEg(mat.Ex, mat.Eg, mat.values, cut=cut)
+    if JAX_WORKING:
+        Ef, val = compute_EfEg_jax(mat.Ex, mat.Eg, mat.values, cut=cut)
+        Ef = np.asarray(Ef)
+    else:
+        Ef, val = compute_EfEg(mat.Ex, mat.Eg, mat.values, cut=cut)
     return Matrix(Ef=Ef, Eg=mat.Eg, values=val, xlabel='$E_f$', ylabel=r'$E_\gamma$')
         
 def compute_EfEg(Ex, Eg, matrix, cut=False):
@@ -337,5 +341,132 @@ def compute_EfEg(Ex, Eg, matrix, cut=False):
         i = np.argmax(x_sum)
         j = len(Ef) - np.argmax(np.flip(x_sum))
         return Ef[i:j], transition_matrix[i:j, :]
+    else:
+        return Ef, transition_matrix
+
+if JAX_WORKING:
+    import jax.numpy as jnp
+    from jax import vmap
+    import jax
+    def compute_EfEg_jax(Ex, Eg, matrix, cut=False):
+        """
+        JAX version of compute_EfEg. Computes the matrix corresponding to transitions from Ei to final energy levels Ef.
+        
+        Parameters:
+            Ex (jax.Array): Array of initial energy levels.
+            Eg (jax.Array): Array of emitted gamma ray energies.
+            matrix (jax.Array): Input matrix of shape (len(Ex), len(Eg)) with counts of observed gamma rays.
+            cut (bool): Whether to remove unnecessary zeros from the output.
+            
+        Returns:
+            tuple: Array of final energy levels Ef and the transition matrix of shape (len(Ef), len(Eg)).
+        """
+        
+        # Calculate dEi, dEg, and dEf
+        dEx = Ex[1] - Ex[0]
+        dEg = Eg[1] - Eg[0]
+        dEf = jnp.minimum(dEg, dEx)
+        
+        # Compute the Ef array
+        Ef_min = Ex[0] - Eg[-1]  # minimum possible final energy
+        Ef_max = Ex[-1] + dEx    # maximum possible final energy
+        Ef = jnp.arange(Ef_min, Ef_max + dEf, dEf)
+        dEf = Ef[1] - Ef[0]  # Ensure consistent bin width
+        
+        # Create a function to compute the index for a single (Ex, Eg) pair
+        def get_index(Ex_i, Eg_j):
+            return jnp.floor((Ex_i - Eg_j - Ef[0]) / dEf).astype(jnp.int32)
+        
+        # Vectorize the index computation over Ex and Eg
+        indices = vmap(lambda x: vmap(lambda y: get_index(x, y))(Eg))(Ex)
+        
+        # Create the transition matrix using scatter_add
+        transition_matrix = jnp.zeros((len(Ef), len(Eg)))
+        
+        # Use a loop over Ex indices since scatter_add doesn't support 2D indices directly
+        def body_fun(i, transition_matrix):
+            indices_i = indices[i]
+            matrix_i = matrix[i]
+            # Add values to the transition matrix using scatter_add
+            dimension_numbers = jax.lax.ScatterDimensionNumbers(
+                update_window_dims=(1,),
+                inserted_window_dims=(0,),
+                scatter_dims_to_operand_dims=(0,)
+            )
+            # Stack indices into a single array
+            indices_2d = jnp.stack([indices_i, jnp.arange(len(Eg))], axis=1)
+            # Reshape matrix_i to have rank 2
+            matrix_i_reshaped = matrix_i.reshape(1, -1)
+            return jax.lax.scatter_add(
+                transition_matrix,
+                indices_2d,
+                matrix_i_reshaped,
+                dimension_numbers=dimension_numbers,
+                indices_are_sorted=False,
+                unique_indices=False
+            )
+        
+        # Apply the loop
+        transition_matrix = jax.lax.fori_loop(
+            0, len(Ex), body_fun, transition_matrix
+        )
+        
+        if cut:
+            # Compute row sums and find non-zero rows
+            x_sum = jnp.sum(transition_matrix, axis=1) > 0
+            i = jnp.argmax(x_sum)
+            j = len(Ef) - jnp.argmax(jnp.flip(x_sum))
+            return Ef[i:j], transition_matrix[i:j, :]
+        else:
+            return Ef, transition_matrix
+
+import jax
+import jax.numpy as jnp
+from jax.ops import segment_sum
+
+def compute_EfEg_jax(Ex, Eg, matrix, cut=False):
+    # bin widths
+    dEx = Ex[1] - Ex[0]
+    dEg = Eg[1] - Eg[0]
+    dEf = jnp.minimum(dEg, dEx)
+
+    # Ef array
+    Ef_min = Ex[0] - Eg[-1]
+    Ef_max = Ex[-1] + dEx
+    Ef = jnp.arange(Ef_min, Ef_max + dEf, dEf)
+    dEf = Ef[1] - Ef[0]              # re-compute to avoid tiny float errors
+    num_Ef = Ef.shape[0]
+
+    # For each (i,j) compute the Ef-bin index K[i,j]
+    K = jnp.floor_divide(Ex[:, None] - Eg[None, :] - Ef[0], dEf).astype(int)
+    valid = (K >= 0) & (K < num_Ef)
+    K_clipped = jnp.clip(K, 0, num_Ef - 1)
+
+    # Define a helper that, for one column j, does:
+    #   hist[k] = sum_i matrix[i,j] where K_clipped[i,j] == k  (and valid)
+    #   cnt[k]  = count of i where K[i,j] == k
+    def hist_and_count(vals_j, Kj, vj):
+        hist = segment_sum(vals_j * vj, Kj, num_segments=num_Ef)
+        cnt  = segment_sum(vj.astype(vals_j.dtype), Kj, num_segments=num_Ef)
+        return hist, cnt
+
+    # vmap over the gamma-ray axis (columns)
+    hist_cols, cnt_cols = jax.vmap(hist_and_count, in_axes=(1,1,1))(matrix, K_clipped, valid)
+
+    # hist_cols has shape (len(Eg), num_Ef) → transpose to (num_Ef, len(Eg))
+    transition_matrix = hist_cols.T
+    count_matrix      = cnt_cols.T
+
+    # (optional) average if you want
+    # transition_matrix = jnp.where(count_matrix > 1,
+    #                               transition_matrix / count_matrix,
+    #                               transition_matrix)
+
+    if cut:
+        # drop leading/trailing all-zero Ef rows
+        nonzero = transition_matrix.sum(axis=1) > 0
+        i0 = jnp.argmax(nonzero)
+        i1 = transition_matrix.shape[0] - jnp.argmax(nonzero[::-1])
+        return Ef[i0:i1], transition_matrix[i0:i1, :]
     else:
         return Ef, transition_matrix

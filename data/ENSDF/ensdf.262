@@ -1,0 +1,447 @@
+262      COMMENTS                                                01NDS    200112
+262   cH COMM$Typ=ful; aut=y. A. Akovali; cit=Nuclear Data Sheets 94, 131       
+262  xcH (2001); cut=1-Sep-2001;                                                
+262   c  AUTH$Y. A. Akovali                                                     
+262   c  INST$Physics Division, Oak Ridge National Laboratory                   
+262  #c       Oak Ridge, Tennessee 37831-6371, USA                              
+262   c  ABST$Information pertaining to the nuclear structure of all nuclei     
+262  2c  with mass number A=262 is presented. Various decay and reaction data   
+262  3c  are evaluated and compared. Adopted data, levels, spin,parity and      
+262  4c  configuration assignments are given. When there are insufficient data, 
+262  5c  expectations from systematics of nuclear properties or/and theoretical 
+262  6c  calculations are quoted. Unexpected or discrepant experimental results 
+262  7c  are also mentioned.                                                    
+262   c  CUT$All data received prior to September 2001 have been considered in  
+262  2c  adopting the properties given in this evaluation.                      
+262   c  ACKN$The evaluator would like to thank Eddie Browne for his thorough   
+262  2c  review of this evaluation and for his valuable comments.               
+262   C  CIT$NDS 94, 131 (2001)                                                 
+262   c  FUND$Research sponsored by the Oak Ridge National Laboratory, managed  
+262  xc  by ut-Battelle,llc, for the u.s. Department of Energy under contract   
+262  xc  number DE-ac05-00or22725.                                              
+
+262      REFERENCES                                              01NDS    200112
+262    R 1971GH01 JOUR PRVCA C4 1850                                            
+262    R 1974JU02 JOUR APASA 40 335                                             
+262    R 1976RA02 JOUR PRVCA C13 229                                            
+262    R 1977BE43 JOUR PRLTA 39 1246                                            
+262    R 1977BEWH REPT ORNL-5297,P85,Bemis                                      
+262    R 1977BEZM JOUR BAPSA 22 611 HE14,Bemis                                  
+262    R 1978NIZW REPT LBL-8151,P84,Nitschke                                    
+262    R 1978PO09 JOUR NUKLA 23 125                                             
+262    R 1979DR07 JOUR YAFIA 29 1149                                            
+262    R 1981MU06 JOUR ZPAAD 300 107                                            
+262    R 1983BO15 JOUR APOBB 14 287                                             
+262    R 1983CW01 JOUR NUPAB 410 254                                            
+262    R 1984MU07 JOUR ZPAAD 315 145                                            
+262    R 1984OG03 JOUR RAACA 37 113                                             
+262    R 1985CW01 JOUR NUPAB 444 1                                              
+262    R 1985LO17 JOUR ZPAAD 322 695                                            
+262    R 1985SO03 JOUR PRVCA 31 1801                                            
+262    R 1986MUZX REPT GSI-86-1,P31,Munzenberg                                  
+262    R 1987MI30 JOUR JPHGB 13 987                                             
+262    R 1988GR30 JOUR RAACA 43 223                                             
+262    R 1988IO04 JOUR RRPQA 33 1071                                            
+262    R 1988MU15 JOUR ZPAAD 330 435                                            
+262    R 1989HUZU PREPRINT UCRL-100763,Hulet                                    
+262    R 1989IL02 JOUR NCIAA 101 225                                            
+262    R 1989KR17 JOUR RAACA 48 121                                             
+262    R 1989MO03 JOUR NUPAB 492 349                                            
+262    R 1989MU09 JOUR ZPAAD 333 163                                            
+262    R 1989ST20 JOUR NUPAB 504 589                                            
+262    R 1990HUZV CONF Houston(Fifty Years with Transuranium Elements) Proc,P279
+262    R 1992BH03 JOUR PRVCA 45 2803                                            
+262    R 1992GO28 JOUR RAACA 57 77                                              
+262    R 1992KR01 JOUR PRVCA 45 1064                                            
+262    R 1993AU05 JOUR NUPAB 565 1                                              
+262    R 1993ZI06 JOUR RAACA 60 11                                              
+262    R 1994LA22 JOUR PRLTA 73 624                                             
+262    R 1995AU04 JOUR NUPAB 595 409                                            
+262    R 1995KOZL CONF St Petersburg,P445,Kolesnikov                            
+262    R 1995OG02 JOUR NUPAB 583 823c                                           
+262    R 1996LA11 JOUR PRVCA 53 2893                                            
+262    R 1997HO14 JOUR ZPAAD 358 377                                            
+262    R 1997MO25 JOUR ADNDA 66 131                                             
+262    R 1997PO18 JOUR BRSPE 61 606                                             
+262    R 1997RO12 JOUR ANEND 24 1457                                            
+262    R 1998TU01 JOUR PRVCA 57 1648                                            
+262    R 1999DR09 JOUR PRVCA 59 3433                                            
+262    R 2000AD15 JOUR NUPAB 678 24                                             
+262    R 2000HO27 JOUR PACHA 72 1525                                            
+262    R 2000LA34 JOUR PRVCA 62 064307                                          
+262    R 2000WI15 JOUR PRLTA 85 2697                                            
+262    R 2001HO06 JOUR ZAANE 10 5                                               
+262    R 2001MO07 JOUR NUPAB 683 266                                            
+262    R 2001MU06 JOUR PYLBB 500 241                                            
+
+262NO    ADOPTED LEVELS                                          01NDS    200112
+262NO  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262NO  Q -2.0E3    SY6.4E3   SY5.8E3   SY7.3E3   SY    2012WA38                 
+262NO cQ $Note: Current evaluation has used the following Q record              
+262NO2cQ -2020     SY6420    syst          7310    syst    1995Au04             
+262NO c                                                                         
+262NO c  Assignment: daughter of {+262}Lr (1989HuZU).                           
+262NO c  {+262}Lr was produced in {+254}Es(127-MeV {+22}Ne); the recoiled       
+262NO2c  lawrencium nuclei were chemically separated; the SF activities         
+262NO3c  correlated with the nobelium K x-rays were identified by 1989HuZU to   
+262NOxc  Be from {+262}No.                                                      
+262NO c                                                                         
+262NO c  Theoretical studies:                                                   
+262NO c  For calculations of equilibrium deformations, see 1983Bo15.            
+262NO c  For calculations of fission barrier, see 1983Cw01.                     
+262NO  L 0.0           0+              5 MS      AP                             
+262NO2 L %SF=100$                                                               
+262NO cL           Only SF decay was observed.                                  
+262NO cL T         5-ms fission activity was assigned by 1989HuZU to            
+262NO2cL T{-1/2}({+262}No) from the time distribution between nobelium K| x     
+262NO3cL ray's and subsequent fission.                                          
+262NO cL           T{-1/2}(SF)|?5 ms is recommended by 2000Ho27 from            
+262NO2cL measurements of R.W. Lougheed, et al, reported in Proc. 50 Years With  
+262NO3cL Nuclear Fission Conf. Vol.II. 694 (1989).                              
+262NO cL           For calculated T{-1/2}(SF), see 1989Mo03, 1989St20 and       
+262NO2cL 1992Bh03. For calculated T{-1/2}(|a), see 1997Mo25 and 1997Po18.       
+262NO3cL The partial half-lives calculated by different methods do not agree;   
+262NO4cL however, the relative partial half-lives, T{-1/2}(SF)/T{-1/2}(|a),     
+262NO5cL predict the SF-decay branching of {+262}No to Be nearly 100%.          
+
+262LR    ADOPTED LEVELS                                          01NDS    200112
+262LR  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262LR  Q -3.E2     SY5.5E3   SY3.6E3   SY7.99E3  SY    2012WA38                 
+262LR cQ $Note: Current evaluation has used the following Q record              
+262LR2cQ -210      SY5510    SY3610    SY8070    syst    1995Au04               
+262LR c                                                                         
+262LR t  Assignment:                                                            
+262LR2t             {+254}Es(127-MeV {+22}Ne) chem (1989HuZU).                  
+262LR3t             The measured cross sections at E({+22}Ne)=125 and 126 fit   
+262LR4t             the expected excitation function (1990HuZV).                
+262LR5t                                                                         
+262LR c  Theoretical calculations:                                              
+262LR c  For calculations of fission barrier, see 1985Cw01.                     
+262LR  L 0.0                           4 H       AP                             
+262LR cL T         212 min {I18} was measured by 1989HuZU from SF activities.   
+262LR2cL 1990HuZV reported that the average of three experiments was 216 min,   
+262LR3cL and that their later work indicated a half-life of closer to 4 h.      
+262LR2 L %SF<10 $ %EC+%B+=? $ %A=?                                              
+262LR cL           SF branching was recommended by 2000Ho27 from measurements   
+262LR2cL of R.W.Lougheed, et al, reported in UCAR 10062-87, 4-2 (1987).         
+262LR cL           Observation of 5-ms SF activities correlated with the        
+262LR2cL nobelium K x-rays shows that the nucleus decays by |e+|b{++}. Branching
+262LR3cL for |e+|b{++} decay, however, has not been determined.                 
+262LR cL           |a decay of {+262}Lr has not been observed.                  
+262LR cL           Calculations by 1997Mo25 yield T{-1/2}(|a)=40000 min.        
+
+262RF    ADOPTED LEVELS                                          01NDS    200112
+262RF  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262RF  Q -3.9E3    SY7.00E3  SY4.5E3   SY8.49E3  SY    2012WA38                 
+262RF cQ $Note: Current evaluation has used the following Q record              
+262RF2cQ -3945     syst 6985   syst 4516   syst 8490   syst    1995Au04         
+262RF c                                                                         
+262RF t  Assignment:                                                            
+262RF2t          {+244}Pu({+22}Ne,4n) excitation function:                      
+262RF3t             E({+22}Ne)=114.4, 109.8, 119.0, and 123.6 MeV  (1996La11)   
+262RF4t                                                                         
+262RF c  Theoretical calculations:                                              
+262RF c  Deformation, Q(|a), E(2+) and I|a(to 2+)/I|a(0+) were calculated by    
+262RF2c  2001Mu06.                                                              
+262RF c  For calculations of fission barrier, see 1974Ju02, 1983Cw01,           
+262RF2c  1987Mi30, 2001Mo07.                                                    
+262RF c  T{-1/2}(SF) was calculated by 1976Ra02, 1978Po09, 1985Lo17,1989Mo03,   
+262RF2c  1989St20.                                                              
+262RF c  T{-1/2}(|a) was calculated by 1997Po18 and 1997Mo25.                   
+262RF c  Decay by pion was studied, and |p/SF probability was calculated        
+262RF2c  by 1988Io04.                                                           
+262RF  XA266SG A DECAY                                                          
+262RF  L 0.0          0+               2.3 S     4                              
+262RF cL T         the measured half-lives are 1.2 s {I+10-5} (obtained by      
+262RF2cL 1994La22 from correlation times for |a-SF events in {+266}Sg           
+262RF3cL |a decay), 2.1 s {I2} (1996La11), 2.5 s {I+24-16} (1998Tu01). Earlier  
+262RF4cL measurements: 1985So03, 1978NiZW.                                      
+262RF2 L %SF LE 100                                                             
+262RF cL           Only the SF decay mode of {+262}Rf has been observed.        
+262RF cL           No |a decay from {+262}Rf was observed, and an upper         
+262RF2cL limit of 0.8% was set by 1996La11. |a-SF correlation ({+258}No         
+262RF3cL decays by SF) was searched by 2000La34, none was detected, and         
+262RF4cL an upper limit of 3% was estimated.                                    
+262RF cL           Various calculations for spontaneous fission half-life gave  
+262RF2cL values ranging from 300 |ms to 15 min. See 1989Mo03, 1989St20,         
+262RF3cL 1985Lo17, 1978Po09 and 1976Ra02.                                       
+262RF cL           Calculated partial half-life for |a decay by                 
+262RF2cL various methods also do not agree with each other: T{-1/2}(|a)=2630 s  
+262RF3cL by 1997Mo25; T{-1/2}(|a)=7 s by 1997Po18 [E|a=8670 was used in their   
+262RF4cL semiempirical formula; no correction has been made for                 
+262RF5cL E|a(g.s. to g.s.)|?8360 from Q(|a)=8490 syst (1995Au04)];              
+262RF6cL log T{-1/2}(|a)=-7.42 y [T{-1/2}(|a)=1.2 s] by 1976Ra02.               
+262RF cL           Calculations of 1997Mo25 gave T{-1/2}(|b)>100 s.             
+262RFX L XREF=A                                                                 
+262RF  L 254       50                                                          ?
+262RFX L XREF=A                                                                 
+262RF cL           See {+266}Sg |a decay data set for a comment about this      
+262RFxcL level.                                                                 
+
+262RF    266SG A DECAY                                           01NDS    200112
+262RF  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+266SG  P 0.0                           21 S      +20-12         8762      51    
+262RF  N                       0.18    GE                                       
+262RF c                                                                         
+262RF c  T{-1/2}({+266}Sg)=21 s {I+20-12} is the measurement of 1998Tu01.       
+262RF c  The |a branching was determined as 15|<%|a|<50 and as 18|<%|a          
+262RF2c  by 1994La22 and 1998Tu01, respectively.                                
+262RF c  Q(|a)({+266}Sg)=8762 {I51}, listed in 1995Au04 was calculated from     
+262RF2c  E|a=8630 measured by 1994La22.                                         
+262RF c  The adopted |a energy, E|a(to {+262}Rf g.s.)=8770 {I40}, yields        
+262RF2c  Q(|a)({+266}Sg)=8903 {I40}.                                            
+262RF  L 0.0         0+                                                         
+262RF  A 8770      40          1.0                                              
+262RF cA E         Measurements of 1998Tu01. The authors of 1994La22 assigned   
+262RF2cA only one alpha at 8.63 {I5} MeV to {+266}Sg alpha decay. See also      
+262RFxcA 1995Og02.                                                              
+262RF cA IA        The alpha intensities were measured by 1998Tu01 as           
+262RF2cA I|a(8770|a)/I|a(8520|a)=66/33. When these intensities are used in      
+262RF3cA hindrance-factor calculations, together with the half-life of 21 s     
+262RF4cA and the alpha branching of 18|<%|a|<50, the calculations yield         
+262RF5cA 1.35 {I8}|<r0|<1.39 {I8}, and HF(8520|a)/HF(8770|a)=0.3. One would     
+262RF6cA expect r0=1.45 {I5} and HF(8520|a)>HF(8770|a). For %|a=50,             
+262RF7cA I|a(8770|a)=100 per 100 alpha decays, the calculations give r0=1.40;   
+262RF8cA if E|a=8630, measured by 1994La22 (together with %|a=50, I|a=100) is   
+262RFxcA used, then r0=1.44 {I8}.                                               
+262RF  L 254       50                                                          ?
+262RF cL           The level energy is calculated by the evaluator from E|a=8520
+262RF2cL and E|a(to gs)=8770. If E|a(to gs)=8630, then E(level)=112 {I50}.      
+262RF  A 8520      30                                                          ?
+262RF cA           Measurements of 1998Tu01. The calculated hindrance factor    
+262RF2cA of 0.3, if I|a=33% of alpha decay, may suggest the existence of        
+262RF3cA a contaminant under this alpha peak.                                   
+
+262DB    ADOPTED LEVELS                                          01NDS    200112
+262DB  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262DB  Q -2.11E3   SY6.06E3  SY2.35E3  SY9.05E3  SY    2012WA38                 
+262DB cQ $Note: Current evaluation has used the following Q record              
+262DB2cQ -2165     syst 6165   syst 2258   syst 9005   syst    1995Au04         
+262DB c                                                                         
+262DB t  Assignment:                                                            
+262DB2t     {+249}Bk(92-97 MeV {+18}O,5n), parent of 4.3-s {+258}Lr (|a's)      
+262DB+t         1971Gh01                                                        
+262DB3t     {+249}Bk(117-MeV {+18}O,5n), chemistry                          1988
+262DB+t  Gr30                                                                   
+262DB3t     {+249}Bk(99-MeV {+18}O,5n), chemistry                  1992Go28,1993
+262DB+t  Zi06                                                                   
+262DB5t     {+248}Cm({+19}F,5n), parent of 4.3-s {+258}Lr (|a's)                
+262DB+t                   1999Dr09                                              
+262DB  L 0.0                           35 S      5                              
+262DB cL T         from measured half-lives: 40 s {I10} (1971Gh01), 32.6 s {I65}
+262DB2cL (1977Be43; from SF decay), 34.1 s {I46} (1977Be43; from |a decay),     
+262DB3cL 35.2 s {I+104-72} (1979Dr07; from SF decay), 33.5 s {I94} (1989Kr17;   
+262DB4cL from SF decay), 35.3 s {I123} (1989Kr17; from correlated |a's),        
+262DB5cL 27 s {I+20-11} (1999Dr09; from |a's).                                  
+262DB2 L %A AP 67                                                               
+262DB cL $%SF+%|e+%|b{++}|?33                                                   
+262DB cL           The |a branching of |?67% is adopted from the data of        
+262DB2cL 1992Kr01. The SF branching of |?33% deduced by 1992Kr01, may include   
+262DB3cL (|e+|b{++}) branching. An upper limit of |?5% for |e+|b{++} branch was 
+262DB4cL obtained by 1977BeZM (see also 1977BeWH) from the absence of L| x      
+262DB5cL ray(Z=104) or K| x ray(Z=104) preceding fission, by assuming           
+262DB6cL T{-1/2}({+262}Rf)|<150 |ms. The adopted half-life of {+262}Rf is 2.3 s 
+262DBxcL {I4}.                                                                  
+262DB cL           |a and SF branchings were obtained in various experiments    
+262DB2cL from |a and fission counts: %SF or %|e|?60 (1971Gh01),                 
+262DB3cL %SF=78 {I6} (1977Be43), %SF|?60 (1979Dr07), %SF=49 {I18} (1988Gr30),   
+262DB4cL %SF=51 {I11} (1989Kr17), %SF|?33 (1992Kr01).                           
+262DB5cL 1971Gh01 addressed the possibility of including SF counts also from    
+262DB6cL decay of {+262}Rf, probable |b{++} decay daughter of {+262}Db, and     
+262DB7cL counts from {+263}Db and {+263}Rf. Because of insufficient data, none  
+262DB8cL of these possibilities was ruled out. The authors of 1992Kr01 examined 
+262DB9cL the {+263}Db production in their {+249}Bk({+18}O,xn) reaction at       
+262DB2cL E({+18}O)=93 and 99 MeV. The {+263}Db nucleus decays by spontaneous    
+262DB3cL fission, and its half-life is 27 s (1992Kr01). Different ratio of      
+262DB4cL {+262}Db/{+263}Db nuclei produced in various experiments could explain 
+262DB5cL the inconsistent branchings deduced.                                   
+262DB cL           1997Mo25 calculated the partial half-lives for |a and        
+262DB2cL |b{++} decays and obtained T{-1/2}(|a)=78.86 s, T{-1/2}(|b{++})=68.99  
+262DB3cL s for {+262}Db g.s. The partial half-life for SF decay was calculated  
+262DB4cL by 1985Lo17 as T{-1/2}(SF)|?32 s, and calculated by 1989Mo03, using    
+262DB5cL two different methods, as 1.9 d and 71 d. See 1985Cw01 for calculation 
+262DB6cL of fission barriers.                                                   
+262DB  L 0.0+X                                                                  
+262DB cL           Level is populated in {+266}Bh |a decay.                     
+262DB2cL Q(|a)({+266}Bh)=9550 {I300}, obtained by 1995Au04 from Q(|a)           
+262DB3cL systematics, suggests E(level)=118 {I+320-118}.                        
+
+262DB    266BH A DECAY                                           01NDS    200112
+262DB  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+266BH  P 0.0                           10 S      LT             9550      SY    
+262DB  N                       1.0     LE                                       
+262DB  L 0.0+X                                                                  
+262DB cL E         E(level)=118 {I+320-118} from Q(|a)({+266}Bh)=9550 {I300}, if
+262DB2cL E|a=9290 {I100}.                                                       
+262DB  A 9290      AP                                                           
+262DB cA E         measured by 2000Wi15. Only one event was seen. The energy    
+262DB2cA resolution was about 100 keV.                                          
+
+262SG    ADOPTED LEVELS                                          01NDS    200112
+262SG  H TYP=ERR$AUT=J. Tuli$DAT=9-Nov-2010$COM=2001Mu06 to 2001Ho06 (G. Audi)$ 
+262SG  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262SG  Q -6.2E3    SY7.71E3  4 3.17E3  SY9600    16    2012WA38                 
+262SG cQ $Note: Current evaluation has used the following Q record              
+262SG2cQ -6084     syst 7810   syst 3220   syst 9600   syst    1995Au04         
+262SG c                                                                         
+262SG t  Assignment:                                                            
+262SG2t     {+207}Pb({+64}Ni,X)270(110) |a decay => {+266}Hs |a decay => {+262}S
+262SG+t  g (2001Ho06).                                                          
+262SG c                                                                         
+262SG c  Theoretical studies:                                                   
+262SG c  For calculations and for predicted T{-1/2}(SF), see 1985Lo17, 1989St20,
+262SG2c  1995KoZL, 1997Ro12.                                                    
+262SG c  For predicted half-lives for |a decay, see 1976Ra02, 1995KoZL,         
+262SG2c  1997Mo25, 1997Po18.                                                    
+262SG c  Deformations, Q(a), E(2+ level) and I|a(to 2+)/I|a(to 0+) were         
+262SG2c  calculated by 2001Ho06.                                                
+262SG c  T{-1/2}(|e decay) was calculated by 1995KoZL and 1997Mo25.             
+262SG c                                                                         
+262SG  XA266HS A DECAY                                                          
+262SG  L 0.0         0+                6.9 MS    +38-18                         
+262SG cL T         measured by 2001Ho06.                                        
+262SG2 L %SF GE 78 $ %A LE 22                                                   
+262SG cL           Only SF branch was detected. From non-observation of |a's    
+262SG2cL upper limit of 22% for |a decay branch was set by 2001Ho06.            
+262SGX L XREF=A                                                                 
+
+262SG    266HS A DECAY                                           01NDS    200112
+262SG  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+266HS  P 0.0         0+                2.3 MS    +13-6          10335     20    
+262SG  N                       1.0     LE                                       
+262SG c  2001Ho06 pointed out that {+266}Hs |a decay might possibly have two    
+262SG2c  components with T{-1/2}=0.35 ms {I+28-11} and T{-1/2}=6.3 ms {I+86-23}.
+262SG3c  If indeed there are two separate states, the 6.3-ms is more likely to  
+262SG4c  be the ground state. See {+266}Hs adopted levels for additional        
+262SGxc  comment.                                                               
+262SG c  The |a decay branching of {+266}Hs has not been experimentally         
+262SG2c  determined. If %SF=1.4, as estimated by 2001Ho06, then %|a=98.6.       
+262SG  L 0.0         0+                                                         
+262SG  A 10180     20                                                           
+262SG cA E         measured by 2001Ho06.                                        
+262SG cA           HF=1.0 yields r{-0}({+262}Sg)=1.48 {I3}, if %|a=100, I|a=80  
+262SG2cA {I20} per 100 |a decays and T{-1/2}=2.3 ms {I+13-6} are used. For      
+262SG3cA T{-1/2}=6.3 ms and for T{-1/2}=0.35 ms, r{-0}=1.44 and r{-0}=1.56,     
+262SGxcA respectively.                                                          
+
+262BH    ADOPTED LEVELS                                          01NDS    200112
+262BH  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262BH  Q             6.7E3   SY8.E2    SY10320   15    2012WA38                 
+262BH cQ $Note: Current evaluation has used the following Q record              
+262BH2cQ              6945   syst 945    syst 10220  syst    1995Au04           
+262BH c                                                                         
+262BH t  Assignments and production methods:                                    
+262BH2t                                                                         
+262BH3t    {+209}Bi({+54}Cr,n) parent of {+258}Db (1981Mu06,1984Og03,1989Mu09). 
+262BH4t       |a correlation chain through {+258}Db, {+254}Lr, {+250}Md, and {+2
+262BH+t  50}Fm                                                                  
+262BH5t       was established.                                                  
+262BH6t                                                                         
+262BH7t    {+208}Pb({+55}Mn,n), grand parent of {+258}Rf (1984Og03).            
+262BH8t       3.9-s SF activities observed by 1984Og03 was interpreted as due   
+262BH9t       to SF decay of {+258}Rf which was produced by |e decay of 4.2-s   
+262BH2t       {+258}Db, |a-decay daughter of {+262}Bh. The {+246}Cf |a's were   
+262BH3t       also observed by 1984Og03 in the |a-decay chain of {+262}Bh.      
+262BH4t                                                                         
+262BH5t    {+205}Tl({+58}Fe,n), grand parent of {+258}Rf (1989Il02).            
+262BH6t       Five fission tracks were detected from reaction products,         
+262BH7t       and T{-1/2}(SF)=2.7 s {I+48-12} was determined by 1989Il02.       
+262BH8t                                                                         
+262BH9t    {+209}Bi({+58}Fe,n)266Mt(|a), grand parent of {+254}Lr and {+250}Fm (
+262BH+t  1997Ho14).                                                             
+262BH2t                                                                         
+262BH c                                                                         
+262BH c  Theoretical studies:                                                   
+262BH c  For calculation of fission barrier, see 1985Cw01, 2000Ad15, 2001Mo07.  
+262BH c  Partial half-life for SF decay was calculated by 1985Lo17, 2000Ho27.   
+262BH cL           Excited levels populated by 266Mt |a decay are not adopted   
+262BH2cL here because of possible multiple parent states with unknown level     
+262BH3cL energies. See 266Mt |a decay data set.                                 
+262BH  L 0.0+X                         102 MS    26                             
+262BH cL T         measured by 1989Mu09. Authors' earlier measurements:         
+262BH2cL 115 ms {I+231-75} (1981Mu06), 56 ms {I+53-18} (1986MuZX),              
+262BH3cL 106 ms {I30} (1988Mu15).                                               
+262BH cL           Level is populated in 266Mt |a decay: the authors of         
+262BH2cL 1997Ho14 observed that the 10682-, 10809- and 10848- keV |a's from     
+262BH3cL 266Mt were correlated with the 9731-, 9831- and 10143- keV |a's from   
+262BH4cL {+262}Bh, and pointed out that the three correlated |a's of            
+262BH5cL 266Mt possibly decay from different 266Mt isomers.                     
+262BH cL           1989Mu09 stated that there is no convincing evidence, but    
+262BH2cL |a correlations might suggest that the 102-ms state is the g.s.        
+262BH3cL The |a energy of E|a=10060, measured by 1989Mu09, yields               
+262BH4cL Q(|a)({+262}Bh)=10216 {I40}+E({+258}Db level fed by 10060a)-E(102-ms   
+262BH5cL {+262}Bh level); the Q(|a) calculated from E|a=10143 of 1997Ho14 is    
+262BH6cL Q(|a)({+262}Bh)=10300+E({+258}Db level fed by 10143a)-E(102-ms         
+262BH7cL {+262}Bh level). Q(|a)({+262}Bh)=10216 {I152} was recommended by       
+262BH8cL 1995Au04 from E|a given by 1989Mu09 which is consistent with the Q(|a) 
+262BH9cL systematics shown by 1993Au05. The Q(|a) deduced from measured E|a and 
+262BH2cL the Q(|a) systematics suggest therefore, that energies of the parent   
+262BH3cL and the daughter levels are close in values, and either of these       
+262BH4cL levels may possibly Be the ground state:                               
+262BH5cL E(102-ms {+262}Bh parent)-E({+258}Db level fed by 10143a)=80 {I160}.   
+262BH6cL As pointed out by 1989Mu09,there is no determining evidence.           
+262BH2 L %A LE 100                                                              
+262BH cL           Only |a decay from this state in {+262}Bh was observed;      
+262BH2cL no SF decay was detected by 1984Og03 and 1989Mu09. An upper limit      
+262BH3cL of 20% was set by 1986MuZX. See also 1984Og03.                         
+262BH  L 0.0+Y                         8.0 MS    21                          M1 
+262BH cL T         measured by 1989Mu09. Earlier measurements: 1981Mu06,        
+262BH2cL 1986MuZX, 1988Mu15.                                                    
+262BH cL           One photon at 382.9 in coincidence with an escape-|a from    
+262BH2cL this state was observed by 1984Mu07, and because of the short          
+262BH3cL correlation time between the 266Mt |a decay and the |a escape,         
+262BH4cL 1989Mu09 suggested that the 8.0-ms state is probably the isomer.       
+262BH5cL However, the 382.9|g has been tentatively reassigned to {+258}Db decay 
+262BH6cL (private communication from S. Hofmann; March 2000).                   
+262BH cL E         the measured E|a=10443 decaying from this level              
+262BH2cL yields Q(|a)({+262}Bh)=10605+E(level fed by 10443a)-E(8.0-ms level).   
+262BH3cL If Q(|a)({+262}Bh)=10216 {I152} (1995Au04), then                       
+262BH4cL E(8.0-ms level)-E(level fed by 10443a)=390 {I160}.                     
+262BH2 L %A LE 100                                                              
+262BH cL           No SF decay was detected by 1989Mu09. An upper limit of 10%  
+262BH2cL was given by 1989Mu09 for SF activities with T{-1/2}<100 ms. Other     
+262BH3cL measurements: 1984Og03, 1986MuZX.                                      
+
+262BH    266MT A DECAY                                           01NDS    200112
+262BH  H TYP=FUL$AUT=Y. Akovali$CIT=NDS 94, 131 (2001)$CUT=1-Aug-2001$          
+262BH c  Fourteen |a groups, correlated with |a groups from the decays of       
+262BH2c  {+262}Bh and {+258}Db, were observed by 1997Ho14:                      
+262BH t                                                                         
+262BH2t       E|a              T{-1/2} (ms)                                     
+262BH3t    -------           ----------                                         
+262BH4t      5800 escape        3.3                                             
+262BH5t     10456               3.1                                             
+262BH6t     10484               0.14                                            
+262BH7t     10561               1.3                                             
+262BH8t     10576 #             0.3                                             
+262BH9t     10661 #             0.8                                             
+262BH2t     10682               0.14                                            
+262BH3t     10809               0.9                                             
+262BH4t     10814               1.2                                             
+262BH5t     10848               1.7                                             
+262BH6t     10859               0.5                                             
+262BH7t     11100               3.5                                             
+262BH8t     11306               1.4                                             
+262BH9t     11739               5.4                                             
+262BH c                                                                         
+262BH c  # sum of |DE and residual energy (private communication from           
+262BH2c  S. Hofmann, March, 2000)                                               
+262BH c                                                                         
+262BH c  The half-lives listed above might indicate existence of various |a     
+262BH2c  decaying isomeric states. The Q(|a)(266mt)=11480, obtained by 1995Au04 
+262BH3c  from systematics, would suggest that the observed highest energy       
+262BH4c  |a may decay from an isomeric state, not from the g.s. of              
+262BH5c  266mt. One may speculate that the 10456- and 11739-keV |a's might      
+262BH6c  decay from one isomeric state with T{-1/2}=4.2|+1.2 ms which probably  
+262BH7c  is not the 266mt ground state; the 10484-, 10576-, 10682- and 10859-keV
+262BH8c  |a's may decay from another state with T{-1/2}=0.27|+0.13 ms;          
+262BH9c  and all others may decay from yet another state with                   
+262BH7c  T{-1/2}=1.2|+0.5 ms, for example.                                      
+262BH c  The authors of 1997Ho14 pointed out that the half-lives of these |a    
+262BH2c  transitions can also be described by one common value of 1.7 ms        
+262BH3c  {I+6-4}. The decay scheme for 266mt |a decay is obviously not complete;
+262BH4c  additional supportive data are needed for construction of a definite   
+262BH5c  decay scheme.                                                          
+266MT  P 0.0       GE                  1.7 MS    +18-16         11480     SY    
+262BH  N                       1.0     LE                                       
+

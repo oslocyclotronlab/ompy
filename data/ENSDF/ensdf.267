@@ -1,0 +1,242 @@
+267      COMMENTS                                                22NDS    202205
+267    H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267   c  TITL$NUCLEAR DATA SHEETS FOR A=267,271,275,279,283,287,291,295,299     
+267   c  AUTH$C. Morse                                                          
+267   c  INST$National Nuclear Data Center                                      
+267  #c       Brookhaven National Laboratory                                    
+267  #c       Upton, New York 11973-5000, USA                                   
+267   c  ABST$Information on the production, identification, half-lives and     
+267  2c  decay modes for experimentally known nuclides with mass numbers of     
+267  3c  267,271,275,279,283,287, and 291, along with attempts to observe       
+267  4c  nuclides with mass numbers of 295 and 299, are presented along with    
+267  5c  the recommended values.  Data here supersede data from the previous    
+267  6c  evaluation in this region, 2005Gu33.  Since the previous evaluation    
+267  7c  many new and conclusive experiments have explored the region of        
+267  8c  superheavy nuclei, thus significantly expanding our knowledge of the   
+267  9c  nuclear chart in this area.                                            
+267   c  CUT$All data prior to September 14, 2021 have been included in this    
+267  2c  evaluation. The main bibliographic source was the NSR database         
+267  3c  (2014Pr09) at Brookhaven Laboratory webpage: www.nndc.bnl.gov/nsr      
+267   c  CIT$NDS 182, 130 (2022).                                               
+267   c  FUND$Research sponsored by Office of Nuclear Physics, Office of        
+267  xc  Science, US Department of Energy, under contract DE-AC02-98CH10946.    
+
+267RF    ADOPTED LEVELS                                          22NDS    202205
+267RF  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267RF  Q -570      SY 4763   SY 5507   SY 7890    SY   2021WA16                 
+267RF cQ $|DQ(|b{+-})=686, |DS(n)=707, |DS(p)=788, |DQ(|a)=300 (2021Wa16)       
+267RF cQ $S(2n)=11389 syst {I678} (2021Wa16)                                    
+267RF c  $ {+267}Rf has been observed as the |a-decay daughter of {+271}Sg at   
+267RF2c  JINR (2004Og12,2006Og05).  Events were identified by the observation   
+267RF3c  of chains of |a-decaying nuclei, terminated by spontaneous fission.    
+267RF4c  The properties of these chains, when compared to those previously      
+267RF5c  observed, allowed individual decays to be assigned to specific nuclei. 
+267RF c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267RF2c  evaluation have been computed from the individual events listed in     
+267RF3c  the references above.  Half-life uncertainties have been computed      
+267RF4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267RF5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267RF6c  quadrature to the averaged statistical uncertainty.                    
+267RF  XA271SG A DECAY (96 S)                                                   
+267RF  L 0                              1.3 H     +23-5                         
+267RFX L XREF=A                                                                 
+267RF2 L %SF=100$%A LE 33.3                                                     
+267RF cL E$Assumed ground state.                                                
+267RF cL T$From two events.                                                     
+
+267RF    271SG A DECAY (96 S)          2004OG12,2006OG05         22NDS    202205
+267RF  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271SG  P 0                              96 S     +88-31          8748     SY    
+271SG cP T$From Adopted Levels.                                                 
+271SG cP QP$From 2021Wa16                                                       
+267RF  N                        1.0                                             
+267RF  L 0                              1.3 H     +23-5                         
+267RF2 L %SF=100$%A LE 33.3                                                     
+267RF  A 8.55E3    8                                                            
+267RF cA E$Weighted average of two events.                                      
+267RF cA $Assumed g.s. to g.s. transition.                                      
+
+267DB    ADOPTED LEVELS                                          22NDS    202205
+267DB  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267DB  Q -1792     SY 6798   SY 3411   SY 7920    SY   2021WA16                 
+267DB cQ $|DQ(|b{+-})=457, |DS(n)=469, |DS(p)=557, |DQ(|a)=300 (2021Wa16)       
+267DB cQ $S(2n)=12511 syst {I436},  S(2p)=8797 syst {I663} (2021Wa16)           
+267DB c  $ {+267}Db has been observed as the |a-decay daughter of {+271}Bh at   
+267DB2c  JINR (2004Og03,2013Og01) and GSI (2013Ru11).  Events were identified   
+267DB3c  by the observation of chains of |a-decaying nuclei, terminated by      
+267DB4c  spontaneous fission.  Comparison of the properties of the chains with  
+267DB5c  those observed in previous studies allowed the assignment of           
+267DB6c  individual decays to specific nuclei.                                  
+267DB c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267DB2c  evaluation have been computed from the individual events listed in     
+267DB3c  the references above.  Half-life uncertainties have been computed      
+267DB4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267DB5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267DB6c  quadrature to the averaged statistical uncertainty.                    
+267DB  XA271BH A DECAY (1.5 S)                                                  
+267DB  L 0                              79 M     +94-28                         
+267DBX L XREF=A                                                                 
+267DB2 L %SF=100$%A LE 25                                                       
+267DB cL E$Assumed ground state.                                                
+267DB cL T$From three events.                                                   
+
+267DB    271BH A DECAY (1.5 S)         2004OG03,2013OG01,2013RU1122NDS    202205
+267DB  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271BH  P 0                              1.5 S     +28-6          9.42E+3  9     
+271BH cP T$From Adopted Levels                                                  
+271BH cP QP$From 2021Wa16                                                       
+267DB  N                        1.0                                             
+267DB  L 0                              79 M     +94-28                         
+267DB2 L %SF=100$%A LE 25                                                       
+267DB  A 9.28E3    7                                                            
+267DB cA E$Weighted average of two events.                                      
+267DB cA $Assumed g.s. to g.s. transition.                                      
+
+267SG    ADOPTED LEVELS                                          22NDS    202205
+267SG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267SG  Q -2958     SY 5882   SY 4223   SY 8625    SY   2021WA16                 
+267SG cQ $|DQ(|b{+-})=371, |DS(n)=358, |DS(p)=385, |DQ(|a)=212 (2021Wa16)       
+267SG cQ $S(2n)=13130 syst {I296},  S(2p)=7461 syst {I445} (2021Wa16)           
+267SG c  $ {+267}Sg has been observed in gas-phase chemistry experiments as the 
+267SG2c  |a-decay daughter of {+271}Hs at GSI (2006Dv01,2008Dv02).  Events      
+267SG3c  were identified based on the observation of correlated chains of       
+267SG4c  |a-decaying nuclei, terminated by spontaneous fission.                 
+267SG c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267SG2c  evaluation have been computed from the individual events listed in     
+267SG3c  the references above.  Half-life uncertainties have been computed      
+267SG4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267SG5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267SG6c  quadrature to the averaged statistical uncertainty.                    
+267SG  XA271HS A DECAY                                                          
+267SG  L 0                              84 S     +55-24                         
+267SGX L XREF=A                                                                 
+267SG2 L %SF=83$%A=17                                                           
+267SG cL E$Assumed ground state.                                                
+267SG cL T$From six events.                                                     
+
+267SG    271HS A DECAY                 2006DV01,2008DV02         22NDS    202205
+267SG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+271HS  P 0                                                       9460     SY    
+271HS cP QP$From 2021Wa16                                                       
+267SG  N                        1.0                                             
+267SG  L 0                              84 S     +55-24                         
+267SG2 L %SF=83$%A=17                                                           
+267SG  A 9.16E3    1                                                            
+267SG cA E$Weighted average of six events.                                      
+267SG cA $Assumed g.s. to g.s. transition.                                      
+
+267BH    ADOPTED LEVELS                                          22NDS    202205
+267BH  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267BH  Q -3893     SY 7411   SY 2141   SY 9230    SY   2021WA16                 
+267BH cQ $|DQ(|b{+-})=279, |DS(n)=309, |DS(p)=359, |DQ(|a)=202 (2021Wa16)       
+267BH cQ $S(2n)=13773 syst {I355},  S(2p)=6195 syst {I345} (2021Wa16)           
+267BH c  $ {+267}Bh has been observed in the {+249}Bk({+22}Ne,4n) reaction at   
+267BH2c  LBNL (2000Wi15) and at the Paul Scherrer Institute (2000Ei05), and in  
+267BH3c  the {+248}Cm({+23}Na,4n) reaction at RIKEN (2009Mo12).  Events were    
+267BH4c  identified by the observation of chains of |a-decaying nuclei.         
+267BH5c  Comparison of the properties of these chains with previous studies     
+267BH6c  allowed individual decays to be assigned to specific nuclei.           
+267BH c  $ 2020Ha27 raises the possibility that previous observations of        
+267BH2c  {+267}Bh actually correspond to {+266}Bh, based on a revision of the   
+267BH3c  decay properties of {+266}Bh discussed in that work.                   
+267BH c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267BH2c  evaluation have been computed from the individual events listed in     
+267BH3c  the references above.  Half-life uncertainties have been computed      
+267BH4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267BH5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267BH6c  quadrature to the averaged statistical uncertainty.                    
+267BH  L 0                              14 S      +6-3                          
+267BH2 L %A=100$%SF<8                                                           
+267BH cL E$Assumed ground state.                                                
+267BH cL T$From 11 events.                                                      
+
+267HS    ADOPTED LEVELS                                          22NDS    202205
+267HS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267HS  Q -5133     SY 6553   SY 2736   SY 10038   13   2021WA16                 
+267HS cQ $|DQ(|b{+-})=512, |DS(n)=99, |DS(p)=189 (2021Wa16)                     
+267HS cQ $S(2n)=14385 syst {I98},  S(2p)=4714 syst {I169},  Q(|ep)=1751 syst    
+267HS2cQ {I263} (2021Wa16)                                                      
+267HS c  $ {+267}Hs has been observed in the {+238}U({+34}S,5n) reaction at     
+267HS2c  JINR (1995La20) and GSI (2010Ni14), and as the |a-decay daughter of    
+267HS3c  {+271}Ds at GSI (1998Ho13,2011Ho10), LBNL (2003Gi05,2004Fo08), and     
+267HS4c  RIKEN (2004Mo40).  Events were identified based on the observation of  
+267HS5c  chains of |a-decaying nuclei.  The properties of these chains, when    
+267HS6c  compared to the literature, allowed individual decays to be assigned   
+267HS7c  to specific nuclei.                                                    
+267HS c  $ Identification of the |a-decay energies originating from {+271}Ds    
+267HS2c  (which determine the level energies in {+267}Hs) has been claimed in   
+267HS3c  various works, but not uniformly.  1998Ho13 identifies E{-|a}=10.738   
+267HS4c  and E{-|a}=10.681, but 2011Ho10 indicates that only 10.738 was         
+267HS5c  observed. 2004Mo40 identifies E{-|a}=10.73 and E{-|a}=10.45, but not   
+267HS6c  10.681. 2004Fo08 identifies E{-|a}=10.738, as well as one event which  
+267HS7c  could be assigned to E{-|a}=10.681 or 10.738, but none at              
+267HS8c  E{-|a}=10.45. The present evaluation represents the evaluator's        
+267HS9c  attempt to reconcile the available data.                               
+267HS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267HS2c  evaluation have been computed from the individual events listed in     
+267HS3c  the references above.  Half-life uncertainties have been computed      
+267HS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267HS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267HS6c  quadrature to the averaged statistical uncertainty.                    
+267HS  XA271DS A DECAY (1.6 MS)                                                 
+267HS  L 0                              43 MS     +9-6                          
+267HSX L XREF=A                                                                 
+267HS2 L %A=100                                                                 
+267HS cL E$Assumed ground state.                                                
+267HS cL T$From 37 events.                                                      
+267HS  L 8E1       2                                                            
+267HSX L XREF=A                                                                 
+267HS cL E$From |DE{-|a}.                                                       
+267HS  L 3.2E2     2                                                            
+267HSX L XREF=A                                                                 
+267HS cL E$From |DE{-|a}.                                                       
+267HS  L X                              0.8 S     +40-4                         
+267HS cL T$From one event (2004Mo40).                                           
+
+267HS    271DS A DECAY (1.6 MS)                                  22NDS    202205
+267HS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267HS c  $ References: 1998Ho13,2011Ho10,2003Gi05,2004Fo08,2004Mo40             
+271DS  P 0                              1.6 MS    +4-3           10870    18    
+271DS cP T$From Adopted Levels.                                                 
+271DS cP QP$From 2021Wa16                                                       
+267HS  N                        1.0                                             
+267HS  L 0                              43 MS     +9-6                          
+267HS2 L %A=100                                                                 
+267HS  A 10.73E3   1                                                            
+267HS cA E$Weighted average of 19 events.                                       
+267HS cA $Assumed g.s. to g.s. transition.                                      
+267HS  L 8E1       2                                                            
+267HS  A 10.65E3   2                                                            
+267HS cA E$Weighted average of four events.                                     
+267HS  L 3.2E2     2                                                            
+267HS  A 10.41E3   2                                                            
+267HS cA E$Weighted average of five events.                                     
+
+267DS    ADOPTED LEVELS: TENTATIVE                               22NDS    202205
+267DS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+267DS  Q                        1082   SY1.178E+4 5    2021WA16                 
+267DS cQ $|DS(p)=225 (2021Wa16)                                                 
+267DS cQ $S(2p)=1599 syst {I205},  Q(|ep)=5451 syst {I205} (2021Wa16)           
+267DS c  $ One possible observation of {+267}Ds was reported in 1995Gh05.       
+267DS2c  However, there were a number of issues that make the identification    
+267DS3c  of the event uncertain.  An equipment failure rendered the daughter    
+267DS4c  decay invisible.  In addition, there were two consecutive              
+267DS5c  implantation events, which complicates the interpretation of           
+267DS6c  subsequent decays. Finally, the proposed decay scheme relies on the    
+267DS7c  existence of unobserved electron-capture decay branches.  Therefore,   
+267DS8c  the assignment of this event to {+267}Ds is considered tentative.      
+267DS c  $ 1995Gh05 requires that the electron-capture decay branch of {+259}Sg 
+267DS2c  to {+259}Ha be 10-35% in order to explain the observed decay-chain     
+267DS3c  candidate.  However, 2015An05 determined that the electron-capture     
+267DS4c  decay branch of {+259}Hs is <1%.                                       
+267DS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+267DS2c  evaluation have been computed from the individual events listed in     
+267DS3c  the references above.  Half-life uncertainties have been computed      
+267DS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+267DS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+267DS6c  quadrature to the averaged statistical uncertainty.                    
+267DS  L 0                              3 US      +13-1                         
+267DS2 L %A=100                                                                 
+267DS cL E$Assumed ground state.                                                
+267DS cL T$From one event.                                                      
+

@@ -217,7 +217,7 @@ class Response:
                                                                binwidth=width)
         return self.discrete_(E=bins_, **kwargs)
 
-    def discrete_(self, *, E: Index, compton: ComptonMatrix | None = None, weights: Components | None = None,
+    def discrete_(self, *, E: Index, compton: ComptonMatrix | None = None, components: Components | None = None,
                   normalize: bool = True, pad: bool = False, force_trilu: bool = True) -> Matrix:
         """
         Rebins the discrete response matrix to the requested energy grid.
@@ -228,8 +228,8 @@ class Response:
             The energy grid to rebin to.
         compton : Matrix | None
             The Compton matrix to use for rebinning. If None, the function will try to use self.compton instead.
-        weights : Components | None
-            The weights to use for rebinning. If None, the function will use self.components instead.
+        components : Components | None
+            The components weights. If None, the function will use self.components instead.
         normalize : bool, default True
             Whether to normalize the rebinned response matrix.
         pad : bool, default False
@@ -264,8 +264,8 @@ class Response:
             E_all = E.copy()
             emin = compton.true_index.to_unit(E).leftmost
             E: Index = E_all[emin:]
-        if weights is None:
-            weights = self.components
+        if components is None:
+            components = self.components
 
         # We preserve area as we want a mean value, not the sum
         try:
@@ -279,7 +279,7 @@ class Response:
         else:
             D.rebin('observed', bins=D.true, inplace=True)
         D = D.to_left()
-        D *= weights.compton
+        D *= components.compton
         D.name = "Response"
 
         if pad:
@@ -306,18 +306,19 @@ class Response:
 
         FE, SE, DE, AP = self.interpolation.structures()
         emin = D.observed_index.leftmost
-        has_511 = (511 >= emin) and not self.disable_ap
+        ap_value = 525.0  # Hack for when you mess up the calibration
+        has_511 = (ap_value >= emin) and not self.disable_ap
         if has_511:
-            j511 = D.index_observed(511)
+            j511 = D.index_observed(ap_value)
 
         for i, e in enumerate(D.true):
-            D.loc[i, e] += mean(FE, e) * weights.FE
-            if e - 511 > emin:
-                D.loc[i, e - 511.0] += mean(SE, e) * weights.SE
-            if e - 2 * 511 > emin:
-                D.loc[i, e - 511.0 * 2] += mean(DE, e) * weights.DE
-            if has_511 and e > 1022:
-                D[i, j511] += mean(AP, e) * weights.AP  # type: ignore
+            D.loc[i, e] += mean(FE, e) * components.FE
+            if e - ap_value > emin:
+                D.loc[i, e - ap_value] += mean(SE, e) * components.SE
+            if e - 2 * ap_value > emin:
+                D.loc[i, e - ap_value * 2] += mean(DE, e) * components.DE
+            if has_511 and e > 2 * ap_value:
+                D[i, j511] += mean(AP, e) * components.AP  # type: ignore
 
         if force_trilu:
             mask = np.tril_indices_from(D.values.T, k=-1)
@@ -388,7 +389,7 @@ class Response:
             case _:
                 raise ValueError(f"Expected Matrix or Vector, got {type(other)}")
 
-    def specialize(self, E: np.ndarray | Index, **kwargs) -> SelfMatrices:
+    def specialize(self, E: np.ndarray | Index, **kwargs) -> ResponseMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given energy grid.
 
         Parameters
@@ -408,7 +409,7 @@ class Response:
         D = self.discrete(E, **kwargs)
         return ResponseMatrices(D, G)
 
-    def specialize_like(self, other: Matrix | Vector, **kwargs) -> SelfMatrices:
+    def specialize_like(self, other: Matrix | Vector, **kwargs) -> ResponseMatrices:
         """ Returns the response matrix and the detector resolution matrix specialized to the given matrix or vector.
 
         Parameters

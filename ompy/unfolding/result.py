@@ -114,6 +114,7 @@ class Result(ABC, Generic[T]):
     # Contaminant spectra
     xi: tuple[T, ...] = ()
     beta: T | None = None
+    do_fold_beta: bool = False
     _ndim: int = 0
 
     @property
@@ -166,6 +167,7 @@ class Result(ABC, Generic[T]):
         return nu
 
     best_nu = best_folded
+    nu = best_nu
 
     def best_eta(self, device="gpu?") -> T:
         best = self.best()
@@ -177,6 +179,8 @@ class Result(ABC, Generic[T]):
                 return best
             case _:
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
+                
+    eta = best_eta
 
     def best_xi_mu(self, i: int) -> T:
         return self.xi[i]
@@ -201,16 +205,6 @@ class Result(ABC, Generic[T]):
         with on_device(device, self.GegD, xi_mu, endpoint="numpy"):
             return xi_mu @ self.GegD
 
-    @alias("beta_nu")
-    def beta_folded(self, device="gpu?") -> T:
-        if self.beta is None:
-            raise ValueError("No beta to fold")
-        if self.G_ex is None:
-            with on_device(device, self.GegD, self.beta, endpoint="numpy"):
-                return self.beta @ self.GegD
-        else:
-            with on_device(device, self.G_ex, self.GegD, self.beta, endpoint="numpy"):
-                return self.Gex @ self.beta @ self.GegD
 
     def best_mu(self) -> T:
         if not self.meta.space == "mu":
@@ -224,8 +218,11 @@ class Result(ABC, Generic[T]):
         for i in range(len(self.xi)):
             nu = nu + self.best_xi_folded(i, device=device)
         if self.beta is not None:
-            nu = nu + self.beta
+            nu = nu + self.beta_folded(device=device)
+        nu.title = "Total (nu)"
         return nu
+
+    best_total = folded_total
 
     def resolve_spaces(self, target: PlotSpace) -> tuple[T, str]:
         label = "unfolded"

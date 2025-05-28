@@ -1,0 +1,119 @@
+281DS    ADOPTED LEVELS                                          22NDS    202205
+269DS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281DS  Q -2060     SY 5119   SY 4526   SY 9473    SY   2021WA16                 
+281DS cQ $|DQ(|b{+-})=918, |DS(n)=896, |DS(p)=776, |DQ(|a)=208 (2021Wa16)       
+281DS cQ $S(2n)=11894 syst {I780},  S(2p)=7805 syst {I776} (2021Wa16)           
+281DS c  $ {+281}Ds has been observed as the |a-decay daughter of {+285}Cn      
+281DS2c  at JINR (2000Og05,2002Og09,2004Og07), GSI (2011Ga19,2012Ho12) and      
+281DS3c  RIKEN (2017Ka66); and in gas-phase chemistry experiments at JINR       
+281DS4c  (2010Wi14) and GSI (2014Ya33). Events were identified by the           
+281DS5c  observation of chains of |a-decaying nuclei terminated by spontaneous  
+281DS6c  fission.  Comparison of the properties of the decay chains with those  
+281DS7c  in the literature allowed individual decays to be assigned to          
+281DS8c  specific nuclei.                                                       
+281DS c  $ Other: One decay chain containing {+281}Ds is reported in 1999Og10,  
+281DS2c  but these results have not been reproduced.                            
+281DS c  $ Half-lives, branching ratios, and |a-decay energies in this          
+281DS2c  evaluation have been computed from the individual events listed in     
+281DS3c  the references above.  Half-life uncertainties have been computed      
+281DS4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+281DS5c  uncertainty is assumed for the |a-decay energies, which is added in    
+281DS6c  quadrature to the averaged statistical uncertainty.                    
+281DS  XA285CN A DECAY (33 S)                                                   
+281DS  L 0                              12 S      +4-2                          
+281DSX L XREF=A                                                                 
+281DS2 L %SF=94$%A=6                                                            
+281DS cL E$Assumed ground state.                                                
+281DS cL T$From 18 events.                                                      
+
+281DS    285CN A DECAY (33 S)                                    22NDS    202205
+269DS  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281DS c  $ References:                                                          
+281DS2c  2000Og05,2002Og09,2004Og07,2011Ga19,2012Ho12,2017Ka66,2014Ya33,        
+281DS3c  2010Wi14.                                                              
+285CN  P 0                              33 S      +10-6          9388     SY    
+285CN cP T$From Adopted Levels.                                                 
+285CN cP QP$From 2021Wa16                                                       
+281DS  N                        1.0                                             
+281DS  L 0                              12 S      +4-2                          
+281DS2 L %SF=94$%A=6                                                            
+281DS  A 9.21E3    1                                                            
+281DS cA E$Weighted average of 17 events.                                       
+281DS cA $Assumed g.s. to g.s. transition.                                      
+
+281RG    ADOPTED LEVELS                                          22NDS    202205
+269RG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281RG  Q -2614     SY 6624   SY 2276   SY 9900    SY   2021WA16                 
+281RG cQ $|DQ(|b{+-})=870, |DS(n)=939, |DS(p)=1076, |DQ(|a)=400 (2021Wa16)      
+281RG cQ $S(2n)=12531 syst {I882},  S(2p)=6830 syst {I1024} (2021Wa16)          
+281RG c  $ {+281}Rg has been observed as the |a-decay daughter of {+285}Nh at   
+281RG2c  JINR (2011Og04,2012Og02,2012Og06,2013Og01,2013Og04) and GSI            
+281RG3c  (2019Kh04). Events were identified based on the observation of time-   
+281RG4c  and position-correlated chains of |a-decaying nuclei, terminated by    
+281RG5c  spontaneous fission.  Comparison of the decay chains to previous       
+281RG6c  observations allowed individual decays to be assigned to specific      
+281RG7c  nuclei.                                                                
+281RG c  $ Half-lives, branching ratios, and |a-decay energies in this          
+281RG2c  evaluation have been computed from the individual events listed in     
+281RG3c  the references above.  Half-life uncertainties have been computed      
+281RG4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+281RG5c  uncertainty is assumed for the |a-decay energies, which is added in    
+281RG6c  quadrature to the averaged statistical uncertainty.                    
+281RG  XA285NH A DECAY (0.93 S)                                                 
+281RG  L 0                              15 S      +4-3                          
+281RGX L XREF=A                                                                 
+281RG2 L %A=18$%SF=82                                                           
+281RG cL E$Assumed ground state.                                                
+281RG cL T$From 21 events.                                                      
+
+281RG    285NH A DECAY (0.93 S)                                  22NDS    202205
+269RG  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281RG c  $ References: 2011Og04,2012Og02,2012Og06,2013Og01,2013Og04,2019Kh04    
+285NH  P 0                              0.93 S   +45-23          1.001E+4 4     
+285NH cP T$From Adopted Levels.                                                 
+285NH cP QP$From 2021Wa16                                                       
+281RG  N                        1.0                                             
+281RG  L 0                              15 S      +4-3                          
+281RG2 L %A=18$%SF=82                                                           
+281RG  A 9.85E3    2                                                            
+281RG cA E$Weighted average of ten events.                                      
+281RG cA $Assumed g.s. to g.s. transition.                                      
+
+281CN    285FL A DECAY (101 MS)                                  22NDS    202205
+269CN  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281CN c  $ References: 2010El06,2015Ut02,2018Ut02.                              
+285FL  P 0                              101 MS   +59-27          1.056E+4 7     
+285FL cP T$From Adopted Levels.                                                 
+285FL cP QP$From 2021Wa16                                                       
+281CN  N                        1.0                                             
+281CN  L 0                              0.18 S    +10-5                         
+281CN2 L %A=100$%SF LE 12.5                                                     
+281CN  A 10.41E3   3                                                            
+281CN cA E$Weighted average of six events.                                      
+281CN cA $Assumed g.s. to g.s. transition.                                      
+
+281CN    ADOPTED LEVELS                                          22NDS    202205
+269CN  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 167 (2022)$CUT=14-Sep-2021$          
+281CN  Q -3863     SY 5779   SY 3228   SY1.043E+4 6    2021WA16                 
+281CN cQ $|DQ(|b{+-})=498, |DS(n)=706, |DS(p)=664 (2021Wa16)                    
+281CN cQ $S(2n)=13216 syst {I560},  S(2p)=5655 syst {I724},  Q(|ep)=338 syst    
+281CN2cQ {I847} (2021Wa16)                                                      
+281CN c  $ {+281}Cn has been observed as the |a-decay daughter of {+285}Fl at   
+281CN2c  LBNL (2010El06) and JINR (2015Ut02,2018Ut02).  Events were identified  
+281CN3c  by the observation of chains of |a-decaying nuclei terminated by       
+281CN4c  spontaneous fission.  Comparison of the decay properties of these      
+281CN5c  chains to those in the literature allowed specific decays to be        
+281CN6c  assigned to individual nuclei.                                         
+281CN c  $ Half-lives, branching ratios, and |a-decay energies in this          
+281CN2c  evaluation have been computed from the individual events listed in     
+281CN3c  the references above.  Half-life uncertainties have been computed      
+281CN4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+281CN5c  uncertainty is assumed for the |a-decay energies, which is added in    
+281CN6c  quadrature to the averaged statistical uncertainty.                    
+281CN  XA285FL A DECAY (101 MS)                                                 
+281CN  L 0                              0.18 S    +10-5                         
+281CNX L XREF=A                                                                 
+281CN2 L %A=100$%SF LE 12.5                                                     
+281CN cL E$Assumed ground state.                                                
+281CN cL T$From seven events.                                                   
+

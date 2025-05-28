@@ -140,3 +140,6 @@ data/**/R.npz
 
 # Ignore ~undo-tree~
 *~undo-tree~
+*.png
+*.nc
+notebooks/*

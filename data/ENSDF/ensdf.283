@@ -1,0 +1,87 @@
+283CN    ADOPTED LEVELS                                          22NDS    202205
+267CN  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+283CN  Q -3226     SY 5560   SY 3694   SY 9888    SY   2021WA16                 
+283CN cQ $|DQ(|b{+-})=754, |DS(n)=824, |DS(p)=851, |DQ(|a)=113 (2021Wa16)       
+283CN cQ $S(2n)=12753 syst {I732},  S(2p)=6514 syst {I788} (2021Wa16)           
+283CN c  $ {+283}Cn has been observed as the product of the {+238}U({+48}Ca,3n) 
+283CN2c  reaction at GSI (2007Ho18) and RIKEN (2017Ka31); as the |a-decay       
+283CN3c  product of {+287}Fl at GSI (2012Ho12), LBNL (2009St21), and JINR       
+283CN4c  (2004Og12,2004Og07,2006Og05); and in gas-phase chemistry experiments   
+283CN5c  JINR (2007Ei03,2008Ei03,2010Ei01).  In all cases, the nuclei were      
+283CN6c  identified based on the observation of time- and position-correlated   
+283CN7c  chains of |a decays, terminated by spontaneous fission.  Comparison    
+283CN8c  of the observed decay properties to those previously observed allowed  
+283CN9c  the members of the chains to be assigned to known nuclei.              
+283CN c  $ 2016Ho09 revises the assignment of chain #1 in 2012Ho12 to have      
+283CN2c  {+291}Lv as its progenitor, which decays through {+283}Cn.  2016Ho09   
+283CN3c  also suggests that the "missing |a" events in 2004Og12 are actually    
+283CN4c  spontaneous fission of {+283}Cn.  This revision is adopted here        
+283CN5c  except for the third entry in Table III of 2004Og12.                   
+283CN c  $ Other: 1999Og07, 1999Og05, 2004Og02 claim observation of {+283}Cn,   
+283CN2c  but the properties of the decay chains identified in these works do    
+283CN3c  not agree with subsequent publications.                                
+283CN c  $ Half-lives, branching ratios, and |a-decay energies in this          
+283CN2c  evaluation have been computed from the individual events listed in     
+283CN3c  the references above.  Half-life uncertainties have been computed      
+283CN4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+283CN5c  uncertainty is assumed for the |a-decay energies, which is added in    
+283CN6c  quadrature to the averaged statistical uncertainty.                    
+283CN  XA287FL A DECAY (0.4 S)                                                  
+283CN  L 0                              4.6 S     +10-7                         
+283CNX L XREF=A                                                                 
+283CN2 L %A=85$%SF=15                                                           
+283CN cL E$Assumed ground state.                                                
+283CN cL T$From 30 events.  Note that the decay time of the escape-|a event     
+283CN2cL associated with {+283}Cn in the chain reassigned to {+291}Lv in        
+283CN3cL 2016Ho09 is not included in this value.                                
+
+283CN    287FL A DECAY (0.4 S)                                   22NDS    202205
+267CN  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+283CN c  $ References: 2012Ho12,2009St21,2004Og12,2004Og07,2006Og05,2010Ei01    
+287FL  P 0                              0.4 S     +13-8          1.017E+4 5     
+287FL cP T$From Adopted Levels.                                                 
+287FL cP QP$From 2021Wa16                                                       
+283CN  N                        1.0                                             
+283CN  L 0                              4.6 S     +10-7                         
+283CN2 L %A=85$%SF=15                                                           
+283CN  A 10.03E3   2                                                            
+283CN cA $Assumed g.s. to g.s. transition.                                      
+283CN cA E$Weighted average of sixteen |a-decay events.                         
+
+283NH    ADOPTED LEVELS                                          22NDS    202205
+267NH  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+283NH  Q              7237   SY 1552   SY 10417   SY   2021WA16                 
+283NH cQ $|DS(n)=592, |DS(p)=701, |DQ(|a)=112 (2021Wa16)                        
+283NH cQ $S(2n)=13389 syst {I530},  S(2p)=5348 syst {I889} (2021Wa16)           
+283NH c  $ {+283}Nh has been observed as the |a-decay daughter of {+287}Mc at   
+283NH2c  JINR (2004Og03,2013Og01) and GSI (2013Ru11).  Chains of time- and      
+283NH3c  position-correlated |a decays terminated by spontaneous fission were   
+283NH4c  used to identify the events, and comparison of the observed decay      
+283NH5c  properties with those in the literature was used to assign chain       
+283NH6c  members to specific nuclei.                                            
+283NH c  $ Half-lives, branching ratios, and |a-decay energies in this          
+283NH2c  evaluation have been computed from the individual events listed in     
+283NH3c  the references above.  Half-life uncertainties have been computed      
+283NH4c  according to the method of 1984Sc13.  An additional 10 keV systematic  
+283NH5c  uncertainty is assumed for the |a-decay energies, which is added in    
+283NH6c  quadrature to the averaged statistical uncertainty.                    
+283NH  XA287MC A DECAY (37 MS)                                                  
+283NH  L 0                              0.07 S    +14-3                         
+283NHX L XREF=A                                                                 
+283NH2 L %A=100$%SF LE 25                                                       
+283NH cL E$Assumed ground state.                                                
+283NH cL T$From two events.                                                     
+
+283NH    287MC A DECAY (37 MS)                                   22NDS    202205
+267NH  H TYP=FUL$AUT=C. Morse$CIT=NDS 182, 130 (2022).$CUT=14-Sep-2021$         
+283NH c  $ References: 2004Og03,2013Og01,2013Ru11                               
+287MC  P 0                              37 MS    +44-13          1.076E+4 7     
+287MC cP T$From Adopted Levels.                                                 
+287MC cP QP$From 2021Wa16                                                       
+283NH  N                        1.0                                             
+283NH  L 0                              0.07 S    +14-3                         
+283NH2 L %A=100$%SF LE 25                                                       
+283NH  A 10.60E3   3                                                            
+283NH cA $Assumed g.s. to g.s. transition.                                      
+283NH cA E$Weighted average of three events.                                    
+

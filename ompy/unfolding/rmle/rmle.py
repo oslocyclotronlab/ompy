@@ -241,4 +241,4 @@ class RMLE(Unfolder):
             time=elapsed, space=self.space, parameters=parameters, method=self.__class__
         )
         return RMLEResult2D(meta=meta, cost=result.aux['loglike'], u=result.mu, aux=result.aux,
-                            beta=result.beta)
+                            beta=result.beta, do_fold_beta=optim_data.background.do_fold)
