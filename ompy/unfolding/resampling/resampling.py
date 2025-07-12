@@ -309,7 +309,7 @@ class Resampling(ABC, Generic[T]):
 
     @property
     def D(self) -> Matrix:
-        return self.base.D
+        return self.base.D_eg
 
     @property
     def raw(self) -> T:

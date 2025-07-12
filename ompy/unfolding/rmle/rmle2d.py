@@ -13,15 +13,14 @@ from ...stubs import Path
 from ..result1d import Cost1D
 from ..result2d import UnfoldedResult2DSimple
 from .loss import Loss, LossFn, KullbackLeibler
-from .penalty import total_penalty
-from .stubs import Optimizer
 from jaxtyping import Float, Array
 from ..utils import scan_tqdm
 from functools import partial
 from .stubs import Background2D, Beta2D, Mu2D, Tau2D, GegDMatrix, GexMatrix, State2D, Data2D
 from .lossmodel import ModelLoss
-from .utils import pytree_dataclass
+from .utils import pytree_dataclass, into_array
 from .tau import TauMap, TAU_MAP
+from .contaminant2d import Contaminant2D
 
 try:
     import optax
@@ -63,7 +62,9 @@ def cost(
     y: Data2D,
     loss: ModelLoss,
     background: BackgroundModel2D,
-    tau_map: TauMap[Mu2D, Tau2D]
+    tau_map: TauMap[Mu2D, Tau2D],
+    efficiency: Float[Array, "Eg"] | None,
+    contaminant_models: tuple[Contaminant2D, ...]
 ) -> tuple[float, dict]:
     """
 
@@ -90,6 +91,18 @@ def cost(
     tau, beta_tau, contaminants = state
     mu = from_tau(tau)
 
+
+    loss_contaminants = 0.0
+    if len(contaminants) > 0:
+        print("has contaminants", len(contaminants))
+        for contaminant, model in zip(contaminants, contaminant_models):
+            #contaminant_nu, tmp = model.loss(from_tau(contaminant))
+            #loss_contaminants += tmp
+            #nu = nu + contaminant_nu
+            contaminant_mu, tmp = model.loss(contaminant)
+            mu = mu + contaminant_mu
+            loss_contaminants += tmp
+
     # The left handed product is the same for both nu and eta
     tmp = G_ex@mu
     nu = tmp@GegD
@@ -99,11 +112,14 @@ def cost(
         beta = from_tau(beta_tau)
         if background.do_fold:
             beta = G_ex@beta@G_eg
+            if efficiency is not None:
+                beta = beta / efficiency[None, :]
         loss_bg = background.cost(beta)
         nu = nu + beta
     else:
         print("no background")
         loss_bg = 0.0
+
 
     likelihood_body = loss(nu, y)
     loglike_per_instance = jnp.sum(likelihood_body, axis=1)
@@ -121,7 +137,7 @@ def cost(
     penalty_terms = 0.0
     penalty_bg = 0.0
 
-    cost = loglike + loss_bg + penalty_terms
+    cost = loglike + loss_bg + penalty_terms + loss_contaminants
 
     aux = {"loglike": loglike, "penalty": penalty_terms, "penalty_bg": penalty_bg, "loss_bg": loss_bg}
 
@@ -143,6 +159,7 @@ def unfold(*,
         prototype=data.prototype,
         mu=mu,
         beta=beta,
+        contaminants=contaminants,
         aux=aux
     )
 
@@ -176,7 +193,10 @@ def make_lower(
         beta_initial = ()
 
     
-    contaminant_initial = ()
+    #contaminant_initial = tuple(settings.tau_map.to_tau(contaminant.setup_initial())
+    #                            for contaminant in data.contaminants)
+    contaminant_initial = tuple(contaminant.setup_initial()
+                                for contaminant in data.contaminants)
 
     params_init = (mu_initial, beta_initial, contaminant_initial)
 
@@ -186,7 +206,9 @@ def make_lower(
     cost_closure = partial(cost, GegD=GegD, G_eg=G_eg, G_ex=G_ex, y=raw,
                             loss=components.loss,
                             background=data.background,
-                            tau_map=settings.tau_map)
+                            tau_map=settings.tau_map,
+                            efficiency=data.efficiency,
+                            contaminant_models=data.contaminants)
 
     value_and_grad = jax.jit(jax.value_and_grad(cost_closure, has_aux=True))
 
@@ -229,6 +251,8 @@ def make_lower(
         mu_tau, beta_tau, contaminants = params
         mu = settings.tau_map.from_tau(mu_tau)
         beta = settings.tau_map.from_tau(beta_tau) if len(beta_tau) > 0 else ()
+        #contaminants = tuple(settings.tau_map.from_tau(contaminant) for contaminant in contaminants)
+        contaminants = tuple(model.transform_out(contaminant) for contaminant, model in zip(contaminants, data.contaminants))
         return (mu, beta, contaminants), loss_state
     return lambda : lower(params_init, opt_state_init, iterations)
 
@@ -286,7 +310,8 @@ class OptimizationData:
     # Prototype of the unfolded spectrum
     prototype: Matrix
     # Contaminants
-    contaminants: tuple[Float[Array, "Ein Eg"], ...] = ()
+    contaminants: tuple[Contaminant2D, ...] = ()
+    efficiency: Float[Array, "Eg"] | None = None
 
     def __post_init__(self):
         self.D = into_array(self.D)
@@ -304,6 +329,16 @@ class OptimizationData:
             if self.raw.shape != background.shape:
                 raise ValueError(f"Raw and background #{i} must have the same shape")
 
+        if self.efficiency is not None:
+            self.efficiency = into_array(self.efficiency)
+            print(self.efficiency.shape)
+            if self.efficiency.shape[0] != self.raw.shape[1]:
+                raise ValueError("Efficiency must have the same shape as the raw data"
+                                 f"Efficiency: {self.efficiency.shape}, Raw: {self.raw.shape}")
+
+        if not isinstance(self.contaminants, Iterable):
+            self.contaminants = tuple(self.contaminants)
+
     @property
     def has_background(self) -> bool:
         return len(self.background.backgrounds) > 0
@@ -313,15 +348,23 @@ class OptimizationResult:
     prototype: Matrix
     mu: Matrix
     beta: Matrix | None = None
+    contaminants: tuple[Matrix, ...] = ()
     aux: dict[str, np.ndarray] = field(default_factory=dict)
 
     def __post_init__(self):
-        self.mu = self.prototype.clone(values=self.mu)
-        if self.beta is not None:
-            self.beta = self.prototype.clone(values=self.beta)
+        self.mu = self.prototype.clone(values=self.mu, name='mu')
+        if len(self.beta) > 0:
+            self.beta = self.prototype.clone(values=self.beta, name='beta')
+        else:
+            self.beta = None
 
         for key, value in self.aux.items():
             self.aux[key] = np.asarray(value)
+
+        #contaminants = []
+        #for contaminant in self.contaminants:
+        #    contaminants.append(self.prototype.clone(values=contaminant, name='contaminant'))
+        #self.contaminants = tuple(contaminants)
 
 
 @dataclass(kw_only=True)
@@ -336,8 +379,3 @@ class RMLEResult2D(Cost1D, UnfoldedResult2DSimple):
         b = UnfoldedResult2DSimple._load(path, meta)
         return a | b
 
-
-def into_array(x: Matrix | np.ndarray | jnp.ndarray) -> jnp.ndarray:
-    if hasattr(x, "values"):
-        x = x.values
-    return jnp.asarray(x)

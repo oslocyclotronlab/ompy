@@ -55,6 +55,8 @@ def empty(ex: ..., eg: array | None = None, **kwargs) -> Vector | Matrix:
     return Matrix(X=ex, Y=eg, values=values)
 
 def eye(array: array, **kwargs) -> Matrix:
+    if isinstance(array, Matrix):
+        array = array.X
     return Matrix(X=array, Y=array, values=np.eye(len(array), **kwargs))
 
 
@@ -470,3 +472,74 @@ def compute_EfEg_jax(Ex, Eg, matrix, cut=False):
         return Ef[i0:i1], transition_matrix[i0:i1, :]
     else:
         return Ef, transition_matrix
+
+    
+def efeg_to_exeg(mat, cut=False) -> Matrix:
+    Ei, val = compute_EiEg_jax(mat.Ef, mat.Eg, mat.values, mat.Ex, cut=cut)
+    Ei = np.asarray(Ei)
+    return Matrix(Ei=Ei, Eg=mat.Eg, values=val, xlabel='$E_i$', ylabel=r'$E_\gamma$')
+
+        
+def compute_EiEg_jax(Ef, Eg, matrix_feg, Ei, cut=False):
+    """
+    Inverse of compute_EfEg_jax: take a matrix in (Ef, Eg) and
+    rebin it back into (Ei, Eg), where Ei is the original Ex axis.
+    
+    Args:
+      Ef         1D array of final energies (length Nf)
+      Eg         1D array of gamma energies (length Ng)
+      matrix_feg 2D array shape (Nf, Ng): your Ef–Eg histogram
+      Ei         1D array of initial energies (length Ni), same as Ex
+      cut        if True, drop any leading/trailing all-zero Ei rows
+    
+    Returns:
+      (Ei_axis, transition_matrix) where transition_matrix has shape (Ni, Ng)
+    """
+    # bin widths
+    dEi = Ei[1] - Ei[0]
+    dEg = Eg[1] - Eg[0]
+    # recompute Ef bin width
+    dEf = Ef[1] - Ef[0]
+    
+    # For each (k,j) in (Ef,Eg), compute the Ei‐bin index I[k,j]
+    # Ei = Ef + Eg  =>  I = floor((Ef[k] + Eg[j] - Ei[0]) / dEi)
+    I = jnp.floor_divide(
+        Ef[:, None] + Eg[None, :] - Ei[0],
+        dEi
+    ).astype(int)
+    valid = (I >= 0) & (I < Ei.shape[0])
+    I_clipped = jnp.clip(I, 0, Ei.shape[0] - 1)
+    
+    # helper: for one Eg‐column j, sum over Ef‐axis
+    def hist_and_count(vals_k, Ik, vmask):
+        # vals_k:    shape (Nf,), the column of matrix_feg
+        # Ik:        shape (Nf,), target bin indices along Ei
+        # vmask:     shape (Nf,), bool mask of valid
+        hist = segment_sum(vals_k * vmask, Ik, num_segments=Ei.shape[0])
+        cnt  = segment_sum(vmask.astype(vals_k.dtype), Ik, num_segments=Ei.shape[0])
+        return hist, cnt
+    
+    # vmap over the Ng columns
+    hist_cols, cnt_cols = jax.vmap(
+        hist_and_count, in_axes=(1,1,1)
+    )(matrix_feg, I_clipped, valid)
+    
+    # hist_cols is shape (Ng, Ni) → transpose efeg_to_exegto (Ni, Ng)
+    transition_matrix = hist_cols.T
+    count_matrix      = cnt_cols.T
+    
+    # if you want to normalize by counts, you can uncomment:
+    # transition_matrix = jnp.where(
+    #     count_matrix > 1,
+    #     transition_matrix / count_matrix,
+    #     transition_matrix
+    # )
+    
+    if cut:
+        # drop leading/trailing all-zero Ei rows
+        nonzero = transition_matrix.sum(axis=1) > 0
+        i0 = jnp.argmax(nonzero)
+        i1 = transition_matrix.shape[0] - jnp.argmax(nonzero[::-1])
+        return Ei[i0:i1], transition_matrix[i0:i1, :]
+    else:
+        return Ei, transition_matrix

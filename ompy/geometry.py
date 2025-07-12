@@ -142,6 +142,10 @@ class Line(Geometry):
                 raise ValueError("'where' must be 'above', 'below' or 'at'")
         return mask
 
+    def get_slope_intercept(self) -> tuple[float, float]:
+        return get_line_parameters(p0=self.p1, p1=self.p2,
+                                   slope=self.slope, intercept=self.intercept)
+
 def get_line_parameters(p0: None | Point = None,
                         p1: None | Point = None, 
                         slope: float | Point = None, 
@@ -223,6 +227,6 @@ class ThickLine(Geometry):
         self.upper.draw(matrix, ax, ls='--', **kw)
         return self.lower.draw(matrix, ax, ls='--', **kw)
 
-    def within(self, matrix: Matrix) -> ArrayBool:
-        mask = self.upper.above(matrix) & self.lower.below(matrix)
+    def outside(self, matrix: Matrix) -> ArrayBool:
+        mask = ~self.upper.above(matrix) | ~self.lower.below(matrix)
         return mask

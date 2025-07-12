@@ -57,7 +57,7 @@ def get_local_dtype_njit():
     return LOCAL_DTYPE
 
 
-@njit
+@njit(cache=True)
 def index(E: np.ndarray, e: LOCAL_DTYPE) -> int:
     if e < E[0]:
         raise IndexError("Energy below bounds.")
@@ -84,7 +84,7 @@ def index(E: np.ndarray, e: LOCAL_DTYPE) -> int:
 #
 #     return i-1
 
-@njit
+@njit(cache=True)
 def index_mid(E: np.ndarray, e: LOCAL_DTYPE) -> int:
     """ Index for mid-binning """
     i = 0
@@ -107,7 +107,7 @@ def index_mid(E: np.ndarray, e: LOCAL_DTYPE) -> int:
     return i - 1
 
 
-@njit
+@njit(cache=True)
 def rebin_1D(counts, mids_in, mids_out):
     """Rebin an array of counts from binning mids_in to binning mids_out
 
@@ -154,7 +154,7 @@ def rebin_1D(counts, mids_in, mids_out):
     return counts_out
 
 
-@njit
+@njit(cache=True)
 def overlap(edge_in_l, edge_in_u,
             edge_out_l, edge_out_u):
     """ Calculate overlap between energy intervals
@@ -181,7 +181,7 @@ def overlap(edge_in_l, edge_in_u,
     return overlap
 
 
-@njit
+@njit(cache=True)
 def div0_1(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
     # with np.errstate(divide='ignore', invalid='ignore'):
@@ -194,7 +194,7 @@ def div0_1(a, b):
     return c
 
 
-@njit
+@njit(cache=True)
 def div0_2(a, b):
     """ division function designed to ignore / 0, i.e. div0([-1, 0, 1], 0 ) -> [0, 0, 0] """
     # with np.errstate(divide='ignore', invalid='ignore'):
@@ -206,7 +206,7 @@ def div0_2(a, b):
     return c
 
 
-@njit
+@njit(cache=True)
 def normalize(R):
     for j in range(R.shape[0]):
         R[j, :] = div0_1(R[j, :], np.sum(R[j, :]))
@@ -249,12 +249,12 @@ class NVector:
         return self.values.dtype
 
 
-@njit
+@njit(cache=True)
 def empty_nvector(E: np.ndarray, dtype=LOCAL_DTYPE):
     return NVector(E, np.empty(len(E), dtype=dtype))
 
 
-@njit
+@njit(cache=True)
 def lerp(x, x0, x1, y0, y1):
     t = (x - x0) / (x1 - x0)
     return (1 - t) * y0 + t * y1

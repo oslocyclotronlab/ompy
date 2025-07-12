@@ -348,6 +348,9 @@ class Detector(ABC, metaclass=CombinedMeta):
                 D=self.discrete_like(array, components=components), G=self.resolution_like(array)
             )
 
+    def efficiency_like(self, array: Vector | Matrix) -> Vector:
+        raise NotImplementedError("Efficiency not implemented")
+
 
 class EgDetector(Detector):
     def _get_energy_dim(self, array: Vector | Matrix) -> Literal[1]:

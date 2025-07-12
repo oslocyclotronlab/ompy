@@ -46,7 +46,7 @@ class UnfoldedResult2D(Result):
         else:
             with on_device(device, best, self.GegD, self.G_ex, endpoint='numpy'):
                 m = self.G_ex@best@self.GegD
-        return self.raw.clone(values=m)  # Fix labels
+        return self.raw.clone(values=m, name='nu')  # Fix labels
     best_nu = best_folded
 
     #@cache
@@ -64,7 +64,7 @@ class UnfoldedResult2D(Result):
                 m = self.best()
             case _:
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
-        return self.raw.clone(values=m)  # Fix labels
+        return self.raw.clone(values=m, name='eta')  # Fix labels
 
     def beta_eta(self, device='gpu?') -> Matrix:
         if self.beta is None:
@@ -85,6 +85,32 @@ class UnfoldedResult2D(Result):
         return self.raw.clone(values=m, name='beta (nu)')  # Fix labels
 
     beta_folded = beta_nu
+
+    def best_contaminant_eta(self, i: int, device='gpu?') -> Matrix:
+        match self.meta.space:
+            case 'mu':
+                best = self.best_contaminant_mu(i)
+                if self.G_ex is None:
+                    with on_device(device, best, self.G_eg, endpoint='numpy'):
+                        m = best@self.G_eg
+                else:
+                    with on_device(device, best, self.G_eg, self.G_ex, endpoint='numpy'):
+                        m = self.G_ex@best@self.G_eg
+            case 'eta':
+                m = self.best_contaminant_mu(i)
+            case _:
+                raise ValueError(f"Cannot map from {self.meta.space} to eta")
+        return self.raw.clone(values=m, name='eta')  # Fix labels
+
+    def best_contaminant_nu(self, i: int, device='gpu?') -> Matrix:
+        best = self.best_contaminant_mu(i)
+        if self.G_ex is None:
+            with on_device(device, best, self.GegD, endpoint='numpy'):
+                m = best@self.GegD
+        else:
+            with on_device(device, best, self.GegD, self.G_ex, endpoint='numpy'):
+                m = self.G_ex@best@self.GegD
+        return self.raw.clone(values=m, name='nu')  # Fix labels
 
 
     def plot_comparison(self, ax: Axes | None = None, raw: bool = True, unfolded: bool = True,

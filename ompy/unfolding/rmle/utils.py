@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable
 import jax
 import jax.numpy as jnp
 import numpy as np
+from ... import Matrix
 
 if TYPE_CHECKING:
     from .contaminant1d import Contaminant1D
@@ -153,3 +154,70 @@ def closure_unpack(
         return mu, contaminants
 
     return func
+
+
+def relaxed_one_hot[T: jnp.ndarray](logits: T, temperature: float = 0.01) -> T:
+    """Compute a continuous relaxation of a one-hot vector using softmax.
+
+    This function takes logits and returns a "soft" one-hot vector by applying
+    the softmax function with a temperature parameter. As temperature approaches 0,
+    the output approaches a discrete one-hot vector.
+
+    Args:
+        logits: Input logits tensor to be converted to probabilities
+        temperature: Temperature parameter controlling the sharpness of the distribution.
+                    Lower values make the output more discrete. Default is 0.01.
+
+    Returns:
+        A tensor of the same shape as logits containing probabilities that sum to 1.
+    """
+    return jax.nn.softmax(logits / temperature)
+
+    
+
+def var_penalty(param: float, lower: float, upper: float) -> float:
+    """Calculate a quadratic penalty for values outside a specified interval.
+
+    This function computes a quadratic penalty that grows as the parameter moves
+    outside the specified bounds. Inside the bounds, the penalty is zero.
+
+    Args:
+        param: The parameter value to check
+        lower: Lower bound of the allowed interval
+        upper: Upper bound of the allowed interval
+
+    Returns:
+        float: The total penalty, which is the sum of penalties for violating
+              the lower and upper bounds. Returns 0.0 if param is within bounds.
+    """
+    # Quadratic penalty outside the [lower, upper] interval.
+    lower_penalty = jnp.where(param < lower, (param - lower) ** 2, 0.0)
+    upper_penalty = jnp.where(param > upper, (param - upper) ** 2, 0.0)
+    return lower_penalty + upper_penalty
+
+    
+
+def into_array(x: Matrix | np.ndarray | jnp.ndarray) -> jnp.ndarray:
+    if hasattr(x, "values"):
+        x = x.values
+    return jnp.asarray(x)
+
+    
+def bounded_param(x, lower, upper):
+    """Map an unbounded variable to a bounded interval using sigmoid.
+
+    This function maps a variable u from (-∞, ∞) to the interval [a, b] using
+    the sigmoid function. This is useful for constrained optimization where we
+    want to optimize an unconstrained variable while ensuring the result lies
+    within specified bounds.
+
+    Args:
+        u: Input variable to be bounded (can be any real number)
+        a: Lower bound of the target interval
+        b: Upper bound of the target interval (must be > a)
+
+    Returns:
+        The input mapped to the interval [a, b]. As u approaches -∞, the output
+        approaches a. As u approaches ∞, the output approaches b.
+    """
+    return lower + (upper - lower) * jax.nn.sigmoid(x)

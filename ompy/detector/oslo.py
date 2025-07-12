@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .detector import EgDetector, ExDetector, CompoundDetector, LambdaEgDetector
-from .oscar import OSCAR
+from .oscar import OSCAR, ResponseDetector
 from .siri import SiRi
 from ..response import Response, DiscreteInterpolation, ResponseMatrices, Components
 from ..array import Vector, Matrix
@@ -19,6 +19,11 @@ class Oslo(CompoundDetector):
         if ex_detector is None:
             ex_detector = SiRi()
         super().__init__(eg_detector=eg_detector, ex_detector=ex_detector)
+
+    @classmethod
+    def from_db(cls, name: str) -> Self:
+        eg_detector = ResponseDetector.from_db(name)
+        return cls(eg_detector=eg_detector)
 
     @property
     def oscar(self) -> OSCAR:
@@ -73,6 +78,9 @@ class Oslo(CompoundDetector):
         else:
             siri = self.siri.normalize_sigma(energy, sigma)
             return self.clone(ex_detector=siri)
+
+    def efficiency_like(self, array: Vector | Matrix) -> Vector:
+        return self.oscar.efficiency_like(array)
 
     def __str__(self) -> str:
         return f"OSLO with eg detector {self.eg_detector} and ex detector {self.ex_detector}"

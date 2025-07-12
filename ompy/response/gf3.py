@@ -173,7 +173,7 @@ def jacobian(fn, x, a, b, c, d, e, f, g, C):
     f7 = njit(df_l[6])
     f8 = njit(df_l[7])
 
-    @njit
+    @njit(cache=True)
     def foo(x, a, b, c, d, e, f, g, C):
         return np.vstack((f1(x, a, b, c, d, e, f, g, C), f2(x, a, b, c, d, e, f, g, C), f3(x, a, b, c, d, e, f, g, C),
                           f4(x, a, b, c, d, e, f, g, C), f5(x, a, b, c, d, e, f, g, C), f6(x, a, b, c, d, e, f, g, C),

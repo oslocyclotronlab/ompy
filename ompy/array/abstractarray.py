@@ -289,8 +289,8 @@ class AbstractArray(AbstractArrayProtocol, ABC):
     def astype(self, dtype) -> Self:
         return self.clone(values=self.values.astype(dtype))
 
-    def apply(self, func: Callable[[np.ndarray], np.ndarray]) -> Self:
-        return self.clone(values=func(self.values))
+    def apply(self, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Self:
+        return self.clone(values=func(self.values, *args, **kwargs))
 
     def sample(self, N: int, mask: np.ndarray | None = None, **kwargs) -> list[Self]:
         """ Draw `N` poisson samples from the array.
@@ -330,7 +330,7 @@ class AbstractArray(AbstractArrayProtocol, ABC):
             if self.ndim == 1:
                 mask = np.ones(len(self.values), dtype=bool)
                 i = self.last_nonzero(**kwargs)
-                mask[i:] = False
+                mask[i+1:] = False
             else:
                 mask = self.last_nonzeros(**kwargs)
         X = np.where(self.values <= zero_limit, zero_value, self.values)
@@ -419,17 +419,18 @@ class AbstractArray(AbstractArrayProtocol, ABC):
         return _device(self.values)
 
     @overload
-    def as_numpy(self, inplace: Literal[False] = ...) -> Self: ...
+    def as_numpy(self, inplace: Literal[False] = ..., copy: bool = False) -> Self: ...
 
     @overload
-    def as_numpy(self, inplace: Literal[True] = ...) -> None: ...
+    def as_numpy(self, inplace: Literal[True] = ..., copy: bool = False) -> None: ...
 
-    def as_numpy(self, inplace: bool = False) -> Self | None:
+    def as_numpy(self, inplace: bool = False, copy: bool = False) -> Self | None:
+        values = np.array(self.values) if copy else np.asarray(self.values)
         if inplace:
-            self.values = np.asarray(self.values)
+            self.values = values
             return None
         else:
-            return self.clone(values=np.asarray(self.values))
+            return self.clone(values=values)
 
     def to_numpy(self) -> np.ndarray:
         return np.asarray(self.values)
@@ -445,6 +446,9 @@ class AbstractArray(AbstractArrayProtocol, ABC):
 
     def to_jax(self):
         return _to_jax(self)
+
+    def xmap(self, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Self:
+        return self.clone(values=func(self.X, *args, **kwargs))
 
         
 
@@ -536,6 +540,7 @@ if JAX_WORKING:
             return device
         else:
             return 'cpu'
+
 
 
 def on_gpu(*arr: AbstractArray, revert: bool = True, endpoint: Device | Literal['leave', 'numpy'] = 'leave'):

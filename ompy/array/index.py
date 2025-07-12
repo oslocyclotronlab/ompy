@@ -20,7 +20,6 @@ from .. import Unit, Quantity, DimensionalityError, njit
 from ..library import only_one_not_none
 from ..stubs import Unitlike, arraylike, QuantityLike, array1D
 from typing import Self, TypeGuard, Never
-from typing_extensions import TypedDict
 
 """
 Note: Due to Python's lack of support for static types, the Mixins must
@@ -285,12 +284,14 @@ class Index(ABC):
         ...
 
     def __getitem__(self, key: int | slice) -> float | Index:
+        def is_int_type(x) -> bool:
+            return isinstance(x, (int, np.integer))
         match key:
             case slice():
                 # Check if slice is all ints and/or nones
-                if ((key.start is not None and not isinstance(key.start, int)) or
-                        (key.stop is not None and not isinstance(key.stop, int)) or
-                        (key.step is not None and not isinstance(key.step, int))):
+                if ((key.start is not None and not is_int_type(key.start)) or
+                        (key.stop is not None and not is_int_type(key.stop)) or
+                        (key.step is not None and not is_int_type(key.step))):
                     key = self.index_slice(key)
                 return self.from_array(self.bins[key], metadata=self.meta)
             case _:

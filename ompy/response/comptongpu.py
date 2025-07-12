@@ -199,7 +199,7 @@ def _interpolate(compton: MTO, E: VE, E_observed: VO, E_true: VT,
     return h_fan
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def edge(E: vector) -> vector:
     X = np.empty_like(E)
     for i in prange(len(X)):
@@ -211,7 +211,7 @@ def edge(E: vector) -> vector:
     return X
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def edge_thickness(E: vector, edges: vector, E_sigma, sigma: vector, nsigma: float) -> vector:
     X = np.empty_like(E)
     for i in prange(len(X)):
@@ -222,7 +222,7 @@ def edge_thickness(E: vector, edges: vector, E_sigma, sigma: vector, nsigma: flo
     return X
 
 
-@njit
+@njit(cache=True)
 def index_cpu(E: vector, e: float, start=0) -> int:
     i = start
     while i < len(E) and E[i] < e:
@@ -230,7 +230,7 @@ def index_cpu(E: vector, e: float, start=0) -> int:
     return i - 1
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def angle(out: MEO, E: VE, Eo: VO) -> None:
     """ Angle between the incident and scattered photon
 
@@ -254,7 +254,7 @@ def angle(out: MEO, E: VE, Eo: VO) -> None:
             out[i, j] = np.float32(0.0)
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def lerp(out: MEO, E: VE, Et: VT, E_to_T: VE, compton: MTO):
     i, j = cuda.grid(2)
     n, m = out.shape
@@ -266,7 +266,7 @@ def lerp(out: MEO, E: VE, Et: VT, E_to_T: VE, compton: MTO):
 
 
 #def find_closest(X: NDArray[S['M'], DTYPE], Y: NDArray[S['N'], DTYPE]) -> NDArray[S['M'], Int32]:
-@njit
+@njit(cache=True)
 def find_closest(X: np.ndarray, Y: np.ndarray) -> np.ndarray:
     """ Find the closest value in Y for each value in X
 
@@ -295,7 +295,7 @@ def dedtheta(e: float, theta: float):
     b = (nb.float32(1.0) + e / nb.float32(511.0) * (nb.float32(1.0) - math.cos(theta))) ** 2
     return a / b
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def dEdtheta(out: MEO, E: VE, angle: MEO):
     """ The derivative of the Compton energy with respect to the angle """
     i, j = cuda.grid(2)
@@ -309,7 +309,7 @@ def dEdtheta(out: MEO, E: VE, angle: MEO):
             out[i, j] = nb.float32(1.0)
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def dEdtheta_into(out: MEO2, Et: VT, angle: MEO, E_to_T: VE):
     """ The derivative of the Compton energy with respect to the angle """
     i, j, k = cuda.grid(3)
@@ -325,7 +325,7 @@ def dEdtheta_into(out: MEO2, Et: VT, angle: MEO, E_to_T: VE):
             out[i, j, k] = nb.float32(0.0)
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def unscattered_into(out: MEO2, Et: VT, Eo: VO, angle: MEO, E_to_T: VE) -> None:
     i, j, k = cuda.grid(3)
     n, m, _ = out.shape
@@ -344,7 +344,7 @@ def unscattered_into(out: MEO2, Et: VT, Eo: VO, angle: MEO, E_to_T: VE) -> None:
             out[i, j, k] = nb.float32(-1.0)  # Sentinel value
 
 
-@cuda.jit(func_or_sig="i4(f4[::1], f4)", device=True, debug=DEBUG, inline=True)
+@cuda.jit(func_or_sig="i4(f4[::1], f4)", device=True, debug=DEBUG, inline=True, cache=True)
 def index(X: vector, x) -> int:
     """ Uses binary search. Muuuch faster! O(log n) """
     if x < X[0] or x > X[-1]:
@@ -367,7 +367,7 @@ def index(X: vector, x) -> int:
     return -1
 
 
-@cuda.jit(func_or_sig="i4(f4[::1], f4, i4)", device=True, debug=DEBUG, inline=True)
+@cuda.jit(func_or_sig="i4(f4[::1], f4, i4)", device=True, debug=DEBUG, inline=True, cache=True)
 def index_from(index: vector, x, start) -> nb.int32:
     """ Find the position of `x` in `index` """
     i = nb.int32(start)
@@ -380,7 +380,7 @@ def index_from(index: vector, x, start) -> nb.int32:
     return len(index) - 1
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def fan(out: MEO, E: VE, E_true: VT,
         unscattered_map: MEO2, E_to_T: VE,
         dEdtheta_E: MEO, dEdtheta_EO2: MEO2, compton: MTO) -> None:
@@ -405,7 +405,7 @@ def fan(out: MEO, E: VE, E_true: VT,
         out[i, j] = p / dEdtheta_E[i, j]
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def lerp_from_edge(out: MEO, E: VE, E_observed: VO, E_true: VT,
                    E_to_T: VE,
                    edges_E: VE, edges_T: VT, stop_E: VE, stop_T: VT, compton: MTO) -> None:
@@ -454,7 +454,7 @@ def distribute(threads_per_block, dim) -> tuple[int, ...]:
     return tuple(np.ceil(B / A).astype(np.int32))
 
 
-@cuda.jit(debug=DEBUG)
+@cuda.jit(debug=DEBUG, cache=True)
 def weight(out: MEO, fan: MEO, lerp: MEO, weight: VE) -> None:
     i, j = cuda.grid(2)
     n, m = fan.shape

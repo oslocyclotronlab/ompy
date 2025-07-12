@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Callable, TypeAlias, Literal, Protocol, runtime_checkable
 import jax.numpy as jnp
 
-from jaxtyping import Float, Array
+from jaxtyping import Float, Array, Bool
 
 #  nu -> n -> loss
 
@@ -44,6 +44,7 @@ type GegMatrix = Float[Array, "Eg_true Eg_measured"]
 type GegDMatrix = Float[Array, "Eg_true Eg_observed"]
 type GexMatrix = Float[Array, "Ein_true Ein_measured"]
 type DMatrix = Float[Array, "Ein Eg"]
+type Mask1D = Bool[Array, "Eg"]
 
 type ContaminantLossFn1D = Callable[[ExpectationParameter1D, GegMatrix, GegDMatrix], float]
 

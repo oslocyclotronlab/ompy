@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import numpy as np
 from dataclasses import dataclass
 from typing import Callable
 
@@ -8,13 +10,13 @@ import matplotlib.pyplot as plt
 from typing import Self
 
 from .tau import from_tau, to_tau
-from .utils import pytree_dataclass
+from .utils import pytree_dataclass, bounded_param
 
 from .stubs import  ExpectationParameter1D, Xi1D, Nu1D, GegMatrix, GegDMatrix, ContaminantLossFn1D
-from ... import Index
+from ... import Index, Vector
 
 
-@dataclass(kw_only=True)
+@pytree_dataclass
 class Contaminant1D:
     """A helper class to specify contaminants
     TODO:
@@ -22,24 +24,26 @@ class Contaminant1D:
     """
 
     E: Index
-    initial: tuple[int, float]  # (index, amplitude)
-    central_bounds: tuple[int, int]  # (lower, upper)
-    temperature: float = 0.01
+    #initial: tuple[float, float]  # (mu_x, amplitude)
+    central_bounds: tuple[float, float]  # (lower, upper)
+    amplitude_mu_bounds: tuple[float, float]
+    sigma: float = 5.0  # Sigma of the soft peak, not the true resolution
     amplitude_mu_penalty: float = 0.0
     amplitude_eta_penalty: float = 0.0
     amplitude_nu_penalty: float = 0.0
-    amplitude_mu_bounds: tuple[float, float] | None = None
     amplitude_eta_bounds: tuple[float, float] | None = None
     amplitude_nu_bounds: tuple[float, float] | None = None
 
-    def __post_init__(self):
+    @classmethod
+    def from_(cls, E: Index, central_bounds, **kwargs) -> Self:
         # The user can specify the central bounds as indexable expressions
-        i = self.E.index_expression(self.central_bounds[0])
-        j = self.E.index_expression(self.central_bounds[1])
-        self.central_bounds = (i, j)
-        # Same with the central value for the initial guess
-        k = self.E.index_expression(self.initial[0])
-        self.initial = (k, self.initial[1])
+        i = E.index_expression(central_bounds[0])
+        j = E.index_expression(central_bounds[1])
+        central_bounds = (E[i], E[j])
+        E = jnp.asarray(E.bins)
+        return cls(E, central_bounds, **kwargs)
+
+    def __post_init__(self):
         # Check the bounds
         if self.amplitude_mu_penalty != 0 and self.amplitude_mu_bounds is None:
             raise ValueError(
@@ -68,103 +72,38 @@ class Contaminant1D:
                 raise ValueError(
                     "amplitude_nu_bounds must be a tuple of two numbers, the lower and upper bounds of the amplitude of nu"
                 )
+    
+    def loss(self, mu: ExpectationParameter1D) -> tuple[Nu1D, float]:
+        mu_x, A = self.transform_out(mu)
+        mu = soft_peak(self.E, mu_x, A, self.sigma)
+        return mu, 0.0
 
-    def closure(self) -> Callable[[Xi1D], tuple[Nu1D, float]]:
-        lower, upper = self.central_bounds
-        T = self.temperature
-        amplitude_mu_penalty = self.amplitude_mu_penalty
-        amplitude_eta_penalty = self.amplitude_eta_penalty
-        amplitude_nu_penalty = self.amplitude_nu_penalty
+    def setup_initial(self) -> tuple[float, float]:
+        mu_x, A = 0.0, 0.0
+        return (mu_x, A)
 
-        # Validate and extract bounds for each amplitude penalty
-        def get_bounds(penalty, bounds, name):
-            if penalty != 0.0 and bounds is None:
-                raise ValueError(f"{name}_bounds must be set if {name}_penalty != 0.0")
-            if bounds is not None:
-                return bounds
-            # Default bounds when not used, for JAX tracer
-            return (-1.0, -1.0)
+    def transform_out(self, params: tuple[float, float]) -> tuple[float, float]:
+        mu_x, A = params
+        mu_x = bounded_param(mu_x, self.central_bounds[0], self.central_bounds[1])
+        A = bounded_param(A, self.amplitude_mu_bounds[0], self.amplitude_mu_bounds[1])
+        return (mu_x, A)
 
-        lower_mu, upper_mu = get_bounds(
-            amplitude_mu_penalty, self.amplitude_mu_bounds, "amplitude_mu"
-        )
-
-        lower_eta, upper_eta = get_bounds(
-            amplitude_eta_penalty, self.amplitude_eta_bounds, "amplitude_eta"
-        )
-
-        lower_nu, upper_nu = get_bounds(
-            amplitude_nu_penalty, self.amplitude_nu_bounds, "amplitude_nu"
-        )
-
-        @jax.jit
-        def func(
-            mu: ExpectationParameter1D,  # mu of xi, not of the data
-            G_eg: GegMatrix,
-            G_egD: GegDMatrix,
-        ) -> tuple[Nu1D, float]:
-            # Enforce the central bounds
-            mu = mu.at[:lower].set(0.0)
-            mu = mu.at[upper:].set(0.0)
-            # The one-hot removes the amplitude, so we must reapply it
-            amplitude_mu = jnp.max(mu)
-            # One-hot encoding ensures a single non-zero element
-            mu = amplitude_mu * relaxed_one_hot(mu, temperature=T)
-            # Nu is always needed
-            nu = mu @ G_egD
-
-            def identity_penalty(_):
-                return 0.0
-
-            def mu_penalty(_):
-                return amplitude_mu_penalty * var_penalty(
-                    amplitude_mu, lower_mu, upper_mu
-                )
-
-            def eta_penalty(_):
-                eta = mu @ G_eg
-                amplitude_eta = jnp.max(eta)
-                return amplitude_eta_penalty * var_penalty(
-                    amplitude_eta, lower_eta, upper_eta
-                )
-
-            def nu_penalty(_):
-                # Here we only care about the amplitude within FE,
-                # which is equivalent to being within the bounds
-                amplitude_nu = jnp.max(nu[lower:upper])
-                return amplitude_nu_penalty * var_penalty(
-                    amplitude_nu, lower_nu, upper_nu
-                )
-
-            mu_cost = jax.lax.cond(
-                amplitude_mu_penalty == 0.0, identity_penalty, mu_penalty, None
-            )
-
-            eta_cost = jax.lax.cond(
-                amplitude_eta_penalty == 0.0, identity_penalty, eta_penalty, None
-            )
-
-            nu_cost = jax.lax.cond(
-                amplitude_nu_penalty == 0.0, identity_penalty, nu_penalty, None
-            )
-
-            return nu, mu_cost + eta_cost + nu_cost
-
-        return func
-
-    def setup_initial(self, initial: jnp.ndarray | None = None) -> jnp.ndarray:
-        if initial is None:
-            mu = jnp.zeros(self.E.bins.shape)
+    def into_vector[T: Vector](self, vector: T | None = None,
+                               params: tuple[float, float] | None = None) -> T:
+        if params is None:
+            mu_x, A = self.transform_out(self.setup_initial())
         else:
-            if len(initial) != len(self.E):
-                raise ValueError(
-                    f"Initial must be of length of data, got {len(initial)}"
-                )
-            mu = jnp.zeros_like(initial)
-        # We map the amplitude to tau space since it will be inverted in the loop
-        mu = mu.at[self.initial[0]].set(to_tau(self.initial[1]))
-        return mu
+            mu_x, A = self.transform_out(params)
 
+        if vector is not None:
+            x = vector.X
+            y = soft_peak(x, mu_x, A, self.sigma)
+            return vector.clone(values=y, name='Contaminant')
+        else:
+            x = self.E
+            y = soft_peak(x, mu_x, A, self.sigma)
+            return Vector(values=y, E=np.asarray(x), name='Contaminant')
+            
     def __len__(self):
         return len(self.E)
 
@@ -175,9 +114,7 @@ class Contaminant1D:
         # Define the attributes to be displayed
         attributes = [
             ("E (Index)", repr(self.E)),
-            ("Initial (index, amplitude)", self.initial),
             ("Central Bounds (lower, upper)", self.central_bounds),
-            ("Temperature", self.temperature),
             ("Amplitude μ Penalty", self.amplitude_mu_penalty),
             ("Amplitude η Penalty", self.amplitude_eta_penalty),
             ("Amplitude ν Penalty", self.amplitude_nu_penalty),
@@ -210,59 +147,18 @@ class Contaminant1D:
     def plot(self, ax=None):
         if ax is None:
             fig, ax = plt.subplots()
-        initial = from_tau(self.setup_initial())
-        ax.plot(initial, label="Initial in $\\mu$ space")
+        initial = self.transform_out(self.setup_initial())
+        y = soft_peak(self.E, initial[0], initial[1], self.sigma)
+        ax.plot(self.E, y, label="Initial in $\\mu$ space")
         return ax
 
 
-def setup_contaminants(
-    contaminants: list[Contaminant1D], initial: jnp.ndarray, mask: jnp.ndarray
-) -> tuple[list[jnp.ndarray], list[jnp.ndarray]]:
-    """Set up initial values and masks for contaminants.
-
-    Take a list of contaminants and concatenates their initial values
-    and masks into arrays suitable for optimization. For each contaminant, it:
-    1. Gets the initial values using the contaminant's setup_initial method
-    2. Creates a zero mask for the contaminant parameters
-    3. Concatenates these with the existing arrays
-
-    Args:
-        contaminants: List of Contaminant1D objects to set up
-        initial: Initial parameter values for the main spectrum
-        mask: Mask array for the main spectrum parameters
-
-    Returns:
-        tuple containing:
-            - Combined array of initial values for main spectrum and contaminants
-            - Combined array of masks for main spectrum and contaminants
-    """
-    x = initial
-    mask = mask
-    for contaminant in contaminants:
-        xi_initial = contaminant.setup_initial(initial)
-        x = jnp.concatenate([x, xi_initial])
-        xi_mask = jnp.zeros_like(mask)
-        mask = jnp.concatenate([mask, xi_mask])
-    return x, mask
-
-def bound_variable(u, a, b):
-    """Map an unbounded variable to a bounded interval using sigmoid.
-
-    This function maps a variable u from (-∞, ∞) to the interval [a, b] using
-    the sigmoid function. This is useful for constrained optimization where we
-    want to optimize an unconstrained variable while ensuring the result lies
-    within specified bounds.
-
-    Args:
-        u: Input variable to be bounded (can be any real number)
-        a: Lower bound of the target interval
-        b: Upper bound of the target interval (must be > a)
-
-    Returns:
-        The input mapped to the interval [a, b]. As u approaches -∞, the output
-        approaches a. As u approaches ∞, the output approaches b.
-    """
-    return a + (b - a) * jax.nn.sigmoid(u)
+def soft_peak(x, mu_x, A, sigma):
+    dist = jnp.exp(-(x - mu_x)**2 / (2 * sigma**2))
+    # Might sometimes want max instead of sum
+    dist /= jnp.sum(dist)
+    return A * dist
+    
 
 def var_penalty(param: float, lower: float, upper: float) -> float:
     """Calculate a quadratic penalty for values outside a specified interval.

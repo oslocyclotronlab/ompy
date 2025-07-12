@@ -112,7 +112,7 @@ def add_aliases(cls):
 class Result(ABC, Generic[T]):
     meta: ResultMeta[T]
     # Contaminant spectra
-    xi: tuple[T, ...] = ()
+    contaminants: tuple[T, ...] = ()
     beta: T | None = None
     do_fold_beta: bool = False
     _ndim: int = 0
@@ -160,50 +160,58 @@ class Result(ABC, Generic[T]):
     @abstractmethod
     def best(self) -> T: ...
 
-    def best_folded(self, device="gpu?") -> T:
+    def best_folded(self, device="gpu?", correct_efficiency: bool = True) -> T:
         best = self.best()
         with on_device(device, self.GegD, best, endpoint="numpy"):
             nu = best @ self.GegD
-        return nu
+        if correct_efficiency:
+            return self.correct_efficiency(nu)
+        else:
+            return nu
 
     best_nu = best_folded
     nu = best_nu
 
-    def best_eta(self, device="gpu?") -> T:
+    def best_eta(self, device="gpu?", correct_efficiency: bool = True) -> T:
         best = self.best()
         match self.meta.space:
             case "mu":
                 with on_device(device, self.G_eg, best, endpoint="numpy"):
-                    return best @ self.G_eg
+                    out = best @ self.G_eg
             case "eta":
-                return best
+                out = best
             case _:
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
+
+        if correct_efficiency:
+            return self.correct_efficiency(out)
+        else:
+            return out
                 
     eta = best_eta
 
-    def best_xi_mu(self, i: int) -> T:
-        return self.xi[i]
+    def best_contaminant_mu(self, i: int) -> T:
+        return self.contaminants[i]
 
-    def best_xi_eta(self, i: int, device="gpu?") -> T:
-        if not self.xi:
-            raise ValueError("No xi to unfold")
-        if i >= len(self.xi):
-            raise ValueError(f"Index {i} out of bounds for xi of length {len(self.xi)}")
+    def best_contaminant_eta(self, i: int, device="gpu?") -> T:
+        if not self.contaminants:
+            raise ValueError("No contaminants to unfold")
+        if i >= len(self.contaminants):
+            raise ValueError(f"Index {i} out of bounds for contaminants of length {len(self.contaminants)}")
         match self.meta.space:
             case "mu":
-                with on_device(device, self.G_eg, self.xi[i], endpoint="numpy"):
-                    return self.xi[i] @ self.G_eg
+                with on_device(device, self.G_eg, self.contaminants[i], endpoint="numpy"):
+                    return self.contaminants[i] @ self.G_eg
             case "eta":
-                return self.xi[i]
+                return self.contaminants[i]
             case _:
                 raise ValueError(f"Cannot map from {self.meta.space} to eta")
 
-    @alias("best_xi_nu")
-    def best_xi_folded(self, i: int, device="gpu?") -> T:
-        xi_mu = self.best_xi_mu(i)
-        with on_device(device, self.GegD, xi_mu, endpoint="numpy"):
-            return xi_mu @ self.GegD
+    @alias("best_contaminant_nu")
+    def best_contaminant_folded(self, i: int, device="gpu?") -> T:
+        contaminant_mu = self.best_contaminant_mu(i)
+        with on_device(device, self.GegD, contaminant_mu, endpoint="numpy"):
+            return contaminant_mu @ self.GegD
 
 
     def best_mu(self) -> T:
@@ -214,13 +222,18 @@ class Result(ABC, Generic[T]):
         return self.best()
 
     def folded_total(self, device="gpu?") -> T:
+        # We can't do the efficiency correction here because
+        # beta_folded might or might not get corrected
         nu = self.best_folded(device=device)
-        for i in range(len(self.xi)):
-            nu = nu + self.best_xi_folded(i, device=device)
+        for i in range(len(self.contaminants)):
+            nu = nu + self.best_contaminant_folded(i, device=device)
         if self.beta is not None:
             nu = nu + self.beta_folded(device=device)
         nu.title = "Total (nu)"
         return nu
+
+    def best_beta(self) -> T:
+        return self.beta
 
     best_total = folded_total
 
@@ -241,8 +254,8 @@ class Result(ABC, Generic[T]):
         return self.raw - self.best_folded()
 
     @property
-    def D(self) -> Matrix:
-        return self.meta.parameters.D
+    def D_eg(self) -> Matrix:
+        return self.meta.parameters.D_eg
 
     @property
     def G_eg(self) -> Matrix:
@@ -258,7 +271,7 @@ class Result(ABC, Generic[T]):
 
     @property
     def GegD(self) -> Matrix:
-        return self.meta.parameters.GegD
+        return self.meta.parameters.GDeg
 
     @property
     def background(self) -> T | None:
@@ -339,6 +352,18 @@ class Result(ABC, Generic[T]):
         if not inplace:
             return self
 
+    @property
+    def efficiency(self) -> Vector | None:
+        return self.meta.parameters.efficiency
+
+    def correct_efficiency[T: Matrix | Vector](self, arr: T) -> T:
+        if self.efficiency is None:
+            return arr
+        if arr.ndim == 1:
+            return arr / self.efficiency
+        else:
+            return arr / self.efficiency[None, :]
+
     @abstractmethod
     def resample(self, N: int, **kwargs) -> Resampling: ...
 
@@ -348,11 +373,12 @@ class Parameters(ABC, Generic[T]):
     raw: T
     background: T | None = None
     initial: T
-    D: Matrix
+    D_eg: Matrix
     G_eg: Matrix
     G_ex: Matrix | None = None  # None should be interpreted as an identity matrix
     mask: np.ndarray | None = None
-    _GegD: Matrix | None = None  # Cache of G_eg @ D
+    _GDeg: Matrix | None = None  # Cache of G_eg @ D
+    efficiency: Vector | None = None
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -361,11 +387,11 @@ class Parameters(ABC, Generic[T]):
             self.to_device("cpu")
 
     @property
-    def GegD(self) -> Matrix:
+    def GDeg(self) -> Matrix:
         # Cache G_eg @ D because the product is so common
-        if self._GegD is None:
-            self._GegD = self.D @ self.G_eg
-        return self._GegD
+        if self._GDeg is None:
+            self._GDeg = self.D_eg @ self.G_eg
+        return self._GDeg
 
     @overload
     def to_device(self, device, inplace: bool = True) -> None: ...
@@ -377,21 +403,21 @@ class Parameters(ABC, Generic[T]):
         if self.background is not None:
             background = self.background.to_device(device, inplace=inplace)
         initial = self.initial.to_device(device, inplace=inplace)
-        D = self.D.to_device(device, inplace=inplace)
+        D = self.D_eg.to_device(device, inplace=inplace)
         G_eg = self.G_eg.to_device(device, inplace=inplace)
         if self.G_ex is not None:
             G_ex = self.G_ex.to_device(device, inplace=inplace)
-        if self._GegD is not None:
-            self._GegD = self._GegD.to_device(device, inplace=inplace)
+        if self._GDeg is not None:
+            self._GDeg = self._GDeg.to_device(device, inplace=inplace)
         if not inplace:
             return Parameters(
                 raw=raw,
                 background=background,
                 initial=initial,
-                D=D,
+                D_eg=D,
                 G_eg=G_eg,
                 G_ex=G_ex,
-                _GegD=self._GegD,
+                _GDeg=self._GDeg,
                 mask=self.mask,
                 **self.kwargs,
             )
@@ -406,21 +432,21 @@ class Parameters(ABC, Generic[T]):
         if self.background is not None:
             background = self.background.as_numpy(inplace=inplace)
         initial = self.initial.as_numpy(inplace=inplace)
-        D = self.D.as_numpy(inplace=inplace)
+        D = self.D_eg.as_numpy(inplace=inplace)
         G_eg = self.G_eg.as_numpy(inplace=inplace)
         if self.G_ex is not None:
             G_ex = self.G_ex.as_numpy(inplace=inplace)
-        if self._GegD is not None:
-            self._GegD = self._GegD.as_numpy(inplace=inplace)
+        if self._GDeg is not None:
+            self._GDeg = self._GDeg.as_numpy(inplace=inplace)
         if not inplace:
             return Parameters(
                 raw=raw,
                 background=background,
                 initial=initial,
-                D=D,
+                D_eg=D,
                 G_eg=G_eg,
                 G_ex=G_ex,
-                _GegD=self._GegD,
+                _GDeg=self._GDeg,
                 mask=self.mask,
                 **self.kwargs,
             )
@@ -436,7 +462,7 @@ class Parameters(ABC, Generic[T]):
         if self.background is not None:
             self.background.save(path / "background.npz", exist_ok=exist_ok)
         self.initial.save(path / "initial.npz", exist_ok=exist_ok)
-        self.D.save(path / "D.npz", exist_ok=exist_ok)
+        self.D_eg.save(path / "D.npz", exist_ok=exist_ok)
         self.G_eg.save(path / "G_eg.npz", exist_ok=exist_ok)
         if self.G_ex is not None:
             self.G_ex.save(path / "G_ex.npz", exist_ok=exist_ok)

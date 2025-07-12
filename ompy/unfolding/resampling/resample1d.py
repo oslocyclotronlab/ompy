@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Iterable, Literal, TYPE_CHECKING
 
 import numpy as np
@@ -16,6 +17,7 @@ from ... import JAX_AVAILABLE
 from .confidence import make_ci
 from .resampling import Resampling
 from .stubs import CI_Method
+from ..rmle.rmle1d import BackgroundModel as BackgroundModel1D
 from ..unfolder import Unfolder
 
 if JAX_AVAILABLE:
@@ -49,29 +51,30 @@ def resample_vector(
             A = res.best_folded().copy()
         case _:
             raise ValueError(f"Unknown sample type {base}. Expected 'raw' or 'folded'")
-    A_boots = A.sample(N)
+    A_boots = A.sample(N, mask=res.meta.parameters.mask)
     for i, boot in enumerate(A_boots):
         A_boots[i] = boot.astype("float32")
 
-    bg: Vector | None = None
-    if res.background is not None:
-        bg = res.background.copy()
-        assert bg is not None
-        bg.values = np.where(bg <= 0, 0, bg.values)
-    bgs: list[Vector] = []
-    # To avoid Poisson(0)
-    # A.values = np.where(A <= 0, 3, A.values)
     costs: list[np.ndarray] = []
-    bg_boots = None
-    if bg is not None:
+    bg_models = None
+    if res.background is not None and len(res.background) > 0:
+        # The background isn't a vector, so we need a sample function
+
         if bootstrap_background:
+            # The BackgroundModel is immutable
+            model_bgs = res.background.backgrounds
             match background_base:
                 case "raw":
-                    bg_boots = bg.sample(N)
+                    bg_boots = list(zip(*[sample(bg, N) for bg in model_bgs]))
                 case "beta":
-                    bg_boots = res.beta.sample(N)
+                    beta = res.beta
+                    bg_boots = list(zip(*[beta.sample(N).values for _ in model_bgs]))
         else:
-            bg_boots = [bg] * N
+            bg_boots = list(zip(*[bg.values for bg in model_bgs]))
+
+        loss = res.background.loss
+        bg_models = [BackgroundModel1D(loss=loss, backgrounds=bg)
+              for bg in bg_boots]
     mean = np.maximum(best, np.mean(best))
     initials = [best.clone(values=np.random.uniform(0, 5 * mean)) for i in range(N)]
     mask_1d = res.meta.parameters.mask
@@ -87,40 +90,24 @@ def resample_vector(
     unf_res: list[UnfoldedResult1D] = unfolder.unfold_vectors(
         A_boots,
         initial=initials,
-        background=bg_boots,
+        background=bg_models,
         mask=mask,
         **kwargs,
     )
-    if False:
-        for i in tqdm(range(N)):
-            bg_boot = bg_boots[i] if bg_boots is not None else None
-            res_ = unfolder.unfold(
-                A_boots[i],
-                initial=initials[i],
-                background=bg_boot,
-                mask=mask,
-                penalty_mask=penalty_mask,
-                **kwargs,
-            )
-            if has_cost(res_):
-                costs.append(res_.cost)
-            if hasattr(res_, "aux"):
-                auxs.append(res_.aux)
-            unfolded_boots.append(res_.best_mu())
-            if hasattr(res_, "beta") and res_.beta is not None:
-                unfolded_betas.append(res_.beta)
+
     elapsed = time.time() - start
 
     unfolded_boots = [res_.best_mu() for res_ in unf_res]
     costs = [res_.cost for res_ in unf_res]
     auxs = [res_.aux for res_ in unf_res]
-    contaminants = [res_.xi for res_ in unf_res]
+    contaminants = [res_.contaminants for res_ in unf_res]
+    unfolded_betas = [res_.beta for res_ in unf_res]
 
     bootstraped = Resampling1D(
         base=res,
         bootstraps=A_boots,
         unfolded=unfolded_boots,  # type: ignore
-        backgrounds=bgs,
+        backgrounds=bg_models,
         costs=costs,
         initials=initials,
         kwargs=kwargs,
@@ -406,7 +393,7 @@ class Resampling1D(Resampling[Vector]):
             method=method,
         )
 
-    def xi_eta(
+    def contaminant_eta(
         self,
         i: int | None = None,
         alpha=0.05,
@@ -420,7 +407,7 @@ class Resampling1D(Resampling[Vector]):
                 ci.append(
                     self._make_ci(
                         xibox[:, i, :],
-                        self.base.best_xi_eta(i).values,
+                        self.base.best_contaminant_eta(i).values,
                         alpha=alpha,
                         summary=summary,
                         method=method,
@@ -430,13 +417,13 @@ class Resampling1D(Resampling[Vector]):
         else:
             return self._make_ci(
                 xibox[:, i, :],
-                self.base.best_xi_eta(i).values,
+                self.base.best_contaminant_eta(i).values,
                 alpha=alpha,
                 summary=summary,
                 method=method,
             )
 
-    def xi_nu(
+    def contaminant_nu(
         self,
         i: int | None = None,
         alpha=0.05,
@@ -450,7 +437,7 @@ class Resampling1D(Resampling[Vector]):
                 ci.append(
                     self._make_ci(
                         xibox[:, i, :],
-                        self.base.best_xi_folded(i).values,
+                        self.base.best_contaminant_folded(i).values,
                         alpha=alpha,
                         summary=summary,
                         method=method,
@@ -460,7 +447,7 @@ class Resampling1D(Resampling[Vector]):
         else:
             return self._make_ci(
                 xibox[:, i, :],
-                self.base.best_xi_folded(i).values,
+                self.base.best_contaminant_folded(i).values,
                 alpha=alpha,
                 summary=summary,
                 method=method,
@@ -474,7 +461,7 @@ class Resampling1D(Resampling[Vector]):
     ) -> AsymmetricVector:
         x = self.nubox + self.xi_nu_box().sum(axis=1)
         y = self.base.best_folded().values + np.sum(
-            [self.base.best_xi_folded(i) for i in range(self.xi_nu_box().shape[1])]
+            [self.base.best_contaminant_folded(i) for i in range(self.xi_nu_box().shape[1])]
         )
         return self._make_ci(
             x,
@@ -525,3 +512,42 @@ class Resampling1D(Resampling[Vector]):
             einsum_op = lambda x: jnp.einsum("ji,kj->ki", self.GegD.values, x)
             self._xi_nu_box = jax.vmap(einsum_op)(box)
         return self._xi_nu_box
+
+
+@partial(jax.jit, static_argnames=("N", "zero_value", "zero_limit"))
+def sample(arr: jnp.ndarray, N: int, mask: np.ndarray | None = None, zero_value: int = 0,
+                zero_limit: int = 0, key: jnp.ndarray | None = None, **kwargs) -> jnp.ndarray:
+    """ Draw `N` poisson samples from the array.
+
+    The `mask` specifies values to ignore. If not set, the mask is assumed to be
+    all zero elements "after" the diagonal.
+    
+    Args:
+        N (int): The number of samples to generate.
+        mask (np.ndarray, optional): A boolean mask array to apply zeros to. If not provided, the last non-zero elements are used.
+    
+    Returns:
+        Iterator[Self]: An iterator that yields `N` new instances of the array, with the sampled values.
+    """
+
+    if mask is None:
+        idxs = jnp.arange(arr.shape[0])
+        mask = idxs <= last_nonzero_index(arr)
+
+    X = jnp.where((arr <= zero_limit) | ~mask, zero_value, arr)
+    if key is None:
+        key = jax.random.PRNGKey(0)
+    return jax.random.poisson(key, X, (N, len(arr)))
+
+@jax.jit
+def last_nonzero_index(arr: jnp.ndarray) -> int:
+    """
+    Returns the index of the last non-zero value in a 1D array,
+    or -1 if all values are zero.
+    """
+    # build an array that's [i if arr[i] != 0, else -1]
+    idxs = jnp.where(arr != 0,
+                     jnp.arange(arr.shape[0], dtype=jnp.int32),
+                     -1)
+    # the max of that is the last non-zero index (or -1)
+    return idxs.max()

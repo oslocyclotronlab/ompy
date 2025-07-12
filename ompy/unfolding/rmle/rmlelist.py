@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 from functools import partial
 import optax
+from itertools import zip_longest
 
 from ... import Vector
 from .rmle1d import DynamicData, OptimResult1D, BackgroundModel, cost, State
@@ -15,6 +16,8 @@ from ..utils import loop_tqdm
 
 if TYPE_CHECKING:
     from .rmle1d import StaticData, Settings
+
+from .stubs import Data1D, Mask1D, Background1D, ExpectationParameter1D, Empty
 
 
 def unfold(
@@ -33,38 +36,67 @@ def unfold(
     lower = make_lower(
         settings,
         static,
+        dynamic,
     )
 
     if dynamic.has_background:
-        if not dynamic.same_background:
-            raise NotImplementedError("Different backgrounds are not supported for list of components")
         # Mean is the best guess
         bg = dynamic.components[0].background
         beta = sum(bg.backgrounds)/len(bg.backgrounds)
+        beta = jnp.stack(tuple(beta for _ in range(len(dynamic))))
     else:
         beta = ()
 
+    if static.contaminants:
+        z = tuple(jnp.stack(tuple(jnp.stack(c.setup_initial()) for c in static.contaminants))
+                  for _ in range(len(dynamic)))
+        contaminants_initial = jnp.stack(z)
+    else:
+        contaminants_initial = ()
 
-    state = (
-        dynamic.initial,
-        beta,
-        (),
-    )
-    
-    
+    mu = jnp.asarray(dynamic.initial)
+    raw = jnp.asarray(dynamic.raw)
 
-    in_axes = (
-        0,  # The initial values
-        0,  # The raw data
-        #None if dynamic.same_background or  is None else 0,  # The background
-        #None if dynamic.same_mask else 0,  # The mask
+    in_axes = {
+        'prompt': 0,
+        'mu_initial': 0,
+        'beta_initial': 0,
+        'contaminants_initial': 0 if len(static.contaminants) > 0 else None,
+    }
+
+    kwargs = dict(
+        prompt=raw,
+        mu_initial=mu,
+        beta_initial=beta,
+        contaminants_initial=contaminants_initial,
     )
-    lower_vmap = jax.vmap(lower, in_axes=in_axes)
-    #states, total_costs, loglikes, penalties = lower_vmap(state, dynamic.)
+    if not dynamic.same_background:
+        # JAX vmap must operate over numeric arrays, so we must pack the backgrounds
+        # into a single array
+        backgrounds = jnp.stack(tuple(jnp.stack(component.background.backgrounds) for component in dynamic.components))
+        in_axes['background'] = 0
+        kwargs['background'] = backgrounds
+
+    lower_vmap = jax.vmap(lower, in_axes=tuple(in_axes.values()))
+    states, total_costs, loglikes, penalties = lower_vmap(*tuple(kwargs.values()))
 
     results: list[OptimResult1D] = []
-    for i in range(len(states)):
-        mu, beta, contaminants = states[i]
+    N = mu.shape[0]
+    for i in range(N):
+        mu = states[0][i]
+        if (beta := states[1]) is not None:
+            beta = beta[i]
+        if (contaminants := states[2]) is not None:
+            # level 1 is the contaminant, level 2 is the vmap index
+            contaminants_list = []
+            for j, model in enumerate(static.contaminants):
+                contaminants_list.append(
+                    model.into_vector(
+                        vector=static.prototype,
+                        params=contaminants[j][i])
+                )
+            contaminants = tuple(contaminants_list)
+
         result = OptimResult1D(
             prototype=static.prototype,
             mu=mu,
@@ -73,7 +105,7 @@ def unfold(
             loglike=loglikes[i],
             penalty=penalties[i],
             xi_penalty=0,
-            xi=contaminants,
+            xi=contaminants
         )
         results.append(result)
     return results
@@ -109,24 +141,30 @@ def make_lower(
     G_eg = data.G_eg
     GegD = data.D @ G_eg
     # Contaminant models that have its matrices unspecified inherit the main matrices
-    contaminants = tuple(model.set_matrices(G_eg, GegD) for model in data.contaminants)
     # no the user must provide the contaminant models
     leave_tqdm = settings.leave_tqdm
     tau_map = settings.tau_map
 
+
+    kwargs = dict(
+        GegD=GegD,
+        G_eg=G_eg,
+        contaminant_models=data.contaminants,
+        loss=data.loss,
+        tau_map=tau_map,
+    )
     # If there is a shared background, we can bake it in here
-    if not dynamic.same_background:
-        raise NotImplementedError("Different backgrounds are not supported for list of components")
+    background = dynamic.components[0].background
+    if dynamic.same_background:
+        kwargs["background"] = background
+    bg_loss = background.loss
+        
 
     cost_closure = partial(
         cost,
-        GegD=GegD,
-        G_eg=G_eg,
-        contaminant_models=0,#contaminants,
-        loss=data.loss,
-        background=dynamic.background,
-        tau_map=tau_map,
+        **kwargs,
     )
+
     value_and_grad = jax.jit(jax.value_and_grad(cost_closure, has_aux=True))
 
     if settings.print_jaxpr:
@@ -140,25 +178,49 @@ def make_lower(
 
     type LoopState = tuple[State, optax.OptState, jnp.ndarray, jnp.ndarray]
 
-    @jax.jit
+    bg_template = BackgroundModel(loss=bg_loss)
+    print(bg_template)
+
+
+    #@jax.jit
     def lower(
-        initial: State,
+        prompt: Data1D,
+        mu_initial: ExpectationParameter1D,
+        beta_initial: ExpectationParameter1D | Empty,
+        contaminants_initial: tuple[ExpectationParameter1D, ...],
+        background: jnp.ndarray | None = None,
     ) -> tuple[State, jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         loglike = jnp.zeros(iterations)
         penalty = jnp.zeros(iterations)
         # Map into tau
-        mu_tau = tau_map.to_tau(initial[0])
-        beta_tau = tau_map.to_tau(initial[1]) if initial[1] is not None else None
-        initial = (mu_tau, beta_tau, initial[2])
+        mu_tau = tau_map.to_tau(mu_initial)
+        beta_tau = tau_map.to_tau(beta_initial) if len(beta_initial) > 0 else ()
+        contaminants_tau = tuple(tau_map.to_tau(c) for c in contaminants_initial)
+        initial = (mu_tau, beta_tau, contaminants_tau)
 
         opt_state_init = optimizer.init(initial)
+
+        # When the background is shared, it has already been baked in and
+        # we don't need to do anything here
+        # If it isn't shared, the BackgroundModel must be reconstructed
+        # since jax.vmap must operate over numeric arrays
+        if background is not None:
+            # This isn't optimal because here all values are traced unnecessarily
+            #background = BackgroundModel(
+            #    loss=bg_loss,
+            #    backgrounds=tuple(background[i] for i in range(background.shape[0]))
+            #)
+            background = bg_template.clone(backgrounds=background)
 
         @loop_tqdm(iterations, leave=leave_tqdm)
         @jax.jit
         def body_fun(i: int, state: LoopState) -> LoopState:
             params, opt_state, loglike, penalty = state
-            (_, aux), g = value_and_grad(params)
-            updates, opt_state = optimizer.update(g, opt_state)
+            if background is None:
+                (_, aux), g = value_and_grad(params, y=prompt)
+            else:
+                (_, aux), g = value_and_grad(params, y=prompt, background=background)
+            updates, opt_state = optimizer.update(g, opt_state, params=params)
             params = optax.apply_updates(params, updates)
             # Everything that is masked is zeroed out now to prevent
             # gradients from being applied
@@ -176,9 +238,10 @@ def make_lower(
 
         # The states are in tau space, so we need to map them back
         mu = tau_map.from_tau(state[0])
-        beta = tau_map.from_tau(state[1]) if state[1] is not None else None
+        beta = tau_map.from_tau(state[1]) if len(state[1]) > 0 else None
+        contaminants = None if len(state[2]) == 0  else state[2]
 
-        return (mu, beta, state[2]), total_cost, loglike, penalty
+        return (mu, beta, contaminants), total_cost, loglike, penalty
 
 
     return lower
@@ -186,7 +249,7 @@ def make_lower(
 
 @dataclass(kw_only=True)
 class DynamicDataList:
-    components: list[DynamicData]
+    components: tuple[DynamicData, ...]
     same_mask: bool = False
     same_background: bool = False
 
@@ -220,7 +283,9 @@ class DynamicDataList:
         # - (D) A tuple of BackgroundModels
         # In those cases we just convert it to a tuple
         # This code ensures we are left with the type tuple[BackgroundModel, ...]
-        if isinstance(background, BackgroundModel):
+        if background is None:
+            background = (BackgroundModel(),)
+        elif isinstance(background, BackgroundModel):
             # (C)
             background = (background,)
         elif isinstance(background, Iterable):
@@ -240,6 +305,7 @@ class DynamicDataList:
         # We now have a tuple of BackgroundModels
         # Ensure compatibility. We could let jax fail later, but the
         # error message will be cryptic
+
         for i, model in enumerate(background):
             for j, bg in enumerate(model.backgrounds):
                 if len(bg) != len(data[0]):
@@ -253,13 +319,14 @@ class DynamicDataList:
                     seen = seen + (model, )
             background = seen
 
+
         same_bg = len(background) == 1
 
         # We now either have (A) a single shared background model, or (B) a tuple of background models
         # If (B), then it must be the same length as the number of vectors
         if not same_bg and len(background) != N:
             raise ValueError(f"Background tuple must be the same length as the number of vectors.\n"
-                             f"Got len(background) = {len(background)} and len(data) = {N}")
+                            f"Got len(background) = {len(background)} and len(data) = {N}")
 
         components = []
         for i in range(N):
@@ -278,7 +345,7 @@ class DynamicDataList:
             )
             components.append(component)
 
-        return cls(components=components, same_mask=all_same, same_background=same_bg)
+        return cls(components=tuple(components), same_mask=all_same, same_background=same_bg)
 
     @property
     def masks(self):

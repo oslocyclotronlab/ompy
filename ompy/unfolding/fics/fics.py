@@ -27,6 +27,7 @@ from .fics_2d import (
     unfold_matrix_jax,
     unfold_matrix_jax_block,
 )
+from .fics_1d_jax import unfold_vector_wrapper, unfold_vectors_wrapper
 
 LOG = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class FICS(Unfolder):
 
     def __init__(
         self,
-        D: Matrix | None = None,
+        D_eg: Matrix | None = None,
         G_eg: Matrix | None = None,
         G_ex: Matrix | None = None,
         detector: Detector | None = None,
@@ -85,7 +86,7 @@ class FICS(Unfolder):
         save_block: bool = False,
         enforce_positivity: bool = False,
     ):
-        super().__init__(D, G_eg, G_ex, detector, space, warn_int_data)
+        super().__init__(D_eg=D_eg, G_eg=G_eg, G_ex=G_ex, detector=detector, space=space, warn_int_data=warn_int_data)
         self.iterations = iterations
         self.weight = weight  # Fluctuation weight
         # We prefer to use GPUs, but fall back to CPU if not available
@@ -125,7 +126,8 @@ class FICS(Unfolder):
     def optimal_lr(self, tol: float | None = None) -> float:
         # kappa = np.linalg.cond(self.R.values, tol)
         # get the largest and smallest singular values
-        s = np.linalg.svd(self.R.values, compute_uv=False)
+        R = self.D @ self.G_eg
+        s = np.linalg.svd(R.values, compute_uv=False)
         s_max = s.max()
         s_min = s.min()
         # return 1 - 2 / (kappa + 1)
@@ -176,7 +178,7 @@ class FICS(Unfolder):
             background=background,
             initial=initial,
             G_eg=G_eg,
-            D=D,
+            D_eg=D,
             kwargs=kw_,
         )
 
@@ -186,6 +188,61 @@ class FICS(Unfolder):
         return FICSResult1D(
             meta=meta, u=uall, cost=cost, fluctuations=fluctuations, kl=kl
         )
+
+    @override
+    def _unfold_vectors(
+        self,
+        data: list[Vector],
+        background: list[Vector] | None,
+        initial: list[Vector],
+        D: Matrix,
+        G_eg: Matrix,
+        mask: list[np.ndarray],
+        **kwargs,
+    ) -> list[FICSResult1D]:
+        kw = self.handle_kwargs(kwargs)
+        data_raw = data
+        if background:
+            # We use the mean as the parameter
+            bg = np.mean(background, axis=0)
+            data = [d - bg for d in data]
+        data = [d.astype("float32") for d in data]
+        initial = [i.astype("float32") for i in initial]
+        D = D.as_numpy().astype("float32")
+        G_eg = G_eg.as_numpy().astype("float32")
+        start = time.time()
+        R = D @ G_eg
+        res = unfold_vectors_wrapper(R, data, initial, kw.iterations, kw.lr)
+        elapsed = time.time() - start
+
+        kw = asdict(kw)
+        kw.pop("disable_tqdm")
+        kw.pop("leave_tqdm")
+        results = []
+        for i in range(len(data_raw)):
+            parameters = Parameters1D(
+                raw=data_raw[i],
+                background=background,
+                initial=initial[i],
+                G_eg=G_eg,
+                D_eg=D,
+                kwargs=kw,
+            )
+            meta = ResultMeta1D(
+                time=elapsed, parameters=parameters, space=self.space, method=self.__class__
+            )
+            results.append(
+                FICSResult1D(
+                    meta=meta,
+                    u=res[i][0],
+                    cost=res[i][1],
+                    fluctuations=res[i][2],
+                    kl=res[i][3]
+                    )
+                )
+
+        return results
+        
 
     @override
     def _unfold_matrix(
@@ -238,7 +295,7 @@ class FICS(Unfolder):
             raw=raw,
             background=background,
             initial=initial,
-            D=D,
+            D_eg=D,
             G_eg=G_eg,
             G_ex=G_ex,
             kwargs=kw_,

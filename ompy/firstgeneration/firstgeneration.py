@@ -6,7 +6,7 @@ from typing import TypeAlias, Literal
 from tqdm.auto import tqdm
 from ..numbalib import njit, prange, jitclass, float32
 from dataclasses import dataclass, asdict
-from ..unfolding import Resampling2D
+from ..unfolding.resampling.resample2d import Resampling2D
 
 """
 TODO:
@@ -231,7 +231,7 @@ def multiplicity_estimation(AG: Matrix) -> Vector:
     Eg_expectation = (AG.Eg * AG).sum(axis='Eg') / Eg_sum
     multiplicity = AG.Ex / Eg_expectation
     multiplicity[multiplicity < 0] = 0
-    multiplicity.xlabel = 'multiplicity'
+    multiplicity.ylabel = 'multiplicity'
     multiplicity.title = 'multiplicity estimation'
     return multiplicity
     
@@ -260,6 +260,8 @@ def population_normalization_njit(multiplicity: VectorNumba,
     Ex = multiplicity.E
     N = np.zeros((len(Ex), len(Ex)), dtype=multiplicity.values.dtype)
     for ei in prange(len(Ex)):
+        if multiplicity[ei] == 0 or Eg_sum[ei] == 0:
+            continue
         for ef in prange(len(Ex)):
             if multiplicity[ef] == 0 or Eg_sum[ef] == 0:
                 continue

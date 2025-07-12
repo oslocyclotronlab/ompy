@@ -51,7 +51,8 @@ def mama_read(
 
     """
     counts = np.genfromtxt(
-        filename, skip_header=10, skip_footer=skip_footer, encoding="latin-1"
+        filename, skip_header=10, skip_footer=skip_footer, encoding="latin-1",
+        comments="!"
     )
     cal = {}
     with open(filename, "r", encoding="latin-1") as datafile:

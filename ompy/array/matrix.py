@@ -330,7 +330,7 @@ class Matrix(AbstractArray, MatrixProtocol):
             values, Y, X = ret
             return cls(Ex=X, Eg=Y, values=values)
         else:
-            raise RuntimeError("Wrong format of mama file")
+            raise RuntimeError("Could not interpret mama file")
 
     @classmethod
     @ensure_path
@@ -341,6 +341,18 @@ class Matrix(AbstractArray, MatrixProtocol):
     @ensure_path
     def from_root(cls, path: Path, what: str, **kwargs) -> Self:
         return load_root_2D(path, what, cls, **kwargs)
+
+    @classmethod
+    def from_hist(cls, **kwargs) -> Self:
+        # Two first kwargs are X and Y
+        kw = iter(kwargs)
+        Xalias = next(kw)
+        Yalias = next(kw)
+        xval = kwargs.pop(Xalias)
+        yval = kwargs.pop(Yalias)
+        values, xedges, yedges = jnp.histogram2d(xval, yval, **kwargs)
+        cls_kwargs = {Xalias: np.asarray(xedges), Yalias: np.asarray(yedges), 'boundary': True}
+        return cls(values=values.T, **cls_kwargs)
 
     @ensure_path
     def save(self, path: Path, filetype: Filetype | None = None, **kwargs) -> None:
@@ -411,7 +423,7 @@ class Matrix(AbstractArray, MatrixProtocol):
         save_txt_2D(self.values, Y, X, path, **kwargs)
 
     @ensure_path
-    def to_numpy(self, path: Path) -> None:
+    def to_npy(self, path: Path) -> None:
         """Save matrix to NumPy binary file format.
 
         Args:
@@ -1102,7 +1114,7 @@ class Matrix(AbstractArray, MatrixProtocol):
                 return f"x={x:1.0f}, y={y:1.0f}"
 
         # TODO: Takes waaaay to much CPU
-        ax.format_coord = format_coord
+        #ax.format_coord = format_coord
 
         cbar: Colorbar | tuple[cm.ScalarMappable, Normalize] = None
         if add_cbar and not all_bad:
@@ -1335,7 +1347,7 @@ class Matrix(AbstractArray, MatrixProtocol):
     def last_nonzeros(self, eps: float = 0.0) -> np.ndarray:
         return last_nonzeros(self.values, eps=eps)
 
-    def to_xarray(self):
+    def to_xarray(self) -> "xr.DataArray":
         return to_xarray_matrix(self)
 
     def to_root(self, identifier: str | None = None):
@@ -1387,8 +1399,10 @@ if XARRAY_AVAILABLE:
     import xarray as xr
 
     def to_xarray_matrix(mat) -> xr.DataArray:  # type: ignore
+        xalias = mat.xalias if mat.xalias else 'y'
+        yalias = mat.yalias if mat.yalias else 'x'
         return xr.DataArray(
-            mat.values, coords=[mat.X, mat.Y], dims=[mat.xalias, mat.yalias]
+            mat.values, coords=[mat.X, mat.Y], dims=[xalias, yalias]
         )
 
 else:

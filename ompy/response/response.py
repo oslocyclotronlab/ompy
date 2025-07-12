@@ -306,7 +306,7 @@ class Response:
 
         FE, SE, DE, AP = self.interpolation.structures()
         emin = D.observed_index.leftmost
-        ap_value = 525.0  # Hack for when you mess up the calibration
+        ap_value = 511.0# 525.0  # Hack for when you mess up the calibration
         has_511 = (ap_value >= emin) and not self.disable_ap
         if has_511:
             j511 = D.index_observed(ap_value)
@@ -427,6 +427,16 @@ class Response:
         D = self.discrete_like(other, **kwargs)
         G = self.gaussian_like(other)
         return ResponseMatrices(D, G)
+
+    def efficiency_like(self, other: Matrix | Vector) -> Vector:
+        if other.ndim == 1:
+            vec = other.xmap(self.interpolation.Eff)
+        else:
+            vec = other.sum(axis=0)
+            vec = vec.xmap(self.interpolation.Eff)
+        vec.name = 'Efficiency'
+        vec.ylabel = 'Efficiency'
+        return vec
 
     def clone(self, data: ResponseData | None = None, interpolation: DiscreteInterpolation | None = None,
               compton: ComptonMatrix | None = None, components: Components | None = None,
@@ -615,7 +625,7 @@ def gaussian_matrix(E: np.ndarray, sigmafn) -> Matrix:
     return Matrix(true=E, observed=E, values=values, ylabel=r'Measured $E_\gamma$', xlabel=r'True $E_\gamma$', edge='mid')
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def _gaussian_matrix(E, sigma):
     n = len(E)
     m = np.zeros((n, n))
@@ -627,6 +637,6 @@ def _gaussian_matrix(E, sigma):
     return m
 
 
-@njit
+@njit(cache=True)
 def gaussian(x, mu, sigma):
     return np.exp(-0.5 * ((x - mu) / sigma) ** 2) / (sigma * np.sqrt(2 * np.pi))

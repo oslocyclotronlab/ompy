@@ -10,6 +10,7 @@ from typing import overload, Literal
 from .io import load, save
 import json
 from .responsepath import get_response_path, ResponseName
+import warnings
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +135,7 @@ class ResponseData:
             If inplace is True, None is returned. If inplace is False, a new ResponseData object is returned.
 
         """
+        # I don't think this is correct.
         total_eff = self.sum(as_vector=True) / self.Eff
         # Scale all counts to the median. Not obvious if this is correct,
         # as I would have assumed all elements in total_eff corresponding to the
@@ -147,7 +149,7 @@ class ResponseData:
             self.AP *= weight
             self.compton.values *= weight[:, None]
         else:
-            compton = self.compton.clone()
+            compton = self.compton.copy()
             compton.values *= weight[:, None]
             return self.clone(FE=self.FE * weight, SE=self.SE * weight, DE=self.DE * weight,
                               AP=self.AP * weight,
@@ -162,6 +164,7 @@ class ResponseData:
 
     def normalize_FWHM(self, energy: Unitlike, fwhm: Unitlike, inplace: bool = False) -> ResponseData | None:
         #warnings.warn("You should not be normalizing the raw counts. Normalize the interpolations instead.")
+        warnings.warn("You really should not be 'normalizing' FWHM. Do a regression on measured FWHM instead.")
         if self.FWHM is None:
             raise ValueError("No FWHM data available.")
         old = self.FWHM.loc[energy]
@@ -185,6 +188,7 @@ class ResponseData:
         MAMA uses a normalized version of the FWHM scaled to 1 at 1330keV and inverted
         by the energy. OMpy requires the FWHM to be a proper function of energy.
         """
+        warnings.warn("You really should not be 'normalizing' FWHM. Do a regression on measured FWHM instead.")
         fwhm = self.FWHM.copy()
         fwhm.values *= fwhm.E * 1 / 1330
         if inplace:

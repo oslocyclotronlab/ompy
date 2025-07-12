@@ -76,6 +76,9 @@ class ResponseDetector(EgDetector):
         title = self.title if title is None else title
         return self.__class__(response, title=title)
 
+    def efficiency_like(self, array: Vector | Matrix) -> Vector:
+        return self.response.efficiency_like(array)
+
 
 class OSCAR(ResponseDetector):
     """

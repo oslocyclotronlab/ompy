@@ -20,12 +20,12 @@ ANNIHILATION_LINEAR_TO = 4e3
 assert (ESCAPE_LINEAR_TO > ESCAPE_LIMIT)
 
 
-@njit
+@njit(cache=True)
 def zero(x):
     return np.zeros_like(x)
 
 
-@njit
+@njit(cache=True)
 def loglerp(X, a, b, Y1, Y2):
     w = 1 / (1 + np.exp(-1 / b * (X - a)))
     return (1 - w) * Y1 + w * Y2
@@ -131,12 +131,12 @@ class AnnihilationInterpolator(Interpolator):
         return AnnihilationInterpolation(self.points, lin_intp, gf_intp, linear_to=linear_to)
 
 
-@njit
+@njit(cache=True)
 def fwhm(E: np.ndarray, a0: float, a1: float, a2: float) -> np.ndarray:
     return np.sqrt(a0 + a1 * E + a2 * E ** 2)
 
 
-@njit
+@njit(cache=True)
 def fwhm_jac(E: np.ndarray, a0: float, a1: float, a2: float) -> np.ndarray:
     val = fwhm(E, a0, a1, a2)
     return np.stack((1 / val, E / val, E ** 2 / val)).T
@@ -233,7 +233,7 @@ class FWHMInterpolator(Interpolator):
         return FWHMInterpolation(self.points, *p, cov=pcov)
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def polylog(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
     y = np.zeros_like(x)
     xlog = np.log(x)
@@ -243,7 +243,7 @@ def polylog(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
     return np.exp(y)
 
 
-@njit(parallel=True)
+@njit(parallel=True, cache=True)
 def polylog_jac(x: np.ndarray, *p: np.ndarray) -> np.ndarray:
     jac = np.empty((len(x), len(p)))
     xlog = np.log(x)

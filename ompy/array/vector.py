@@ -620,6 +620,14 @@ class Vector(AbstractArray, VectorProtocol):
     def ylabel(self, value: str) -> None:
         self.update(vlabel=value, inplace=True)
 
+    @property
+    def vlabel(self) -> str:
+        return self.metadata.vlabel
+
+    @vlabel.setter
+    def vlabel(self, value: str) -> None:
+        self.update(vlabel=value, inplace=True)
+
     def get_ylabel(self) -> str:
         return self.ylabel
 

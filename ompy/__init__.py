@@ -165,7 +165,7 @@ def __getattr__(name):
     def _import(name):
         return importlib.import_module("." + name, __package__)
     match name:
-        case "unfolding" | "detector" | "external" | "decomposition" | "nuclear":
+        case "unfolding" | "detector" | "firstgeneration" | "external" | "decomposition" | "nuclear":
             return _import(name)
         case _:
             raise AttributeError(f"module {__name__} has no attribute {name}")

@@ -298,7 +298,7 @@ class AsymmetricVector(ErrorVector):
         # Extract all keyword argumetns that are in metakwargs from kwargs
         for key in metakwargs:
             if key in kwargs:
-                metadata = metadata.update(key=kwargs.pop(key))
+                metadata = metadata.update(**{key: kwargs.pop(key)})
         return AsymmetricVector(
             X=X,
             values=values,
@@ -309,6 +309,57 @@ class AsymmetricVector(ErrorVector):
             copy=copy,
             **kwargs,
         )
+
+    def __add__(self, other: AsymmetricVector) -> Self:
+        if not hasattr(other, "lerr") or not hasattr(other, "uerr"):
+            raise ValueError("Cannot add AsymmetricVector to non-AsymmetricVector")
+        lerr = np.sqrt(self.lerr**2 + other.lerr**2)
+        uerr = np.sqrt(self.uerr**2 + other.uerr**2)
+        return self.clone(values=self.values + other.values, lerr=lerr, uerr=uerr)
+
+    def __sub__(self, other: AsymmetricVector) -> Self:
+        if not hasattr(other, "lerr") or not hasattr(other, "uerr"):
+            raise ValueError("Cannot subtract AsymmetricVector from non-AsymmetricVector")
+        lerr = np.sqrt(self.lerr**2 + other.lerr**2)
+        uerr = np.sqrt(self.uerr**2 + other.uerr**2)
+        return self.clone(values=self.values - other.values, lerr=lerr, uerr=uerr)
+
+    def __mul__(self, other: AsymmetricVector | float | int) -> Self:
+        if isinstance(other, (float, int)):
+            # For scalar multiplication, errors scale linearly
+            return self.clone(values=self.values * other, 
+                            lerr=abs(other) * self.lerr,
+                            uerr=abs(other) * self.uerr)
+        if not hasattr(other, "lerr") or not hasattr(other, "uerr"):
+            raise ValueError("Cannot multiply AsymmetricVector with non-AsymmetricVector")
+        # Error propagation for multiplication
+        lerr = np.sqrt((self.lerr * other.values)**2 + (other.lerr * self.values)**2)
+        uerr = np.sqrt((self.uerr * other.values)**2 + (other.uerr * self.values)**2)
+        return self.clone(values=self.values * other.values, lerr=lerr, uerr=uerr)
+
+    def __truediv__(self, other: AsymmetricVector | float | int) -> Self:
+        if isinstance(other, (float, int)):
+            # For scalar division, errors scale inversely
+            return self.clone(values=self.values / other,
+                            lerr=self.lerr / abs(other),
+                            uerr=self.uerr / abs(other))
+        if not hasattr(other, "lerr") or not hasattr(other, "uerr"):
+            raise ValueError("Cannot divide AsymmetricVector by non-AsymmetricVector")
+        # Error propagation for division
+        lerr = np.sqrt((self.lerr / other.values)**2 + 
+                      (other.lerr * self.values / other.values**2)**2)
+        uerr = np.sqrt((self.uerr / other.values)**2 + 
+                      (other.uerr * self.values / other.values**2)**2)
+        return self.clone(values=self.values / other.values, lerr=lerr, uerr=uerr)
+
+    def __radd__(self, other: AsymmetricVector) -> Self:
+        return self.__add__(other)
+
+    def __rsub__(self, other: AsymmetricVector) -> Self:
+        return (-self).__add__(other)
+
+    def __rmul__(self, other: AsymmetricVector | float | int) -> Self:
+        return self.__mul__(other)
 
 
 def save(

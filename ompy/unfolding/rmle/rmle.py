@@ -26,18 +26,20 @@ from .lossmodel import ModelLoss
 from ..unfolder import Unfolder
 from ..result1d import Parameters1D, ResultMeta1D
 from ..result2d import Parameters2D, ResultMeta2D
-from .loss import Loss, LossFn, KullbackLeibler
 from ... import Vector, Matrix
+import warnings
 
 if TYPE_CHECKING:
     from .contaminant1d import Contaminant1D
     from .contaminant2d import Contaminant2D
+
 
 def jit_cost1d() -> jax.core.Callable:
     return jax.jit(
         jax.value_and_grad(cost1d, has_aux=True),
         static_argnames=("contaminants", "unpacker", "penalties", "loss"),
     )
+
 
 type Optimizer = Any
 
@@ -59,19 +61,22 @@ class RMLE(Unfolder):
         mask: np.ndarray,
         contaminants: tuple[Contaminant1D, ...] = (),
         loss: ModelLoss = ModelLoss(),
+        efficiency: Vector | None = None,
         **kwargs,
     ) -> RMLEResult1D:
         """
         This mostly just packs arguments into structs and then passes them to the optimizer,
         then unpacks and packs the results into a RMLEResult1D.
         """
+        if efficiency is not None:
+            warnings.warn("Efficiency is not supported for 1D unfolding. Ignoring.")
 
         # These are simple structs that contain the data and the parameters
         # Turns out we got a lot to keep track of
         dynamic = DynamicData1D(
-            raw=data, initial=initial, mask=mask, background=background
+            raw=data.values, initial=initial.values, mask=mask, background=background
         )
-        settings = Settings1D.from_kwargs(kwargs)
+        settings = Settings.from_kwargs(kwargs)
         static = StaticData1D(
             D=D,
             G_eg=G_eg,
@@ -93,12 +98,9 @@ class RMLE(Unfolder):
         )
 
         elapsed = time.time() - start
-        kwargs = (
-            asdict(settings)
-            | {"contaminants": contaminants}
-        )
+        kwargs = asdict(settings) | {"contaminants": contaminants, "loss": loss}
         parameters = Parameters1D(
-            D=D,
+            D_eg=D,
             G_eg=G_eg,
             raw=data,
             background=background,
@@ -107,7 +109,10 @@ class RMLE(Unfolder):
             mask=np.asarray(mask),
         )  # Kwargs got popped by OptimParams.from_kwargs()
         meta = ResultMeta1D(
-            time=elapsed, space=self.space, parameters=parameters, method=self.__class__
+            time=elapsed,
+            space=self.space,
+            parameters=parameters,
+            method=self.__class__,
         )
         return RMLEResult1D(
             meta=meta,
@@ -115,7 +120,7 @@ class RMLE(Unfolder):
             u=result.mu,
             beta=result.beta,
             aux=result.aux,
-            xi=result.xi,
+            contaminants=result.xi,
         )
 
     @override
@@ -136,7 +141,7 @@ class RMLE(Unfolder):
 
         # We have used all kwargs as we can. The rest are probably misspelled
         if len(kwargs) > 0:
-            raise ValueError(f"Unknown keyword arguments: {kwargs.keys()}")
+            warnings.warn(f"Unknown keyword arguments: {kwargs.keys()}")
 
         static = StaticData1D(
             D=D,
@@ -151,7 +156,6 @@ class RMLE(Unfolder):
             dynamic=components,
             settings=settings,
             static=static,
-            **kwargs,
         )
 
         elapsed = time.time() - start
@@ -159,7 +163,7 @@ class RMLE(Unfolder):
         results: list[RMLEResult1D] = []
         for i, result in enumerate(optim_results):
             parameters = Parameters1D(
-                D=D,
+                D_eg=D,
                 G_eg=G_eg,
                 raw=data[i],
                 background=background[i] if background is not None else None,
@@ -180,7 +184,7 @@ class RMLE(Unfolder):
                     u=result.mu,
                     beta=result.beta,
                     aux=result.aux,
-                    xi=result.xi,
+                    contaminants=result.xi,
                 )
             )
 
@@ -196,10 +200,9 @@ class RMLE(Unfolder):
         G_ex: Matrix | None,
         mask: np.ndarray,
         contaminants: tuple[Contaminant2D, ...] = (),
+        efficiency: Vector | None = None,
         **kwargs,
     ) -> RMLEResult2D:
-
-
         components = OptimizationComponents(
             initial=initial,
             mask=mask,
@@ -217,6 +220,7 @@ class RMLE(Unfolder):
             G_ex=G_ex,
             prototype=data,
             contaminants=contaminants,
+            efficiency=efficiency,
         )
         start = time.time()
         result = unfold_matrix(
@@ -228,7 +232,7 @@ class RMLE(Unfolder):
 
         # TODO Add Response coefficients as optimisation parameter
         parameters = Parameters2D(
-            D=D,
+            D_eg=D,
             raw=data,
             background=background,
             initial=initial,
@@ -240,5 +244,12 @@ class RMLE(Unfolder):
         meta = ResultMeta2D(
             time=elapsed, space=self.space, parameters=parameters, method=self.__class__
         )
-        return RMLEResult2D(meta=meta, cost=result.aux['loglike'], u=result.mu, aux=result.aux,
-                            beta=result.beta, do_fold_beta=optim_data.background.do_fold)
+        return RMLEResult2D(
+            meta=meta,
+            cost=result.aux["loglike"],
+            u=result.mu,
+            aux=result.aux,
+            beta=result.beta,
+            do_fold_beta=optim_data.background.do_fold,
+            contaminants=result.contaminants,
+        )

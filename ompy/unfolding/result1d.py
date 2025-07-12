@@ -298,7 +298,9 @@ class Cost1D(Result[T]):
                 keys = self.aux.keys() if auxiliary else []
             else:
                 keys = auxiliary
-            aux = {k: self.aux[k][start:] for k in keys}
+            print(self.aux) 
+            aux = {k: self.aux[k][start:] for k in keys
+                   if self.aux[k].ndim > 0}
 
         if relative:
             cost /= cost[0]

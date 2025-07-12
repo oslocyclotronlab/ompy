@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Iterable, Self
 import time
 
 import jax
@@ -13,9 +13,9 @@ from functools import partial
 from ... import Vector
 from ...stubs import Path
 from ..result1d import Cost1D, UnfoldedResult1DSimple
-from ..utils import loop_tqdm, richardson_rate
+from ..utils import loop_tqdm
 from .contaminant1d import Contaminant1D
-from .stubs import Optimizer, Background1D, Mu1D, Tau1D
+from .stubs import Optimizer, Background1D, Mu1D, Tau1D, Mask1D
 from .stubs import Beta1D as Beta
 from .stubs import Contaminants1D as Contaminants
 from .stubs import Data1D as Data
@@ -23,9 +23,9 @@ from .stubs import ExpectationParameter1D as ExpectationParameter
 from .stubs import Nu1D, DMatrix, GegMatrix, GegDMatrix
 from .stubs import State1D as State
 from .tau import TAU_MAP, TauMap
-from .utils import pytree_dataclass
-from jaxtyping import Bool
+from .utils import pytree_dataclass, into_array
 from .lossmodel import ModelLoss
+
 if TYPE_CHECKING:
     from .contaminant1d import Contaminant1D, ContaminantModel1D
 
@@ -60,18 +60,63 @@ BackgroundModel object.
 """
 
 
-
-
-@pytree_dataclass
+@dataclass(kw_only=True, frozen=True)
 class BackgroundModel:
     loss: ModelLoss = ModelLoss()
     backgrounds: tuple[Background1D, ...] = ()
 
+    def __init__(self, backgrounds: Background1D | tuple[Background1D, ...] | list[Background1D] | None = None,
+                 loss: ModelLoss = ModelLoss()):
+        # Use object.__setattr__ to bypass frozen dataclass restrictions
+        object.__setattr__(self, 'loss', loss)
+        if backgrounds is None:
+            object.__setattr__(self, 'backgrounds', ())
+        elif isinstance(backgrounds, Iterable):
+            object.__setattr__(self, 'backgrounds', tuple(into_array(bg) for bg in backgrounds))
+        else:
+            object.__setattr__(self, 'backgrounds', (into_array(backgrounds),))
+
     def cost(self, beta: Beta) -> tuple[float, float, tuple[float, ...]]:
         loss = sum(jnp.sum(self.loss.loss(beta, bg)) for bg in self.backgrounds)
-        penalty_terms = tuple(jnp.sum(penalty(beta)[0]) for penalty in self.loss.penalty)
+        penalty_terms = tuple(
+            jnp.sum(penalty(beta)[0]) for penalty in self.loss.penalty
+        )
         penalty = sum(penalty_terms)
         return loss, penalty
+
+    def __len__(self):
+        return len(self.backgrounds)
+
+    def __eq__(self, other: BackgroundModel) -> bool:
+        if len(self) != len(other):
+            return False
+        same_bg = all(
+            jnp.all(bg == other.backgrounds[i]) for i, bg in enumerate(self.backgrounds)
+        )
+        return self.loss == other.loss and same_bg
+
+    def clone(self, backgrounds: Background1D | tuple[Background1D, ...] | list[Background1D] | None = None,
+              loss: ModelLoss | None = None) -> Self:
+        if backgrounds is None:
+            backgrounds = self.backgrounds
+        if loss is None:
+            loss = self.loss
+        return BackgroundModel(backgrounds=backgrounds, loss=loss)
+
+def flatten_background_model(model: BackgroundModel):
+    children = (model.loss, model.backgrounds)  # arrays/dynamic values
+    aux_data = {}  # static values
+    return children, aux_data
+
+
+def unflatten_background_model(aux_data, children):
+    loss, backgrounds = children
+    return BackgroundModel(loss=loss, backgrounds=backgrounds)
+
+
+jax.tree_util.register_pytree_node(BackgroundModel, 
+                                  flatten_background_model,
+                                  unflatten_background_model)
 
 
 def cost_contaminants(
@@ -102,20 +147,31 @@ def cost(
     tau_map: TauMap[Mu1D, Tau1D],
 ) -> tuple[jnp.ndarray, dict]:
     tau, beta_tau, contaminants = state
+
     mu = tau_map.from_tau(tau)
+
+    if len(contaminant_models) > 0:
+        print("Has contaminants")
+        c = contaminant_models[0]
+        mu_c, contaminant_loss = c.loss(contaminants[0])
+        mu = mu + mu_c
+    else:
+        print("No contaminants")
+        contaminant_loss = 0.0
+
     nu = mu @ GegD
 
     if background.backgrounds:
+        print("Has background")
         beta = tau_map.from_tau(beta_tau)
         loss_bg, penalty_bg = background.cost(beta)
         nu = nu + beta
     else:
+        print("No background")
         loss_bg, penalty_bg = (0.0, 0.0)
 
-    nu, xi_penalty = (nu, 0.0)
     likelihood_body = loss.loss(nu, y)
     loglike = jnp.sum(likelihood_body)
-
 
     eta_penalties = ()
     eta_normalized_penalties = ()
@@ -141,30 +197,39 @@ def cost(
 
     if mu_normalized_penalties:
         mu_norm = mu / jnp.sum(mu + 1e-10)
-        total_penalty += sum(penalty(mu_norm) for penalty in mu_normalized_penalties)
-        total_penalty_magnitude += sum(penalty(mu_norm) for penalty in mu_normalized_penalties)
+        # penalty, penalty_magnitude = zip(*[penalty(mu_norm) for penalty in mu_normalized_penalties])
+        # total_penalty += sum(penalty)
+        # total_penalty_magnitude += sum(penalty_magnitude)
+        for penalty in mu_normalized_penalties:
+            p, p_mag = penalty(mu_norm)
+            total_penalty += p.sum()
+            total_penalty_magnitude += p_mag.sum()
 
     if eta_penalties or eta_normalized_penalties:
         # Map to eta space
         eta = mu @ G_eg
         if eta_penalties:
-            penalty, penalty_magnitude = zip(*[penalty(eta) for penalty in eta_penalties])
+            penalty, penalty_magnitude = zip(
+                *[penalty(eta) for penalty in eta_penalties]
+            )
             total_penalty += sum(penalty)
             total_penalty_magnitude += sum(penalty_magnitude)
         if eta_normalized_penalties:
             # Rescale to get a proper probability distribution
             eta_norm = eta / jnp.sum(eta + 1e-10)
 
-            penalty, penalty_magnitude = zip(*[penalty(eta_norm) for penalty in eta_normalized_penalties])
+            penalty, penalty_magnitude = zip(
+                *[penalty(eta_norm) for penalty in eta_normalized_penalties]
+            )
             total_penalty += sum(penalty)
             total_penalty_magnitude += sum(penalty_magnitude)
 
-    cost = loglike + total_penalty + xi_penalty + loss_bg + penalty_bg
+    cost = loglike + total_penalty + contaminant_loss + loss_bg + penalty_bg
 
     aux = {
         "loglike": loglike,
         "penalty": total_penalty_magnitude,
-        "xi_penalty": xi_penalty,
+        "contaminant_loss": contaminant_loss,
     }
 
     return cost, aux
@@ -182,7 +247,6 @@ def unfold(
     # Set up Xi for contamination
     # x, mask = setup_contaminants(data_params.contaminants, tau, components.mask)
 
-
     # The optimization function is created from a closure of all constants
     # that we never vmap over.
     lower = make_lower(
@@ -193,12 +257,12 @@ def unfold(
 
     if dynamic.background.backgrounds:
         # Mean is the best guess
-        beta = sum(dynamic.background.backgrounds)/len(dynamic.background.backgrounds)
+        beta = sum(dynamic.background.backgrounds) / len(dynamic.background.backgrounds)
     else:
         beta = None
 
     if static.contaminants:
-        contaminants = tuple(c.initial for c in static.contaminants)
+        contaminants = tuple(c.setup_initial() for c in static.contaminants)
     else:
         contaminants = ()
 
@@ -214,15 +278,22 @@ def unfold(
         lower(state)
         print("Starting profile")
         start = time.time()
-        with jax.profiler.trace(
-            "/tmp/jax-trace-unfold-vec", create_perfetto_link=True
-        ):
-            state, total_cost, loglike, penalty= lower(state)
+        with jax.profiler.trace("/tmp/jax-trace-unfold-vec", create_perfetto_link=True):
+            state, total_cost, loglike, penalty = lower(state)
         print(f"Profiling took {time.time() - start} seconds")
     else:
-        state, total_cost, loglike, penalty= lower(state)
+        state, total_cost, loglike, penalty = lower(state)
 
     mu, beta, contaminants = state
+    if contaminants:
+        p = static.contaminants[0].transform_out(contaminants[0])
+        print(p)
+
+    # Reconstitute the contaminants as vectors
+    contaminant_vecs: list[Vector] = [
+        model.into_vector(vector=static.prototype, params=c)
+        for c, model in zip(contaminants, static.contaminants)
+    ]
 
     result = OptimResult1D(
         prototype=static.prototype,
@@ -232,7 +303,7 @@ def unfold(
         penalty=penalty,
         beta=beta,
         xi_penalty=0,
-        xi=contaminants,
+        xi=contaminant_vecs,
     )
     return result
 
@@ -266,18 +337,15 @@ def make_lower(
     G_eg = data.G_eg
     GegD = data.D @ G_eg
     # Contaminant models that have its matrices unspecified inherit the main matrices
-    contaminants = tuple(model.set_matrices(G_eg, GegD) for model in data.contaminants)
     # no the user must provide the contaminant models
     leave_tqdm = settings.leave_tqdm
     tau_map = settings.tau_map
-
-
 
     cost_closure = partial(
         cost,
         GegD=GegD,
         G_eg=G_eg,
-        contaminant_models=0,#contaminants,
+        contaminant_models=data.contaminants,
         loss=data.loss,
         background=dynamic.background,
         tau_map=tau_map,
@@ -312,7 +380,7 @@ def make_lower(
         def body_fun(i: int, state: LoopState) -> LoopState:
             params, opt_state, loglike, penalty = state
             (_, aux), g = value_and_grad(params)
-            updates, opt_state = optimizer.update(g, opt_state)
+            updates, opt_state = optimizer.update(g, opt_state, params=params)
             params = optax.apply_updates(params, updates)
             # Everything that is masked is zeroed out now to prevent
             # gradients from being applied
@@ -334,9 +402,7 @@ def make_lower(
 
         return (mu, beta, state[2]), total_cost, loglike, penalty
 
-
     return lower
-
 
 
 @dataclass(kw_only=True)
@@ -410,7 +476,7 @@ class OptimResult1D:
         if xi is not None:
             self.xi = [prototype.clone(values=np.asarray(x)) for x in xi]
         else:
-            self.xi = []
+            self.xi = ()
         self.total_cost = np.asarray(total_cost)
         self.loglike = np.asarray(loglike)
         self.penalty = np.asarray(penalty)
@@ -448,7 +514,7 @@ class DynamicData:
 
     raw: Data
     initial: ExpectationParameter
-    mask: Bool[Array, "Eg"]
+    mask: Mask1D
     background: BackgroundModel = BackgroundModel()
     _run_checks: bool = True
 
@@ -466,13 +532,24 @@ class DynamicData:
         # Here we flip the mask because jax.set uses the opposite convention
         if self._run_checks:
             self.mask = ~jnp.asarray(self.mask)
-            
 
         if not isinstance(self.background, BackgroundModel):
             if not isinstance(self.background, Iterable):
-                self.background = BackgroundModel(backgrounds=(jnp.asarray(self.background),))
+                self.background = BackgroundModel(
+                    backgrounds=(jnp.asarray(self.background.values),)
+                )
             else:
-                self.background = BackgroundModel(backgrounds=tuple(jnp.asarray(bg) for bg in self.background))
+                bgs = []
+                for bg in self.background:
+                    # Each element may be a BackgroundModel or an arraylike
+                    if len(bg) == 0:
+                        continue
+
+                    if isinstance(bg, BackgroundModel):
+                        bgs.extend(bg.backgrounds)
+                    else:
+                        bgs.append(jnp.asarray(bg))
+                self.background = BackgroundModel(backgrounds=tuple(bgs))
 
         if self._run_checks:
             for i, bg in enumerate(self.background.backgrounds):
@@ -553,10 +630,11 @@ class StaticData:
 
         if not isinstance(self.contaminants, Iterable):
             self.contaminants = (self.contaminants,)
+        if not isinstance(self.contaminants, tuple):
+            self.contaminants = tuple(self.contaminants)
 
         for i, contaminant in enumerate(self.contaminants):
             if len(contaminant) != N:
                 raise ValueError(
                     f"Contaminant must be of length of data, got {len(contaminant)} for number {i}."
                 )
-
