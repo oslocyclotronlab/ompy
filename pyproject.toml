@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=69", "setuptools-scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ompy"                                  # canonical PyPI name: lowercase
+description = "OMpy: tools for Oslo Method / nuclear data analysis."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dynamic = ["version"]
+
+authors = [
+  { name = "Jørgen Eriksson Midtbø", email = "jorgenem@gmail.com" },
+  { name = "Fabio Zeiser",           email = "fabio.zeiser@fys.uio.no" },
+  { name = "Erlend Lima",            email = "erlendlima@outlook.com" }
+]
+
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "scipy",
+  "tqdm",
+  "pint",
+  "pandas",
+  "sympy",
+  "pint",
+  "nudel @ git+https://github.com/op3/nudel.git",
+  "argcomplete",
+  "jaxtyping",
+  "jax",
+  "h5py",
+  "optax",
+  "numba",
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License",          # change if not MIT
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.urls]
+Homepage = "https://github.com/oslocyclotronlab/ompy"
+Source   = "https://github.com/oslocyclotronlab/ompy"
+Issues   = "https://github.com/oslocyclotronlab/ompy/issues"
+
+#[project.optional-dependencies]
+#full         = ["numba", "jax", "xarray", "h5py", "jax-tqdm", "optax"]
+#jax          = ["jax", "jax-tqdm", "optax"]
+#numba        = ["numba"]
+#recommended  = ["jax"]
+
+[project.scripts]
+ompy = "ompy.cli:main"
+
+# ---- setuptools config for src-layout discovery ----
+
+[tool.setuptools.packages.find]
+where   = ["src"]
+include = ["ompy*"]
+
+[tool.setuptools.package-data]
+ompy = ["data/*"]
+
+# ---- setuptools-scm (version from git tags) ----
+
+[tool.setuptools_scm]
+write_to = "src/ompy/_version.py"
+# Default version scheme is fine (PEP 440). You can customize if you want:
+# version_scheme = "guess-next-dev"
+# local_scheme   = "node-and-date"
+
+[tool.mutmut]
+paths_to_mutate = [ "src/ompy/array/index.py" ]
+also_copy = [ "src/ompy" ]
+pytest_add_cli_args_test_selection= [ "tests/" ]

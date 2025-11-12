@@ -10,3 +10,15 @@ src/
 ompy/__pycache__/
 ompy/.mypy_cache/
 .git/
+# Ignore everything
+**
+
+# but allow the Dockerfile and this .dockerignore
+!Dockerfile
+!.dockerignore
+!pyproject.toml
+!src/
+!tests/
+!README.md
+!LICENSE
+!CHANGELOG.md

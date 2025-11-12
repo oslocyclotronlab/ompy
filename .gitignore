@@ -130,6 +130,8 @@ tags
 
 notebooks/**/
 docs/source/api
+docs/source/_autosummary/
+docs/source/reference/autoapi/
 data/**/R.npy
 data/**/R.npz
 
@@ -143,3 +145,20 @@ data/**/R.npz
 *.png
 *.nc
 notebooks/*
+
+
+**/__pycache__/
+*.py[cod]
+build/
+dist/
+.pytest_cache/
+.env
+.venv
+*.egg-info/
+__pypackages__/
+data/
+*.h5
+*.npz
+*.json
+mutants/
+*.npy

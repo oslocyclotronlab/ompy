@@ -1,7 +1,9 @@
-sphinx>=2.1.2.
-sphinx-automodapi
-sphinx-autodoc-typehints
+sphinx>=8.2
+furo
+pydata-sphinx-theme
+myst-parser>=3.0
 nbsphinx
-nbsphinx-link
-mock
-ipython
+sphinx-autodoc-typehints>=2.0
+sphinx-copybutton
+sphinx-design
+sphinx-autoapi

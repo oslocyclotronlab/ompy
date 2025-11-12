@@ -1,0 +1,38 @@
+/* docs/_static/css/custom.css */
+.bd-main .bd-content .bd-article-container { max-width: 60em; }
+.bd-page-width { max-width: 88rem; }
+
+/* Version switcher from PyData Sphinx Theme */
+
+.version-switcher__menu a.list-group-item {
+  font-size: small;
+}
+
+button.btn.version-switcher__button,
+button.btn.version-switcher__button:hover {
+  color: black;
+  font-size: small;
+}
+
+/* Main index page cards */
+
+.sd-card .sd-card-img-top {
+  height: 80px;
+  width: 80px;
+  margin: 1rem auto 0.5rem;
+  object-fit: contain;
+}
+
+.sd-card-body {
+  padding: 1rem;
+  font-size: 0.9rem;
+}
+
+.sd-card-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.sd-card-footer {
+  padding: 0.75rem 1rem;
+}
