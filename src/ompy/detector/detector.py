@@ -1,18 +1,19 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod, ABCMeta
-from ..stubs import Unitlike, Axes
-from ..stubs import array as Array
-from ..library import from_unit, into_unit
-from ..array import Vector, Matrix, Index
-from ..units import u
-from ..response import DiscreteInterpolation, Response, ResponseMatrices, Components
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import overload, Literal, Callable, TypeAlias, Self, Type
-import warnings
+
+from abc import ABC, ABCMeta, abstractmethod
 from functools import partial
-from ..accel import njit, jax_working
+from typing import Callable, Literal, Self, TypeAlias, overload
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from ..accel import jax_working, njit
+from ..array import Index, Matrix, Vector
 from ..array.ops import eye
+from ..units import from_unit, into_unit
+from ..stubs import Axes, Unitlike
+from ..stubs import array as Array
+from ..units import u
 from .mixture_response import mixture_response, mixture_sigma
 
 FWHM_TO_SIGMA = 1 / (2 * np.sqrt(2 * np.log(2)))
@@ -558,9 +559,10 @@ def ngaussian(x: np.ndarray, mu: float, sigma: float):
 
 
 if _HAS_JAX_WORKING:
+    from functools import partial
+
     import jax
     import jax.numpy as jnp
-    from functools import partial
 
     def gaussian(x, mu, sigma):
         """

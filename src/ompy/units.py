@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pint import DimensionalityError
+from pint._typing import UnitLike
 
 # Lazy singleton registry; created on first use.
 __ureg = None
@@ -39,3 +39,20 @@ Quantity = u.Quantity
 Unit = u.Unit
 Q_ = Quantity
 ureg = u
+
+
+
+def from_unit(quantity: UnitLike, default: UnitLike) -> float:
+    unit = ureg.Unit(default)
+    match quantity:
+        case str():
+            return ureg.Quantity(quantity).to(unit).magnitude
+        case ureg.Quantity():
+            return quantity.to(unit).magnitude
+        case _:
+            return quantity
+
+
+def into_unit(quantity: UnitLike, default: UnitLike) -> UnitLike:
+    value = from_unit(quantity, default)
+    return value * ureg.Unit(default)

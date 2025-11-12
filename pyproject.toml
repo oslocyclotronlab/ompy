@@ -32,6 +32,7 @@ dependencies = [
   "h5py",
   "optax",
   "numba",
+  "xarray",  # TODO: This is not really needed
 ]
 
 classifiers = [
@@ -53,6 +54,7 @@ Issues   = "https://github.com/oslocyclotronlab/ompy/issues"
 #jax          = ["jax", "jax-tqdm", "optax"]
 #numba        = ["numba"]
 #recommended  = ["jax"]
+recommended = ["uproot"]
 
 [project.scripts]
 ompy = "ompy.cli:main"
