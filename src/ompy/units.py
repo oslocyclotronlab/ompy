@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pint import DimensionalityError
 from pint._typing import UnitLike
 
 # Lazy singleton registry; created on first use.
