@@ -18,12 +18,13 @@ from .rebin import _rebin_uniform_left_left, Preserve
 from ..accel import njit
 from ..units import Unit, Quantity, DimensionalityError
 from ..config import get_global_dtype
-from ..library import only_one_not_none
 from ..rendering.html import collapsible
 from ..stubs import Unitlike, arraylike, QuantityLike, array1D
 
 FloatScalar: TypeAlias = np.floating[Any]
 FloatArray1D: TypeAlias = NDArray[np.floating[Any]]
+
+
 
 """
 Note: Due to Python's lack of support for static types, the Mixins must
@@ -1768,3 +1769,19 @@ def _from_dict(d: IndexDict) -> Index:
 
 def compress(x):
     return [(k, len(list(g))) for k, g in groupby(x)]
+
+
+def only_one_not_none(*args):
+    x = only_one(*[arg is not None for arg in args])
+    return x
+
+
+def only_one(*args):
+    """ One and exactly one of the arguments evaluate to true """
+    already_true = False
+    for arg in args:
+        if arg and not already_true:
+            already_true = True
+        elif arg and already_true:
+            return False
+    return already_true
