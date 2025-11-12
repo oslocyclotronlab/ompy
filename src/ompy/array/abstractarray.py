@@ -7,9 +7,8 @@ from abc import ABC, abstractmethod
 from .index import Index
 from ..accel import jax_working
 from ..units import Unit
-from ..computation_context import new_context, active_context, ComputationContext
+from .computation_context import new_context, active_context, ComputationContext
 from .abstractarrayprotocol import AbstractArrayProtocol
-#from nptyping import NDArray, Shape, Floating
 from typing import Iterator, Self, Literal, Callable, overload, TypeAlias, Any
 from numpy.typing import NDArray, DTypeLike
 from .stubs import Array, NPOrder
