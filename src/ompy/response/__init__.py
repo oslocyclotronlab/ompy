@@ -24,7 +24,6 @@ perturb.py and calibrator.py are for development, they test the inherent uncerta
 the entire Eg into account, but I never found a good way to do this. 
 """
 from .numbalib import *
-from .calibrator import *
 from .io import save, load
 from .responsedata import *
 from .interpolation import *
