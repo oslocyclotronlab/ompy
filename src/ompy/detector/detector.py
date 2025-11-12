@@ -15,6 +15,7 @@ from ..stubs import Axes, Unitlike
 from ..stubs import array as Array
 from ..units import u
 from .mixture_response import mixture_response, mixture_sigma
+from ..response import ResponseMatrices, Components
 
 FWHM_TO_SIGMA = 1 / (2 * np.sqrt(2 * np.log(2)))
 Backend: TypeAlias = Literal["numpy", "jax"]
