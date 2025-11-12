@@ -394,7 +394,7 @@ def get_status_section() -> Section:
     if h5_version:
         h5_sec.add_entry(InfoEntry("version", h5_version))
     root.add_section(h5_sec)
-    for pkg in ("xarray", "pymc", "pyro", "scikit-learn", "optax"):
+    for pkg in ("xarray", "optax"):
         avail, ver = is_available(pkg)
         sec = Section(pkg)
         sec.add_entry(StatusEntry("installed", avail))

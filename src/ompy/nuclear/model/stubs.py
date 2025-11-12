@@ -1,11 +1,11 @@
-from typing import TypeAlias, Literal, Callable
+from typing import TypeAlias, Literal, Callable, Any
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 
-Levels: TypeAlias = xr.DataArray
-TALYSPopulation: TypeAlias = xr.DataArray
+# TODO: Replace with proper types when xarray is installed, but needs a refactor
+Levels: TypeAlias = Any #xr.DataArray
+TALYSPopulation: TypeAlias = Any #xr.DataArray
 DiscreteLevels: TypeAlias = pd.DataFrame
 
 SamplingType: TypeAlias = Literal['poisson', 'wigner']
