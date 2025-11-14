@@ -706,11 +706,27 @@ if uproot_available():
             xarr = hist.axis(0).edges()[:-1]  # Use left edges (skip rightmost boundary)
             yarr = hist.axis(1).edges()[:-1]  # Use left edges (skip rightmost boundary)
             title = hist.title
-            xlabel = hist.axis(0).labels() or ''
-            ylabel = hist.axis(1).labels() or ''
-            X = LeftUniformIndex.from_array(yarr, label=ylabel)
-            Y = LeftUniformIndex.from_array(xarr, label=xlabel)
+            xlabel = hist.member('fXaxis').member('fTitle')
+            ylabel = hist.member('fYaxis').member('fTitle')
+            xlabel, xunit = _fix_label(xlabel)
+            ylabel, yunit = _fix_label(ylabel)
+            X = LeftUniformIndex.from_array(yarr, label=ylabel, unit=yunit)
+            Y = LeftUniformIndex.from_array(xarr, label=xlabel, unit=xunit)
             return cls(X=X, Y=Y, values=values.T, name=title)
+
+    def _fix_label(label: str) -> tuple[str, Unit]:
+        if not label:
+            return label, None
+
+        label = label.strip()
+        # We assume it is on the form "<label> [<unit>]"
+        if '[' not in label:
+            label = f"${label}$"
+            return label, None
+        label, unit = label.split(' [')
+        unit = unit.rstrip(']')
+        label = f"${label}$"
+        return label, Unit(unit)
 
 
 def save_npz_asymmetric_1d(path: Path, vector, exist_ok: bool = False) -> None:

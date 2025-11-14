@@ -178,9 +178,7 @@ def make_lower(
 
     type LoopState = tuple[State, optax.OptState, jnp.ndarray, jnp.ndarray]
 
-    bg_template = BackgroundModel(loss=bg_loss)
-    print(bg_template)
-
+    bg_template = BackgroundModel(loss=bg_loss, do_fold=background.do_fold)
 
     #@jax.jit
     def lower(
@@ -332,7 +330,7 @@ class DynamicDataList:
         for i in range(N):
             bg = background
             if background and not same_bg:
-                # Now we known [i] exists by the check above
+                # Now we know [i] exists by the check above
                 bg = background[i]
             component = DynamicData(
                 raw=jnp.asarray(data[i]),

@@ -43,13 +43,14 @@ def resample_vector(
     kwargs = res.meta.kwargs | kwargs
     unfolder = Unfolder.from_result_constructor(res)
 
-    A_boots = [vec.astype("float32") for vec in sampler.sample_data(N, base=base)]
+    A_boots = [vec.astype("float32") for vec in sampler.sample_total(N, base=base)]
 
     background_samples = sampler.sample_background(
         N,
         base=background_base,
         bootstrap=bootstrap_background,
     )
+        
     bg_models = background_samples if background_samples else None
     best = res.best()
     mean = np.maximum(best, np.mean(best))
@@ -78,7 +79,7 @@ def resample_vector(
     costs = [res_.cost for res_ in unf_res]
     auxs = [res_.aux for res_ in unf_res]
     contaminants = [res_.contaminants for res_ in unf_res]
-    unfolded_betas = [res_.beta for res_ in unf_res]
+    unfolded_betas = [res_.best_beta() for res_ in unf_res]
 
     bootstraped = Resampling1D(
         base=res,
@@ -533,7 +534,7 @@ class Sampler1D(Sampler):
                 case "raw":
                     draws = [sample(bg, count) for bg in model_bgs]
                 case "beta":
-                    beta = self.result.beta
+                    beta = self.result.best_beta()
                     if beta is None:
                         raise ValueError("Result does not include beta for background sampling")
                     beta_samples = beta.sample(count)
@@ -545,20 +546,24 @@ class Sampler1D(Sampler):
                     raise ValueError("Background base must be 'raw' or 'beta'")
             bg_boots = list(zip(*[np.asarray(d) for d in draws]))
             loss = background.loss
+            do_fold = background.do_fold
             return [
                 BackgroundModel1D(
                     loss=loss,
                     backgrounds=tuple(np.asarray(bg_) for bg_ in boot),
+                    do_fold=do_fold,
                 )
                 for boot in bg_boots
             ]
 
         base_draws = [np.asarray(bg.values) for bg in model_bgs]
         loss = background.loss
+        do_fold = background.do_fold
         return [
             BackgroundModel1D(
                 loss=loss,
                 backgrounds=tuple(np.asarray(draw) for draw in base_draws),
+                do_fold=do_fold,
             )
             for _ in range(count)
         ]
@@ -567,10 +572,10 @@ class Sampler1D(Sampler):
         self,
         count: int,
         *,
-        base: Literal["folded", "raw"] = "folded",
+        base: Literal["folded", "raw", "nu"] = "folded",
     ) -> list[Vector]:
         match base:
-            case "folded":
+            case "folded" | "nu":
                 vec = self.result.folded_total()
             case "raw":
                 vec = self.result.raw

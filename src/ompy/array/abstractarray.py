@@ -366,7 +366,12 @@ class AbstractArray(AbstractArrayProtocol[NDArray[Any], Any], ABC):
     def apply(self, func: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> Self:
         return self.clone(values=func(self.values, *args, **kwargs))
 
-    def sample(self, N: int, mask: np.ndarray | None = None, **kwargs) -> list[Self]:
+    @overload
+    def sample(self, N: Literal[1] = 1, mask: np.ndarray | None = None, **kwargs) -> Self: ...
+    @overload
+    def sample(self, N: int, mask: np.ndarray | None = None, **kwargs) -> list[Self]: ...
+
+    def sample(self, N: int = 1, mask: np.ndarray | None = None, **kwargs) -> Self | list[Self]:
         """ Draw `N` poisson samples from the array.
 
         The `mask` specifies values to ignore. If not set, the mask is assumed to be
@@ -381,7 +386,10 @@ class AbstractArray(AbstractArrayProtocol[NDArray[Any], Any], ABC):
         Returns:
             list[Self]: An iterator that yields `N` new instances of the array, with the sampled values.
         """
-        return list(self.sample_it(N, mask, **kwargs))
+        samples =  list(self.sample_it(N, mask, **kwargs))
+        if len(samples) == 1:
+            return samples[0]
+        return samples
 
     def sample_it(self, N: int, mask: np.ndarray | None = None, zero_value: int = 0,
                   zero_limit: int = 0, **kwargs) -> Iterator[Self]:
@@ -399,6 +407,8 @@ class AbstractArray(AbstractArrayProtocol[NDArray[Any], Any], ABC):
         Returns:
             Iterator[Self]: An iterator that yields `N` new instances of the array, with the sampled values.
         """
+        if N <= 0:
+            raise ValueError(f"N must be positive, not {N}")
 
         if mask is None:
             if self.ndim == 1:

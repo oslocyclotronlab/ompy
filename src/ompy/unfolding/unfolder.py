@@ -47,8 +47,6 @@ class Unfolder(ABC):
         space: Space = "mu",
         warn_int_data: bool = True,
     ):
-        # We must transpose D and G_eg because of convention
-        # Better to it here than expecting the user to remember it.
         self._D_eg: Matrix | None = D_eg
         self._D_ex: Matrix | None = D_ex
         self._G_eg: Matrix | None = G_eg

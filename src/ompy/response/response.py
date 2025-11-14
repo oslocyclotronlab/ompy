@@ -24,13 +24,14 @@ from ..accel import numba_cuda_available
 from ..helpers import make_ax
 from ..stubs import Pathlike, Unitlike, Axes, Plots1D
 from ..array.rebin import RebinningBinWidthError
+from ..units import Quantity
 
 if numba_cuda_available():
     from .comptongpu import interpolate_gpu
 import logging
 
 LOG = logging.getLogger(__name__)
-logging.captureWarnings(True)
+#logging.captureWarnings(True)
 
 # TODO
 # [x] Save and load components
@@ -265,7 +266,7 @@ class Response:
         compton: ComptonMatrix | None = None,
         components: Components | None = None,
         normalize: bool = True,
-        pad: bool = False,
+        pad: bool = True,
         force_trilu: bool = True,
     ) -> Matrix:
         """
@@ -281,8 +282,8 @@ class Response:
             The components weights. If None, the function will use self.components instead.
         normalize : bool, default True
             Whether to normalize the rebinned response matrix.
-        pad : bool, default False
-            Whether to pad the rebinned response matrix.
+        pad : bool, default True
+            Whether to pad the rebinned response matrix below the lowest energy in the Compton matrix.
         force_trilu : bool, default True
             Whether to force the rebinned response matrix to be lower triangular.
             This is physically required. The off-diagonal elements are purely numerical artifacts.
@@ -317,6 +318,7 @@ class Response:
         if pad:
             E_all = E.copy()
             emin = compton.true_index.to_unit(E).leftmost
+            emin = max(emin, E_all.leftmost)
             E: Index = E_all[emin:]
         if components is None:
             components = self.components
@@ -339,6 +341,9 @@ class Response:
         D.name = "Response"
 
         if pad:
+            # If we go too low, we get artifacts
+            if E.leftmost_u < Quantity('100keV'):
+                warnings.warn("The requested energy grid is dangerously low, < 100keV. This will cause artifacts in the response matrix.")
             D_full = Matrix(
                 true=E_all,
                 observed=E_all,

@@ -248,7 +248,10 @@ class Result(ABC, Generic[T]):
         return nu
 
     def best_beta(self) -> T:
-        return self.beta
+        if self.do_fold_beta:
+            return self.beta_folded()
+        else:
+            return self.beta
 
     best_total = folded_total
 
@@ -515,7 +518,7 @@ class Result(ABC, Generic[T]):
         ratio = y/(nu+1e-3)
         g = self.G_ex.T @ (1 - ratio) @ self.G_eg.T @ self.D_eg.T
 
-        g[~self.mask] = 0
+        g[self.mask] = 0
 
         g.name = 'Gradient pressure'
         g.ylabel = r'$E_\gamma$'
@@ -1223,7 +1226,7 @@ def _apply_mask_arrays(nu_hat: np.ndarray, n: np.ndarray, mask: np.ndarray | Non
     nu_hat = np.asarray(nu_hat, dtype=float)
     n = np.asarray(n, dtype=float)
     if mask is not None:
-        mask = ~np.asarray(mask, dtype=bool)
+        mask = np.asarray(mask, dtype=bool)
         nu_hat = nu_hat[mask]
         n = n[mask]
     nu_hat = np.clip(nu_hat, 1e-12, None)  # avoid log(0)

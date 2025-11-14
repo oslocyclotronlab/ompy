@@ -117,6 +117,7 @@ class RMLE(Unfolder):
             cost=result.total_cost,
             u=result.mu,
             beta=result.beta,
+            do_fold_beta=dynamic.background.do_fold,
             aux=result.aux,
             contaminants=result.xi,
         )
@@ -181,6 +182,7 @@ class RMLE(Unfolder):
                     cost=result.total_cost,
                     u=result.mu,
                     beta=result.beta,
+                    do_fold_beta=components.components[i].background.do_fold,
                     aux=result.aux,
                     contaminants=result.xi,
                 )

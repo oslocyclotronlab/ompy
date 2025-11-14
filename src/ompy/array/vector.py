@@ -497,13 +497,16 @@ class Vector(AbstractArray, VectorProtocol):
             return self.clone(X=index, values=rebinned)
 
     @overload
-    def cut_like(self, other: Vector, inplace: Literal[False] = ...) -> Self: ...
+    def reshape_like(self, other: Vector, inplace: Literal[False] = ...) -> Self: ...
 
     @overload
-    def cut_like(self, other: Vector, inplace: Literal[True] = ...) -> None: ...
+    def reshape_like(self, other: Vector, inplace: Literal[True] = ...) -> None: ...
 
-    def cut_like(self, other: Vector | Index, inplace: bool = False) -> Self | None:
-        """Cut the vector so its index becomes congruent with ``other``.
+    def reshape_like(self, other: Vector | Index, inplace: bool = False) -> Self | None:
+        """Reshape the vector so its index becomes congruent with ``other``.
+
+        This method cuts the vector to match another vector's binning structure.
+        Both vectors must have the same bin widths and share a congruent lattice.
 
         Args:
             other: Vector (or Index) providing the target binning.
@@ -555,6 +558,207 @@ class Vector(AbstractArray, VectorProtocol):
             return None
         return self.clone(X=target_index, values=values)
 
+    @overload
+    def cut_like(self, other: Vector, inplace: Literal[False] = ..., fill: int | None = None) -> Self: ...
+
+    @overload
+    def cut_like(self, other: Vector, inplace: Literal[True] = ..., fill: int | None = None) -> None: ...
+
+    def cut_like(self, other: Vector | Index, inplace: bool = False, fill: int | None = None) -> Self | None:
+        """Cut the vector to span the same range as ``other``.
+
+        Unlike reshape_like, this method does not require matching bin widths.
+        It only ensures that the vector spans the same range as the other vector/index.
+
+        Args:
+            other: Vector (or Index) providing the target range.
+            inplace: Update this vector in-place when True. Returns a new vector otherwise.
+            fill: Value to use when other has a larger range. If None and other is larger,
+                  raises ValueError. If provided, extends the vector with this fill value.
+
+        Raises:
+            ValueError: If other has a larger range and fill is None.
+        """
+        match other:
+            case Vector():
+                target_index = other._index
+            case Index():
+                target_index = other
+            case _:
+                raise TypeError(f"Cannot cut like {type(other)}")
+
+        # Convert to same units and edge type
+        aligned_target = target_index.to_unit(self._index.unit).to_same_edge(self._index)
+        
+        if len(aligned_target) == 0:
+            raise ValueError("Cannot align to an empty index.")
+        
+        # Get the range boundaries
+        source_left = float(self._index.leftmost)
+        source_right = float(self._index.rightmost)
+        target_left = float(aligned_target.leftmost)
+        target_right = float(aligned_target.rightmost)
+        
+        # Check if target extends beyond source
+        extends_left = target_left < source_left
+        extends_right = target_right > source_right
+        
+        if (extends_left or extends_right) and fill is None:
+            raise ValueError(
+                f"Target has larger range [{target_left}, {target_right}] than source "
+                f"[{source_left}, {source_right}] and no fill value provided."
+            )
+        
+        # Find overlapping range
+        overlap_left = max(source_left, target_left)
+        overlap_right = min(source_right, target_right)
+        
+        if overlap_left >= overlap_right:
+            raise ValueError("No overlap between source and target")
+        
+        # Find indices in source that fall within target range
+        source_bins = self._index.bins
+        mask = (source_bins >= target_left) & (source_bins <= target_right)
+        
+        if not np.any(mask):
+            # No bins in range, try a more lenient check
+            mask = (source_bins >= overlap_left) & (source_bins <= overlap_right)
+        
+        if not np.any(mask):
+            raise ValueError("No bins from source fall within target range")
+        
+        # Get the slice of values
+        indices = np.where(mask)[0]
+        start_idx = indices[0]
+        stop_idx = indices[-1] + 1
+        
+        cut_values = self.values[start_idx:stop_idx]
+        cut_index = self._index[start_idx:stop_idx]
+        
+        # If target is larger and fill is provided, we need to extend
+        if fill is not None and (extends_left or extends_right):
+            # Extend source's binning to cover target's range, keeping source's bin width
+            # Get source's bin width
+            source_dX = self._index.steps()
+            if isinstance(source_dX, np.ndarray):
+                # Non-uniform binning - use the most common bin width
+                bin_width = float(np.median(source_dX))
+            else:
+                bin_width = float(source_dX)
+            
+            # Determine how many bins to add on each side
+            n_left = 0
+            n_right = 0
+            
+            if extends_left:
+                # Calculate bins needed to extend left
+                gap_left = source_left - target_left
+                n_left = int(np.ceil(gap_left / bin_width))
+            
+            if extends_right:
+                # Calculate bins needed to extend right
+                gap_right = target_right - source_right
+                n_right = int(np.ceil(gap_right / bin_width))
+            
+            # Create extended bins array
+            total_bins = len(cut_index) + n_left + n_right
+            
+            # Build the extended index using source's binning class
+            new_leftmost = cut_index.leftmost - n_left * bin_width
+            extended_bins = new_leftmost + np.arange(total_bins) * bin_width
+            # Use cut_index's class to preserve the exact Index type (Left/Mid, Uniform/NonUniform)
+            new_index = cut_index.__class__.from_array(
+                extended_bins,
+                extrapolate_boundary=True,
+                unit=cut_index.unit,
+                label=cut_index.label,
+                alias=cut_index.alias
+            )
+            
+            # Create array with fill values
+            new_values = np.full(len(new_index), fill, dtype=self.values.dtype)
+            
+            # Place cut_values in the correct position
+            # cut_values starts at n_left
+            new_values[n_left:n_left + len(cut_index)] = cut_values
+            
+            if inplace:
+                self.values = new_values
+                self._index = new_index
+                return None
+            return self.clone(X=new_index, values=new_values)
+        else:
+            if inplace:
+                self.values = cut_values
+                self._index = cut_index
+                return None
+            return self.clone(X=cut_index, values=cut_values)
+
+    @overload
+    def align_with(self, other: Vector, fill: None = None) -> tuple[Self, Self]: ...
+
+    @overload
+    def align_with(self, other: Vector, fill: int) -> tuple[Self, Self]: ...
+
+    def align_with(self, other: Vector | Index, fill: int | None = None) -> tuple[Self, Self]:
+        """Align both vectors to a common congruent binning structure.
+        
+        Both vectors are rebinned to the coarser (larger) bin width and cut/extended
+        to a common range, ensuring they become congruent (identical binning structure).
+        
+        Args:
+            other: The vector or index to align with
+            fill: If None, uses intersection of ranges only.
+                  If provided, extends to union of ranges with this fill value.
+        
+        Returns:
+            Tuple of (self_aligned, other_aligned) with congruent binning
+            
+        Raises:
+            ValueError: If there's no overlapping range between vectors
+            
+        Example:
+            >>> v1 = Vector(X=np.arange(0, 100, 2), ...)  # bin width 2
+            >>> v2 = Vector(X=np.arange(20, 80, 5), ...)  # bin width 5
+            >>> v1_aligned, v2_aligned = v1.align_with(v2)
+            >>> # Both now have bin width 5, range [20, 80]
+            >>> v1_aligned.X_index == v2_aligned.X_index  # True
+        """
+        # Get the other as a Vector
+        match other:
+            case Vector():
+                other_vec = other
+            case Index():
+                # Create a dummy vector from index
+                other_vec = Vector(X=other, values=np.zeros(len(other)))
+            case _:
+                raise TypeError(f"Cannot align with {type(other)}")
+        
+        # Translate fill parameter: fill=None → 'intersection', fill=int → 'union'
+        mode = 'intersection' if fill is None else 'union'
+        
+        # Use Index.align_with() to get common index (handles coarser bin width and lattice alignment)
+        common_index = self._index.align_with(other_vec._index, fill=mode)
+        
+        # Rebin both vectors directly to the common index
+        # This automatically handles the lattice alignment
+        v1 = self.rebin(bins=common_index)
+        v2 = other_vec.rebin(bins=common_index)
+        
+        # For union mode with non-zero fill, rebin fills with 0 by default
+        # We need to replace the 0s in extended regions with the fill value
+        if fill is not None and fill != 0:
+            # Identify regions that were extended (outside original range)
+            mask_v1 = (common_index.bins < self._index.leftmost) | (common_index.bins > self._index.rightmost)
+            mask_v2 = (common_index.bins < other_vec._index.leftmost) | (common_index.bins > other_vec._index.rightmost)
+            
+            # Fill extended regions
+            if np.any(mask_v1):
+                v1.values[mask_v1] = fill
+            if np.any(mask_v2):
+                v2.values[mask_v2] = fill
+        
+        return v1, v2
 
     def set_order(self, order: np._OrderKACF) -> None:
         """Wrapper around numpy to set the alignment"""

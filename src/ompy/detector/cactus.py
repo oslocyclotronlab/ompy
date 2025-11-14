@@ -30,7 +30,6 @@ class CACTUS(ResponseDetector):
     @classmethod
     def from_str(cls, version: str = '') -> Self:
         name = refine_name(version)
-        print(name)
         return cls(Response.from_db(name), title=name)
 
     @classmethod

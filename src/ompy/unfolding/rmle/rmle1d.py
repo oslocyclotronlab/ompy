@@ -64,11 +64,13 @@ BackgroundModel object.
 class BackgroundModel:
     loss: ModelLoss = ModelLoss()
     backgrounds: tuple[Background1D, ...] = ()
+    do_fold: bool = False
 
     def __init__(self, backgrounds: Background1D | tuple[Background1D, ...] | list[Background1D] | None = None,
-                 loss: ModelLoss = ModelLoss()):
+                 loss: ModelLoss = ModelLoss(), do_fold: bool = False):
         # Use object.__setattr__ to bypass frozen dataclass restrictions
         object.__setattr__(self, 'loss', loss)
+        object.__setattr__(self, 'do_fold', do_fold)
         if backgrounds is None:
             object.__setattr__(self, 'backgrounds', ())
         elif isinstance(backgrounds, Iterable):
@@ -96,22 +98,24 @@ class BackgroundModel:
         return self.loss == other.loss and same_bg
 
     def clone(self, backgrounds: Background1D | tuple[Background1D, ...] | list[Background1D] | None = None,
-              loss: ModelLoss | None = None) -> Self:
+              loss: ModelLoss | None = None, do_fold: bool | None = None) -> Self:
         if backgrounds is None:
             backgrounds = self.backgrounds
         if loss is None:
             loss = self.loss
-        return BackgroundModel(backgrounds=backgrounds, loss=loss)
+        if do_fold is None:
+            do_fold = self.do_fold
+        return BackgroundModel(backgrounds=backgrounds, loss=loss, do_fold=do_fold)
 
 def flatten_background_model(model: BackgroundModel):
     children = (model.loss, model.backgrounds)  # arrays/dynamic values
-    aux_data = {}  # static values
+    aux_data = {'do_fold': model.do_fold}  # static values
     return children, aux_data
 
 
 def unflatten_background_model(aux_data, children):
     loss, backgrounds = children
-    return BackgroundModel(loss=loss, backgrounds=backgrounds)
+    return BackgroundModel(loss=loss, backgrounds=backgrounds, do_fold=aux_data['do_fold'])
 
 
 jax.tree_util.register_pytree_node(BackgroundModel, 
@@ -151,23 +155,21 @@ def cost(
     mu = tau_map.from_tau(tau)
 
     if len(contaminant_models) > 0:
-        print("Has contaminants")
         c = contaminant_models[0]
         mu_c, contaminant_loss = c.loss(contaminants[0])
         mu = mu + mu_c
     else:
-        print("No contaminants")
         contaminant_loss = 0.0
 
     nu = mu @ GegD
 
     if background.backgrounds:
-        print("Has background")
         beta = tau_map.from_tau(beta_tau)
+        if background.do_fold:
+            beta = beta @ GegD
         loss_bg, penalty_bg = background.cost(beta)
         nu = nu + beta
     else:
-        print("No background")
         loss_bg, penalty_bg = (0.0, 0.0)
 
     likelihood_body = loss.loss(nu, y)

@@ -33,6 +33,8 @@ dependencies = [
   "optax",
   "numba",
   "xarray",  # TODO: This is not really needed
+  "ipywidgets",  # for tqdm
+  "jax-tqdm",
 ]
 
 classifiers = [

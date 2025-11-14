@@ -563,31 +563,17 @@ class Matrix(AbstractArray, MatrixProtocol):
         Y = self.Y_index.to_unit("keV").bins
         save_tar([self.values, Y, X])
 
+    @overload
+    def reshape_like(self, other: Matrix, inplace: Literal[False] = ...) -> Matrix: ...
+
+    @overload
+    def reshape_like(self, other: Matrix, inplace: Literal[True] = ...) -> None: ...
+
     def reshape_like(self, other: Matrix, inplace: bool = False) -> Matrix | None:
-        """Cut and rebin a matrix like another matrix (according to energy arrays)
+        """Reshape the matrix so its axes become congruent with ``other``.
 
-        Args:
-            other (Matrix): The other matrix
-            inplace (bool, optional): If True make the cut in place. Otherwise
-                return a new matrix. Defaults to False.
-
-        Returns:
-            Matrix | None: If inplace is False, returns the cut matrix
-        """
-        if inplace:
-            self.rebin(0, bins=other.X_index, inplace=True)
-            self.rebin(1, bins=other.Y_index, inplace=True)
-        else:
-            return self.rebin(1, bins=other.Y_index).rebin(0, bins=other.X_index)
-
-    @overload
-    def cut_like(self, other: Matrix, inplace: Literal[False] = ...) -> Matrix: ...
-
-    @overload
-    def cut_like(self, other: Matrix, inplace: Literal[True] = ...) -> None: ...
-
-    def cut_like(self, other: Matrix, inplace: bool = False) -> Matrix | None:
-        """Cut the matrix so its axes become congruent with ``other``.
+        This method cuts the matrix to match another matrix's binning structure.
+        Both matrices must have the same bin widths and share a congruent lattice.
 
         Args:
             other: Matrix providing the target binning.
@@ -650,6 +636,227 @@ class Matrix(AbstractArray, MatrixProtocol):
             self.Y_index = y_index
             return None
         return self.clone(X=x_index, Y=y_index, values=values)
+
+    @overload
+    def cut_like(self, other: Matrix, inplace: Literal[False] = ..., fill: int | None = None) -> Matrix: ...
+
+    @overload
+    def cut_like(self, other: Matrix, inplace: Literal[True] = ..., fill: int | None = None) -> None: ...
+
+    def cut_like(self, other: Matrix, inplace: bool = False, fill: int | None = None) -> Matrix | None:
+        """Cut the matrix to span the same range as ``other``.
+
+        Unlike reshape_like, this method does not require matching bin widths.
+        It only ensures that X and Y span the same range as the other matrix.
+
+        Args:
+            other: Matrix providing the target range.
+            inplace: Update this matrix in-place when True. Returns a new matrix otherwise.
+            fill: Value to use when other has a larger range. If None and other is larger,
+                  raises ValueError. If provided, extends the matrix with this fill value.
+
+        Raises:
+            ValueError: If other has a larger range and fill is None.
+        """
+
+        def _cut_axis(
+            source: Index, target: Index, source_values: np.ndarray, axis: int, axis_label: str
+        ) -> tuple[Index, np.ndarray]:
+            # Convert to same units and edge type
+            aligned_target = target.to_unit(source.unit).to_same_edge(source)
+            
+            if len(aligned_target) == 0:
+                raise ValueError(f"Cannot align to empty axis {axis_label!r}.")
+            
+            # Get the range boundaries
+            source_left = float(source.leftmost)
+            source_right = float(source.rightmost)
+            target_left = float(aligned_target.leftmost)
+            target_right = float(aligned_target.rightmost)
+            
+            # Check if target extends beyond source
+            extends_left = target_left < source_left
+            extends_right = target_right > source_right
+            
+            if (extends_left or extends_right) and fill is None:
+                raise ValueError(
+                    f"Target axis {axis_label!r} has larger range "
+                    f"[{target_left}, {target_right}] than source "
+                    f"[{source_left}, {source_right}] and no fill value provided."
+                )
+            
+            # Find overlapping range
+            overlap_left = max(source_left, target_left)
+            overlap_right = min(source_right, target_right)
+            
+            if overlap_left >= overlap_right:
+                raise ValueError(
+                    f"No overlap between source and target on axis {axis_label!r}"
+                )
+            
+            # Find indices in source that fall within target range
+            # We want bins whose centers or edges fall within [target_left, target_right]
+            source_bins = source.bins
+            mask = (source_bins >= target_left) & (source_bins <= target_right)
+            
+            if not np.any(mask):
+                # No bins in range, try a more lenient check
+                mask = (source_bins >= overlap_left) & (source_bins <= overlap_right)
+            
+            if not np.any(mask):
+                raise ValueError(
+                    f"No bins from source fall within target range on axis {axis_label!r}"
+                )
+            
+            # Get the slice of values
+            indices = np.where(mask)[0]
+            start_idx = indices[0]
+            stop_idx = indices[-1] + 1
+            
+            if axis == 0:
+                cut_values = source_values[start_idx:stop_idx, :]
+            else:
+                cut_values = source_values[:, start_idx:stop_idx]
+            
+            cut_index = source[start_idx:stop_idx]
+            
+            # If target is larger and fill is provided, we need to extend
+            if fill is not None and (extends_left or extends_right):
+                # Extend source's binning to cover target's range, keeping source's bin width
+                # Get source's bin width
+                source_dX = source.steps()
+                if isinstance(source_dX, np.ndarray):
+                    # Non-uniform binning - use the most common bin width
+                    bin_width = float(np.median(source_dX))
+                else:
+                    bin_width = float(source_dX)
+                
+                # Determine how many bins to add on each side
+                n_left = 0
+                n_right = 0
+                
+                if extends_left:
+                    # Calculate bins needed to extend left
+                    gap_left = source_left - target_left
+                    n_left = int(np.ceil(gap_left / bin_width))
+                
+                if extends_right:
+                    # Calculate bins needed to extend right
+                    gap_right = target_right - source_right
+                    n_right = int(np.ceil(gap_right / bin_width))
+                
+                # Create extended bins array
+                total_bins = len(cut_index) + n_left + n_right
+                
+                # Build the extended index using source's binning class
+                new_leftmost = cut_index.leftmost - n_left * bin_width
+                extended_bins = new_leftmost + np.arange(total_bins) * bin_width
+                # Use cut_index's class to preserve the exact Index type (Left/Mid, Uniform/NonUniform)
+                new_index = cut_index.__class__.from_array(
+                    extended_bins,
+                    extrapolate_boundary=True,
+                    unit=cut_index.unit,
+                    label=cut_index.label,
+                    alias=cut_index.alias
+                )
+                
+                # Create array with fill values
+                if axis == 0:
+                    new_shape = (len(new_index), source_values.shape[1])
+                else:
+                    new_shape = (source_values.shape[0], len(new_index))
+                new_values = np.full(new_shape, fill, dtype=source_values.dtype)
+                
+                # Place cut_values in the correct position
+                # cut_values starts at n_left
+                if axis == 0:
+                    new_values[n_left:n_left + len(cut_index), :] = cut_values
+                else:
+                    new_values[:, n_left:n_left + len(cut_index)] = cut_values
+                
+                return new_index, new_values
+            else:
+                return cut_index, cut_values
+        
+        # Process both axes
+        x_index, values_x_cut = _cut_axis(self.X_index, other.X_index, self.values, 0, "X")
+        y_index, values_final = _cut_axis(self.Y_index, other.Y_index, values_x_cut, 1, "Y")
+        
+        if inplace:
+            self.values = values_final
+            self.X_index = x_index
+            self.Y_index = y_index
+            return None
+        return self.clone(X=x_index, Y=y_index, values=values_final)
+
+    @overload
+    def align_with(self, other: Matrix, fill: None = None) -> tuple[Matrix, Matrix]: ...
+
+    @overload  
+    def align_with(self, other: Matrix, fill: int) -> tuple[Matrix, Matrix]: ...
+
+    def align_with(self, other: Matrix, fill: int | None = None) -> tuple[Matrix, Matrix]:
+        """Align both matrices to a common congruent binning structure.
+        
+        Both matrices are rebinned to the coarser (larger) bin width and cut/extended
+        to a common range, ensuring they become congruent (identical binning structure).
+        
+        Args:
+            other: The matrix to align with
+            fill: If None, uses intersection of ranges only (no extension).
+                  If provided, extends to union of ranges, filling with this value.
+        
+        Returns:
+            Tuple of (self_aligned, other_aligned) with congruent binning
+            
+        Raises:
+            ValueError: If there's no overlapping range between matrices
+            
+        Example:
+            >>> mat1 = Matrix(X=np.arange(0, 100, 2), ...)  # bin width 2, range [0,100]
+            >>> mat2 = Matrix(X=np.arange(20, 80, 5), ...)  # bin width 5, range [20,80]
+            >>> m1, m2 = mat1.align_with(mat2)  # Intersection
+            >>> # Both now have bin width 5 (coarser), range [20,80] (overlap)
+            >>> m1.X_index == m2.X_index  # True
+            >>> m1.Y_index == m2.Y_index  # True
+            >>> 
+            >>> m1, m2 = mat1.align_with(mat2, fill=0)  # Union with fill
+            >>> # Both now have bin width 5, range [0,100] (full coverage)
+        """
+        # Translate fill parameter: fill=None → 'intersection', fill=int → 'union'
+        mode = 'intersection' if fill is None else 'union'
+        
+        # Use Index.align_with() to get common indices (handles coarser bin width and lattice alignment)
+        common_X = self.X_index.align_with(other.X_index, fill=mode)
+        common_Y = self.Y_index.align_with(other.Y_index, fill=mode)
+        
+        # Rebin both matrices directly to the common indices
+        # This automatically handles the lattice alignment
+        m1 = self.rebin(axis=0, bins=common_X).rebin(axis=1, bins=common_Y)
+        m2 = other.rebin(axis=0, bins=common_X).rebin(axis=1, bins=common_Y)
+        
+        # For union mode with non-zero fill, rebin fills with 0 by default
+        # We need to replace the 0s in extended regions with the fill value
+        if fill is not None and fill != 0:
+            # Identify regions that were extended (outside original range)
+            X_mask_m1 = (common_X.bins < self.X_index.leftmost) | (common_X.bins > self.X_index.rightmost)
+            Y_mask_m1 = (common_Y.bins < self.Y_index.leftmost) | (common_Y.bins > self.Y_index.rightmost)
+            X_mask_m2 = (common_X.bins < other.X_index.leftmost) | (common_X.bins > other.X_index.rightmost)
+            Y_mask_m2 = (common_Y.bins < other.Y_index.leftmost) | (common_Y.bins > other.Y_index.rightmost)
+            
+            # Fill extended regions for m1
+            if np.any(X_mask_m1):
+                m1.values[X_mask_m1, :] = fill
+            if np.any(Y_mask_m1):
+                m1.values[:, Y_mask_m1] = fill
+                
+            # Fill extended regions for m2
+            if np.any(X_mask_m2):
+                m2.values[X_mask_m2, :] = fill
+            if np.any(Y_mask_m2):
+                m2.values[:, Y_mask_m2] = fill
+        
+        return m1, m2
 
     @overload
     def rebin(

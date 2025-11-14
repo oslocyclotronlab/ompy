@@ -713,6 +713,89 @@ class Index(ABC):
     def steps(self) -> FloatArray1D:
         pass
 
+    def align_with(
+        self,
+        other: Index,
+        fill: Literal["intersection"] | int | None = None
+    ) -> Index:
+        """
+        Create a common aligned Index C from this index and another.
+        
+        Properties of C:
+        - bin width dx(C) = max(dx(self), dx(other)) (coarsest)
+        - For intersection (fill=None or 'intersection'): range covers max(left_self, left_other) to min(right_self, right_other)
+        - For union (fill=int): range covers min(left_self, left_other) to max(right_self, right_other)
+        - Aligned to global lattice (origin 0) to ensure self.align_with(other) == other.align_with(self)
+        
+        Args:
+            other: The other Index to align with
+            fill: If None or 'intersection', return intersection. If int, return union.
+        
+        Returns:
+            Index: A new uniform index with the common binning
+        """
+        # Get bin widths - use the coarser (larger) bin width
+        if self.is_uniform():
+            bw_self = float(self.dX)
+        else:
+            # For non-uniform, use median bin width
+            bw_self = float(np.median(self.steps()))
+        
+        if other.is_uniform():
+            bw_other = float(other.dX)
+        else:
+            bw_other = float(np.median(other.steps()))
+        
+        common_bw = max(bw_self, bw_other)
+        
+        # Determine mode and range
+        if fill is None or fill == "intersection":
+            # Intersection mode
+            left = max(float(self.leftmost), float(other.leftmost))
+            right = min(float(self.rightmost), float(other.rightmost))
+            
+            if left >= right:
+                raise ValueError(
+                    f"No overlapping range: [{left}, {right}]"
+                )
+            
+            # Start at first multiple of bw >= left
+            start = np.ceil(left / common_bw) * common_bw
+            n_bins = int(np.floor((right - start) / common_bw))
+        else:
+            # Union mode
+            left = min(float(self.leftmost), float(other.leftmost))
+            right = max(float(self.rightmost), float(other.rightmost))
+            
+            # Start at first multiple of bw <= left
+            start = np.floor(left / common_bw) * common_bw
+            n_bins = int(np.ceil((right - start) / common_bw))
+        
+        if n_bins < 1:
+            raise ValueError(
+                f"Range too small for bin width {common_bw}: [{left}, {right}]"
+            )
+        
+        # Create the common bins
+        common_bins = start + np.arange(n_bins) * common_bw
+        
+        # Use the same Index class as self (prefer uniform)
+        if self.is_uniform():
+            index_cls = type(self)
+        elif other.is_uniform():
+            index_cls = type(other)
+        else:
+            # Both non-uniform, use uniform class
+            index_cls = self.uniform_cls()
+        
+        # Create and return the common index
+        return index_cls.from_array(
+            common_bins,
+            unit=self.unit,
+            label=self.label,
+            alias=self.alias
+        )
+
     @classmethod
     @abstractmethod
     def uniform_cls(cls) -> type[Index]:

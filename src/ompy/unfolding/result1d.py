@@ -35,6 +35,26 @@ class UnfoldedResult1D(Result[Vector]):
     def folded(self, *args, **kwargs) -> Vector:
         return self.GegD.T @ self.unfolded(*args, **kwargs)
 
+    def beta_eta(self, device='gpu?') -> Vector:
+        if self.beta is None:
+            raise ValueError("No beta to fold")
+        if self.do_fold_beta:
+            m = self.beta @ self.G_eg
+        else:
+            return self.beta
+        return self.raw.clone(values=m, name='beta (eta)')
+
+    def beta_nu(self, device='gpu?') -> Vector:
+        if self.beta is None:
+            raise ValueError("No beta to fold")
+        if self.do_fold_beta:
+            m = self.beta @ self.GegD
+        else:
+            return self.beta
+        return self.raw.clone(values=m, name='beta (nu)')
+
+    beta_folded = beta_nu
+
     # @make_axes
     def plot_comparison(self, ax: Axes | None = None,
                         unfolded: bool = True, folded: bool = True,
@@ -302,7 +322,6 @@ class Cost1D(Result[T]):
                 keys = self.aux.keys() if auxiliary else []
             else:
                 keys = auxiliary
-            print(self.aux) 
             aux = {k: self.aux[k][start:] for k in keys
                    if self.aux[k].ndim > 0}
 
